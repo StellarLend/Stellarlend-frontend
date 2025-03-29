@@ -44,7 +44,7 @@ export default function HowItWorks(){
     <section className="w-full bg-black py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-8 lg:px-12">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-6 sm:mb-8 md:mb-10">
-          <h2 className="text-2xl sm:text-3xl md:text-[40px] font-bold text-[#15A350]">How It Works</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-[40px] mx-auto md:mx-0 font-bold text-[#15A350]">How It Works</h2>
           <Link
             href="/lending"
             className="text-[#AAABAB] hidden md:flex items-center border py-2 sm:py-3 px-4 sm:px-8 rounded-lg border-[#1D2025]
