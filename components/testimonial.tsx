@@ -110,7 +110,7 @@ const TestimonialsSection = () => {
   };
 
   return (
-    <div className="bg-black py-20 overflow-hidden">
+    <div className="bg-black py-20 overflow-hidden" id='testimonials'>
       <div className="container mx-auto px-4 my-auto">
         <h2 className="text-5xl font-bold text-[#18BA5B] text-center mb-12">
             Testimonials
