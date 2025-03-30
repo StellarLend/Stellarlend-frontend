@@ -1,4 +1,4 @@
-import Hero from "@/components/Hero";
+
 import HowItWorks from "@/components/HowItWorks";
 import Header from "@/components/Navbar/Navbar";
 import TestimonialsSection from "@/components/testimonial";
