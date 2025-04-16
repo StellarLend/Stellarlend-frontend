@@ -3,7 +3,7 @@ import Header from "@/components/Navbar/Navbar";
 import TestimonialsSection from "@/components/testimonial";
 import ExploreFeatures from "@/components/ExploreFeatures";
 import Hero from "@/components/Hero";
-
+import Footer from "@/components/Footer/Footer";
 export default function Home() {
   return (
     <div className="">
@@ -14,6 +14,7 @@ export default function Home() {
         <ExploreFeatures />
         <TestimonialsSection />
       </main>
+      <Footer/>
     </div>
   );
 }
