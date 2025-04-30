@@ -1,13 +1,11 @@
-"use client";
-
-import React from "react";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
-import Button from "./ui/Button";
-import Image from "next/image";
-import HeroImage from "@/public/images/heroimg1.png";
-import MobileHeroImage from "@/public/images/heromobile.png";
-import { motion } from "framer-motion";
+"use client"
+import Link from "next/link"
+import { ChevronRight } from "lucide-react"
+import Button from "./ui/Button"
+import Image from "next/image"
+import HeroImage from "@/public/images/heroimg1.png"
+import MobileHeroImage from "@/public/images/heromobile.png"
+import { motion } from "framer-motion"
 
 export default function Hero() {
   // Animation variants
@@ -20,7 +18,7 @@ export default function Hero() {
         delayChildren: 0.3,
       },
     },
-  };
+  }
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
@@ -29,7 +27,7 @@ export default function Hero() {
       opacity: 1,
       transition: { duration: 0.5, ease: "easeOut" },
     },
-  };
+  }
 
   const imageVariants = {
     hidden: { scale: 0.95, opacity: 0 },
@@ -38,7 +36,7 @@ export default function Hero() {
       opacity: 1,
       transition: { duration: 0.7, ease: "easeOut", delay: 0.6 },
     },
-  };
+  }
 
   return (
     <motion.div
@@ -67,35 +65,30 @@ export default function Hero() {
             Fast & Secure DeFi Lending on Stellar
           </motion.h1>
 
-          <motion.p
-            className="font-medium texy-sm xl:text-lg text-[#AAABAB] text-center"
-            variants={itemVariants}
-          >
-            Borrow and lend with ultra-low fees, instant settlements, and full
-            transparency—powered by Soroban smart contracts.
+          <motion.p className="font-medium texy-sm xl:text-lg text-[#AAABAB] text-center" variants={itemVariants}>
+            Borrow and lend with ultra-low fees, instant settlements, and full transparency—powered by Soroban smart
+            contracts.
           </motion.p>
 
-          <motion.div
-            className="flex flex-col md:flex-row gap-4"
-            variants={containerVariants}
-          >
+          <motion.div className="flex flex-col md:flex-row gap-4" variants={containerVariants}>
             <motion.div variants={itemVariants}>
-              <Button
-                text="Get a Loan Now"
-                className="bg-[#15A350] 
-                text-[#F8F8F8] text-xs md:text-sm font-medium rounded-lg 
-                flex items-center py-2 sm:py-3 px-4 sm:px-6 cursor-pointer"
-              />
+              <Link href="/lend-borrow">
+                <Button
+                  text="Get a Loan Now"
+                  className="bg-[#15A350] 
+                  text-[#F8F8F8] text-xs md:text-sm font-medium rounded-lg 
+                  flex items-center py-2 sm:py-3 px-4 sm:px-6 cursor-pointer"
+                />
+              </Link>
             </motion.div>
 
             <motion.div variants={itemVariants}>
               <Link
-                href="/lending"
+                href="/lend-borrow"
                 className="text-[#AAABAB] text-xs md:text-sm font-medium flex items-center py-2 sm:py-3 px-4 sm:px-6 
                 hover:text-[#15A350] transition-all duration-300"
               >
-                Start Lending{" "}
-                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 text-[#AAABAB]" />
+                Start Lending <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 text-[#AAABAB]" />
               </Link>
             </motion.div>
           </motion.div>
@@ -103,19 +96,19 @@ export default function Hero() {
 
         <motion.div variants={imageVariants} initial="hidden" animate="visible">
           <Image
-            src={HeroImage}
+            src={HeroImage || "/placeholder.svg"}
             width={1140}
             height={800}
             alt="get a loan"
             className="hidden md:block md:mx-auto"
           />
           <Image
-            src={MobileHeroImage}
+            src={MobileHeroImage || "/placeholder.svg"}
             alt="get a loan"
             className="ml-5 rounded-br-3xl min-[735px]:ml-6 md:hidden"
           />
         </motion.div>
       </div>
     </motion.div>
-  );
+  )
 }
