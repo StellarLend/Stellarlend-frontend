@@ -4,20 +4,19 @@ import Footer from "@/components/Footer";
 import TestimonialsSection from "@/components/testimonial";
 import ExploreFeatures from "@/components/ExploreFeatures";
 import Hero from "@/components/Hero";
-import TopNav from "@/components/Navbar/TopNav";
+
 
 export default function Home() {
   return (
     <div className="">
-      <TopNav />
-      {/* <Header />
+      <Header />
       <main>
         <Hero />
         <HowItWorks />
         <ExploreFeatures />
         <TestimonialsSection />
       </main>
-      <Footer /> */}
+      <Footer />
     </div>
   );
 }
