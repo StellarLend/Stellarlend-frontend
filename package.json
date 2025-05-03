@@ -10,11 +10,13 @@
     "svg": "node scripts/svgToComponent.js"
   },
   "dependencies": {
+    "date-fns": "^4.1.0",
     "framer-motion": "^12.6.2",
     "lucide-react": "^0.484.0",
     "motion": "^12.6.2",
     "next": "15.2.3",
     "react": "^19.0.0",
+    "react-datepicker": "^8.3.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
