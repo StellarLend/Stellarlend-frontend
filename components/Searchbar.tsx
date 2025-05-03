@@ -13,7 +13,7 @@ const Searchbar: React.FC<SearchbarProps> = ({ placeholder = "Search..." }) => {
           placeholder={placeholder}
           className="w-full px-4 py-2 rounded-xl font-semibold text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-[var(--New-outline,#71B48D)] focus:border-transparent hover:border-[var(--New-outline,#71B48D)]"
           style={{
-            border: '1px solid var(--New-outline, #71B48D)',
+            border: '1px solid var(--New-outline,rgb(105, 202, 146))',
           }}
         />
       </div>

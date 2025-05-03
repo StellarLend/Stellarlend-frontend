@@ -18,10 +18,18 @@ const TopNav = () => {
       <div className="flex flex-wrap sm:flex-nowrap items-center w-full sm:w-auto gap-3">
         {/* Network Selector */}
         <div
-  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm"
+  className="flex items-center text-white text-sm"
   style={{
+    width: '135px',
+    height: '43.78125px',
+    gap: '8px',
+    paddingTop: '8px',
+    paddingRight: '12px',
+    paddingBottom: '8px',
+    paddingLeft: '12px',
+    borderRadius: '33.2px',
+    border: '0.33px solid #FFFFFF',
     background: '#FFFFFF1C',
-    border: '0.24px solid #71B48D',
   }}
 >
   <Image src="/icons/stellar.png" alt="Stellar" width={16} height={16} />
@@ -43,17 +51,37 @@ const TopNav = () => {
 
 
 
+
 {/* Wallet Address */}
 <div
-  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-sm"
+  className="flex items-center text-white text-sm"
   style={{
+    width: '139px',
+    height: '43.78125px',
+    gap: '8px',
+    paddingTop: '8px',
+    paddingRight: '12px',
+    paddingBottom: '8px',
+    paddingLeft: '12px',
+    borderRadius: '33.2px',
+    border: '0.33px solid #FFFFFF',
     background: '#FFFFFF1C',
-    border: '0.27px solid #71B48D',
   }}
 >
   <span>Ga2j6...f5g3</span>
-  <svg className="w-3 h-3 text-white color-white  " width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z" fill="#FFFFFF"></path></svg>
-  
+  <svg
+    className="w-3 h-3 text-white"
+    width="10"
+    height="6"
+    viewBox="0 0 10 6"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
+      fill="#FFFFFF"
+    />
+  </svg>
 </div>
 
 
