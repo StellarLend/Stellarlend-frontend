@@ -11,12 +11,12 @@ export default function Dashboard() {
           <h1 className="text-white text-4xl font-bold mb-6 md:mb-0">Dashboard</h1>
 
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <button className="bg-transparent hover:bg-[#0A3D1E] text-white border border-white rounded-lg flex items-center justify-center gap-2 py-3 px-6 transition-colors">
+            <button className="bg-[#087734] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center justify-center gap-2 py-3 px-6 transition-colors">
                 <Image src="/icons/coins-01.svg" alt="Lend" width={20} height={20} />
                 <span>Lend More</span>
             </button>
 
-            <button className="bg-[#40d47e] hover:bg-[#0A3D1E] text-white border border-white rounded-lg flex items-center justify-center gap-2 py-3 px-6 transition-colors">
+            <button className="bg-[#07c456] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center justify-center gap-2 py-3 px-6 transition-colors">
                 <Image src="/icons/bank.svg" alt="Borrow" width={20} height={20} />
                 <span>Borrow Now</span>
             </button>

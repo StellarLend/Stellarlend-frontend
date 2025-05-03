@@ -40,7 +40,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
     <div className={`${cardBg} rounded-xl overflow-hidden`}>
       <div className="p-5 pb-4">
         <div className="flex items-center gap-2 mb-4">
-          <div className="bg-[#15A350] bg-opacity-20 p-1.5 rounded-md flex items-center justify-center">
+          <div className=" bg-opacity-20 p-1.5 rounded-md flex items-center justify-center">
             {icon}
           </div>
           <span className={`${textColor} text-base font-medium`}>{label}</span>
