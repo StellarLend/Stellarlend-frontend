@@ -1,23 +1,25 @@
 import React, { useState, ChangeEvent, MouseEvent } from "react";
 import Image, { StaticImageData } from "next/image";
-import profile from "@/public/images/profile-pic.png";
-import Camera from "@/public/camera-ai-fill.svg"; // adjust the path if needed
+import profile from "@/public/images/p-Picture.jpg";
+import Camera from "@/public/camera-ai-fill.svg"; 
 
 
 const formFields = [
-  { id: "firstName", label: "First Name", placeholder: " John", type: "text" },
-  { id: "lastName", label: "Last Name", placeholder: " Snow", type: "text" },
-  { id: "email", label: "Email", placeholder: "johnsnow@gmail.com", type: "email" },
-  { id: "phone", label: "Phone Number", placeholder: " 555-123-4567", type: "tel" },
-  { id: "id", label: "ID", placeholder: " 12345", type: "text" },
-  { id: "taxId", label: "Tax Verification Number", placeholder: " SSN or EIN", type: "text" },
-  { id: "country", label: "Identification Country", placeholder: " USA", type: "text" },
+  { id: "firstName", label: "First Name", placeholder: "Ex.John", type: "text" },
+  { id: "lastName", label: "Last Name", placeholder: "Ex.Doe", type: "text" },
+  { id: "email", label: "Email", placeholder: "johndoe@gmail.com", type: "email" },
+  { id: "phone", label: "Phone Number", placeholder: " Ex.Doe", type: "tel" },
+  { id: "id", label: "ID", placeholder: " Ex.Doe", type: "text" },
+  { id: "taxId", label: "Tax Verification Number", placeholder: " Ex.Doe", type: "text" },
+  { id: "country", label: "Identification Country", placeholder: " Ex.Doe", type: "text" },
 ];
 
 const ProfileForm: React.FC = () => {
   const [avatar, setAvatar] = useState<string | StaticImageData>(profile);
   const [gender, setGender] = useState<"male" | "female" | "">("");
-  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<Record<string, string>>({
+    address : ''
+  });
 
   // fn to handle profile image manipulations
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -46,7 +48,7 @@ const ProfileForm: React.FC = () => {
         type={type}
         id={id}
         placeholder={placeholder}
-        className="w-full text-[#8F8989] text-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#2600FF]"
+        className="w-full text-gray-900 text-sm  px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-[#2600FF]"
         value={formData[id] || ""}
         onChange={(e) => handleInputChange(id, e.target.value)}
       />
@@ -60,12 +62,12 @@ const ProfileForm: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 flex-grow">
+    <div className="bg-white  md:p-2 flex-grow">
       <h2 className="text-lg font-semibold text-gray-800 mb-6">Profile</h2>
 
       {/* Avatar Section */}
-      <div className="flex flex-col sm:flex-row items-center gap-4 mb-8">
-        <div className="relative sm:w-16 sm:h-16 w-25 h-25 cursor-pointer">
+      <div className="flex  sm:flex-row gap-2 sm:gap-10 mb-8">
+        <div className="relative sm:w-18 sm:h-18 w-20 h-20 cursor-pointer">
           <Image
             src={avatar}
             alt="Profile"
@@ -73,12 +75,12 @@ const ProfileForm: React.FC = () => {
             className="rounded-full object-cover border border-gray-200"
             unoptimized={typeof avatar === "string"}
           />
-          <span className="absolute bottom-0 right-0 text-white bg-[#FFFFFF] rounded-full p-1 sm:w-5 sm:h-5 w-8 h-8 flex items-center justify-center">
+          <span className="absolute bottom-0 right-0 text-white bg-[#FFFFFF] rounded-full p-1 sm:w-7 sm:h-7 w-8 h-8 flex items-center justify-center">
             <Image src={Camera} alt="Upload" width={50} height={50} />
           </span>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3 mt-8">
           <label className="cursor-pointer">
             <input
               type="file"
@@ -86,14 +88,14 @@ const ProfileForm: React.FC = () => {
               className="hidden"
               onChange={handleAvatarUpload}
             />
-            <span className="inline-flex items-center justify-center p-2 sm:px-4 sm:py-2 bg-[#2600FF] text-white rounded-md sm:text-sm text-[12px]">
-              Upload Photo
+            <span className="inline-flex items-center justify-center px-3 py-[5px] sm:px-6 sm:py-[5px] bg-[#2600FF] text-white rounded-md sm:text-sm text-[12px]">
+              Upload New
             </span>
           </label>
           <button
             type="button"
             onClick={() => setAvatar(profile)}
-            className="sm:px-4 sm:py-2 p-2 cursor-pointer bg-[#D9D9D9] hover:bg-red-600 hover:text-white text-gray-700 rounded-md sm:text-sm text-[12px]"
+            className=" px-3 py-[5px] sm:px-6 sm:py-[5px] cursor-pointer bg-[#D9D9D9] hover:bg-red-600 hover:text-white text-gray-700 rounded-md sm:text-sm text-[12px]"
           >
             Delete Avatar
           </button>
@@ -108,25 +110,25 @@ const ProfileForm: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {formFields.slice(2, 4).map(renderInputField)}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 items-center md:grid-cols-2 gap-4">
 
           {/* Gender Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Gender <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-center gap-8 mt-2">
+            <div className="flex items-center justify-between sm:gap-8 mt-2">
               {["male", "female"].map((g) => (
-                <label key={g} className="inline-flex items-center">
+                <label key={g} className="inline-flex gap-12 border-1 border-gray-100  p-2 rounded-md items-center">
+                  <span className="text-sm text-gray-700 capitalize">{g}</span>
                   <input
                     type="radio"
                     name="gender"
                     value={g}
                     checked={gender === g}
                     onChange={() => setGender(g as "male" | "female")}
-                    className="h-4 w-4 text-violet-600"
+                    className="h-4 w-4 text-violet-600 cursor-pointer"
                   />
-                  <span className="ml-2 text-sm text-gray-700 capitalize">{g}</span>
                 </label>
               ))}
             </div>
@@ -148,30 +150,32 @@ const ProfileForm: React.FC = () => {
             id="address"
             placeholder="Address"
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none  focus:border-[#2600FF]"
+            className="w-full px-3 py-2 border text-sm text-gray-900 border-gray-300 rounded-md focus:outline-none focus:border-[#2600FF]"
             value={formData["address"] || ""}
             onChange={(e) => handleInputChange("address", e.target.value)}
           ></textarea>
+
         </div>
 
         {/* Buttons */}
         <div className="flex gap-3">
 
         <button
-            type="button"
-            className="sm:px-12 px-8 py-1 text-sm cursor-pointer hover:bg-[#D9D9D9] bg-white border border-gray-300 text-[#2600FF] rounded-md "
-          >
-            Cancel
-          </button>
-
-          <button
             onClick={handleSubmit}
             type="button"
             className="sm:px-12 px-8 py-1 text-sm cursor-pointer bg-[#2600FF] text-white rounded-md font-medium"
           >
             Save
-          </button>
+        </button>
 
+        <button
+            type="button"
+            className="sm:px-12 px-8 py-1 text-sm cursor-pointer hover:bg-[#D9D9D9] bg-white border border-gray-300 text-[#2600FF] rounded-md "
+          >
+            Cancel
+        </button>
+
+          
         </div>
       </div>
     </div>
