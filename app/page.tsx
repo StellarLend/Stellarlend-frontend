@@ -4,6 +4,7 @@ import Footer from "@/components/Footer";
 import TestimonialsSection from "@/components/testimonial";
 import ExploreFeatures from "@/components/ExploreFeatures";
 import Hero from "@/components/Hero";
+import FastSecure from "@/components/FastSecure";
 
 
 export default function Home() {
@@ -14,6 +15,7 @@ export default function Home() {
         <Hero />
         <HowItWorks />
         <ExploreFeatures />
+        <FastSecure />
         <TestimonialsSection />
       </main>
       <Footer />
