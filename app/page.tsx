@@ -7,7 +7,6 @@ import ExploreFeatures from "@/components/ExploreFeatures";
 import Hero from "@/components/Hero";
 import FastSecure from "@/components/FastSecure";
 
-
 export default function Home() {
   return (
     <div className="">

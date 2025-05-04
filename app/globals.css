@@ -31,3 +31,27 @@ body {
   color: var(--foreground);
   font-family: 'Inter', sans-serif;
 }
+
+.react-datepicker__close-icon::after{
+  background-color: #d1d5dc !important;
+}
+
+.react-datepicker__day--selected{
+  background-color: #d1d5dc !important;
+  color: #000 !important;
+}
+
+.react-datepicker__day--selected:hover{
+  background-color: #d1d5dc4b !important;
+  color: #000 !important;
+}
+
+.react-datepicker__day--today{
+  background-color: #b3bdce !important;
+  color: #000 !important;
+}
+
+.react-datepicker__day--today:hover{
+  background-color: #d1d5dc4b !important;
+  color: #000 !important;
+}
