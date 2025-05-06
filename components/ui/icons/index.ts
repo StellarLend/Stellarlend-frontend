@@ -1,1 +1,1 @@
-export { Dropdown } from './Dropdown';
+export { FastSecure } from './FastSecure';
