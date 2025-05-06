@@ -12,7 +12,7 @@ export default function Account() {
         <Sidebar />
 
         <div className="flex-1 bg-white rounded-lg shadow-sm p-4 md:p-6">
-          {pathname === "/account/profile" && <ProfileForm />}
+          { pathname === "/account/profile" && <ProfileForm /> }
         </div>
       </div>
     </div>

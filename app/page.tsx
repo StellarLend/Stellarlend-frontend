@@ -10,7 +10,7 @@ import FastSecure from "@/components/FastSecure";
 export default function Home() {
   return (
     <div className="">
-        {/* <Navbar/> */}
+      {/* <Navbar/> */ }
       <Header />
       <main>
         <Hero />
