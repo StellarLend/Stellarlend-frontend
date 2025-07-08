@@ -1,5 +1,5 @@
 import React from 'react';
-import TopNav from "@/components/Navbar/TopNav"; // adjust the path based on your folder structure
+import TopNav from "@/components/shared/layout/TopNav";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (

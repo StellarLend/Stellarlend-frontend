@@ -1,6 +1,6 @@
 "use client"
-import ProfileForm from "@/components/account/ProfileForm";
-import Sidebar from "@/components/Navbar/Sidebar";
+import ProfileForm from "@/components/features/account/components/ProfileForm";
+import Sidebar from "@/components/shared/layout/Sidebar";
 import { usePathname } from "next/navigation";
 
 export default function Account() {

@@ -3,15 +3,15 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import useSidebar from "@/context/SidebarContext";
-import { Notification } from "./ui/icons/Notification";
-import { LoginCircleFill } from "./ui/icons";
-import { ArrowLeftRightLine } from "./ui/icons/ArrowLeftRightLine";
-import { DashboardFill } from "./ui/icons/DashboardFill";
-import { ReceiptFill } from "./ui/icons/ReceiptFill";
-import { Settings5Fill } from "./ui/icons/Settings5Fill";
-import { WalletFill } from "./ui/icons/WalletFill";
+import { Notification } from "../ui/icons/Notification";
+import { LoginCircleFill } from "../ui/icons";
+import { ArrowLeftRightLine } from "../ui/icons/ArrowLeftRightLine";
+import { DashboardFill } from "../ui/icons/DashboardFill";
+import { ReceiptFill } from "../ui/icons/ReceiptFill";
+import { Settings5Fill } from "../ui/icons/Settings5Fill";
+import { WalletFill } from "../ui/icons/WalletFill";
 
-export const NavLink = () => {
+export const NavigationMenu = () => {
   const [activeLink, setActiveLink] = useState("dashboard");
   const { isSidebarOpen, isMobile } = useSidebar();
 

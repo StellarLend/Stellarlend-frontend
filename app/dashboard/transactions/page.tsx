@@ -1,4 +1,4 @@
-import RecentTransactions from '@/components/RecentTransactions';
+import RecentTransactions from '@/components/shared/common/RecentTransactions';
 
 export default function TransactionsPage() {
   return (

@@ -3,12 +3,12 @@
 import { ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Dollar } from './ui/icons/Dollar';
-import { ShieldBlockchain } from './ui/icons/ShieldBlockchain';
-import { Zap } from './ui/icons/Zap';
-import { Global } from './ui/icons/Global';
-import { Union } from './ui/icons/Union';
-import { File } from './ui/icons/File';
+import { Dollar } from '../shared/ui/icons/Dollar';
+import { ShieldBlockchain } from '../shared/ui/icons/ShieldBlockchain';
+import { Zap } from '../shared/ui/icons/Zap';
+import { Global } from '../shared/ui/icons/Global';
+import { Union } from '../shared/ui/icons/Union';
+import { File } from '../shared/ui/icons/File';
 
 const features = [
   {

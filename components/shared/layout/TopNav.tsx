@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import Searchbar from '../Searchbar';
+import Searchbar from '../common/Searchbar';
 import { Notification } from '../ui/icons/Notification';
 import { Dropdown } from '../ui/icons';
 

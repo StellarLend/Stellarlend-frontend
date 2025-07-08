@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import Button from "./ui/Button";
+import Button from "../shared/ui/Button";
 import Image from "next/image";
 import HeroImage from "@/public/images/heroimg1.png";
 import MobileHeroImage from "@/public/images/heromobile.png";
