@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import LendingForm from '@/components/lending/LendingForm';
-import BorrowingForm from '@/components/lending/BorrowingForm';
-import InterestCalculator from '@/components/lending/InterestCalculator';
-import TransactionSummary from '@/components/lending/TransactionSummary';
-import ConfirmModal from '@/components/lending/ConfirmModal';
-import TabSelector from '@/components/lending/TabSelector';
+import LendingForm from '@/components/features/lending/components/LendingForm';
+import BorrowingForm from '@/components/features/lending/components/BorrowingForm';
+import InterestCalculator from '@/components/features/lending/components/InterestCalculator';
+import TransactionSummary from '@/components/features/lending/components/TransactionSummary';
+import ConfirmModal from '@/components/features/lending/components/ConfirmModal';
+import TabSelector from '@/components/features/lending/components/TabSelector';
 
 export interface LendingData {
   asset: string;

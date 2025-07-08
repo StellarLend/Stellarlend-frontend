@@ -1,7 +1,7 @@
 "use client"
 import Image from 'next/image';
 
-import MetricsCards from "@/components/dashboard/MetricsCards"
+import MetricsCards from "@/components/features/dashboard/components/MetricsCards"
 
 export default function Dashboard() {
   return (
