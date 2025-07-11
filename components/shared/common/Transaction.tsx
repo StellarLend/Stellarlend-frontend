@@ -151,16 +151,22 @@ export default function Transactions() {
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
     const d = new Date(date + " " + fixedTime);
+
+    //  date for month
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
       day: "2-digit",
       year: "numeric",
     };
+
+    // date for hours and minites
     const dateStr = d.toLocaleDateString("en-US", options);
     let [h, m] = [d.getHours(), d.getMinutes()];
     const ampm = h >= 12 ? "PM" : "AM";
     h = h % 12;
     h = h ? h : 12;
+
+    // time
     const timeStr = `${h.toString().padStart(2, "0")}:${m
       .toString()
       .padStart(2, "0")}${ampm}`;
@@ -226,7 +232,7 @@ export default function Transactions() {
   });
 
   return (
-    <section className="bg-white rounded-t-xl shadow p-8 ">
+    <section className="bg-white rounded-t-xl shadow md:p-8 p-6 ">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
           <div className="relative" ref={searchRef}>
@@ -242,7 +248,7 @@ export default function Transactions() {
                 <input
                   type="text"
                   placeholder="Search by type, amount, asset, id"
-                  className="border rounded px-2 py-1 text-sm w-48 focus:outline-none"
+                  className=" rounded p-1  text-sm w-48 focus:outline-none"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   autoFocus
@@ -258,8 +264,11 @@ export default function Transactions() {
               <ListFilter size={18} />
               <span>Filter</span>
             </div>
+
+
+            {/*  */}
             {showFilter && (
-              <div className="absolute left-0 mt-2 w-32 bg-white border rounded shadow z-10">
+              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 {statusOptions.map((opt) => (
                   <button
                     key={opt}
@@ -286,8 +295,10 @@ export default function Transactions() {
               <ChevronsUpDown size={18} />
               <span>Sort</span>
             </div>
+
+            {/*  */}
             {showSort && (
-              <div className="absolute left-0 mt-2 w-32 bg-white border rounded shadow z-10">
+              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 <button
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
                     sortBy === "date" ? "font-bold text-primary-700" : ""
@@ -326,7 +337,8 @@ export default function Transactions() {
             )}
           </div>
         </div>
-        <div className="flex gap-2 items-center mt-2 sm:mt-0">
+
+        <div className="hidden md:flex gap-2 items-center mt-2 sm:mt-0 text-black/40">
           <DatePicker
             selected={dateFromObj}
             onChange={(date: Date | null) => {
@@ -342,7 +354,7 @@ export default function Transactions() {
               />
             }
             dateFormat="MM-dd-yyyy"
-            className="w-[140px]"
+            className="w-[140px] placeholder:text-sm"
             maxDate={new Date()}
             isClearable
             placeholderText="MM-DD-YYYY"
@@ -369,7 +381,7 @@ export default function Transactions() {
               return "";
             }}
             dateFormat="MM-dd-yyyy"
-            className="w-[140px]"
+            className="w-[140px] placeholder:text-sm"
             maxDate={new Date()}
             isClearable
             placeholderText="MM-DD-YYYY"
@@ -433,6 +445,7 @@ export default function Transactions() {
                   </td>
                 </tr>
               ))}
+
               {filtered.length === 0 && !loading && (
                 <tr>
                   <td colSpan={5} className="text-center py-6">

@@ -9,14 +9,14 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="">
-        <div className="pt-10 border-t px-6 md:px-12 ">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-            <h1 className="text-white md:text-[24px] text-xl font-bold mb-6 md:mb-0">
+        <div className="md:pt-10 md:border-t px-6 md:px-12 flex-col-reverse md:flex-col flex">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center md:mb-8">
+            <h1 className="text-white md:text-[24px] text-xl font-bold mb-6 md:mb-0 md:block hidden">
               Dashboard
             </h1>
 
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <button className="bg-[#087734] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center justify-center gap-2 py-3 px-6 transition-colors">
+            <div className="flex flex-row gap-4 w-full sm:w-auto">
+              <button className="bg-[#087734] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center w-full sm:w-auto justify-center gap-2 py-3 px-6 transition-colors">
                 <Image
                   src="/icons/coins-01.svg"
                   alt="Lend"
@@ -26,7 +26,7 @@ export default function Dashboard() {
                 <span>Lend More</span>
               </button>
 
-              <button className="bg-[#07c456] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center justify-center gap-2 py-3 px-6 transition-colors">
+              <button className="bg-[#07c456] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center w-full sm:w-auto justify-center gap-2 py-3 px-6 transition-colors">
                 <Image
                   src="/icons/bank.svg"
                   alt="Borrow"

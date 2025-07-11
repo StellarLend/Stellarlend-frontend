@@ -24,19 +24,23 @@ export const SideNav = () => {
     <>
       {isSidebarOpen && (
         <motion.aside
-          className={`bg-white dark:bg-[#101010] h-screen border border-[#e5e5e5] dark:border-[#1A1A1A] ${
-            isMobile ? "fixed top-0 left-0 z-50 w-full" : "relative"
-          }`}
+          className={`
+          h-screen 
+          bg-[linear-gradient(to_bottom,_black_0%,_black_65%,_#15A350_100%)]
+          dark:bg-[linear-gradient(to_bottom,_#101010_0%,_#101010_55%,_#15A350_100%)]
+          ${isMobile ? "fixed top-0 left-0 z-50 w-full" : "relative"}
+        `}
           initial={false}
           animate={{
             width: isMobile ? "100%" : "380px", // Sidebar is always expanded now
           }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
+          
           <div className="space-y-6 h-full overflow-y-auto">
             {/* Header section */}
-            <div className="px-6 py-6 flex justify-between items-center border-b border-[#71B48D] ">
-              <h2 className="text-black dark:text-white text-xl font-bold">
+            <div className="p-6 flex justify-between items-center border-b border-[#71B48D] ">
+              <h2 className="text-black dark:text-white text-2xl font-bold">
                 StellarLend
               </h2>
 
