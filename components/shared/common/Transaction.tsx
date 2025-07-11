@@ -12,6 +12,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import Image from "next/image";
+import { Pagination } from "./Pagination";
 
 export type TransactionStatus = "Completed" | "Processing" | "Failed";
 export type Transaction = {
@@ -97,7 +98,11 @@ const statusOptions: (TransactionStatus | "All")[] = [
   "Failed",
 ];
 
-export default function Transactions() {
+interface TransactionsProps {
+  showPagination?: boolean;
+}
+
+export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"All" | TransactionStatus>("All");
@@ -231,6 +236,16 @@ export default function Transactions() {
     );
   });
 
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Or whatever number you prefer
+
+
+  // Calculate paginated data
+  const paginatedTransactions = transactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
@@ -387,6 +402,7 @@ export default function Transactions() {
           />
         </div>
       </div>
+
       <div className="overflow-x-auto">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Loading...</div>
@@ -455,6 +471,17 @@ export default function Transactions() {
             </tbody>
           </table>
         )}
+
+        <div className="">
+          {showPagination && (
+            <Pagination
+              totalItems={18}
+              itemsPerPage={6}
+              currentPage={1}
+              setCurrentPage={setCurrentPage}
+            />
+          )}
+        </div>
       </div>
     </section>
   );

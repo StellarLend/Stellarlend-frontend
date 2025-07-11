@@ -1,9 +1,9 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import Transactions from "./Transaction";
 
 import React from "react";
+import { Transactions } from "./Transaction";
 
 export const RecentTransactions = () => {
   return (
@@ -14,7 +14,7 @@ export const RecentTransactions = () => {
           View All <ArrowRight size={16} />
         </button>
       </div>
-      <Transactions />
+      <Transactions showPagination={false} />
     </section>
   );
 };

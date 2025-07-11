@@ -22,7 +22,7 @@ export const SideNav = () => {
 
   return (
     <>
-      {isSidebarOpen && (
+      {(!isMobile || isSidebarOpen) && (
         <motion.aside
           className={`
           h-screen 
@@ -36,7 +36,6 @@ export const SideNav = () => {
           }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
-          
           <div className="space-y-6 h-full overflow-y-auto">
             {/* Header section */}
             <div className="p-6 flex justify-between items-center border-b border-[#71B48D] ">
@@ -64,6 +63,9 @@ export const SideNav = () => {
                   "Settings",
                   "Lending",
                 ]}
+                onLinkClick={() => {
+                  if (isMobile) closeSidebar(); // Close only on mobile
+                }}
               />
             </div>
           </div>
