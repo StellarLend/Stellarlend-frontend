@@ -59,14 +59,14 @@ const LendIcon = () => (
     <path
       d="M6.66667 13.3333L3.33333 10L6.66667 6.66667"
       stroke="white"
-      stroke-width="1.5"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
       d="M16.6667 10H3.33333"
       stroke="white"
-      stroke-width="1.5"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
@@ -84,14 +84,14 @@ const BorrowIcon = () => (
     <path
       d="M13.3333 6.66667L16.6667 10L13.3333 13.3333"
       stroke="white"
-      stroke-width="1.5"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
       d="M3.33333 10H16.6667"
       stroke="white"
-      stroke-width="1.5"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
     />

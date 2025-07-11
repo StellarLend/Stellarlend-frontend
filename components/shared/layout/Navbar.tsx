@@ -23,9 +23,16 @@ const Header = () => {
 
           {/* Navigation Links - Desktop */}
           <div className="hidden md:flex space-x-6 items-center justify-between px-2">
-            <NavLink className="" href="#how-it-works">How It Works</NavLink>
-            <NavLink className="" href="#features"> Features</NavLink>
-            <NavLink className="" href="#testimonials">Testimonials</NavLink>
+            <NavLink className="" href="#how-it-works">
+              How It Works
+            </NavLink>
+            <NavLink className="" href="#features">
+              {" "}
+              Features
+            </NavLink>
+            <NavLink className="" href="#testimonials">
+              Testimonials
+            </NavLink>
           </div>
           <div className="hidden md:flex text-white space-x-4">
             <button className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350]">
@@ -49,9 +56,16 @@ const Header = () => {
         {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="md:hidden mt-4 flex flex-col space-y-4">
-            <NavLink className="" href="#how-it-works">How It Works</NavLink>
-            <NavLink className="" href="#features"> Features</NavLink>
-            <NavLink className="" href="#testimonials">Testimonials</NavLink>
+            <NavLink className="" href="#how-it-works">
+              How It Works
+            </NavLink>
+            <NavLink className="" href="#features">
+              {" "}
+              Features
+            </NavLink>
+            <NavLink className="" href="#testimonials">
+              Testimonials
+            </NavLink>
             <div className="flex flex-col md:hidden w-fit text-white space-y-4">
               <button className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350]">
                 Launch app

@@ -4,11 +4,11 @@ import { SideNav } from "./SideNav";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="min-h-screen bg-[#15A350] w-full flex">
+    <div className="flex">
       <SideNav />
-      <div className="w-full">
+      <div className="w-full min-h-screen bg-[#15A350] flex flex-col">
         <TopNav />
-        <main className="">{children}</main>
+        <main className="flex-1">{children}</main>
       </div>
     </div>
   );

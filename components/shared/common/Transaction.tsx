@@ -232,7 +232,7 @@ export default function Transactions() {
   });
 
   return (
-    <section className="bg-white rounded-t-xl shadow md:p-8 p-6 ">
+    <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
           <div className="relative" ref={searchRef}>
@@ -264,7 +264,6 @@ export default function Transactions() {
               <ListFilter size={18} />
               <span>Filter</span>
             </div>
-
 
             {/*  */}
             {showFilter && (

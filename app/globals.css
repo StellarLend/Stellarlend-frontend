@@ -1,5 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap');
-@import 'tailwindcss';
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
+@import "tailwindcss";
 
 :root {
   --background: #ffffff;
@@ -27,31 +27,40 @@
 }
 
 body {
+  height: 100%; /* Valid */
+  min-width: 100px; /* Add unit like px or rem */
+  justify-content: center; /* Only one valid value allowed */
+
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
+
+  -webkit-text-size-adjust: auto;  /* ✅ or none */
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+
 }
 
-.react-datepicker__close-icon::after{
+.react-datepicker__close-icon::after {
   background-color: #d1d5dc !important;
 }
 
-.react-datepicker__day--selected{
+.react-datepicker__day--selected {
   background-color: #d1d5dc !important;
   color: #000 !important;
 }
 
-.react-datepicker__day--selected:hover{
+.react-datepicker__day--selected:hover {
   background-color: #d1d5dc4b !important;
   color: #000 !important;
 }
 
-.react-datepicker__day--today{
+.react-datepicker__day--today {
   background-color: #b3bdce !important;
   color: #000 !important;
 }
 
-.react-datepicker__day--today:hover{
+.react-datepicker__day--today:hover {
   background-color: #d1d5dc4b !important;
   color: #000 !important;
 }
