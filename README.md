@@ -1,6 +1,5 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-
 ## Getting Started
 
 First, run the development server:
@@ -34,7 +33,6 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 # SVG to React Component Converter
@@ -44,18 +42,21 @@ This project includes a powerful script to convert SVG files into reusable React
 ## SVG to React Component Converter Guide
 
 ### Prerequisites
+
 - Node.js installed
 - A Next.js project with TypeScript
 
 ### Setup
 
 1. Place the conversion script in your project:
+
 ```bash
 mkdir scripts
 # Copy the svgToComponent.js file into the scripts folder
 ```
 
 2. Add the script to your package.json:
+
 ```json
 {
   "scripts": {
@@ -68,11 +69,13 @@ mkdir scripts
 
 1. Place your SVG files in the `public/images` directory
 2. Run the conversion script:
+
 ```bash
 npm run svg
 ```
 
 The script will:
+
 - Convert all SVG files to React components
 - Create components in `components/ui/icons`
 - Automatically generate/update the barrel file (index.ts)
@@ -82,15 +85,17 @@ The script will:
 ### Example
 
 Let's say you have this SVG file `dollar.svg`:
+
 ```svg
 <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M20 3.33337V36.6667" stroke="#F8F8F8" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M20 3.33337V36.6667" stroke="#F8F8F8" strokeWidth="2.5" strokeLinecap="round"/>
 </svg>
 ```
 
 After running the script, it will:
 
 1. Create `Dollar.tsx`:
+
 ```tsx
 interface DollarProps {
   className?: string;
@@ -98,28 +103,41 @@ interface DollarProps {
   height?: string | number;
 }
 
-export const Dollar = ({ 
-  className = "", 
+export const Dollar = ({
+  className = "",
   width = "40",
-  height = "40"
+  height = "40",
 }: DollarProps) => {
   return (
-    <svg className={className} width={width} height={height} viewBox="0 0 40 40" fill="none">
-      <path d="M20 3.33337V36.6667" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+    <svg
+      className={className}
+      width={width}
+      height={height}
+      viewBox="0 0 40 40"
+      fill="none"
+    >
+      <path
+        d="M20 3.33337V36.6667"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 };
 ```
 
 2. Update `index.ts` automatically:
+
 ```tsx
-export { Dollar } from './Dollar';
+export { Dollar } from "./Dollar";
 // ... other exports will be added automatically as you convert more SVGs
 ```
 
 ### Using the Converted Components
 
 Simply import from the automatically generated barrel file:
+
 ```tsx
 import { Dollar } from '@/components/ui/icons';
 
@@ -156,6 +174,7 @@ import { Dollar } from '@/components/ui/icons';
 ### Troubleshooting
 
 If you encounter issues:
+
 1. Check that your SVG files are properly formatted
 2. Ensure the SVGs are in the correct directory (`public/images`)
 3. Check the console output for specific error messages

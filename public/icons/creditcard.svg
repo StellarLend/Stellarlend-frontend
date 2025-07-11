@@ -1,6 +1,10 @@
 <svg width="121" height="120" viewBox="0 0 121 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M10.667 60C10.667 42.3126 10.667 33.4688 15.931 27.5645C16.7729 26.6201 17.7009 25.7468 18.7043 24.9543C24.9776 20 34.3741 20 53.167 20H68.167C86.96 20 96.3565 20 102.63 24.9543C103.633 25.7468 104.561 26.6201 105.403 27.5645C110.667 33.4688 110.667 42.3126 110.667 60C110.667 77.6875 110.667 86.531 105.403 92.4355C104.561 93.38 103.633 94.253 102.63 95.0455C96.3565 100 86.96 100 68.167 100H53.167C34.3741 100 24.9776 100 18.7043 95.0455C17.7009 94.253 16.7729 93.38 15.931 92.4355C10.667 86.531 10.667 77.6875 10.667 60Z" stroke="#15A350" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M50.667 80H58.167" stroke="#15A350" stroke-width="7.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M73.167 80H90.667" stroke="#15A350" stroke-width="7.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10.667 45H110.667" stroke="#15A350" stroke-width="7.5" stroke-linejoin="round"/>
+    <path
+        d="M10.667 60C10.667 42.3126 10.667 33.4688 15.931 27.5645C16.7729 26.6201 17.7009 25.7468 18.7043 24.9543C24.9776 20 34.3741 20 53.167 20H68.167C86.96 20 96.3565 20 102.63 24.9543C103.633 25.7468 104.561 26.6201 105.403 27.5645C110.667 33.4688 110.667 42.3126 110.667 60C110.667 77.6875 110.667 86.531 105.403 92.4355C104.561 93.38 103.633 94.253 102.63 95.0455C96.3565 100 86.96 100 68.167 100H53.167C34.3741 100 24.9776 100 18.7043 95.0455C17.7009 94.253 16.7729 93.38 15.931 92.4355C10.667 86.531 10.667 77.6875 10.667 60Z"
+        stroke="#15A350" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M50.667 80H58.167" stroke="#15A350" strokeWidth="7.5" stroke-miterlimit="10" strokeLinecap="round"
+        strokeLinejoin="round" />
+    <path d="M73.167 80H90.667" stroke="#15A350" strokeWidth="7.5" stroke-miterlimit="10" strokeLinecap="round"
+        strokeLinejoin="round" />
+    <path d="M10.667 45H110.667" stroke="#15A350" strokeWidth="7.5" strokeLinejoin="round" />
 </svg>

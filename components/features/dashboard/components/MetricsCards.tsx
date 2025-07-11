@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { Copy } from "lucide-react";
 
@@ -37,55 +39,67 @@ const MetricCard: React.FC<MetricCardProps> = ({
   const iconBgColor = isPrimary ? "bg-[#14532D]" : "bg-[#065F3A]";
 
   return (
-    <div className={`${cardBg} rounded-xl overflow-hidden`}>
-      <div className="p-5 pb-4">
+    <div
+      className={`
+        ${cardBg} rounded-xl overflow-hidden p-4 transform transition-transform
+        hover:scale-[1.02] active:scale-[1.03] min-w-[345px] w-full border-[#71B48D33] my-6
+        cursor-pointer
+      `}
+    >
+      <div>
         <div className="flex items-center gap-2 mb-4">
-          <div className="bg-opacity-20 p-1.5 rounded-md flex items-center justify-center">
+          <div className="bg-opacity-20 rounded-md flex items-center justify-center">
             {icon}
           </div>
-          <span className={`${textColor} text-base font-medium`}>{label}</span>
+          <span className={`${textColor} text-sm font-medium`}>{label}</span>
         </div>
-        <h3 className={`${textColor} text-[32px] font-bold mb-4`}>{value}</h3>
+        <h3 className={`${textColor} text-[28px] font-bold mb-4`}>
+          {value}
+        </h3>
       </div>
 
       {(subLabel || copyValue) && (
-        <div className={`${subBg} h-14 px-6 flex items-center justify-between`}>
+        <div
+          className={`${subBg} h-14 px-6 text-sm flex items-center rounded-xl justify-between`}
+        >
           {subLabel && subValue ? (
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-1">
-                <span className={`${subLabelColor} text-lg font-medium`}>
-                  {subLabel}
-                </span>
-                <span className="text-white text-lg font-medium">·</span>
-                <span className={`${textColor} text-lg font-medium`}>
-                  {subValue}
-                </span>
-              </div>
+            <div className="flex items-center gap-1">
+              <span className={`${subLabelColor} text-sm font-medium`}>
+                {subLabel}
+              </span>
+              <span className="text-white font-medium">·</span>
+              <span className={`${textColor} text-sm font-medium`}>
+                {subValue}
+              </span>
             </div>
           ) : copyValue ? (
             <div className="flex items-center justify-between w-full min-w-0 flex-nowrap">
-  <div className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
-    <span className={`${subLabelColor} text-sm md:text-base font-medium shrink-0`}>
-      Copy Address
-    </span>
-    <span className="text-white font-medium shrink-0">·</span>
-    <span className={`${textColor} text-sm md:text-base font-medium truncate`}>
-      {copyValue}
-    </span>
-  </div>
-  <button
-    onClick={handleCopy}
-    className={`${iconBgColor} hover:bg-opacity-80 rounded-md w-9 h-9 flex items-center justify-center transition-all ml-2 shrink-0`}
-    aria-label="Copy address to clipboard"
-  >
-    {isCopied ? (
-      <span className="text-green-200 text-xs">Copied!</span>
-    ) : (
-      <Copy size={20} className="text-green-100" />
-    )}
-  </button>
-</div>
-
+              <div className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+                <span
+                  className={`${subLabelColor} text-sm font-medium shrink-0`}
+                >
+                  Copy Address
+                </span>
+                <span className="text-white font-medium shrink-0">·</span>
+                <span className={`${textColor} text-sm font-medium truncate`}>
+                  {copyValue}
+                </span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent bubbling to parent
+                  handleCopy();
+                }}
+                className={`${iconBgColor} hover:bg-opacity-80 rounded-md w-9 h-9 flex items-center justify-center transition-all ml-2 shrink-0`}
+                aria-label="Copy address to clipboard"
+              >
+                {isCopied ? (
+                  <span className="text-green-200 text-xs">Copied!</span>
+                ) : (
+                  <Copy size={20} className="text-green-100" />
+                )}
+              </button>
+            </div>
           ) : null}
         </div>
       )}
@@ -95,28 +109,44 @@ const MetricCard: React.FC<MetricCardProps> = ({
 
 export default function MetricsCards() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-      <MetricCard
-        isPrimary={true}
-        icon={<img src="/icons/icon.svg" alt="Wallet Icon" className="w-5 h-5" />}
-        label="Available Balance"
-        value="$3,750.00 XLM"
-        copyValue="BaDE1b2U45...670UzZ"
-      />
-      <MetricCard
-        icon={<img src="/icons/icon-11.svg" alt="Dollar Icon" className="w-5 h-5" />}
-        label="Total Borrowed Amount"
-        value="$1,500.00 XLM"
-        subLabel="Next Due Payment"
-        subValue="$250.00 in 4 days"
-      />
-      <MetricCard
-        icon={<img src="/icons/icon-11.svg" alt="Dollar Icon" className="w-5 h-5" />}
-        label="Total Supplied Funds"
-        value="$5,000.00 XLM"
-        subLabel="Earnings from Lending"
-        subValue="$95.00 XLM"
-      />
+    <div className="overflow-x-auto w-full">
+      <div className="flex gap-3 w-full grid-cols-3">
+        <MetricCard
+          isPrimary
+          icon={
+            <img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />
+          }
+          label="Available Balance"
+          value="$3,750.00 XLM"
+          copyValue="BaDE1b2U45...670UzZ"
+        />
+        <MetricCard
+          icon={
+            <img
+              src="/icons/Icon-11.svg"
+              alt="Dollar Icon"
+              className="w-6 h-6"
+            />
+          }
+          label="Total Borrowed Amount"
+          value="$1,500.00 XLM"
+          subLabel="Next Due Payment"
+          subValue="$250.00 in 4 days"
+        />
+        <MetricCard
+          icon={
+            <img
+              src="/icons/Icon-11.svg"
+              alt="Dollar Icon"
+              className="w-6 h-6"
+            />
+          }
+          label="Total Supplied Funds"
+          value="$5,000.00 XLM"
+          subLabel="Earnings from Lending"
+          subValue="$95.00 XLM"
+        />
+      </div>
     </div>
   );
 }
