@@ -1,8 +1,6 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import useSidebar from "@/context/SidebarContext";
 import { Notification } from "../ui/icons/Notification";
 import { LoginCircleFill } from "../ui/icons";
 import { ArrowLeftRightLine } from "../ui/icons/ArrowLeftRightLine";
@@ -17,11 +15,14 @@ import Link from "next/link";
 
 type NavigationMenuProps = {
   visibleLinks?: string[];
+  onLinkClick?: () => void; // ✅ optional function
 };
 
-export const NavigationMenu = ({ visibleLinks }: NavigationMenuProps) => {
+export const NavigationMenu = ({
+  visibleLinks,
+  onLinkClick,
+}: NavigationMenuProps) => {
   const [activeLink, setActiveLink] = useState("dashboard");
-  const { isSidebarOpen, isMobile } = useSidebar();
 
   useEffect(() => {
     const savedLink = localStorage.getItem("activeLink");
@@ -43,10 +44,13 @@ export const NavigationMenu = ({ visibleLinks }: NavigationMenuProps) => {
       path: "/dashboard/loan",
       icon: (color: string) => <Bank color={color} />,
     },
-    { link: "Lending", icon: (color: string) => <CoinIcon color={color} /> },
+    {
+      link: "Lending",
+      icon: (color: string) => <CoinIcon color={color} />,
+    },
     {
       link: "Cash and receipt",
-      path: "/dashboard/",
+      path: "/dashboard",
       icon: (color: string) => <ReceiptFill color={color} />,
     },
     {
@@ -56,7 +60,7 @@ export const NavigationMenu = ({ visibleLinks }: NavigationMenuProps) => {
     },
     {
       link: "Notification",
-      path: "/dashboard/",
+      path: "/dashboard",
       icon: (color: string) => <Notification color={color} />,
     },
     {
@@ -74,19 +78,18 @@ export const NavigationMenu = ({ visibleLinks }: NavigationMenuProps) => {
     ? links.filter((l) => visibleLinks.includes(l.link))
     : links;
 
-  const transactionNotification = 10;
+  const handleClick = (linkName: string) => {
+    setActiveLink(linkName);
+    localStorage.setItem("activeLink", linkName);
+    onLinkClick?.(); // ✅ optional call
+  };
 
   return (
     <nav>
       <ul className="space-y-1 flex items-center flex-col">
-        {filteredLinks.map((link, index) => {
+        {filteredLinks.map((link) => {
           const isActive = activeLink.toLowerCase() === link.link.toLowerCase();
           const iconColor = "#1C1A1A";
-
-          const handleClick = () => {
-            setActiveLink(link.link);
-            localStorage.setItem("activeLink", link.link);
-          };
 
           return (
             <Link
@@ -95,11 +98,10 @@ export const NavigationMenu = ({ visibleLinks }: NavigationMenuProps) => {
               className="w-full"
             >
               <li
-                key={index}
-                onClick={handleClick}
-                className={`cursor-pointer py-4 px-3 w-full relative rounded-lg flex justify-between items-center transition-colors duration-150
-                ${isActive ? "bg-[#15A350] " : "hover:bg-[#94e0b4a9]"}
-              `}
+                onClick={() => handleClick(link.link)}
+                className={`cursor-pointer py-4 px-3 w-full relative rounded-lg flex justify-between items-center transition-colors duration-150 ${
+                  isActive ? "bg-[#15A350]" : "hover:bg-[#94e0b4a9]"
+                }`}
               >
                 <div className="flex gap-3 items-center relative z-20">
                   {link.icon(iconColor)}

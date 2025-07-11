@@ -5,7 +5,7 @@ import { DashboardLayout } from "@/components";
 import TransactionsTable from "@/components/shared/common/Transaction";
 
 // Import both the fetch function and the type
-import { fetchTransactions, type Transaction } from "@/components/shared/common/RecentTransactions";
+import { fetchTransactions, type Transaction } from "@/components/shared/common/Transaction";
 import { Bank } from "@/components/shared/ui/icons/Bank";
 
 export default function TransactionsPage() {
@@ -36,7 +36,7 @@ export default function TransactionsPage() {
           </div>
         </div>
       </div>
-      <TransactionsTable data={transactions} />
+      <TransactionsTable  />
     </DashboardLayout>
   );
 }

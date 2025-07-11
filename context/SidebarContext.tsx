@@ -11,60 +11,73 @@ import {
 
 interface SidebarContextProps {
   isSidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+  closeSidebar: () => void;
   isMobile: boolean;
 }
 
-const SidebarContext = createContext<SidebarContextProps | undefined>(undefined);
+const SidebarContext = createContext<SidebarContextProps | undefined>(
+  undefined
+);
 
-interface SidebarProviderProps {
-  children: ReactNode;
-}
+export const SidebarProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const [isMobile, setIsMobile] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-export const SidebarProvider: FC<SidebarProviderProps> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("sidebarOpen");
-      return saved !== null ? saved === "true" : true;
-    }
-    return true;
-  });
-
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-
-  // Update mobile state on window resize
   useEffect(() => {
+    // Check mobile status after component mounts
     const checkIsMobile = () => {
       setIsMobile(window.innerWidth < 768);
+      // Close sidebar by default on mobile
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      }
     };
 
     checkIsMobile();
+
+    // Load saved state only after we know we're on client
+    const saved = localStorage.getItem("sidebarOpen");
+    if (saved !== null) {
+      setIsSidebarOpen(saved === "true");
+    }
+
     window.addEventListener("resize", checkIsMobile);
     return () => window.removeEventListener("resize", checkIsMobile);
   }, []);
 
-  // Save sidebar state to localStorage
   useEffect(() => {
-    localStorage.setItem("sidebarOpen", isSidebarOpen.toString());
-  }, [isSidebarOpen]);
+    if (!isMobile) {
+      localStorage.setItem("sidebarOpen", isSidebarOpen.toString());
+    }
+  }, [isSidebarOpen, isMobile]);
 
-  // Explicit wrapper for setting sidebar open state
-  const setSidebarOpen = (open: boolean) => {
-    setIsSidebarOpen(open);
+  const toggleSidebar = () => {
+    setIsSidebarOpen((prev) => !prev);
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
   };
 
   return (
-    <SidebarContext.Provider value={{ isSidebarOpen, setSidebarOpen, isMobile }}>
+    <SidebarContext.Provider
+      value={{
+        isSidebarOpen,
+        toggleSidebar,
+        closeSidebar,
+        isMobile,
+      }}
+    >
       {children}
     </SidebarContext.Provider>
   );
 };
 
-const useSidebar = (): SidebarContextProps => {
+export const useSidebar = () => {
   const context = useContext(SidebarContext);
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider");
   }
   return context;
 };
-export default useSidebar;

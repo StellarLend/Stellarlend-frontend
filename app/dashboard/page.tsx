@@ -2,12 +2,8 @@
 import Image from "next/image";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
-import {
-  DashboardLayout,
-  RecentTransactions,
-  SideNav,
-  TopNav,
-} from "@/components";
+import { DashboardLayout } from "@/components";
+import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
 
 export default function Dashboard() {
   return (
@@ -43,7 +39,8 @@ export default function Dashboard() {
           </div>
           <MetricsCards />
         </div>
-        <div className="pt-8">
+
+        <div className="pt-8 ">
           <RecentTransactions />
         </div>
       </div>
