@@ -46,11 +46,12 @@ export const NavigationMenu = ({
     },
     {
       link: "Lending",
+      path: "/dashboard/lending",
       icon: (color: string) => <CoinIcon color={color} />,
     },
     {
       link: "Cash and receipt",
-      path: "/dashboard",
+      path: "/dashboard/receipt",
       icon: (color: string) => <ReceiptFill color={color} />,
     },
     {
@@ -60,7 +61,7 @@ export const NavigationMenu = ({
     },
     {
       link: "Notification",
-      path: "/dashboard",
+      path: "/dashboard/notification",
       icon: (color: string) => <Notification color={color} />,
     },
     {
