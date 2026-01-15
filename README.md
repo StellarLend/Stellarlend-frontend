@@ -1,183 +1,300 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stellarlend
 
-## Getting Started
+**Fast & Secure DeFi Lending on Stellar**
 
-First, run the development server:
+Stellarlend is a decentralized finance (DeFi) lending platform built on the Stellar blockchain. It enables users to borrow and lend digital assets with ultra-low fees, instant settlements, and full transparency—powered by Soroban smart contracts. The platform is designed for both crypto-native users and those new to DeFi, offering an intuitive interface for managing lending and borrowing operations on one of the most efficient blockchain networks.
+
+This frontend application provides a modern, responsive web interface for interacting with the Stellarlend protocol, featuring real-time transaction tracking, interest rate calculations, and comprehensive dashboard analytics.
+
+## 🚀 Features
+
+- **Lending & Borrowing**: Earn interest by lending assets or borrow against collateral
+- **Multi-Asset Support**: Support for XLM, USDC, BTC, ETH, and other Stellar-based assets
+- **Real-Time Calculations**: Dynamic interest rate and payment calculations
+- **Transaction Management**: Track all lending, borrowing, and payment transactions
+- **Dashboard Analytics**: Comprehensive metrics and insights
+- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
+- **Component Library**: Built with Storybook for component development and documentation
+
+## 📋 Requirements
+
+- **Node.js**: v18.0.0 or higher
+- **Package Manager**: npm, yarn, pnpm, or bun
+- **Git**: For version control
+
+## 🛠️ Setup Instructions
+
+### 1. Clone the Repository
 
 ```bash
+git clone <repository-url>
+cd Stellarlend-frontend
+```
+
+### 2. Install Dependencies
+
+Choose your preferred package manager:
+
+```bash
+# Using npm
+npm install
+
+# Using yarn
+yarn install
+
+# Using pnpm (recommended)
+pnpm install
+
+# Using bun
+bun install
+```
+
+### 3. Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your configuration:
+
+```env
+# Stellar Network Configuration
+NEXT_PUBLIC_STELLAR_NETWORK=testnet
+NEXT_PUBLIC_HORIZON_URL=https://horizon-testnet.stellar.org
+
+# API Configuration (if applicable)
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+
+# Feature Flags
+NEXT_PUBLIC_ENABLE_ANALYTICS=false
+```
+
+> **Note**: For production, use the Stellar mainnet configuration and secure your environment variables.
+
+### 4. Run the Development Server
+
+```bash
+# Using npm
 npm run dev
-# or
+
+# Using yarn
 yarn dev
-# or
+
+# Using pnpm
 pnpm dev
-# or
+
+# Using bun
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-# SVG to React Component Converter
-
-This project includes a powerful script to convert SVG files into reusable React components. Below you'll find detailed instructions on how to use it.
-
-## SVG to React Component Converter Guide
-
-### Prerequisites
-
-- Node.js installed
-- A Next.js project with TypeScript
-
-### Setup
-
-1. Place the conversion script in your project:
+### 5. Build for Production
 
 ```bash
-mkdir scripts
-# Copy the svgToComponent.js file into the scripts folder
+npm run build
+npm start
 ```
 
-2. Add the script to your package.json:
+## 🧪 Testing
 
-```json
-{
-  "scripts": {
-    "svg": "node scripts/svgToComponent.js"
-  }
-}
+### Run Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with coverage
+npm test -- --coverage
 ```
 
-### Usage
+### Component Testing with Storybook
 
-1. Place your SVG files in the `public/images` directory
-2. Run the conversion script:
+```bash
+# Start Storybook development server
+npm run storybook
+
+# Build Storybook for static hosting
+npm run build-storybook
+```
+
+Storybook will be available at [http://localhost:6006](http://localhost:6006)
+
+## 📁 Project Structure
+
+```
+Stellarlend-frontend/
+├── app/                      # Next.js App Router pages
+│   ├── account/             # User account pages
+│   ├── dashboard/           # Dashboard pages
+│   ├── lending/             # Lending & borrowing pages
+│   └── layout.tsx           # Root layout
+├── components/              # React components
+│   ├── atoms/              # Atomic design: smallest components
+│   ├── molecules/          # Composite components
+│   ├── organisms/          # Complex components
+│   ├── features/           # Feature-specific components
+│   │   ├── account/        # Account feature components
+│   │   ├── dashboard/      # Dashboard feature components
+│   │   └── lending/        # Lending feature components
+│   ├── marketing/          # Marketing page components
+│   └── shared/             # Shared components
+│       ├── ui/             # UI components (buttons, icons, etc.)
+│       ├── layout/         # Layout components (navbar, sidebar, etc.)
+│       └── common/         # Common utility components
+├── constants/              # Application constants
+│   └── design-tokens.ts   # Design system tokens
+├── context/               # React context providers
+│   └── SidebarContext.tsx
+├── lib/                   # Utility libraries
+│   ├── auth.ts            # Authentication utilities
+│   ├── utils/             # Utility functions
+│   │   ├── cn.ts          # Class name utilities (Tailwind merge)
+│   │   └── index.ts       # Utils barrel export
+│   └── index.ts           # Lib barrel export
+├── types/                 # TypeScript type definitions
+│   ├── Transaction.ts     # Transaction-related types
+│   ├── common.ts          # Common utility types
+│   └── index.ts           # Types barrel export
+├── public/                # Static assets
+│   ├── icons/             # Icon assets
+│   └── images/            # Image assets
+├── scripts/               # Build and utility scripts
+│   ├── svgToComponent.js  # SVG to React component converter
+│   └── generate-component.js
+├── test/                 # Test utilities and helpers
+│   ├── test-utils.tsx
+│   └── component-helpers.ts
+└── stories/              # Storybook stories
+```
+
+## 🎨 Component Development
+
+### Generate New Components
+
+We use [Plop](https://plopjs.com/) for component scaffolding:
+
+```bash
+npm run generate-component
+```
+
+Follow the prompts to create a new component with proper structure, tests, and Storybook stories.
+
+### Convert SVG to React Components
+
+Place SVG files in `public/images` and run:
 
 ```bash
 npm run svg
 ```
 
-The script will:
+This will automatically convert SVGs to React components in `components/shared/ui/icons/`.
 
-- Convert all SVG files to React components
-- Create components in `components/ui/icons`
-- Automatically generate/update the barrel file (index.ts)
-- Delete the original SVG files after successful conversion
-- Show progress and results in the console
+## 🔗 Helpful Links
 
-### Example
+### Documentation
+- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
+- [React Documentation](https://react.dev) - React library documentation
+- [TypeScript Documentation](https://www.typescriptlang.org/docs/) - TypeScript language reference
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs) - Utility-first CSS framework
+- [Stellar Documentation](https://developers.stellar.org/docs) - Stellar blockchain development guide
+- [Soroban Documentation](https://soroban.stellar.org/docs) - Soroban smart contracts
 
-Let's say you have this SVG file `dollar.svg`:
+### Development Tools
+- [Storybook](https://storybook.js.org/docs) - Component development environment
+- [Vitest](https://vitest.dev) - Fast unit test framework
+- [Playwright](https://playwright.dev) - End-to-end testing framework
 
-```svg
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M20 3.33337V36.6667" stroke="#F8F8F8" strokeWidth="2.5" strokeLinecap="round"/>
-</svg>
+### Design & Styling
+- [Framer Motion](https://www.framer.com/motion/) - Animation library
+- [Lucide Icons](https://lucide.dev) - Icon library
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for detailed guidelines.
+
+**Quick Start:**
+1. **Fork the repository** and create a feature branch
+2. **Follow the code style** - We use ESLint and Prettier (configured with Husky pre-commit hooks)
+3. **Write tests** for new features and bug fixes
+4. **Update documentation** as needed
+5. **Submit a pull request** with a clear description of changes
+
+### Code Style
+
+- **Linting**: Run `npm run lint` before committing
+- **Formatting**: Prettier is configured to run automatically on commit
+- **TypeScript**: Strict mode enabled - ensure all types are properly defined
+
+### Commit Guidelines
+
+We use [Conventional Commits](https://www.conventionalcommits.org/). Examples:
+- `feat: add new lending form component`
+- `fix: resolve transaction status display issue`
+- `docs: update README with setup instructions`
+
+For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## 🚢 Deployment
+
+### Vercel (Recommended)
+
+The easiest way to deploy is using [Vercel](https://vercel.com):
+
+1. Push your code to GitHub
+2. Import the repository in Vercel
+3. Configure environment variables
+4. Deploy!
+
+### Manual Deployment
+
+```bash
+# Build the application
+npm run build
+
+# Start production server
+npm start
 ```
 
-After running the script, it will:
+For more deployment options, see the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying).
 
-1. Create `Dollar.tsx`:
+## 📝 Scripts Reference
 
-```tsx
-interface DollarProps {
-  className?: string;
-  width?: string | number;
-  height?: string | number;
-}
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run tests with Vitest |
+| `npm run storybook` | Start Storybook |
+| `npm run build-storybook` | Build Storybook for static hosting |
+| `npm run svg` | Convert SVG files to React components |
+| `npm run generate-component` | Generate new component scaffold |
 
-export const Dollar = ({
-  className = "",
-  width = "40",
-  height = "40",
-}: DollarProps) => {
-  return (
-    <svg
-      className={className}
-      width={width}
-      height={height}
-      viewBox="0 0 40 40"
-      fill="none"
-    >
-      <path
-        d="M20 3.33337V36.6667"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-};
-```
+## 🔒 Security
 
-2. Update `index.ts` automatically:
+- Never commit `.env.local` or any files containing secrets
+- Use environment variables for all sensitive configuration
+- Regularly update dependencies to patch security vulnerabilities
+- Review and audit smart contract interactions before production use
 
-```tsx
-export { Dollar } from "./Dollar";
-// ... other exports will be added automatically as you convert more SVGs
-```
+## 📄 License
 
-### Using the Converted Components
+[Add your license information here]
 
-Simply import from the automatically generated barrel file:
+## 🙋 Support
 
-```tsx
-import { Dollar } from '@/components/ui/icons';
+For questions, issues, or feature requests:
+- Open an issue on GitHub
+- Contact the development team
+- Check the documentation links above
 
-// Basic usage
-<Dollar />
+---
 
-// With custom size
-<Dollar width={32} height={32} />
-
-// With color
-<Dollar className="text-blue-500" />
-
-// With hover effect
-<Dollar className="text-gray-400 hover:text-blue-500 transition-colors" />
-```
-
-### Features
-
-- ✨ Automatic conversion of SVG files to TypeScript components
-- 🎨 Support for dynamic colors via currentColor
-- 📏 Configurable dimensions through props
-- 🧩 TypeScript interfaces for proper typing
-- 🧹 Automatic cleanup of original SVG files
-- 📦 Automatic barrel file (index.ts) generation and updates
-- 🔄 Automatic conversion of kebab-case attributes to camelCase
-
-### Best Practices
-
-1. Use meaningful names for your SVG files
-2. Keep your SVGs optimized (you can use tools like SVGO)
-3. Use consistent dimensions in your SVGs when possible
-4. Leverage Tailwind classes for styling when possible
-
-### Troubleshooting
-
-If you encounter issues:
-
-1. Check that your SVG files are properly formatted
-2. Ensure the SVGs are in the correct directory (`public/images`)
-3. Check the console output for specific error messages
-4. Verify that the SVG doesn't contain unsupported features
-
-For more information, check the [CHANGELOG.md](./CHANGELOG.md) file.
+**Built with ❤️ for the Stellar ecosystem**
