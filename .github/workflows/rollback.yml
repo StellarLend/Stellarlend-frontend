@@ -1,0 +1,116 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to rollback to'
+        required: true
+        type: string
+      reason:
+        description: 'Reason for rollback'
+        required: false
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_APP_ENV: ${{ github.event.inputs.environment }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ github.event.inputs.environment == 'production' && secrets.PRODUCTION_API_URL || secrets.STAGING_API_URL }}
+
+      - name: Deploy rollback to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: ${{ github.event.inputs.environment == 'production' && '--prod' || '' }}
+
+      - name: Verify rollback
+        run: |
+          sleep 30  # Wait for deployment to propagate
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            url="https://stellarlend.com"
+          else
+            url="https://stellarlend-staging.vercel.app"
+          fi
+          
+          response=$(curl -s -o /dev/null -w "%{http_code}" $url)
+          if [ "$response" != "200" ]; then
+            echo "Rollback verification failed - site not responding"
+            exit 1
+          fi
+          
+          echo "Rollback verification successful"
+
+      - name: Create rollback issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: issue } = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔄 Rollback: ${{ github.event.inputs.environment }} to ${{ github.event.inputs.version }}`,
+              body: `## Rollback Executed
+              
+              **Environment:** ${{ github.event.inputs.environment }}
+              **Rolled back to:** ${{ github.event.inputs.version }}
+              **Reason:** ${{ github.event.inputs.reason || 'Not specified' }}
+              **Executed by:** @${{ github.actor }}
+              **Timestamp:** ${new Date().toISOString()}
+              
+              ## Next Steps
+              - [ ] Verify rollback is working correctly
+              - [ ] Investigate root cause of the issue
+              - [ ] Plan fix for the original problem
+              - [ ] Schedule re-deployment when ready
+              
+              ## Verification
+              - ✅ Deployment completed successfully
+              - ✅ Health check passed
+              `,
+              labels: ['rollback', 'urgent', '${{ github.event.inputs.environment }}']
+            });
+
+      - name: Notify team of rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: |
+            🔄 **Rollback Completed**
+            
+            **Environment:** ${{ github.event.inputs.environment }}
+            **Version:** ${{ github.event.inputs.version }}
+            **Reason:** ${{ github.event.inputs.reason || 'Not specified' }}
+            **Executed by:** ${{ github.actor }}
+            
+            Please verify the rollback and investigate the original issue.

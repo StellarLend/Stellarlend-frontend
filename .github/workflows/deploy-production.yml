@@ -1,0 +1,77 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+environment: production
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_APP_ENV: production
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.PRODUCTION_API_URL }}
+          NEXT_PUBLIC_STELLAR_NETWORK: ${{ secrets.STELLAR_NETWORK }}
+          NEXT_PUBLIC_STELLAR_HORIZON_URL: ${{ secrets.STELLAR_HORIZON_URL }}
+          NEXT_PUBLIC_SOROBAN_RPC_URL: ${{ secrets.SOROBAN_RPC_URL }}
+          NEXT_PUBLIC_GA_TRACKING_ID: ${{ secrets.GA_TRACKING_ID }}
+          NEXT_PUBLIC_MIXPANEL_TOKEN: ${{ secrets.MIXPANEL_TOKEN }}
+
+      - name: Deploy to Vercel (Production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            🚀 **Stellarlend Frontend Release ${{ github.ref }}**
+            
+            **Changes in this Release:**
+            ${{ github.event.head_commit.message }}
+            
+            **Deployment:**
+            - ✅ Production deployment successful
+            - 🔗 Live at: https://stellarlend.com
+            
+            **What's New:**
+            - Bug fixes and improvements
+            - Performance optimizations
+            - Security updates
+          draft: false
+          prerelease: false
+
+      - name: Notify team of deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: |
+            🚀 Stellarlend Frontend ${{ github.ref }} deployed to production!
+            Live at: https://stellarlend.com

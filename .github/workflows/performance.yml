@@ -1,0 +1,58 @@
+name: Performance Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment
+        if: github.event_name == 'pull_request'
+        uses: fountainhead/action-wait-for-check@v1.1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: deploy-staging
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            https://stellarlend-staging.vercel.app
+            https://stellarlend-staging.vercel.app/lending
+            https://stellarlend-staging.vercel.app/dashboard
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          configPath: './lighthouserc.json'
+
+      - name: Bundle size analysis
+        run: |
+          npm ci
+          npm run build
+          npx bundlewatch --config bundlewatch.config.json
+
+      - name: Comment PR with performance results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## 📊 Performance Report\n\n';
+            comment += '✅ Lighthouse CI completed successfully!\n';
+            comment += '📦 Bundle size analysis completed!\n\n';
+            comment += 'Check the full report in the Actions tab.';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

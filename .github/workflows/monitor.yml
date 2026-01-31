@@ -1,0 +1,76 @@
+name: Application Monitoring
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check staging health
+        id: staging-check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://stellarlend-staging.vercel.app/api/health || echo "000")
+          if [ "$response" != "200" ]; then
+            echo "staging_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "staging_status=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check production health
+        id: production-check
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://stellarlend.com/api/health || echo "000")
+          if [ "$response" != "200" ]; then
+            echo "production_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "production_status=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Alert on staging failure
+        if: failure() && steps.staging-check.outputs.staging_status == 'failed'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: |
+            🚨 **ALERT: Staging Environment Down**
+            
+            The Stellarlend staging environment is not responding.
+            URL: https://stellarlend-staging.vercel.app
+            
+            Please investigate immediately.
+
+      - name: Alert on production failure
+        if: failure() && steps.production-check.outputs.production_status == 'failed'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: |
+            🚨 **CRITICAL ALERT: Production Environment Down**
+            
+            The Stellarlend production environment is not responding.
+            URL: https://stellarlend.com
+            
+            **IMMEDIATE ACTION REQUIRED**
+
+      - name: Performance monitoring
+        run: |
+          # Check response times
+          staging_time=$(curl -o /dev/null -s -w "%{time_total}" https://stellarlend-staging.vercel.app || echo "0")
+          production_time=$(curl -o /dev/null -s -w "%{time_total}" https://stellarlend.com || echo "0")
+          
+          echo "Staging response time: ${staging_time}s"
+          echo "Production response time: ${production_time}s"
+          
+          # Alert if response time > 5 seconds
+          if (( $(echo "$production_time > 5.0" | bc -l) )); then
+            echo "Production response time is too slow: ${production_time}s"
+            exit 1
+          fi

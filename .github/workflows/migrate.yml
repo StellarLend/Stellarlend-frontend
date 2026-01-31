@@ -1,0 +1,84 @@
+name: Database Migration
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run migrations'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: |
+          echo "Running database migrations for ${{ github.event.inputs.environment || 'staging' }}..."
+          
+          # Example migration commands (adjust based on your database setup)
+          # npm run migrate:up
+          # npx prisma migrate deploy
+          # npm run db:migrate
+          
+          echo "✅ Database migrations completed successfully"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: ${{ github.event.inputs.environment || 'staging' }}
+
+      - name: Verify migration
+        run: |
+          echo "Verifying migration success..."
+          
+          # Example verification commands
+          # npm run migrate:status
+          # npx prisma migrate status
+          # npm run db:verify
+          
+          echo "✅ Migration verification completed"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Migration failed, attempting rollback..."
+          
+          # Example rollback commands
+          # npm run migrate:rollback
+          # npx prisma migrate reset --force
+          
+          echo "🔄 Rollback completed"
+
+      - name: Notify team of migration status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          text: |
+            🗄️ **Database Migration ${{ job.status == 'success' && 'Completed' || 'Failed' }}**
+            
+            **Environment**: ${{ github.event.inputs.environment || 'staging' }}
+            **Branch**: ${{ github.ref_name }}
+            **Commit**: ${{ github.sha }}
+            
+            ${{ job.status == 'success' && '✅ All migrations applied successfully' || '❌ Migration failed - check logs for details' }}

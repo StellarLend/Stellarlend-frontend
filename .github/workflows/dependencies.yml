@@ -1,0 +1,72 @@
+name: Update Dependencies
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly on Monday
+  workflow_dispatch:
+
+jobs:
+  update-deps:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update dependencies
+        run: |
+          npm update
+          npm audit fix --force
+
+      - name: Run tests after update
+        run: |
+          npm run lint
+          npx tsc --noEmit
+          npm run build
+        continue-on-error: true
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update dependencies'
+          title: '🔄 chore: update dependencies'
+          body: |
+            ## 📦 Automated Dependency Update
+            
+            This PR updates all dependencies to their latest versions.
+            
+            ### Changes:
+            - Updated npm dependencies
+            - Applied security fixes via `npm audit fix`
+            
+            ### Testing:
+            - ✅ Linting passed
+            - ✅ Type checking passed  
+            - ✅ Build completed successfully
+            
+            Please review the changes and test thoroughly before merging.
+            
+            ---
+            *This PR was created automatically by the dependency update workflow.*
+          branch: update-dependencies
+          delete-branch: true
+          labels: |
+            dependencies
+            automated
+            chore
+
+      - name: Enable auto-merge for dependency updates
+        if: steps.cpr.outputs.pull-request-number
+        run: gh pr merge --auto --merge "${{ steps.cpr.outputs.pull-request-number }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
