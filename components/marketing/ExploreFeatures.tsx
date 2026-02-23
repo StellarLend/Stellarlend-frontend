@@ -13,28 +13,33 @@ import { File } from '../shared/ui/icons/File';
 const features = [
   {
     icon: Dollar,
-    title: "Low-Cost Lending &\nBorrowing",
-    description: "Enjoy Stellar's ultra-low fees and fast transactions."
+    title: "Ultra-Low\nFees",
+    description: "Stellar's network ensures transactions cost less than a cent, maximizing your returns."
   },
   {
     icon: ShieldBlockchain,
-    title: "Secure &\nTransparent",
-    description: "Full custody of assets with audited smart contracts."
+    title: "Bank-Grade\nSecurity",
+    description: "Audited smart contracts and multi-signature protection keep your assets safe."
   },
   {
     icon: Zap,
-    title: "Instant\nSettlements",
-    description: "No waiting times, immediate access to funds."
+    title: "3-Second\nSettlements",
+    description: "Near-instant transactions mean you never miss market opportunities."
   },
   {
     icon: Global,
-    title: "Global\nAccess",
-    description: "Open to anyone, including the unbanked."
+    title: "Borderless\nAccess",
+    description: "Available worldwide with no geographic restrictions or KYC barriers."
   },
   {
     icon: File,
-    title: "Automated\nRisk Controls",
-    description: "AI-driven collateral and liquidation management."
+    title: "Smart Risk\nManagement",
+    description: "AI-powered liquidation protection and dynamic collateral ratios."
+  },
+  {
+    icon: Dollar,
+    title: "Competitive\nAPYs",
+    description: "Earn up to 12% APY on stablecoins with automated compounding."
   }
 ];
 
@@ -71,19 +76,31 @@ export default function ExploreFeatures() {
           viewport={{ once: true, margin: "-100px" }}
         >
           <motion.div 
-            className="flex flex-col justify-center items-center md:items-start"
+            className="flex flex-col justify-center items-center md:items-start lg:col-span-3"
             variants={itemVariants}
           >
-            <h2 className="text-[40px] leading-[100%] font-bold text-[#00FF7F] mb-6 text-center md:text-left">
-              Explore Our Features
+            <h2 className="text-[40px] leading-[100%] font-bold text-[#00FF7F] mb-4 text-center md:text-left">
+              Why Choose Stellarlend?
             </h2>
-            <Link
-            href="/lending"
-            className="text-[#AAABAB] flex items-center border py-2 sm:py-3 px-4 sm:px-8 rounded-lg border-[#1D2025]
-             hover:text-[#15A350] hover:border-[#15A350] transition-all duration-300"
-          >
-            Start Lending <ChevronRight className="h-4 w-4 ml-1 text-[#AAABAB] group-hover:text-[#15A350]" />
-          </Link>
+            <p className="text-[#AAABAB] text-lg mb-6 text-center md:text-left max-w-2xl">
+              Experience the future of DeFi lending with our cutting-edge features designed for maximum security and returns.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link
+                href="/lending"
+                className="bg-[#15A350] text-white flex items-center py-3 px-8 rounded-lg
+                 hover:bg-[#128F42] transition-all duration-300 font-medium"
+              >
+                Start Earning <ChevronRight className="h-4 w-4 ml-2" />
+              </Link>
+              <Link
+                href="/borrow"
+                className="border border-[#15A350] text-[#15A350] flex items-center py-3 px-8 rounded-lg
+                 hover:bg-[#15A350] hover:text-white transition-all duration-300 font-medium"
+              >
+                Borrow Now <ChevronRight className="h-4 w-4 ml-2" />
+              </Link>
+            </div>
           </motion.div>
 
           {features.map((feature, index) => {
