@@ -64,15 +64,15 @@ export default function Hero() {
             className="font-bold min-[500px]:w-5/6 md:w-3/4 xl:w-full text-[32px] xl:text-6xl text-center"
             variants={itemVariants}
           >
-            Fast & Secure DeFi Lending on Stellar
+            DeFi Lending, Reimagined on Stellar
           </motion.h1>
 
           <motion.p
             className="font-medium texy-sm xl:text-lg text-[#AAABAB] text-center"
             variants={itemVariants}
           >
-            Borrow and lend with ultra-low fees, instant settlements, and full
-            transparency—powered by Soroban smart contracts.
+            Borrow instantly, earn competitively. Built on Stellar's network for 
+            ultra-low fees, lightning-fast settlements, and complete transparency.
           </motion.p>
 
           <motion.div
@@ -81,7 +81,7 @@ export default function Hero() {
           >
             <motion.div variants={itemVariants}>
               <Button
-                text="Get a Loan Now"
+                text="Launch App"
                 className="bg-[#15A350] 
                 text-[#F8F8F8] text-xs md:text-sm font-medium rounded-lg 
                 flex items-center py-2 sm:py-3 px-4 sm:px-6 cursor-pointer"
@@ -89,14 +89,13 @@ export default function Hero() {
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <Link
-                href="/lending"
-                className="text-[#AAABAB] text-xs md:text-sm font-medium flex items-center py-2 sm:py-3 px-4 sm:px-6 
-                hover:text-[#15A350] transition-all duration-300"
-              >
-                Start Lending{" "}
-                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1 text-[#AAABAB]" />
-              </Link>
+              <Button
+                text="Sign Up"
+                className="border border-[#15A350] text-[#15A350] 
+                text-xs md:text-sm font-medium rounded-lg 
+                flex items-center py-2 sm:py-3 px-4 sm:px-6 cursor-pointer
+                hover:bg-[#15A350] hover:text-[#F8F8F8] transition-all"
+              />
             </motion.div>
           </motion.div>
         </motion.div>
@@ -106,14 +105,35 @@ export default function Hero() {
             src={HeroImage}
             width={1140}
             height={800}
-            alt="get a loan"
+            alt="DeFi lending platform interface"
             className="hidden md:block md:mx-auto"
           />
           <Image
             src={MobileHeroImage}
-            alt="get a loan"
+            alt="Mobile DeFi lending interface"
             className="ml-5 rounded-br-3xl min-[735px]:ml-6 md:hidden"
           />
+        </motion.div>
+
+        {/* Trust indicators */}
+        <motion.div 
+          className="flex flex-wrap justify-center items-center gap-6 md:gap-10 mt-8 md:mt-12"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.8 }}
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-[#15A350] rounded-full"></div>
+            <span className="text-sm text-[#AAABAB]">Audited Smart Contracts</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-[#15A350] rounded-full"></div>
+            <span className="text-sm text-[#AAABAB]">1000+ Active Users</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-[#15A350] rounded-full"></div>
+            <span className="text-sm text-[#AAABAB]">$2M+ TVL</span>
+          </div>
         </motion.div>
       </div>
     </motion.div>

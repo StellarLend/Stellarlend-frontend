@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
+import { Twitter, Github, Linkedin, Mail } from 'lucide-react';
 
-export default function NewsletterAndFooter() {
+export default function Footer() {
     const [email, setEmail] = useState('');
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [isValidEmail, setIsValidEmail] = useState(true);
@@ -28,7 +29,6 @@ export default function NewsletterAndFooter() {
         setError('');
         
         try {
-          
           const response = await fetch('/api/subscribe', {
             method: 'POST',
             headers: {
@@ -40,7 +40,6 @@ export default function NewsletterAndFooter() {
           if (!response.ok) {
             throw new Error('Subscription failed');
           }
-          
          
           setIsSubscribed(true);
           setEmail('');
@@ -52,96 +51,168 @@ export default function NewsletterAndFooter() {
         }
       }
     };
-  const currentYear = new Date().getFullYear();
+
+    const currentYear = new Date().getFullYear();
+    
+    const footerLinks = {
+      product: [
+        { name: 'Features', href: '/features' },
+        { name: 'How It Works', href: '#how-it-works' },
+        { name: 'Pricing', href: '/pricing' },
+        { name: 'Security', href: '/security' },
+      ],
+      company: [
+        { name: 'About Us', href: '/about' },
+        { name: 'Blog', href: '/blog' },
+        { name: 'Careers', href: '/careers' },
+        { name: 'Contact', href: '/contact' },
+      ],
+      resources: [
+        { name: 'Documentation', href: '/docs' },
+        { name: 'API Reference', href: '/api-docs' },
+        { name: 'Audits', href: '/audits' },
+        { name: 'FAQ', href: '/faq' },
+      ],
+      legal: [
+        { name: 'Terms of Service', href: '/terms' },
+        { name: 'Privacy Policy', href: '/privacy' },
+        { name: 'Cookie Policy', href: '/cookies' },
+        { name: 'Disclaimer', href: '/disclaimer' },
+      ]
+    };
+
+    const socialLinks = [
+      { icon: Twitter, href: 'https://twitter.com/stellarlend', label: 'Twitter' },
+      { icon: Github, href: 'https://github.com/stellarlend', label: 'GitHub' },
+      { icon: Linkedin, href: 'https://linkedin.com/company/stellarlend', label: 'LinkedIn' },
+      { icon: Mail, href: 'mailto:contact@stellarlend.com', label: 'Email' },
+    ];
   
   return (
-    <div className="bg-[#0d0d0d] py-20 overflow-hidden text-white">
-
-    {/* Newsletter Section */}
-
-    <div className="container lg:text-left text-center mx-auto px-4 my-auto">
-      <div className="p-8 mx-8 lg:flex lg:flex-row flex-col justify-between items-center">
-        <div className="">
-            <div>
-                <h2 className="text-2xl font-bold mb-2">Join our newsletter</h2>
-                <p className="text-[#AAABAB] mb-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
-           </div>
-        </div>
-        <div>
-          {!isSubscribed ? (
-            <form onSubmit={handleSubscribe} className="flex flex-col md:flex-row gap-3">
-              <div className="flex-grow">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className={`w-full px-4 py-3 bg-transparent border ${!isValidEmail ? 'border-red-500' : 'border-[#1D2025]'} rounded-md focus:outline-none focus:ring-2 focus:ring-green-500`}
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setIsValidEmail(true);
-                    setError('');
-                  }}
+    <footer className="bg-[#0D0D0D] text-white">
+      {/* Newsletter Section */}
+      <div className="border-b border-[#1D2025]">
+        <div className="max-w-6xl mx-auto px-4 py-16">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-4">Stay Updated with Stellarlend</h2>
+            <p className="text-[#AAABAB] text-lg mb-8 max-w-2xl mx-auto">
+              Get the latest updates on new features, market insights, and exclusive opportunities delivered to your inbox.
+            </p>
+            
+            {!isSubscribed ? (
+              <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+                <div className="flex-1">
+                  <input
+                    type="email"
+                    placeholder="Enter your email address"
+                    className={`w-full px-4 py-3 bg-transparent border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#15A350] transition-all
+                      ${!isValidEmail ? 'border-red-500' : 'border-[#1D2025] hover:border-[#15A350]'}`}
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setIsValidEmail(true);
+                      setError('');
+                    }}
+                    disabled={isLoading}
+                  />
+                  {!isValidEmail && (
+                    <p className="text-red-500 text-sm mt-2">Please enter a valid email address</p>
+                  )}
+                  {error && (
+                    <p className="text-red-500 text-sm mt-2">{error}</p>
+                  )}
+                </div>
+                <button 
+                  type="submit" 
+                  className="bg-[#15A350] hover:bg-[#128F42] text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed whitespace-nowrap"
                   disabled={isLoading}
-                />
-                {!isValidEmail && (
-                  <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
-                )}
-                {error && (
-                  <p className="text-red-500 text-sm mt-1">{error}</p>
-                )}
+                >
+                  {isLoading ? 'Subscribing...' : 'Subscribe'}
+                </button>
+              </form>
+            ) : (
+              <div className="bg-green-900/20 border border-green-500/30 text-[#15A350] p-4 rounded-lg max-w-md mx-auto">
+                <p className="font-medium">Thanks for subscribing! Check your inbox for confirmation.</p>
               </div>
-              <button 
-                type="submit" 
-                className="hover:bg-green-700 bg-[#15A350] text-white font-semibold px-6 py-3 rounded-md transition-colors duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Subscribing...' : 'Join Now'}
-              </button>
-            </form>
-          ) : (
-            <div className="bg-green-900 bg-opacity-50 text-[#15A350] p-4 rounded-md">
-              <p className="font-medium">Thanks for subscribing! You'll receive our next newsletter soon.</p>
-            </div>
-          )}
-          
-          <p className="text-white text-xs mt-4">
-            By subscribing you agree to with our <a href="/privacy" className="text-white hover:text-[#15A350] underline">Privacy Policy</a>
-          </p>
+            )}
+            
+            <p className="text-[#AAABAB] text-sm mt-4">
+              By subscribing you agree to our{' '}
+              <a href="/privacy" className="text-[#15A350] hover:underline">Privacy Policy</a>
+              {' '}and{' '}
+              <a href="/terms" className="text-[#15A350] hover:underline">Terms of Service</a>
+            </p>
+          </div>
         </div>
       </div>
-    </div>
-    
-    {/* Footer Section */}
 
-    <footer>
-      <div className="max-w-6xl mx-auto px-4 py-12">
-        
-        <div className="flex flex-wrap justify-center gap-8 mb-8">
-          <a href="#how-it-works" className="text-gray-400 hover:text-white transition-colors">
-            How It Works
-          </a>
-          <a href="/features" className="text-gray-400 hover:text-white transition-colors">
-            Features
-          </a>
-          <a href="#testimonials" className="text-gray-400 hover:text-white transition-colors">
-            Testimonials
-          </a>
-        </div>
-        
-        
-        <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-[#1D2025]">
-         
-          <div className="mb-4 md:mb-0">
-            <h2 className="text-xl font-bold">Stellarfriend</h2>
+      {/* Main Footer Content */}
+      <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+          {/* Brand Section */}
+          <div className="lg:col-span-2">
+            <h3 className="text-2xl font-bold text-white mb-4">Stellarlend</h3>
+            <p className="text-[#AAABAB] mb-6 max-w-sm">
+              The future of DeFi lending on Stellar. Fast, secure, and accessible to everyone.
+            </p>
+            
+            {/* Social Links */}
+            <div className="flex space-x-4">
+              {socialLinks.map((social, index) => {
+                const Icon = social.icon;
+                return (
+                  <a
+                    key={index}
+                    href={social.href}
+                    aria-label={social.label}
+                    className="w-10 h-10 bg-[#1D2025] hover:bg-[#15A350] rounded-lg flex items-center justify-center transition-colors duration-200"
+                  >
+                    <Icon className="w-5 h-5 text-white" />
+                  </a>
+                );
+              })}
+            </div>
           </div>
-          
-          
-          <div className="text-white text-sm">
-            © {currentYear} Stellarfriend. All rights reserved.
+
+          {/* Footer Links */}
+          {Object.entries(footerLinks).map(([category, links]) => (
+            <div key={category}>
+              <h4 className="text-white font-semibold mb-4 capitalize">{category}</h4>
+              <ul className="space-y-2">
+                {links.map((link, index) => (
+                  <li key={index}>
+                    <a
+                      href={link.href}
+                      className="text-[#AAABAB] hover:text-[#15A350] transition-colors duration-200"
+                    >
+                      {link.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="border-t border-[#1D2025]">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="text-[#AAABAB] text-sm">
+              &copy; {currentYear} Stellarlend. All rights reserved.
+            </div>
+            
+            <div className="flex items-center space-x-6 text-sm">
+              <span className="text-[#AAABAB]">Built on</span>
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 bg-[#15A350] rounded-full"></div>
+                <span className="text-white font-medium">Stellar</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </footer>
-  </div>
   );
-} 
+}

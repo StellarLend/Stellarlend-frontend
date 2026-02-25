@@ -19,22 +19,22 @@ export default function HowItWorks(){
   const steps: Step[] = [
     {
       id: 1,
-      title: "Connect Your Wallet",
-      description: "Securely connect your Stellar-compatible wallet to access the platform.",
+      title: "Connect Wallet",
+      description: "Securely connect your Stellar wallet with one click. No registration required.",
       iconPath: "/icons/connect.svg",
       alt: "connect",
     },
     {
       id: 2,
-      title: "Deposit Collateral",
-      description: "Lock your assets as collateral to start borrowing instantly.",
+      title: "Choose Your Path",
+      description: "Lend assets to earn competitive APY or borrow against your collateral instantly.",
       iconPath: "/icons/coins.svg",
       alt: "deposit",
     },
     {
       id: 3,
-      title: "Get a Loan",
-      description: "Receive funds in your wallet with minimal fees and fast settlement.",
+      title: "Start Earning",
+      description: "Watch your assets grow with real-time tracking and automated compound interest.",
       iconPath: "/icons/creditcard.svg",
       alt: "loan",
     },
@@ -44,7 +44,12 @@ export default function HowItWorks(){
     <section className="w-full bg-black py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-8 lg:px-12">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-6 sm:mb-8 md:mb-10">
-          <h2 className="text-2xl sm:text-3xl md:text-[40px] mx-auto md:mx-0 font-bold text-[#15A350]">How It Works</h2>
+          <div className="text-center md:text-left">
+            <h2 className="text-2xl sm:text-3xl md:text-[40px] font-bold text-[#15A350] mb-2">How It Works</h2>
+            <p className="text-[#AAABAB] text-sm md:text-base max-w-lg">
+              Get started in minutes with our simple, secure process
+            </p>
+          </div>
           <Link
             href="/lending"
             className="text-[#AAABAB] hidden md:flex items-center border py-2 sm:py-3 px-4 sm:px-8 rounded-lg border-[#1D2025]
