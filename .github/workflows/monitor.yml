@@ -2,7 +2,7 @@ name: Application Monitoring
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
+    - cron: ''  # Every 5 minutes
   workflow_dispatch:
 
 jobs:
