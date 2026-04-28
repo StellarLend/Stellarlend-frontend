@@ -1,15 +1,15 @@
 // types/common.ts
-type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-// type Required<T, K extends keyof T> = T & Required<Pick<T, K>>;
+export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+// export type Required<T, K extends keyof T> = T & Required<Pick<T, K>>;
 
-interface ButtonProps {
+export interface ButtonProps {
   variant: string;
   size: string;
 }
 
-type DeepPartial<T> = {
+export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
 };
 
 // Usage
-type PartialButtonProps = Optional<ButtonProps, "variant" | "size">;
+export type PartialButtonProps = Optional<ButtonProps, "variant" | "size">;

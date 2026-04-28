@@ -1,8 +1,8 @@
-import React, { useState, ChangeEvent, MouseEvent } from "react";
+import React, { useMemo, useState, ChangeEvent, MouseEvent } from "react";
 import Image, { StaticImageData } from "next/image";
 import profile from "@/public/images/p-Picture.jpg";
 import Camera from "@/public/camera-ai-fill.svg"; 
-
+import { EmptyState } from "@/components/shared/common/EmptyState";
 
 const formFields = [
   { id: "firstName", label: "First Name", placeholder: "Ex.John", type: "text" },
@@ -14,12 +14,40 @@ const formFields = [
   { id: "country", label: "Identification Country", placeholder: " Ex.Doe", type: "text" },
 ];
 
+const initialFormData: Record<string, string> = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  id: "",
+  taxId: "",
+  country: "",
+  address: "",
+};
+
 const ProfileForm: React.FC = () => {
   const [avatar, setAvatar] = useState<string | StaticImageData>(profile);
   const [gender, setGender] = useState<"male" | "female" | "">("");
-  const [formData, setFormData] = useState<Record<string, string>>({
-    address : ''
-  });
+  const [formData, setFormData] = useState<Record<string, string>>(initialFormData);
+  const [editMode, setEditMode] = useState(false);
+
+  const isProfileEmpty = useMemo(
+    () => !Object.values(formData).some(Boolean) && !gender,
+    [formData, gender]
+  );
+
+  if (isProfileEmpty && !editMode) {
+    return (
+      <div className="bg-white md:p-2 flex-grow">
+        <EmptyState
+          title="Your profile is almost ready"
+          description="Complete your account details to unlock lending, borrowing, and faster settlements on Stellarlend."
+          actionLabel="Complete profile"
+          onAction={() => setEditMode(true)}
+        />
+      </div>
+    );
+  }
 
   // fn to handle profile image manipulations
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {

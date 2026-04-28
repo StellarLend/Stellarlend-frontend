@@ -12,7 +12,9 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
+import { EmptyState } from "./EmptyState";
 
 export type TransactionStatus = "Completed" | "Processing" | "Failed";
 export type Transaction = {
@@ -119,6 +121,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const sortRef = useRef<HTMLDivElement>(null);
   const [dateFromObj, setDateFromObj] = useState<Date | null>(null);
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setLoading(true);
@@ -240,12 +243,16 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10; // Or whatever number you prefer
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, status, dateFrom, dateTo]);
 
-  // Calculate paginated data
-  const paginatedTransactions = transactions.slice(
+  // Calculate paginated data based on filtered results.
+  const paginatedTransactions = filtered.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
@@ -406,6 +413,15 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       <div className="overflow-x-auto">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Loading...</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-6 py-16">
+            <EmptyState
+              title="No transactions yet"
+              description="Your transaction history will appear here once you lend, borrow, or make payments on Stellarlend."
+              actionLabel="Explore lending"
+              onAction={() => router.push("/lending")}
+            />
+          </div>
         ) : (
           <table className="min-w-full text-sm border">
             <thead>
@@ -420,7 +436,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((txn, idx) => (
+              {paginatedTransactions.map((txn, idx) => (
                 <tr
                   key={idx}
                   className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
@@ -460,24 +476,16 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                   </td>
                 </tr>
               ))}
-
-              {filtered.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={5} className="text-center py-6">
-                    No transactions found.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         )}
 
         <div className="">
-          {showPagination && (
+          {showPagination && filtered.length > 0 && (
             <Pagination
-              totalItems={18}
-              itemsPerPage={6}
-              currentPage={1}
+              totalItems={filtered.length}
+              itemsPerPage={itemsPerPage}
+              currentPage={currentPage}
               setCurrentPage={setCurrentPage}
             />
           )}
