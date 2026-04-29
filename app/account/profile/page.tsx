@@ -1,6 +1,7 @@
 "use client"
 import ProfileForm from "@/components/features/account/components/ProfileForm";
 import Sidebar from "@/components/shared/layout/Sidebar";
+import { PageHeader } from "@/components/shared/common";
 import { usePathname } from "next/navigation";
 
 export default function Account() {
@@ -12,6 +13,11 @@ export default function Account() {
         <Sidebar />
 
         <div className="flex-1 bg-white rounded-lg shadow-sm p-4 md:p-6">
+          <PageHeader
+            tone="light"
+            title="Profile"
+            description="Manage your personal details, security settings, and notification preferences."
+          />
           {pathname === "/account/profile" && <ProfileForm />}
         </div>
       </div>

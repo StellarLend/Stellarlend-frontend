@@ -7,6 +7,7 @@ import InterestCalculator from '@/components/features/lending/components/Interes
 import TransactionSummary from '@/components/features/lending/components/TransactionSummary';
 import ConfirmModal from '@/components/features/lending/components/ConfirmModal';
 import TabSelector from '@/components/features/lending/components/TabSelector';
+import { PageHeader } from '@/components/shared/common';
 
 export interface LendingData {
   asset: string;
@@ -65,14 +66,10 @@ export default function LendingPage() {
 
       <div className="max-w-7xl mx-auto">
   
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Lending & Borrowing
-          </h1>
-          <p className="text-gray-50">
-            Earn interest by lending your assets or borrow against your collateral
-          </p>
-        </div>
+        <PageHeader
+          title="Lending & Borrowing"
+          description="Earn interest by lending your assets or borrow against your collateral."
+        />
 
        
         <TabSelector activeTab={activeTab} onTabChange={setActiveTab} />

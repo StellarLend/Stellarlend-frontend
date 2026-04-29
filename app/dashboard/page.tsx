@@ -3,6 +3,7 @@ import Image from "next/image";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
 import { DashboardLayout } from "@/components";
+import { PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
 
 export default function Dashboard() {
@@ -10,33 +11,33 @@ export default function Dashboard() {
     <DashboardLayout>
       <div className="">
         <div className="md:pt-10 md:border-t px-6 md:px-12 flex-col-reverse md:flex-col flex">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center md:mb-8">
-            <h1 className="text-white md:text-[24px] text-xl font-bold mb-6 md:mb-0 md:block hidden">
-              Dashboard
-            </h1>
+          <PageHeader
+            title="Dashboard"
+            description="Track lending, borrowing, and collateral health at a glance."
+            actions={
+              <>
+                <button className="bg-[#087734] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center w-full sm:w-auto justify-center gap-2 py-3 px-6 transition-colors">
+                  <Image
+                    src="/icons/coins-01.svg"
+                    alt="Lend"
+                    width={20}
+                    height={20}
+                  />
+                  <span>Lend More</span>
+                </button>
 
-            <div className="flex flex-row gap-4 w-full sm:w-auto">
-              <button className="bg-[#087734] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center w-full sm:w-auto justify-center gap-2 py-3 px-6 transition-colors">
-                <Image
-                  src="/icons/coins-01.svg"
-                  alt="Lend"
-                  width={20}
-                  height={20}
-                />
-                <span>Lend More</span>
-              </button>
-
-              <button className="bg-[#07c456] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center w-full sm:w-auto justify-center gap-2 py-3 px-6 transition-colors">
-                <Image
-                  src="/icons/bank.svg"
-                  alt="Borrow"
-                  width={20}
-                  height={20}
-                />
-                <span>Borrow Now</span>
-              </button>
-            </div>
-          </div>
+                <button className="bg-[#07c456] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center w-full sm:w-auto justify-center gap-2 py-3 px-6 transition-colors">
+                  <Image
+                    src="/icons/bank.svg"
+                    alt="Borrow"
+                    width={20}
+                    height={20}
+                  />
+                  <span>Borrow Now</span>
+                </button>
+              </>
+            }
+          />
           <MetricsCards />
         </div>
 
