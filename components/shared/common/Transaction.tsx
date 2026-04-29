@@ -15,6 +15,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
+import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
 
 export type TransactionStatus = "Completed" | "Processing" | "Failed";
 export type Transaction = {
@@ -85,12 +86,6 @@ export const fetchTransactions = async (): Promise<Transaction[]> => {
       status: "Completed",
     },
   ];
-};
-
-const statusColors: Record<TransactionStatus, string> = {
-  Completed: "bg-green-100 text-green-700",
-  Processing: "bg-yellow-100 text-yellow-700",
-  Failed: "bg-red-100 text-red-700",
 };
 
 const statusOptions: (TransactionStatus | "All")[] = [
@@ -470,13 +465,10 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                         {formatDateTime(txn.date, txn.time)}
                       </td>
                       <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-semibold ${
-                            statusColors[txn.status]
-                          }`}
-                        >
-                          {txn.status}
-                        </span>
+                        <StatusBadge
+                          variant={transactionStatusToVariant(txn.status)}
+                          label={txn.status}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -509,13 +501,10 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                         #{txn.id}
                       </div>
                     </div>
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                        statusColors[txn.status]
-                      }`}
-                    >
-                      {txn.status}
-                    </span>
+                    <StatusBadge
+                      variant={transactionStatusToVariant(txn.status)}
+                      label={txn.status}
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">

@@ -1,2 +1,4 @@
 export { default as Button } from './Button';
-export * from './icons'; 
+export { StatusBadge, transactionStatusToVariant } from './StatusBadge';
+export type { StatusBadgeProps, StatusVariant, StatusBadgeSize } from './StatusBadge';
+export * from './icons';
