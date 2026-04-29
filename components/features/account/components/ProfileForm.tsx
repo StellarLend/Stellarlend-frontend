@@ -1,8 +1,8 @@
-import React, { useState, ChangeEvent, MouseEvent } from "react";
+import React, { useMemo, useState, ChangeEvent, MouseEvent } from "react";
 import Image, { StaticImageData } from "next/image";
 import profile from "@/public/images/p-Picture.jpg";
 import Camera from "@/public/camera-ai-fill.svg"; 
-
+import { EmptyState } from "@/components/shared/common/EmptyState";
 
 const formFields = [
   { id: "firstName", label: "First Name", placeholder: "e.g. John", type: "text", group: "personal", helpText: "Please enter your legal first name." },
@@ -13,6 +13,17 @@ const formFields = [
   { id: "taxId", label: "Tax Verification Number", placeholder: "e.g. 12-3456789", type: "text", group: "verification", helpText: "Required for tax reporting." },
   { id: "country", label: "Identification Country", placeholder: "e.g. United States", type: "text", group: "verification", helpText: "The country that issued your ID." },
 ];
+
+const initialFormData: Record<string, string> = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  id: "",
+  taxId: "",
+  country: "",
+  address: "",
+};
 
 const ProfileForm: React.FC = () => {
   const [avatar, setAvatar] = useState<string | StaticImageData>(profile);

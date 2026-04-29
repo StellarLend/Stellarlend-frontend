@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import config from '@/lib/config';
 
+export const runtime = 'nodejs';
+
 export async function GET() {
   try {
     const healthData = {
@@ -8,7 +10,7 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
-      uptime: process.uptime(),
+      uptime: typeof process !== 'undefined' ? process.uptime() : 0,
       checks: {
         database: 'healthy', // Add actual database check if needed
         api: 'healthy',      // Add actual API check if needed
