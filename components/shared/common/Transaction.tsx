@@ -12,7 +12,9 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
+import { EmptyState } from "./EmptyState";
 
 export type TransactionStatus = "Completed" | "Processing" | "Failed";
 export type Transaction = {
@@ -119,6 +121,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const sortRef = useRef<HTMLDivElement>(null);
   const [dateFromObj, setDateFromObj] = useState<Date | null>(null);
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setLoading(true);
@@ -250,6 +253,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
@@ -410,6 +414,15 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       <div className="">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Loading...</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-6 py-16">
+            <EmptyState
+              title="No transactions yet"
+              description="Your transaction history will appear here once you lend, borrow, or make payments on Stellarlend."
+              actionLabel="Explore lending"
+              onAction={() => router.push("/lending")}
+            />
+          </div>
         ) : (
           <>
             {/* Desktop View */}
