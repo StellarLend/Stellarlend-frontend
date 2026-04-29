@@ -29,6 +29,8 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
   const [formData, setFormData] = useState<LendingData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [submitMessage, setSubmitMessage] = useState('');
 
   const selectedAsset = ASSETS.find(a => a.symbol === formData.asset);
   const rates = INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
@@ -58,12 +60,25 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitStatus('idle');
+    setSubmitMessage('');
     if (validateForm()) {
       setIsSubmitting(true);
-      // Simulate validation/processing
-      await new Promise(resolve => setTimeout(resolve, 800));
-      onSubmit(formData);
-      setIsSubmitting(false);
+      try {
+        // Simulate validation/processing
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setSubmitStatus('success');
+        setSubmitMessage('Details validated successfully.');
+        onSubmit(formData);
+      } catch (err) {
+        setSubmitStatus('error');
+        setSubmitMessage('An error occurred during validation.');
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      setSubmitStatus('error');
+      setSubmitMessage('Please fix the errors in the form before continuing.');
     }
   };
 
@@ -88,6 +103,21 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
           Choose an asset and amount to lend, then set your desired interest rate
         </p>
       </div>
+
+      {submitMessage && (
+        <div
+          className={cn(
+            "p-4 rounded-xl mb-6 text-sm font-medium",
+            submitStatus === 'success' 
+              ? "bg-green-50 text-green-800 border border-green-200" 
+              : "bg-red-50 text-red-800 border border-red-200"
+          )}
+          role="alert"
+          aria-live="polite"
+        >
+          {submitMessage}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Asset Selection */}
@@ -194,7 +224,7 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
           </div>
           
           {errors.interestRate && (
-            <p className="text-xs text-red-500 font-medium">{errors.interestRate}</p>
+            <p className="text-xs text-red-500 font-medium" role="alert" aria-live="polite">{errors.interestRate}</p>
           )}
         </div>
 
@@ -234,4 +264,4 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
       </form>
     </div>
   );
-}
+}

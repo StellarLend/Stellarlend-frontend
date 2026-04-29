@@ -38,6 +38,8 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
   const [formData, setFormData] = useState<LendingData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [submitMessage, setSubmitMessage] = useState('');
 
   const selectedAsset = ASSETS.find(a => a.symbol === formData.asset);
   const collateralAsset = ASSETS.find(a => a.symbol === formData.collateral);
@@ -79,11 +81,24 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitStatus('idle');
+    setSubmitMessage('');
     if (validateForm()) {
       setIsSubmitting(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      onSubmit(formData);
-      setIsSubmitting(false);
+      try {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setSubmitStatus('success');
+        setSubmitMessage('Details validated successfully.');
+        onSubmit(formData);
+      } catch (err) {
+        setSubmitStatus('error');
+        setSubmitMessage('An error occurred during validation.');
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      setSubmitStatus('error');
+      setSubmitMessage('Please fix the errors in the form before continuing.');
     }
   };
 
@@ -95,6 +110,21 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
           Borrow assets by providing collateral. Minimum 150% collateralization required.
         </p>
       </div>
+
+      {submitMessage && (
+        <div
+          className={cn(
+            "p-4 rounded-xl mb-6 text-sm font-medium",
+            submitStatus === 'success' 
+              ? "bg-green-50 text-green-800 border border-green-200" 
+              : "bg-red-50 text-red-800 border border-red-200"
+          )}
+          role="alert"
+          aria-live="polite"
+        >
+          {submitMessage}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Borrow Asset Selection */}
@@ -185,7 +215,7 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
             ))}
           </div>
           {errors.duration && (
-            <p className="text-xs text-red-500 font-medium mt-2">{errors.duration}</p>
+            <p className="text-xs text-red-500 font-medium mt-2" role="alert" aria-live="polite">{errors.duration}</p>
           )}
         </div>
 
@@ -224,7 +254,7 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
             ))}
           </div>
           {errors.collateral && (
-            <p className="text-xs text-red-500 font-medium mt-2">{errors.collateral}</p>
+            <p className="text-xs text-red-500 font-medium mt-2" role="alert" aria-live="polite">{errors.collateral}</p>
           )}
         </div>
 
@@ -254,7 +284,7 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
               )}
             </div>
             {errors.collateralAmount && (
-              <p className="text-xs text-red-500 font-bold">{errors.collateralAmount}</p>
+              <p className="text-xs text-red-500 font-bold" role="alert" aria-live="polite">{errors.collateralAmount}</p>
             )}
           </div>
         )}
@@ -295,4 +325,4 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
       </form>
     </div>
   );
-}
+}

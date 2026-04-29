@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LendingData, CalculationResult } from '@/app/lending/page';
+import { cn } from '@/lib/utils/cn';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -22,6 +23,16 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasAgreed, setHasAgreed] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [submitMessage, setSubmitMessage] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setSubmitStatus('idle');
+      setSubmitMessage('');
+      setHasAgreed(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -29,8 +40,16 @@ export default function ConfirmModal({
     if (!hasAgreed) return;
     
     setIsConfirming(true);
+    setSubmitStatus('idle');
+    setSubmitMessage('');
     try {
       await onConfirm();
+      setSubmitStatus('success');
+      setSubmitMessage('Transaction confirmed successfully!');
+      setTimeout(onClose, 2000);
+    } catch (err) {
+      setSubmitStatus('error');
+      setSubmitMessage('Transaction failed. Please try again.');
     } finally {
       setIsConfirming(false);
     }
@@ -68,6 +87,21 @@ export default function ConfirmModal({
               </svg>
             </button>
           </div>
+
+          {submitMessage && (
+            <div
+              className={cn(
+                "p-3 rounded-lg mb-4 text-sm font-medium",
+                submitStatus === 'success' 
+                  ? "bg-green-50 text-green-800 border border-green-200" 
+                  : "bg-red-50 text-red-800 border border-red-200"
+              )}
+              role="alert"
+              aria-live="polite"
+            >
+              {submitMessage}
+            </div>
+          )}
 
           {/* Transaction Details */}
           <div className="mb-6">
