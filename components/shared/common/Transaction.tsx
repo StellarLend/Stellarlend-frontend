@@ -241,13 +241,14 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // Or whatever number you prefer
+  const itemsPerPage = 6;
 
+  // Reset to first page when filtering/searching
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, status, dateFrom, dateTo]);
+  }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
-  // Calculate paginated data based on filtered results.
+  // Calculate paginated data
   const paginatedTransactions = filtered.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -410,7 +411,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Loading...</div>
         ) : filtered.length === 0 ? (
@@ -423,62 +424,155 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
             />
           </div>
         ) : (
-          <table className="min-w-full text-sm border">
-            <thead>
-              <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
-                <th className="py-3 px-4 text-left font-semibold">
-                  Transaction Type
-                </th>
-                <th className="py-3 px-4 text-left font-semibold">Amount</th>
-                <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                <th className="py-3 px-4 text-left font-semibold">Date</th>
-                <th className="py-3 px-4 text-left font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-sm border">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
+                    <th className="py-3 px-4 text-left font-semibold">
+                      Transaction Type
+                    </th>
+                    <th className="py-3 px-4 text-left font-semibold">Amount</th>
+                    <th className="py-3 px-4 text-left font-semibold">Asset</th>
+                    <th className="py-3 px-4 text-left font-semibold">Date</th>
+                    <th className="py-3 px-4 text-left font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedTransactions.map((txn, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-black">{txn.type}</div>
+                        <div className="text-sm font-normal text-[#667185]">
+                          #{txn.id}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-mono">
+                        {txn.amount > 0
+                          ? `+$${txn.amount}`
+                          : `-$${Math.abs(txn.amount)}`}
+                      </td>
+                      <td className="py-6 px-4 flex items-center gap-2">
+                        <Image
+                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                          alt={txn.asset}
+                          width={24}
+                          height={24}
+                          className="inline-block"
+                        />
+                        <span className="ml-1 font-medium ">{txn.asset}</span>
+                      </td>
+                      <td className="py-3 px-4 ">
+                        {formatDateTime(txn.date, txn.time)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-semibold ${
+                            statusColors[txn.status]
+                          }`}
+                        >
+                          {txn.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {filtered.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-6">
+                        No transactions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
               {paginatedTransactions.map((txn, idx) => (
-                <tr
+                <div
                   key={idx}
-                  className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
+                  className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-black">{txn.type}</div>
-                    <div className="text-sm font-normal text-[#667185]">
-                      #{txn.id}
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Type
+                      </span>
+                      <div className="font-bold text-gray-900">{txn.type}</div>
+                      <div className="text-xs text-gray-500 font-mono">
+                        #{txn.id}
+                      </div>
                     </div>
-                  </td>
-                  <td className="py-3 px-4 font-mono">
-                    {txn.amount > 0
-                      ? `+$${txn.amount}`
-                      : `-$${Math.abs(txn.amount)}`}
-                  </td>
-                  <td className="py-6 px-4 flex items-center gap-2">
-                    <Image
-                      src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                      alt={txn.asset}
-                      width={24}
-                      height={24}
-                      className="inline-block"
-                    />
-                    <span className="ml-1 font-medium ">{txn.asset}</span>
-                  </td>
-                  <td className="py-3 px-4 ">
-                    {formatDateTime(txn.date, txn.time)}
-                  </td>
-                  <td className="py-3 px-4">
                     <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
+                      className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                         statusColors[txn.status]
                       }`}
                     >
                       {txn.status}
                     </span>
-                  </td>
-                </tr>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Asset
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                          alt={txn.asset}
+                          width={20}
+                          height={20}
+                        />
+                        <span className="font-bold text-gray-900">
+                          {txn.asset}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Amount
+                      </span>
+                      <div
+                        className={`font-mono font-bold text-base ${
+                          txn.amount > 0 ? "text-green-600" : "text-gray-900"
+                        }`}
+                      >
+                        {txn.amount > 0
+                          ? `+$${txn.amount}`
+                          : `-$${Math.abs(txn.amount)}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Date & Time
+                      </span>
+                      <div className="text-sm text-gray-700">
+                        {formatDateTime(txn.date, txn.time)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+
+              {filtered.length === 0 && !loading && (
+                <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                  <p className="text-gray-500">No transactions found.</p>
+                </div>
+              )}
+            </div>
+          </>
         )}
+
 
         <div className="">
           {showPagination && filtered.length > 0 && (
