@@ -141,6 +141,12 @@ const ProfileForm: React.FC = () => {
           <span className="absolute bottom-0 right-0 text-white bg-[#2600FF] rounded-full p-1.5 shadow-sm">
             <Image src={Camera} alt="Upload" width={16} height={16} className="invert" />
           </span>
+          <input
+            type="file"
+            accept="image/*"
+            className="absolute inset-0 opacity-0 cursor-pointer"
+            onChange={handleAvatarUpload}
+          />
         </div>
 
         <div className="flex flex-col gap-2">
@@ -217,6 +223,9 @@ const ProfileForm: React.FC = () => {
                 <p className="mt-1 text-xs text-gray-400" id="gender-help">Select your gender.</p>
               )}
             </div>
+            {errors.gender && (
+              <p className="text-xs text-red-500 mt-1.5">{errors.gender}</p>
+            )}
           </div>
         </div>
 

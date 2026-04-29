@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { LendingData } from '@/app/lending/page';
+import { Input } from '@/components/shared/ui/Input';
+import Button from '@/components/shared/ui/Button';
+import { cn } from '@/lib/utils/cn';
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -25,6 +28,7 @@ const INTEREST_RATES = {
 export default function LendingForm({ onSubmit, initialData }: LendingFormProps) {
   const [formData, setFormData] = useState<LendingData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedAsset = ASSETS.find(a => a.symbol === formData.asset);
   const rates = INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
@@ -41,7 +45,7 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
     if (!formData.amount || formData.amount <= 0) {
       newErrors.amount = 'Please enter a valid amount';
     } else if (selectedAsset && formData.amount > selectedAsset.balance) {
-      newErrors.amount = 'Insufficient balance';
+      newErrors.amount = `Insufficient balance. Maximum available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`;
     }
 
     if (!formData.interestRate || formData.interestRate < rates.min || formData.interestRate > rates.max) {
@@ -52,16 +56,27 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
+      setIsSubmitting(true);
+      // Simulate validation/processing
+      await new Promise(resolve => setTimeout(resolve, 800));
       onSubmit(formData);
+      setIsSubmitting(false);
     }
   };
 
   const handleMaxAmount = () => {
     if (selectedAsset) {
       setFormData(prev => ({ ...prev, amount: selectedAsset.balance }));
+      if (errors.amount) {
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.amount;
+          return next;
+        });
+      }
     }
   };
 
@@ -74,76 +89,94 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
         {/* Asset Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 mb-3">
             Select Asset
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             {ASSETS.map(asset => (
               <button
                 key={asset.symbol}
                 type="button"
-                onClick={() => setFormData(prev => ({ ...prev, asset: asset.symbol }))}
-                className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, asset: asset.symbol }));
+                  setErrors({});
+                }}
+                className={cn(
+                  "p-4 rounded-xl border-2 transition-all duration-200 text-left relative overflow-hidden group",
                   formData.asset === asset.symbol
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                    ? "border-green-500 bg-green-50 ring-1 ring-green-500"
+                    : "border-gray-100 hover:border-gray-200 bg-gray-50/30"
+                )}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium text-gray-900">{asset.symbol}</span>
-                  <span className="text-xs text-gray-500">{asset.name}</span>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={cn(
+                    "font-bold text-sm",
+                    formData.asset === asset.symbol ? "text-green-700" : "text-gray-900"
+                  )}>
+                    {asset.symbol}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold bg-white px-1.5 py-0.5 rounded border border-gray-100">
+                    {asset.name}
+                  </span>
                 </div>
-                <div className="text-sm text-gray-600">
-                  Balance: {asset.balance.toLocaleString()} {asset.symbol}
+                <div className="text-xs text-gray-500 font-medium">
+                  Balance: {asset.balance.toLocaleString()}
                 </div>
+                {formData.asset === asset.symbol && (
+                  <div className="absolute top-0 right-0 p-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  </div>
+                )}
               </button>
             ))}
           </div>
         </div>
 
         {/* Amount Input */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Amount to Lend
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              value={formData.amount || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 text-black focus:ring-green-500 focus:border-transparent ${
-                errors.amount ? 'border-red-300' : 'border-gray-300'
-              }`}
-              placeholder="Enter amount"
-              step="0.01"
-            />
-            <button
-              type="button"
-              onClick={handleMaxAmount}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-green-600 hover:text-green-700 font-medium"
-            >
-              MAX
-            </button>
-          </div>
-          {errors.amount && (
-            <p className="mt-1 text-sm text-red-600">{errors.amount}</p>
-          )}
-          {selectedAsset && (
-            <p className="mt-1 text-sm text-gray-500">
-              Available: {selectedAsset.balance.toLocaleString()} {formData.asset}
-            </p>
-          )}
+        <div className="relative">
+          <Input
+            label="Amount to Lend"
+            type="number"
+            step="0.01"
+            placeholder="0.00"
+            value={formData.amount || ''}
+            error={errors.amount}
+            helperText={selectedAsset ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}` : undefined}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }));
+              if (errors.amount) {
+                setErrors(prev => {
+                  const next = { ...prev };
+                  delete next.amount;
+                  return next;
+                });
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleMaxAmount}
+            className="absolute right-3 top-[38px] text-xs font-bold text-green-600 hover:text-green-700 bg-green-50 px-2 py-1 rounded transition-colors"
+          >
+            MAX
+          </button>
         </div>
 
         {/* Interest Rate */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Interest Rate (% APY)
-          </label>
-          <div className="space-y-3">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">
+              Interest Rate (% APY)
+            </label>
+            <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">
+              {formData.interestRate.toFixed(1)}% APY
+            </span>
+          </div>
+          
+          <div className="px-1">
             <input
               type="range"
               min={rates.min}
@@ -151,38 +184,54 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
               step="0.1"
               value={formData.interestRate}
               onChange={(e) => setFormData(prev => ({ ...prev, interestRate: parseFloat(e.target.value) }))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
             />
-            <div className="flex justify-between text-sm text-gray-500">
-              <span>{rates.min}%</span>
-              <span className="font-medium text-gray-900">{formData.interestRate}% APY</span>
-              <span>{rates.max}%</span>
+            <div className="flex justify-between text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">
+              <span>MIN: {rates.min}%</span>
+              <span>DEFAULT: {rates.default}%</span>
+              <span>MAX: {rates.max}%</span>
             </div>
           </div>
+          
           {errors.interestRate && (
-            <p className="mt-1 text-sm text-red-600">{errors.interestRate}</p>
+            <p className="text-xs text-red-500 font-medium">{errors.interestRate}</p>
           )}
         </div>
 
         {/* Terms */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h3 className="font-medium text-gray-900 mb-2">Lending Terms</h3>
-          <ul className="text-sm text-gray-600 space-y-1">
-            <li>• Minimum lending period: 7 days</li>
-            <li>• Interest is calculated daily and compounded</li>
-            <li>• You can withdraw your funds anytime after the minimum period</li>
-            <li>• Early withdrawal may incur a 0.5% penalty fee</li>
+        <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
+          <h3 className="text-xs font-bold text-gray-900 mb-3 uppercase tracking-wider">Lending Terms</h3>
+          <ul className="text-xs text-gray-500 space-y-2 font-medium">
+            <li className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5">✓</span>
+              Minimum lending period: 7 days
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5">✓</span>
+              Interest is calculated daily and compounded
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-green-500 mt-0.5">✓</span>
+              Withdraw funds anytime after minimum period
+            </li>
+            <li className="flex items-start gap-2 text-gray-400">
+              <span className="mt-0.5">ℹ</span>
+              Early withdrawal may incur a 0.5% penalty fee
+            </li>
           </ul>
         </div>
 
         {/* Submit Button */}
-        <button
+        <Button
           type="submit"
-          className="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200"
+          variant="success"
+          size="lg"
+          fullWidth
+          isLoading={isSubmitting}
         >
           Review Lending Offer
-        </button>
+        </Button>
       </form>
     </div>
   );
-}
+}
