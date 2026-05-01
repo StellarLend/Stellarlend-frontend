@@ -63,24 +63,30 @@ const TopNav = () => {
 
           <div className="flex gap-4 items-center">
             {/* Notification */}
-            <div className="p-2 rounded cursor-pointer">
+            <button
+              className="p-2 rounded-md hover:bg-white/30 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+              aria-label="View notifications"
+            >
               <Image
                 src="/icons/notification.png"
-                alt="Notifications"
+                alt=""
                 width={24}
                 height={24}
               />
-            </div>
+            </button>
             {/* Profile Avatar */}
-            <div>
+            <button
+              className="rounded-full hover:ring-2 hover:ring-white hover:ring-opacity-50 transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+              aria-label="View profile"
+            >
               <Image
                 src="/images/profile.jpg"
-                alt="profile"
-                className="rounded-full cursor-pointer"
+                alt=""
+                className="rounded-full"
                 width={32}
                 height={32}
               />
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -96,24 +102,30 @@ const TopNav = () => {
 
         <div className="flex gap-4 items-center">
           {/* Notification */}
-          <div className="p-2 rounded cursor-pointer">
+          <button
+            className="p-2 rounded-md hover:bg-white/30 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+            aria-label="View notifications"
+          >
             <Image
               src="/icons/notification.png"
-              alt="Notifications"
+              alt=""
               width={24}
               height={24}
             />
-          </div>
+          </button>
           {/* Profile Avatar */}
-          <div>
+          <button
+            className="rounded-full hover:ring-2 hover:ring-white hover:ring-opacity-50 transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+            aria-label="View profile"
+          >
             <Image
               src="/images/profile.jpg"
-              alt="profile"
-              className="rounded-full cursor-pointer"
+              alt=""
+              className="rounded-full"
               width={32}
               height={32}
             />
-          </div>
+          </button>
         </div>
       </div>
     </div>
