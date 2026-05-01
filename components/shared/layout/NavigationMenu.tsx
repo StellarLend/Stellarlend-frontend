@@ -85,43 +85,41 @@ export const NavigationMenu = ({
   };
 
   return (
-    <nav>
+    <nav aria-label="Main navigation">
       <ul className="space-y-1 flex items-center flex-col">
         {filteredLinks.map((link) => {
           const isActive = activeLink.toLowerCase() === link.link.toLowerCase();
-          const iconColor = "#1C1A1A";
+          const iconColor = isActive ? "#15A350" : "#AAABAB";
 
           return (
-            <Link
-              key={link.path ?? link.link}
-              href={link.path || "#"}
-              className="w-full"
-            >
-              <li
+            <li key={link.path ?? link.link} className="w-full">
+              <Link
+                href={link.path || "#"}
                 onClick={() => handleClick(link.link)}
-                className={`cursor-pointer py-4 px-3 w-full relative rounded-lg flex justify-between items-center transition-colors duration-150 ${
-                  isActive ? "bg-[#15A350]" : "hover:bg-[#94e0b4a9]"
-                }`}
+                className={`
+                  group py-3.5 px-4 w-full relative rounded-lg flex justify-between items-center transition-all duration-200
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black
+                  ${isActive ? "bg-[#15A350]/15 text-[#15A350]" : "text-[#AAABAB] hover:bg-white/5 hover:text-white"}
+                `}
+                aria-current={isActive ? "page" : undefined}
               >
+                {/* Active indicator */}
+                <span
+                  className={`absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
+                  aria-hidden="true"
+                />
                 <div className="flex gap-3 items-center relative z-20">
                   {link.icon(iconColor)}
                   <span
-                    className={`transition-colors duration-150 ${
-                      isActive ? "text-black dark:text-white" : ""
+                    className={`transition-colors duration-200 ${
+                      isActive ? "text-[#15A350] font-semibold" : ""
                     }`}
                   >
                     {link.link}
                   </span>
                 </div>
-
-                {isActive && (
-                  <motion.div
-                    className="absolute left-0 top-0 w-full h-full rounded-lg z-10"
-                    layoutId="activeLink-expanded"
-                  />
-                )}
-              </li>
-            </Link>
+              </Link>
+            </li>
           );
         })}
       </ul>
