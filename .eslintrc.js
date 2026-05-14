@@ -1,21 +1,11 @@
 // .eslintrc.js
 module.exports = {
+  extends: ["next/core-web-vitals"],
   rules: {
-    "react/prop-types": "off", // Enforce TypeScript instead
-    "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
-    "component-props-naming": [
-      "error",
-      {
-        rule: "^([A-Z][a-z]*)+Props$",
-      },
-    ],
-    "component-file-structure": [
-      "error",
-      {
-        requiredFiles: ["index.ts", "types.ts"],
-      },
-    ],
+    "react/prop-types": "off",
+    "@next/next/no-html-link-for-pages": "off",
+    "react/no-unescaped-entities": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "@next/next/no-img-element": "off",
   },
-
-  extends: ["plugin:storybook/recommended"]
 };

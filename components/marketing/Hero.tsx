@@ -7,11 +7,11 @@ import Button from "../shared/ui/Button";
 import Image from "next/image";
 import HeroImage from "@/public/images/heroimg1.png";
 import MobileHeroImage from "@/public/images/heromobile.png";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 
 export default function Hero() {
   // Animation variants
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -22,21 +22,21 @@ export default function Hero() {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { y: 20, opacity: 0 },
     visible: {
       y: 0,
       opacity: 1,
-      transition: { duration: 0.5, ease: "easeOut" },
+      transition: { duration: 0.5, ease: "easeOut" as const },
     },
   };
 
-  const imageVariants = {
+  const imageVariants: Variants = {
     hidden: { scale: 0.95, opacity: 0 },
     visible: {
       scale: 1,
       opacity: 1,
-      transition: { duration: 0.7, ease: "easeOut", delay: 0.6 },
+      transition: { duration: 0.7, ease: "easeOut" as const, delay: 0.6 },
     },
   };
 

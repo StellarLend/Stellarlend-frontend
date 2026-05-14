@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { cn } from "@/utils/cn";
+import { cn } from "@/lib/utils/cn";
 
 export interface TooltipProps {
   /**
@@ -46,7 +46,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   className,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [timeoutId, setTimeoutId] = useState<number | null>(null);
+  const [timeoutId, setTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -98,7 +98,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
     onFocus: showTooltip,
     onBlur: hideTooltip,
     "aria-describedby": isVisible ? "tooltip-content" : undefined,
-  });
+  } as React.HTMLAttributes<HTMLElement>);
 
   return (
     <div ref={triggerRef} className="relative inline-block">

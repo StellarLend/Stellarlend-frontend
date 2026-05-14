@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
+import { cn } from "@/lib/utils/cn";
 
 interface ConfirmModalProps {
   isOpen: boolean;

@@ -233,6 +233,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       </div>
     );
   });
+  CustomDateInput.displayName = "CustomDateInput";
 
 
   const [currentPage, setCurrentPage] = useState(1);
