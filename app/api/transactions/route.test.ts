@@ -1,97 +1,192 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextRequest } from 'next/server';
-import { GET } from './route';
+import { describe, it, expect } from "vitest";
+import { NextRequest } from "next/server";
+import { GET, POST } from "@/app/api/transactions/route";
+import { ASSET_SYMBOLS, TRANSACTION_TYPES, TRANSACTION_STATUSES } from "@/types/enums";
 
-vi.mock('@/lib/auth', () => ({
-  getUser: vi.fn().mockResolvedValue({ name: 'Test User' }),
-}));
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-function makeRequest(query: Record<string, string> = {}, headers: Record<string, string> = {}): NextRequest {
-  const url = new URL('http://localhost/api/transactions');
-  for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
-  return new NextRequest(url, { headers });
+function makeGetRequest(params: Record<string, string> = {}) {
+  const url = new URL("http://localhost/api/transactions");
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  return new NextRequest(url);
 }
 
-describe('GET /api/transactions', () => {
-  beforeEach(() => vi.clearAllMocks());
+function makePostRequest(body: unknown) {
+  return new NextRequest("http://localhost/api/transactions", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
-  it('returns 200 with JSON array', async () => {
-    const res = await GET(makeRequest());
+// ---------------------------------------------------------------------------
+// GET – accepted values
+// ---------------------------------------------------------------------------
+
+describe("GET /api/transactions – accepted values", () => {
+  it("returns 200 with no filters", async () => {
+    const res = await GET(makeGetRequest());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body.length).toBeGreaterThan(0);
+    expect(Array.isArray(body.transactions)).toBe(true);
   });
 
-  it('includes ETag header on 200 response', async () => {
-    const res = await GET(makeRequest());
-    expect(res.headers.get('ETag')).toMatch(/^"[0-9a-f]{32}"$/);
-  });
-
-  it('sets private Cache-Control (user-specific data)', async () => {
-    const res = await GET(makeRequest());
-    const cc = res.headers.get('Cache-Control');
-    expect(cc).toContain('private');
-    expect(cc).not.toContain('public');
-  });
-
-  it('includes Authorization in Vary header', async () => {
-    const res = await GET(makeRequest());
-    expect(res.headers.get('Vary')).toContain('Authorization');
-  });
-
-  it('returns 304 when If-None-Match matches current ETag', async () => {
-    const first = await GET(makeRequest());
-    const etag = first.headers.get('ETag')!;
-
-    const second = await GET(makeRequest({}, { 'if-none-match': etag }));
-    expect(second.status).toBe(304);
-  });
-
-  it('304 body is empty', async () => {
-    const first = await GET(makeRequest());
-    const etag = first.headers.get('ETag')!;
-
-    const second = await GET(makeRequest({}, { 'if-none-match': etag }));
-    expect(await second.text()).toBe('');
-  });
-
-  it('returns 200 when If-None-Match does not match (data changed)', async () => {
-    const res = await GET(makeRequest({}, { 'if-none-match': '"outdated-etag"' }));
+  it.each([...ASSET_SYMBOLS])("accepts asset=%s", async (asset) => {
+    const res = await GET(makeGetRequest({ asset }));
     expect(res.status).toBe(200);
   });
 
-  it('ETags differ when filters produce different result sets', async () => {
-    const all = await GET(makeRequest());
-    const filtered = await GET(makeRequest({ status: 'Completed' }));
-    expect(all.headers.get('ETag')).not.toBe(filtered.headers.get('ETag'));
+  it.each([...TRANSACTION_TYPES])("accepts type=%s", async (type) => {
+    const res = await GET(makeGetRequest({ type }));
+    expect(res.status).toBe(200);
   });
 
-  it('filters by status query param', async () => {
-    const res = await GET(makeRequest({ status: 'Completed' }));
+  it.each([...TRANSACTION_STATUSES])("accepts status=%s", async (status) => {
+    const res = await GET(makeGetRequest({ status }));
+    expect(res.status).toBe(200);
+  });
+
+  it("filters by asset correctly", async () => {
+    const res = await GET(makeGetRequest({ asset: "XLM" }));
+    const { transactions } = await res.json();
+    expect(transactions.every((t: { asset: string }) => t.asset === "XLM")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET – rejected values
+// ---------------------------------------------------------------------------
+
+describe("GET /api/transactions – rejected values", () => {
+  it.each(["STRK", "DOGE", "xlm", ""])(
+    "rejects unknown asset=%s with 400",
+    async (asset) => {
+      const res = await GET(makeGetRequest({ asset }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/Unknown asset/);
+      expect(body.error).toMatch(ASSET_SYMBOLS.join(", "));
+    }
+  );
+
+  it.each(["Transfer", "deposit", "DEPOSIT"])(
+    "rejects unknown type=%s with 400",
+    async (type) => {
+      const res = await GET(makeGetRequest({ type }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/Unknown type/);
+    }
+  );
+
+  it.each(["Pending", "completed", "FAILED"])(
+    "rejects unknown status=%s with 400",
+    async (status) => {
+      const res = await GET(makeGetRequest({ status }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/Unknown status/);
+    }
+  );
+});
+
+// ---------------------------------------------------------------------------
+// POST – accepted values
+// ---------------------------------------------------------------------------
+
+const validBody = {
+  asset: "XLM",
+  type: "Deposit",
+  status: "Completed",
+  amount: 100,
+  date: "2025-01-01",
+  time: "09:00AM",
+};
+
+describe("POST /api/transactions – accepted values", () => {
+  it("creates a transaction with valid body", async () => {
+    const res = await POST(makePostRequest(validBody));
+    expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.every((t: { status: string }) => t.status === 'Completed')).toBe(true);
+    expect(body.transaction).toMatchObject(validBody);
+    expect(body.transaction.id).toMatch(/^TXN/);
   });
 
-  it('filters by search query param', async () => {
-    const res = await GET(makeRequest({ search: 'XLM' }));
+  it.each([...ASSET_SYMBOLS])("accepts asset=%s", async (asset) => {
+    const res = await POST(makePostRequest({ ...validBody, asset }));
+    expect(res.status).toBe(201);
+  });
+
+  it.each([...TRANSACTION_TYPES])("accepts type=%s", async (type) => {
+    const res = await POST(makePostRequest({ ...validBody, type }));
+    expect(res.status).toBe(201);
+  });
+
+  it.each([...TRANSACTION_STATUSES])("accepts status=%s", async (status) => {
+    const res = await POST(makePostRequest({ ...validBody, status }));
+    expect(res.status).toBe(201);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST – rejected values
+// ---------------------------------------------------------------------------
+
+describe("POST /api/transactions – rejected values", () => {
+  it.each(["STRK", "DOGE", "xlm", null, undefined])(
+    "rejects unknown asset=%s with 400",
+    async (asset) => {
+      const res = await POST(makePostRequest({ ...validBody, asset }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/Unknown asset/);
+    }
+  );
+
+  it.each(["Transfer", "deposit", null])(
+    "rejects unknown type=%s with 400",
+    async (type) => {
+      const res = await POST(makePostRequest({ ...validBody, type }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/Unknown type/);
+    }
+  );
+
+  it.each(["Pending", "completed", null])(
+    "rejects unknown status=%s with 400",
+    async (status) => {
+      const res = await POST(makePostRequest({ ...validBody, status }));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toMatch(/Unknown status/);
+    }
+  );
+
+  it("rejects non-numeric amount with 400", async () => {
+    const res = await POST(makePostRequest({ ...validBody, amount: "not-a-number" }));
+    expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.every((t: { asset: string }) => t.asset === 'XLM')).toBe(true);
+    expect(body.error).toMatch(/amount/);
   });
 
-  it('returns 401 when user is not authenticated', async () => {
-    const { getUser } = await import('@/lib/auth');
-    vi.mocked(getUser).mockResolvedValueOnce(null as never);
-
-    const res = await GET(makeRequest());
-    expect(res.status).toBe(401);
+  it("rejects missing date with 400", async () => {
+    const { date: _d, ...noDate } = validBody;
+    const res = await POST(makePostRequest(noDate));
+    expect(res.status).toBe(400);
   });
 
-  it('304 uses private Cache-Control for user data', async () => {
-    const first = await GET(makeRequest());
-    const etag = first.headers.get('ETag')!;
-
-    const second = await GET(makeRequest({}, { 'if-none-match': etag }));
-    expect(second.headers.get('Cache-Control')).toContain('private');
+  it("rejects invalid JSON with 400", async () => {
+    const req = new NextRequest("http://localhost/api/transactions", {
+      method: "POST",
+      body: "not-json",
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid JSON/);
   });
 });

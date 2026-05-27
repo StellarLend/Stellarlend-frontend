@@ -1,44 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
-import { generateETag, isNotModified, cacheHeaders, notModifiedResponse } from '@/lib/api/etag';
+import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 
 export const runtime = 'nodejs';
 
-// Health data changes infrequently — 30 s is a reasonable public cache TTL.
-const HEALTH_MAX_AGE = 30;
-
-export async function GET(request: NextRequest) {
+async function checkStellarNetwork(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    // Only hash the fields that indicate meaningful state changes.
-    // timestamp and uptime are volatile and must NOT influence the ETag,
-    // otherwise caching is useless (every response would have a new ETag).
-    const stableChecks = {
-      status: 'healthy',
+    await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
+}
+
+export async function GET() {
+  try {
+    const stellarStatus = await checkStellarNetwork();
+
+    const healthData = {
+      status: stellarStatus === 'unhealthy' ? 'unhealthy' : 'healthy',
+      timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
       checks: {
         database: 'healthy',
         api: 'healthy',
-        stellar: 'healthy',
+        stellar: stellarStatus,
       },
     };
 
-    const etag = generateETag(stableChecks);
-
-    if (isNotModified(request, etag)) {
-      return new NextResponse(null, notModifiedResponse(etag, 'public'));
-    }
-
-    const healthData = {
-      ...stableChecks,
-      timestamp: new Date().toISOString(),
-      uptime: typeof process !== 'undefined' ? process.uptime() : 0,
-    };
-
-    return NextResponse.json(healthData, {
-      status: 200,
-      headers: cacheHeaders(etag, HEALTH_MAX_AGE, 'public'),
-    });
+    const httpStatus = healthData.status === 'healthy' ? 200 : 503;
+    return NextResponse.json(healthData, { status: httpStatus });
   } catch {
     return NextResponse.json(
       {
