@@ -40,6 +40,18 @@ export default defineConfig({
         },
       },
       {
+        extends: true,
+        test: {
+          name: "unit",
+          environment: "node",
+          include: [
+            "lib/**/*.test.ts",
+            "app/api/**/*.test.ts",
+            "components/**/*.test.tsx",
+          ],
+        },
+      },
+      {
         test: {
           name: "accessibility",
           include: [
