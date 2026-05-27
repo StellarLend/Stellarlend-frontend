@@ -1,41 +1,111 @@
-import { NextResponse } from "next/server";
-import { parseTransactionParams } from "../../../lib/transactions/validator";
-import { fetchTransactions } from "../../../types/Transaction";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  ASSET_SYMBOLS,
+  TRANSACTION_TYPES,
+  TRANSACTION_STATUSES,
+  isAssetSymbol,
+  isTransactionType,
+  isTransactionStatus,
+} from "@/types/enums";
+import { fetchTransactions } from "@/types/Transaction";
+import type { Transaction } from "@/types/Transaction";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const { params, errors } = parseTransactionParams(searchParams);
+export const runtime = "nodejs";
 
-  if (errors) {
-    return NextResponse.json({ error: "Invalid parameters", details: errors }, { status: 400 });
+/** GET /api/transactions
+ *  Optional query params: asset, type, status
+ *  Returns 400 with a descriptive error for any unknown vocabulary value.
+ */
+export async function GET(req: NextRequest) {
+  const { searchParams } = req.nextUrl;
+
+  const asset = searchParams.get("asset");
+  const type = searchParams.get("type");
+  const status = searchParams.get("status");
+
+  if (asset !== null && !isAssetSymbol(asset)) {
+    return NextResponse.json(
+      { error: `Unknown asset "${asset}". Supported: ${ASSET_SYMBOLS.join(", ")}` },
+      { status: 400 }
+    );
   }
 
-  // Use the mock data as our database
-  let data = await fetchTransactions();
+  if (type !== null && !isTransactionType(type)) {
+    return NextResponse.json(
+      { error: `Unknown type "${type}". Supported: ${TRANSACTION_TYPES.join(", ")}` },
+      { status: 400 }
+    );
+  }
 
-  // 1. Filter
-  if (params.status) data = data.filter(t => t.status === params.status);
-  if (params.asset) data = data.filter(t => t.asset === params.asset);
-  if (params.startDate) data = data.filter(t => new Date(t.date) >= new Date(params.startDate!));
-  if (params.endDate) data = data.filter(t => new Date(t.date) <= new Date(params.endDate!));
+  if (status !== null && !isTransactionStatus(status)) {
+    return NextResponse.json(
+      { error: `Unknown status "${status}". Supported: ${TRANSACTION_STATUSES.join(", ")}` },
+      { status: 400 }
+    );
+  }
 
-  // 2. Sort
-  data.sort((a, b) => {
-    if (params.sort === "date-asc") return new Date(a.date).getTime() - new Date(b.date).getTime();
-    if (params.sort === "amount-desc") return Math.abs(b.amount) - Math.abs(a.amount);
-    if (params.sort === "amount-asc") return Math.abs(a.amount) - Math.abs(b.amount);
-    return new Date(b.date).getTime() - new Date(a.date).getTime(); // default: date-desc
-  });
+  let transactions = await fetchTransactions();
 
-  // 3. Paginate
-  const totalCount = data.length;
-  const totalPages = Math.ceil(totalCount / params.pageSize);
-  const startIndex = (params.page - 1) * params.pageSize;
-  const paginatedData = data.slice(startIndex, startIndex + params.pageSize);
+  if (asset) transactions = transactions.filter((t) => t.asset === asset);
+  if (type) transactions = transactions.filter((t) => t.type === type);
+  if (status) transactions = transactions.filter((t) => t.status === status);
 
-  // 4. Return Data + Metadata
-  return NextResponse.json({
-    data: paginatedData,
-    meta: { page: params.page, pageSize: params.pageSize, totalCount, totalPages }
-  });
+  return NextResponse.json({ transactions });
+}
+
+/** POST /api/transactions
+ *  Body: Partial<Transaction> (id is generated server-side)
+ *  Validates asset, type, and status against canonical enums.
+ */
+export async function POST(req: NextRequest) {
+  let body: Partial<Transaction>;
+
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { asset, type, status, amount, date, time } = body;
+
+  if (!isAssetSymbol(asset)) {
+    return NextResponse.json(
+      { error: `Unknown asset "${asset}". Supported: ${ASSET_SYMBOLS.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  if (!isTransactionType(type)) {
+    return NextResponse.json(
+      { error: `Unknown type "${type}". Supported: ${TRANSACTION_TYPES.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  if (!isTransactionStatus(status)) {
+    return NextResponse.json(
+      { error: `Unknown status "${status}". Supported: ${TRANSACTION_STATUSES.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  if (typeof amount !== "number") {
+    return NextResponse.json({ error: "amount must be a number" }, { status: 400 });
+  }
+
+  if (!date || !time) {
+    return NextResponse.json({ error: "date and time are required" }, { status: 400 });
+  }
+
+  const transaction: Transaction = {
+    id: `TXN${Date.now()}`,
+    asset,
+    type,
+    status,
+    amount,
+    date,
+    time,
+  };
+
+  return NextResponse.json({ transaction }, { status: 201 });
 }
