@@ -1,0 +1,75 @@
+name: Server Coverage Gate
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'app/api/**'
+      - 'lib/**'
+      - 'test/server/**'
+      - 'vitest.config.ts'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'app/api/**'
+      - 'lib/**'
+      - 'test/server/**'
+      - 'vitest.config.ts'
+
+jobs:
+  server-coverage:
+    name: API & Lib coverage (≥95%)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run server-side tests with coverage
+        run: npx vitest run --project server --coverage
+        env:
+          NODE_ENV: test
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-coverage-report
+          path: coverage/
+          retention-days: 14
+
+      - name: Report coverage to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const coveragePath = 'coverage/coverage-summary.json';
+            if (!fs.existsSync(coveragePath)) return;
+            const summary = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+            const total = summary.total;
+            const body = [
+              '## Server Coverage Report',
+              '',
+              '| Metric | Coverage |',
+              '|--------|----------|',
+              `| Lines | ${total.lines.pct}% |`,
+              `| Statements | ${total.statements.pct}% |`,
+              `| Functions | ${total.functions.pct}% |`,
+              `| Branches | ${total.branches.pct}% |`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
