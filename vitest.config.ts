@@ -17,7 +17,7 @@ export default defineConfig({
 
   resolve: {
     alias: {
-      "@": path.resolve(dirname, "."),
+      "@": path.resolve(__dirname, "./"),
     },
 },
   test: {
@@ -45,7 +45,7 @@ export default defineConfig({
           name: "accessibility",
           environment: "jsdom",
           globals: true,
-          setupFiles: ["./vitest.setup.ts"],
+          setupFiles: "./vitest.setup.ts",
           include: [
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
