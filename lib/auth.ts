@@ -12,55 +12,43 @@ const AUTH_CONFIG = {
   sessionExpiryHours: parseInt(process.env.AUTH_SESSION_EXPIRY || "24", 10),
 };
 
+import { SignJWT, jwtVerify } from "jose";
+
 /**
- * Verify JWT signature (simplified for demo)
- * In production, use proper JWT libraries like jsonwebtoken or jose
+ * Create a new session JWT
  */
-function verifySessionSignature(token: string, secret: string): boolean {
-  try {
-    // Basic verification - in production use proper JWT verification
-    const parts = token.split(".");
-    if (parts.length !== 3) return false;
+export async function createSession(user: Partial<User>): Promise<string> {
+  const secret = new TextEncoder().encode(AUTH_CONFIG.sessionSecret);
+  const alg = "HS256";
 
-    // For production: use jose or jsonwebtoken library
-    // import { jwtVerify } from 'jose';
-    // const verified = await jwtVerify(token, new TextEncoder().encode(secret));
-    // return !!verified;
+  const token = await new SignJWT({
+    userId: user.id,
+    walletAddress: user.walletAddress,
+    email: user.email,
+    name: user.name,
+  })
+    .setProtectedHeader({ alg })
+    .setIssuedAt()
+    .setExpirationTime(`${AUTH_CONFIG.sessionExpiryHours}h`)
+    .sign(secret);
 
-    return true; // Placeholder - implement proper verification
-  } catch {
-    return false;
-  }
+  return token;
 }
 
 /**
- * Parse session payload from JWT
- * In production, use proper JWT decoding with verification
+ * Set session cookie
  */
-function parseSessionPayload(token: string): Partial<Session> | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-
-    // Decode the payload (base64url decode)
-    const payload = JSON.parse(
-      Buffer.from(parts[1], "base64url").toString("utf-8")
-    );
-
-    return {
-      user: {
-        id: payload.sub || payload.userId,
-        email: payload.email,
-        name: payload.name,
-        walletAddress: payload.walletAddress,
-        createdAt: new Date(payload.iat * 1000),
-      },
-      issuedAt: new Date(payload.iat * 1000),
-      expiresAt: new Date(payload.exp * 1000),
-    };
-  } catch {
-    return null;
-  }
+export async function setSessionCookie(token: string) {
+  const cookieStore = await cookies();
+  cookieStore.set({
+    name: AUTH_CONFIG.sessionCookieName,
+    value: token,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: AUTH_CONFIG.sessionExpiryHours * 60 * 60,
+  });
 }
 
 /**
@@ -76,23 +64,27 @@ export async function getSession(): Promise<Session | null> {
       return null;
     }
 
-    // Verify signature
-    if (!verifySessionSignature(sessionCookie.value, AUTH_CONFIG.sessionSecret)) {
+    const secret = new TextEncoder().encode(AUTH_CONFIG.sessionSecret);
+
+    // Verify and parse session
+    try {
+      const { payload } = await jwtVerify(sessionCookie.value, secret);
+      
+      return {
+        user: {
+          id: (payload.sub || payload.userId) as string,
+          email: payload.email as string | undefined,
+          name: payload.name as string | undefined,
+          walletAddress: payload.walletAddress as string | undefined,
+          createdAt: new Date((payload.iat || 0) * 1000),
+        },
+        issuedAt: new Date((payload.iat || 0) * 1000),
+        expiresAt: new Date((payload.exp || 0) * 1000),
+      } as Session;
+    } catch (e) {
+      // Invalid signature or expired token
       return null;
     }
-
-    // Parse and validate session
-    const session = parseSessionPayload(sessionCookie.value);
-    if (!session || !session.user || !session.expiresAt) {
-      return null;
-    }
-
-    // Check if session is expired
-    if (new Date() > session.expiresAt) {
-      return null;
-    }
-
-    return session as Session;
   } catch (error) {
     console.error("Session retrieval error:", error);
     return null;

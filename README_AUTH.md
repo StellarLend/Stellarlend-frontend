@@ -359,29 +359,33 @@ For more troubleshooting, see [docs/AUTH.md](docs/AUTH.md)
 - [ ] Read [docs/AUTH.md](docs/AUTH.md) for complete documentation
 - [ ] Run tests: `pnpm test -- lib/auth.test.ts --coverage`
 - [ ] Create login/logout endpoints
-- [ ] Integrate with Stellar wallet authentication
-- [ ] Update components to handle authenticated/unauthenticated states
-- [ ] Deploy to staging and test
-- [ ] Deploy to production
+- [x] Integrate with Stellar wallet authentication
 
-## 📞 Support
+## 🔑 Stellar Wallet Authentication (SEP-10 Style)
 
-For questions or issues:
+The app now supports a wallet-centric authentication flow where users prove ownership of their Stellar address via cryptographic signatures.
 
-1. Check [docs/AUTH.md](docs/AUTH.md) for detailed documentation
-2. Review test cases in [lib/auth.test.ts](lib/auth.test.ts) for examples
-3. See [types/common.ts](types/common.ts) for type definitions
-4. Check [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) for implementation details
+### API Routes
 
-## ✅ Implementation Summary
+1. **`POST /api/auth/challenge`**
+   - **Body:** `{ "walletAddress": "G..." }`
+   - **Returns:** `{ "transaction": "base64_xdr_string" }`
+   - **Description:** Generates a SEP-10 challenge transaction valid for 5 minutes.
 
-- ✅ Session-backed auth implemented
-- ✅ >95% test coverage (35+ tests)
-- ✅ Security best practices applied
-- ✅ Comprehensive documentation provided
-- ✅ Type-safe implementation
-- ✅ Production-ready code
+2. **`POST /api/auth/verify`**
+   - **Body:** `{ "transaction": "base64_xdr_string_signed_by_client" }`
+   - **Returns:** `{ "success": true, "walletAddress": "G..." }`
+   - **Description:** Verifies the client's signature on the challenge transaction. If valid, mints a session JWT and sets it as an `httpOnly` cookie.
 
----
+### Environment Variables
 
-**Ready to use! Start with `pnpm test -- lib/auth.test.ts --coverage` to verify the implementation.**
+Ensure you have a Server Signing Secret configured in your `.env.local` for issuing and validating challenges:
+
+```bash
+# Required for generating and verifying SEP-10 challenges
+# Keep this secret safe!
+STELLAR_SIGNING_SECRET=S...
+NEXT_PUBLIC_APP_DOMAIN=localhost:3000
+```
+
+*Note: If `STELLAR_SIGNING_SECRET` is missing during development, the server will log a warning and generate a random keypair on startup.*
