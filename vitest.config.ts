@@ -41,12 +41,22 @@ export default defineConfig({
           ],
         },
       },
+      {
+        test: {
+          name: "unit",
+          include: ["lib/**/*.test.ts"],
+          environment: "node",
+        },
+      },
     ],
     coverage: {
       reporter: ["text", "json"],
       include: [
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/layout/TopNav.tsx",
+        "lib/cache/index.ts",
+        "app/api/prices/route.ts",
+        "app/api/positions/route.ts",
       ],
     },
   },
