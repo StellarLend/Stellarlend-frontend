@@ -10,6 +10,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
+    "test:server": "vitest --project server",
+    "test:server:coverage": "vitest --project server --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "svg": "node scripts/svgToComponent.js",
