@@ -67,6 +67,7 @@ export default defineConfig({
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
+            "lib/config.test.ts",
           ],
           alias: {
             "@": path.resolve(dirname, "."),
@@ -84,6 +85,8 @@ export default defineConfig({
         "components/shared/layout/TopNav.tsx",
         "types/enums.ts",
         "app/api/transactions/route.ts",
+        "lib/config.ts",
+        "lib/server-config.ts",
       ],
       exclude: ["lib/utils/cn.ts", "**/*.stories.*", "**/*.test.*"],
       thresholds: {
