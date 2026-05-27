@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
+<<<<<<< HEAD
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -16,6 +17,13 @@ async function checkStellarNetwork(): Promise<'healthy' | 'degraded' | 'unhealth
 }
 
 export async function GET() {
+=======
+import { withRequestLogging } from '@/lib/api/handler';
+
+export const runtime = 'nodejs';
+
+async function handleHealth() {
+>>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
   try {
     const stellarStatus = await checkStellarNetwork();
 
@@ -44,3 +52,8 @@ export async function GET() {
     );
   }
 }
+<<<<<<< HEAD
+=======
+
+export const GET = withRequestLogging('/api/health', handleHealth);
+>>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))

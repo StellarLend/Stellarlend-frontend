@@ -69,7 +69,22 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 # Feature Flags
 NEXT_PUBLIC_ENABLE_ANALYTICS=false
+
+# Server Logging Configuration
+SERVER_LOG_LEVEL=info
 ```
+
+Logging is emitted as structured JSON by `lib/logger.ts` and includes:
+- `timestamp`
+- `level`
+- `route`
+- `method`
+- `status`
+- `durationMs`
+- `message`
+- `context`
+
+Sensitive information such as authorization headers, API keys, auth tokens, and Stellar public/secret keys are redacted automatically.
 
 > **Note**: For production, use the Stellar mainnet configuration and secure your environment variables.
 

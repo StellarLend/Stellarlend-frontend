@@ -67,7 +67,11 @@ export default defineConfig({
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
+<<<<<<< HEAD
             "lib/config.test.ts",
+=======
+            "lib/**/*.test.ts",
+>>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
           ],
           alias: {
             "@": path.resolve(dirname, "."),
