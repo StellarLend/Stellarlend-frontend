@@ -10,12 +10,16 @@
     "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
+    "test:server": "vitest --project server",
+    "test:server:coverage": "vitest --project server --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "svg": "node scripts/svgToComponent.js",
     "generate-component": "plop",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test:server": "vitest run --project server",
+    "test:server:coverage": "vitest run --project server --coverage"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
@@ -29,7 +33,8 @@
     "react": "^19.0.0",
     "react-datepicker": "^8.3.0",
     "react-dom": "^19.0.0",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@axe-core/react": "^4.10.2",
