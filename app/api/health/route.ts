@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 
@@ -24,7 +24,6 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
-      uptime: typeof process !== 'undefined' ? process.uptime() : 0,
       checks: {
         database: 'healthy',
         api: 'healthy',
