@@ -5,18 +5,12 @@ import { LendingData } from '@/app/lending/page';
 import { Input } from '@/components/shared/ui/Input';
 import Button from '@/components/shared/ui/Button';
 import { cn } from '@/lib/utils/cn';
+import { ASSETS } from '@/lib/assets';
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
   initialData: LendingData;
 }
-
-const ASSETS = [
-  { symbol: 'XLM', name: 'Stellar Lumens', balance: 3750.00 },
-  { symbol: 'USDC', name: 'USD Coin', balance: 1250.00 },
-  { symbol: 'BTC', name: 'Bitcoin', balance: 0.15 },
-  { symbol: 'ETH', name: 'Ethereum', balance: 2.5 },
-];
 
 const INTEREST_RATES = {
   XLM: { min: 5.0, max: 12.0, default: 8.5 },
