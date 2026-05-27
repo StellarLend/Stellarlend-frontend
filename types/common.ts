@@ -13,3 +13,23 @@ export type DeepPartial<T> = {
 
 // Usage
 export type PartialButtonProps = Optional<ButtonProps, "variant" | "size">;
+
+// Authentication Types
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  walletAddress?: string;
+  createdAt: Date;
+}
+
+export interface Session {
+  user: User;
+  expiresAt: Date;
+  issuedAt: Date;
+}
+
+export interface AuthError {
+  code: string;
+  message: string;
+}

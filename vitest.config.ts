@@ -10,8 +10,15 @@ const dirname =
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
 
+const alias = { "@": path.resolve(dirname, ".") };
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(dirname, "."),
+    },
+  },
   test: {
     projects: [
       {
@@ -44,20 +51,35 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["lib/**/*.test.ts"],
           environment: "node",
+          include: [
+            "types/enums.test.ts",
+            "app/api/transactions/route.test.ts",
+          ],
+          alias: {
+            "@": path.resolve(dirname, "."),
+          },
         },
       },
     ],
     coverage: {
-      reporter: ["text", "json"],
+      provider: "v8",
+      reporter: ["text", "json", "lcov"],
       include: [
+        "app/api/**",
+        "lib/**",
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/layout/TopNav.tsx",
-        "lib/cache/index.ts",
-        "app/api/prices/route.ts",
-        "app/api/positions/route.ts",
+        "types/enums.ts",
+        "app/api/transactions/route.ts",
       ],
+      exclude: ["lib/utils/cn.ts", "**/*.stories.*", "**/*.test.*"],
+      thresholds: {
+        lines: 95,
+        functions: 95,
+        branches: 90,
+        statements: 95,
+      },
     },
   },
 });
