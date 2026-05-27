@@ -9,21 +9,8 @@ import ConfirmModal from '@/components/features/lending/components/ConfirmModal'
 import TabSelector from '@/components/features/lending/components/TabSelector';
 import { PageHeader } from '@/components/shared/common';
 
-export interface LendingData {
-  asset: string;
-  amount: number;
-  interestRate: number;
-  duration?: number;
-  collateral?: string;
-  collateralAmount?: number;
-}
-
-export interface CalculationResult {
-  totalEarnings: number;
-  dailyEarnings: number;
-  totalRepayment?: number;
-  monthlyPayment?: number;
-}
+export type { LendingData, CalculationResult } from '@/lib/lending/types';
+import type { LendingData, CalculationResult } from '@/lib/lending/types';
 
 export default function LendingPage() {
   const [activeTab, setActiveTab] = useState<'lend' | 'borrow'>('lend');

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LendingData, CalculationResult } from '@/app/lending/page';
+import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { calculateQuote } from '@/lib/lending/quote';
 
 interface InterestCalculatorProps {
   data: LendingData;
@@ -13,51 +14,21 @@ export default function InterestCalculator({ data, type, onCalculate }: Interest
   const [calculation, setCalculation] = useState<CalculationResult | null>(null);
 
   useEffect(() => {
-    if (data.amount > 0 && data.interestRate > 0) {
-      calculateInterest();
+    if (data.amount <= 0 || data.interestRate <= 0) {
+      setCalculation(null);
+      return;
     }
-  }, [data.amount, data.interestRate, data.duration, type]);
 
-  const calculateInterest = () => {
-    const { amount, interestRate, duration = 30 } = data;
+    const outcome = calculateQuote(type, data);
 
-    if (type === 'lend') {
-      // Lending calculations
-      const dailyRate = interestRate / 365 / 100;
-      const dailyEarnings = amount * dailyRate;
-      const totalEarnings = dailyEarnings * duration;
-
-      const result: CalculationResult = {
-        totalEarnings,
-        dailyEarnings,
-      };
-
-      setCalculation(result);
-      onCalculate(result);
-    } else {
-      // Borrowing calculations
-      const monthlyRate = interestRate / 12 / 100;
-      const numberOfPayments = Math.ceil(duration / 30);
-
-      const monthlyPayment = numberOfPayments > 0
-        ? (amount * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
-          (Math.pow(1 + monthlyRate, numberOfPayments) - 1)
-        : 0;
-
-      const totalRepayment = monthlyPayment * numberOfPayments;
-      const totalInterest = totalRepayment - amount;
-
-      const result: CalculationResult = {
-        totalEarnings: totalInterest,
-        dailyEarnings: totalInterest / duration,
-        totalRepayment,
-        monthlyPayment,
-      };
-
-      setCalculation(result);
-      onCalculate(result);
+    if (!outcome.ok) {
+      setCalculation(null);
+      return;
     }
-  };
+
+    setCalculation(outcome.result);
+    onCalculate(outcome.result);
+  }, [data.amount, data.interestRate, data.duration, type, onCalculate]);
 
   if (!calculation && data.amount > 0) {
     return (
