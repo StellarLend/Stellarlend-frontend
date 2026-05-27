@@ -1,32 +1,52 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
+import { generateETag, isNotModified, cacheHeaders, notModifiedResponse } from '@/lib/api/etag';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+// Health data changes infrequently — 30 s is a reasonable public cache TTL.
+const HEALTH_MAX_AGE = 30;
+
+export async function GET(request: NextRequest) {
   try {
-    const healthData = {
+    // Only hash the fields that indicate meaningful state changes.
+    // timestamp and uptime are volatile and must NOT influence the ETag,
+    // otherwise caching is useless (every response would have a new ETag).
+    const stableChecks = {
       status: 'healthy',
-      timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
-      uptime: typeof process !== 'undefined' ? process.uptime() : 0,
       checks: {
-        database: 'healthy', // Add actual database check if needed
-        api: 'healthy',      // Add actual API check if needed
-        stellar: 'healthy'   // Add actual Stellar network check if needed
-      }
+        database: 'healthy',
+        api: 'healthy',
+        stellar: 'healthy',
+      },
     };
 
-    return NextResponse.json(healthData, { status: 200 });
-  } catch (error) {
+    const etag = generateETag(stableChecks);
+
+    if (isNotModified(request, etag)) {
+      return new NextResponse(null, notModifiedResponse(etag, 'public'));
+    }
+
+    const healthData = {
+      ...stableChecks,
+      timestamp: new Date().toISOString(),
+      uptime: typeof process !== 'undefined' ? process.uptime() : 0,
+    };
+
+    return NextResponse.json(healthData, {
+      status: 200,
+      headers: cacheHeaders(etag, HEALTH_MAX_AGE, 'public'),
+    });
+  } catch {
     return NextResponse.json(
       {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
-        error: 'Health check failed'
+        error: 'Health check failed',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

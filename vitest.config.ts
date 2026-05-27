@@ -41,6 +41,29 @@ export default defineConfig({
           ],
         },
       },
+      {
+        resolve: { alias: { "@": path.resolve(dirname, ".") } },
+        test: {
+          name: "server",
+          environment: "node",
+          include: [
+            "app/api/**/*.test.ts",
+            "lib/**/*.test.ts",
+          ],
+          coverage: {
+            provider: "v8",
+            reporter: ["text", "json", "lcov"],
+            include: ["app/api/**/*.ts", "lib/**/*.ts"],
+            exclude: ["**/*.test.ts", "**/*.d.ts", "lib/utils/**"],
+            thresholds: {
+              lines: 95,
+              functions: 95,
+              branches: 90,
+              statements: 95,
+            },
+          },
+        },
+      },
     ],
     coverage: {
       reporter: ["text", "json"],
