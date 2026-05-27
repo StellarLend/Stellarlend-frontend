@@ -10,6 +10,8 @@ const dirname =
     ? __dirname
     : path.dirname(fileURLToPath(import.meta.url));
 
+const alias = { "@": path.resolve(dirname, ".") };
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   test: {
@@ -39,6 +41,29 @@ export default defineConfig({
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
           ],
+        },
+      },
+      {
+        resolve: { alias },
+        test: {
+          name: "server",
+          environment: "node",
+          include: [
+            "app/api/**/*.test.ts",
+            "lib/**/*.test.ts",
+          ],
+          coverage: {
+            provider: "v8",
+            reporter: ["text", "json", "lcov"],
+            include: ["app/api/**/*.ts", "lib/**/*.ts"],
+            exclude: ["**/*.test.ts", "**/*.d.ts", "lib/utils/**"],
+            thresholds: {
+              lines: 95,
+              functions: 95,
+              branches: 90,
+              statements: 95,
+            },
+          },
         },
       },
     ],
