@@ -10,6 +10,7 @@ This frontend application provides a modern, responsive web interface for intera
 
 - **Lending & Borrowing**: Earn interest by lending assets or borrow against collateral
 - **Multi-Asset Support**: Support for XLM, USDC, BTC, ETH, and other Stellar-based assets
+- **Real-Time Asset Pricing**: Cached price oracle proxy for secure price feeds
 - **Real-Time Calculations**: Dynamic interest rate and payment calculations
 - **Transaction Management**: Track all lending, borrowing, and payment transactions
 - **Dashboard Analytics**: Comprehensive metrics and insights
