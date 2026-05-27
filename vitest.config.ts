@@ -44,6 +44,8 @@ export default defineConfig({
         test: {
           name: "accessibility",
           environment: "jsdom",
+          globals: true,
+          setupFiles: ["./vitest.setup.ts"],
           include: [
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
