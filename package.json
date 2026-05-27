@@ -11,16 +11,14 @@
     "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
-    "test:server": "vitest --project server",
-    "test:server:coverage": "vitest --project server --coverage",
+    "test:server": "vitest run --project server",
+    "test:server:coverage": "vitest run --project server --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "svg": "node scripts/svgToComponent.js",
     "generate-component": "plop",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "test:server": "vitest run --project server",
-    "test:server:coverage": "vitest run --project server --coverage"
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
@@ -86,5 +84,6 @@
       "prettier --write",
       "git add"
     ]
-  }
+  },
+  "packageManager": "pnpm@11.4.0+sha512.f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f"
 }
