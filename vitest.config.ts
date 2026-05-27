@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
+import tsconfigPaths from "vite-tsconfig-paths";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
@@ -12,6 +13,13 @@ const dirname =
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+  plugins: [tsconfigPaths(), react()],
+
+  resolve: {
+    alias: {
+      "@": path.resolve(dirname, "."),
+    },
+},
   test: {
     projects: [
       {
@@ -35,6 +43,7 @@ export default defineConfig({
       {
         test: {
           name: "accessibility",
+          environment: "jsdom",
           include: [
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
@@ -49,9 +58,7 @@ export default defineConfig({
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
           ],
-          alias: {
-            "@": path.resolve(dirname, "."),
-          },
+
         },
       },
     ],

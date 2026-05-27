@@ -1,8 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IconButton } from './IconButton';
+import { describe, it, expect, vi, beforeEach} from "vitest";
+import React from "react";
 
 describe('IconButton Accessibility', () => {
-  const mockOnClick = jest.fn();
+  const mockOnClick = vi.fn();
 
   beforeEach(() => {
     mockOnClick.mockClear();
