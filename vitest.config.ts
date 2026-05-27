@@ -41,12 +41,27 @@ export default defineConfig({
           ],
         },
       },
+      {
+        test: {
+          name: "unit",
+          environment: "node",
+          include: [
+            "types/enums.test.ts",
+            "app/api/transactions/route.test.ts",
+          ],
+          alias: {
+            "@": path.resolve(dirname, "."),
+          },
+        },
+      },
     ],
     coverage: {
       reporter: ["text", "json"],
       include: [
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/layout/TopNav.tsx",
+        "types/enums.ts",
+        "app/api/transactions/route.ts",
       ],
     },
   },
