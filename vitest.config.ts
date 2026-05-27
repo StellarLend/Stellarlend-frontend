@@ -48,6 +48,8 @@ export default defineConfig({
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
+            "app/api/webhooks/transactions/route.test.ts",
+            "lib/webhooks/verify.test.ts",
           ],
           alias: {
             "@": path.resolve(dirname, "."),
@@ -62,6 +64,10 @@ export default defineConfig({
         "components/shared/layout/TopNav.tsx",
         "types/enums.ts",
         "app/api/transactions/route.ts",
+        "app/api/webhooks/transactions/route.ts",
+        "lib/webhooks/verify.ts",
+        "lib/webhooks/types.ts",
+        "lib/transactions/store.ts",
       ],
     },
   },
