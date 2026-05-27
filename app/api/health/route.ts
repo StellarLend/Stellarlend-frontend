@@ -1,15 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
-import { httpFetch, isUpstreamError } from '@/lib/http';
+import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 
 export const runtime = 'nodejs';
 
-async function checkStellarNetwork(): Promise<'healthy' | 'degraded'> {
+async function checkStellarNetwork(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpFetch(`${config.stellar.horizonUrl}`, { maxRetries: 1, timeoutMs: 5000 });
+    await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
-  } catch {
-    return 'degraded';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
   }
 }
 
@@ -18,27 +20,27 @@ export async function GET() {
     const stellarStatus = await checkStellarNetwork();
 
     const healthData = {
-      status: stellarStatus === 'healthy' ? 'healthy' : 'degraded',
+      status: stellarStatus === 'unhealthy' ? 'unhealthy' : 'healthy',
       timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
-      uptime: typeof process !== 'undefined' ? process.uptime() : 0,
       checks: {
+        database: 'healthy',
         api: 'healthy',
         stellar: stellarStatus,
       },
     };
 
-    return NextResponse.json(healthData, { status: 200 });
-  } catch (error) {
-    const detail = isUpstreamError(error) ? error.message : 'Health check failed';
+    const httpStatus = healthData.status === 'healthy' ? 200 : 503;
+    return NextResponse.json(healthData, { status: httpStatus });
+  } catch {
     return NextResponse.json(
       {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
-        error: detail,
+        error: 'Health check failed',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

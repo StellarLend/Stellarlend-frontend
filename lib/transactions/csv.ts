@@ -1,36 +1,37 @@
-import { Transaction } from './repository';
+import type { Transaction } from './types';
 
-const CSV_HEADERS = ['id', 'userId', 'type', 'amount', 'asset', 'status', 'timestamp', 'txHash'] as const;
+const CSV_HEADERS = ['ID', 'Type', 'Amount', 'Asset', 'Date', 'Time', 'Status'] as const;
 
 /**
- * Escapes a single CSV field.
- * - Wraps in double-quotes if the value contains a comma, double-quote, newline,
- *   or starts with a formula-injection trigger character (=, +, -, @, tab, CR).
- * - Doubles any embedded double-quotes.
+ * Escapes a single CSV field value.
+ *
+ * - Wraps all fields in double-quotes.
+ * - Doubles any embedded double-quotes per RFC 4180.
+ * - Prefixes fields starting with =, +, -, or @ with a single quote to
+ *   prevent formula-injection when opened in spreadsheet applications.
  */
-export function escapeCsvField(value: string): string {
-  const needsQuoting =
-    /[,"\n\r]/.test(value) || /^[=+\-@\t\r]/.test(value);
-
-  if (!needsQuoting) return value;
-
-  return '"' + value.replace(/"/g, '""') + '"';
+export function escapeField(value: string): string {
+  const injection = /^[=+\-@\t\r]/.test(value);
+  const escaped = (injection ? `'${value}` : value).replace(/"/g, '""');
+  return `"${escaped}"`;
 }
 
-/**
- * Serializes an array of transactions to a CSV string with a header row.
- * Streams row-by-row to bound memory usage for large result sets.
- */
-export function transactionsToCsv(transactions: Transaction[]): string {
-  const rows: string[] = [CSV_HEADERS.join(',')];
+export function serializeTransactionsToCSV(transactions: Transaction[]): string {
+  const header = CSV_HEADERS.map(escapeField).join(',');
 
-  for (const tx of transactions) {
-    const row = CSV_HEADERS.map((col) => {
-      const raw = tx[col] ?? '';
-      return escapeCsvField(String(raw));
-    });
-    rows.push(row.join(','));
-  }
+  const rows = transactions.map((txn) =>
+    [
+      txn.id,
+      txn.type,
+      txn.amount.toString(),
+      txn.asset,
+      txn.date,
+      txn.time,
+      txn.status,
+    ]
+      .map(escapeField)
+      .join(','),
+  );
 
-  return rows.join('\n');
+  return [header, ...rows].join('\r\n');
 }

@@ -1,22 +1,51 @@
-export type UpstreamErrorCode =
+export type HttpErrorCode =
   | 'TIMEOUT'
   | 'NETWORK_ERROR'
   | 'HTTP_ERROR'
   | 'PARSE_ERROR'
   | 'RETRY_EXHAUSTED';
 
-export class UpstreamError extends Error {
+export class HttpError extends Error {
   constructor(
-    public readonly code: UpstreamErrorCode,
+    public readonly code: HttpErrorCode,
     message: string,
     public readonly status?: number,
-    public readonly cause?: unknown
+    public readonly cause?: unknown,
   ) {
     super(message);
-    this.name = 'UpstreamError';
+    this.name = 'HttpError';
   }
 }
 
-export function isUpstreamError(err: unknown): err is UpstreamError {
-  return err instanceof UpstreamError;
+export class TimeoutError extends HttpError {
+  constructor(url: string, timeoutMs: number) {
+    super('TIMEOUT', `Request to ${url} timed out after ${timeoutMs}ms`);
+    this.name = 'TimeoutError';
+  }
+}
+
+export class NetworkError extends HttpError {
+  constructor(url: string, cause: unknown) {
+    super('NETWORK_ERROR', `Network error fetching ${url}`, undefined, cause);
+    this.name = 'NetworkError';
+  }
+}
+
+export class UpstreamHttpError extends HttpError {
+  constructor(url: string, status: number) {
+    super('HTTP_ERROR', `Upstream ${url} returned ${status}`, status);
+    this.name = 'UpstreamHttpError';
+  }
+}
+
+export class RetryExhaustedError extends HttpError {
+  constructor(url: string, attempts: number, lastError: HttpError) {
+    super(
+      'RETRY_EXHAUSTED',
+      `All ${attempts} attempts failed for ${url}: ${lastError.message}`,
+      lastError.status,
+      lastError,
+    );
+    this.name = 'RetryExhaustedError';
+  }
 }

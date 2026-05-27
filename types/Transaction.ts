@@ -1,10 +1,12 @@
-export type TransactionStatus = "Completed" | "Processing" | "Failed";
+import type { AssetSymbol, TransactionType, TransactionStatus } from "./enums";
+
+export type { AssetSymbol, TransactionType, TransactionStatus };
 
 export interface Transaction {
   id: string;
-  type: string;
+  type: TransactionType;
   amount: number;
-  asset: "XLM" | "BTC" | "STRK";
+  asset: AssetSymbol;
   date: string;
   time: string;
   status: TransactionStatus;
@@ -37,7 +39,7 @@ export const fetchTransactions = async (): Promise<Transaction[]> => {
       id: "TXN12347",
       type: "Withdrawal",
       amount: -7500,
-      asset: "STRK",
+      asset: "USDC",
       date: "2025-02-28",
       time: "04:45PM",
       status: "Completed",
@@ -64,11 +66,10 @@ export const fetchTransactions = async (): Promise<Transaction[]> => {
       id: "TXN12350",
       type: "Deposit",
       amount: 20000,
-      asset: "STRK",
+      asset: "ETH",
       date: "2024-11-15",
       time: "01:05PM",
       status: "Completed",
     },
-    // Add more transactions as needed
   ];
 };

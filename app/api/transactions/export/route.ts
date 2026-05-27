@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
-import { fetchTransactions, parseTransactionFilter, transactionsToCsv } from '@/lib/transactions';
+import {
+  fetchTransactions,
+  filterTransactions,
+  serializeTransactionsToCSV,
+} from '@/lib/transactions';
+import type { TransactionFilters, TransactionStatus } from '@/lib/transactions';
 
 export const runtime = 'nodejs';
 
-function buildFilename(): string {
-  const date = new Date().toISOString().slice(0, 10);
-  return `transactions-${date}.csv`;
+const VALID_STATUSES = new Set<string>(['All', 'Completed', 'Processing', 'Failed']);
+
+function parseFilters(searchParams: URLSearchParams): TransactionFilters {
+  const status = searchParams.get('status') ?? 'All';
+  return {
+    search:   searchParams.get('search')   ?? undefined,
+    status:   VALID_STATUSES.has(status) ? (status as TransactionStatus | 'All') : 'All',
+    dateFrom: searchParams.get('dateFrom') ?? undefined,
+    dateTo:   searchParams.get('dateTo')   ?? undefined,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -15,22 +27,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const { valid, filter, error } = parseTransactionFilter(searchParams);
-  if (!valid) {
-    return NextResponse.json({ error }, { status: 400 });
-  }
+  const filters = parseFilters(request.nextUrl.searchParams);
+  const all = await fetchTransactions();
+  const filtered = filterTransactions(all, filters);
 
-  filter.userId = (user as { id?: string }).id ?? undefined;
-
-  const transactions = await fetchTransactions(filter);
-  const csv = transactionsToCsv(transactions);
+  const csv = serializeTransactionsToCSV(filtered);
+  const filename = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;
 
   return new NextResponse(csv, {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${buildFilename()}"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Cache-Control': 'no-store',
     },
   });
