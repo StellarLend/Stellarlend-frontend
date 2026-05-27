@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "check-secrets": "node scripts/check-client-secrets.js",
+    "build": "npm run check-secrets && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "next lint && npm run check-secrets",
     "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
@@ -29,6 +30,7 @@
     "react": "^19.0.0",
     "react-datepicker": "^8.3.0",
     "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
@@ -42,7 +44,6 @@
     "@storybook/addon-vitest": "^9.0.18",
     "@storybook/cli": "^9.0.18",
     "@storybook/nextjs-vite": "^9.0.18",
-    "eslint-config-next": "15.2.3",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -53,6 +54,7 @@
     "@vitest/coverage-v8": "^3.2.4",
     "bundlewatch": "^0.4.1",
     "eslint": "^9.31.0",
+    "eslint-config-next": "15.2.3",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-storybook": "^9.0.18",
     "globals": "^16.3.0",
