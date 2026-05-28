@@ -62,7 +62,7 @@ export default defineConfig({
       },
       {
         test: {
-          name: "unit",
+          name: "unit-specific",
           environment: "node",
           include: [
             "types/enums.test.ts",
