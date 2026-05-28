@@ -17,9 +17,8 @@ interface Config {
     googleAnalyticsId?: string;
     mixpanelToken?: string;
   };
-  rateLimit: {
-    max: number;
-    window: number;
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
   };
 }
 
@@ -42,9 +41,8 @@ const config: Config = {
     googleAnalyticsId: process.env.NEXT_PUBLIC_GA_TRACKING_ID,
     mixpanelToken: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
   },
-  rateLimit: {
-    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
-    window: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10), // Default 1 minute
+  logging: {
+    level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
   },
 };
 

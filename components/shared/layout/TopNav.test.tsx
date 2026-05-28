@@ -1,6 +1,6 @@
-import React from "react";
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import TopNav from './TopNav';
 
 import TopNav from "./TopNav";
 import { SidebarProvider } from "@/context/SidebarContext";

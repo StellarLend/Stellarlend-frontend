@@ -31,9 +31,7 @@ export default defineConfig({
         extends: true,
 
         plugins: [
-          storybookTest({
-            configDir: path.join(dirname, ".storybook"),
-          }),
+          storybookTest({ configDir: path.join(dirname, ".storybook") }),
         ],
 
         test: {
@@ -69,15 +67,13 @@ export default defineConfig({
         extends: true,
 
         test: {
-          name: "unit-specific",
+          name: "unit-api",
           environment: "node",
 
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
-            "app/api/webhooks/transactions/route.test.ts",
-            "lib/webhooks/verify.test.ts",
-            "lib/config.test.ts",
+            "lib/**/*.test.ts",
           ],
         },
       },
