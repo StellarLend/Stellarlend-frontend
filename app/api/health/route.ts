@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
+import { withHandler } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
@@ -16,10 +16,9 @@ async function checkStellarNetwork(): Promise<'healthy' | 'degraded' | 'unhealth
 }
 
 export async function GET() {
-  try {
+  return withHandler(async () => {
     const stellarStatus = await checkStellarNetwork();
-
-    const healthData = {
+    return {
       status: stellarStatus === 'unhealthy' ? 'unhealthy' : 'healthy',
       timestamp: new Date().toISOString(),
       environment: config.app.environment,
@@ -30,17 +29,5 @@ export async function GET() {
         stellar: stellarStatus,
       },
     };
-
-    const httpStatus = healthData.status === 'healthy' ? 200 : 503;
-    return NextResponse.json(healthData, { status: httpStatus });
-  } catch {
-    return NextResponse.json(
-      {
-        status: 'unhealthy',
-        timestamp: new Date().toISOString(),
-        error: 'Health check failed',
-      },
-      { status: 500 },
-    );
-  }
+  });
 }
