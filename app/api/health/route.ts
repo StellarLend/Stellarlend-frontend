@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
+import { withHandler } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
