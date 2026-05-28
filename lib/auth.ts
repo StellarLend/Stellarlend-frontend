@@ -1,161 +1,54 @@
-// lib/auth.ts
-import { cookies } from "next/headers";
-import { User, Session, AuthError } from "@/types/common";
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
 
-/**
- * Auth Configuration
- * These should be set via environment variables for production
- */
-const AUTH_CONFIG = {
-  sessionCookieName: process.env.NEXT_PUBLIC_SESSION_COOKIE || "session",
-  sessionSecret: process.env.AUTH_SECRET || "dev-secret-change-in-production",
-  sessionExpiryHours: parseInt(process.env.AUTH_SESSION_EXPIRY || "24", 10),
-};
-
-/**
- * Verify JWT signature (simplified for demo)
- * In production, use proper JWT libraries like jsonwebtoken or jose
- */
-function verifySessionSignature(token: string, secret: string): boolean {
-  try {
-    // Basic verification - in production use proper JWT verification
-    const parts = token.split(".");
-    if (parts.length !== 3) return false;
-
-    // For production: use jose or jsonwebtoken library
-    // import { jwtVerify } from 'jose';
-    // const verified = await jwtVerify(token, new TextEncoder().encode(secret));
-    // return !!verified;
-
-    return true; // Placeholder - implement proper verification
-  } catch {
-    return false;
-  }
+export async function getUser() {
+  return { name: "Guest" }; // dummy user - expand as needed
 }
 
-/**
- * Parse session payload from JWT
- * In production, use proper JWT decoding with verification
- */
-function parseSessionPayload(token: string): Partial<Session> | null {
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-in-production";
+
+export function getAuthUser(req: NextRequest): AuthUser | null {
   try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
 
-    // Decode the payload (base64url decode)
-    const payload = JSON.parse(
-      Buffer.from(parts[1], "base64url").toString("utf-8")
-    );
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
 
-    return {
-      user: {
-        id: payload.sub || payload.userId,
-        email: payload.email,
-        name: payload.name,
-        walletAddress: payload.walletAddress,
-        createdAt: new Date(payload.iat * 1000),
-      },
-      issuedAt: new Date(payload.iat * 1000),
-      expiresAt: new Date(payload.exp * 1000),
-    };
+
+    const cookieToken = req.cookies.get("session")?.value ?? null;
+
+    const token = bearerToken ?? cookieToken;
+    if (!token) return null;
+
+    const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    if (typeof payload.sub !== "string" || typeof payload.email !== "string") {
+      return null;
+    }
+
+    return { id: payload.sub, email: payload.email };
   } catch {
     return null;
   }
 }
 
-/**
- * Get the current session from cookies
- * @returns Session if valid, null otherwise
- */
-export async function getSession(): Promise<Session | null> {
-  try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(AUTH_CONFIG.sessionCookieName);
-
-    if (!sessionCookie?.value) {
-      return null;
-    }
-
-    // Verify signature
-    if (!verifySessionSignature(sessionCookie.value, AUTH_CONFIG.sessionSecret)) {
-      return null;
-    }
-
-    // Parse and validate session
-    const session = parseSessionPayload(sessionCookie.value);
-    if (!session || !session.user || !session.expiresAt) {
-      return null;
-    }
-
-    // Check if session is expired
-    if (new Date() > session.expiresAt) {
-      return null;
-    }
-
-    return session as Session;
-  } catch (error) {
-    console.error("Session retrieval error:", error);
-    return null;
-  }
-}
-
-/**
- * Get the current authenticated user
- * @returns User if authenticated, null otherwise
- */
-export async function getUser(): Promise<User | null> {
-  try {
-    const session = await getSession();
-    return session?.user || null;
-  } catch (error) {
-    console.error("User retrieval error:", error);
-    return null;
-  }
-}
-
-/**
- * Get authenticated user with error handling
- * @returns User or throws AuthError
- */
-export async function getAuthenticatedUser(): Promise<User> {
-  const user = await getUser();
+export function requireAuth(req: NextRequest): AuthUser {
+  const user = getAuthUser(req);
   if (!user) {
-    throw {
-      code: "UNAUTHENTICATED",
-      message: "User is not authenticated",
-    } as AuthError;
+    throw NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return user;
 }
 
-/**
- * Check if user is authenticated (server-side)
- * @returns true if user has valid session
- */
-export async function isAuthenticated(): Promise<boolean> {
-  const user = await getUser();
-  return user !== null;
+
+export function signToken(user: AuthUser, expiresIn = "1h"): string {
+  return jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
+    expiresIn,
+  });
 }
-
-/**
- * Get session expiry info (useful for client-side logic)
- * @returns Expiry info or null
- */
-export async function getSessionExpiry(): Promise<{ expiresAt: Date; expiresIn: number } | null> {
-  try {
-    const session = await getSession();
-    if (!session?.expiresAt) return null;
-
-    const now = new Date();
-    const expiresIn = Math.max(0, session.expiresAt.getTime() - now.getTime());
-
-    return {
-      expiresAt: session.expiresAt,
-      expiresIn,
-    };
-  } catch (error) {
-    console.error("Session expiry retrieval error:", error);
-    return null;
-  }
-}
-
