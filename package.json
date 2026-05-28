@@ -18,9 +18,7 @@
     "svg": "node scripts/svgToComponent.js",
     "generate-component": "plop",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "test:server": "vitest run --project server",
-    "test:server:coverage": "vitest run --project server --coverage"
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",

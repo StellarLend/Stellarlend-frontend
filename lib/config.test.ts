@@ -15,6 +15,7 @@ describe('Config Modules', () => {
     delete process.env.NEXT_PUBLIC_STELLAR_NETWORK;
     delete process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL;
     delete process.env.NEXT_PUBLIC_SOROBAN_RPC_URL;
+    delete process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID;
     delete process.env.NEXT_PUBLIC_GA_TRACKING_ID;
     delete process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
 
@@ -39,6 +40,7 @@ describe('Config Modules', () => {
     expect(config.stellar.network).toBe('testnet');
     expect(config.stellar.horizonUrl).toBe('https://horizon-testnet.stellar.org');
     expect(config.stellar.sorobanRpcUrl).toBe('https://soroban-testnet.stellar.org');
+    expect(config.stellar.sorobanContractId).toBe('');
     expect(config.analytics.googleAnalyticsId).toBeUndefined();
     expect(config.analytics.mixpanelToken).toBeUndefined();
   });
@@ -51,6 +53,7 @@ describe('Config Modules', () => {
     process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
     process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.test.com';
     process.env.NEXT_PUBLIC_SOROBAN_RPC_URL = 'https://rpc.test.com';
+    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID = 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
     process.env.NEXT_PUBLIC_GA_TRACKING_ID = 'UA-TEST-1';
     process.env.NEXT_PUBLIC_MIXPANEL_TOKEN = 'MP-TEST-1';
 
@@ -64,6 +67,7 @@ describe('Config Modules', () => {
     expect(config.stellar.network).toBe('public');
     expect(config.stellar.horizonUrl).toBe('https://horizon.test.com');
     expect(config.stellar.sorobanRpcUrl).toBe('https://rpc.test.com');
+    expect(config.stellar.sorobanContractId).toBe('GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
     expect(config.analytics.googleAnalyticsId).toBe('UA-TEST-1');
     expect(config.analytics.mixpanelToken).toBe('MP-TEST-1');
   });

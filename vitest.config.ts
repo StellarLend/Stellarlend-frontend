@@ -62,12 +62,11 @@ export default defineConfig({
       },
       {
         test: {
-          name: "unit",
+          name: "server-unit",
           environment: "node",
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
-            "lib/config.test.ts",
           ],
           alias: {
             "@": path.resolve(dirname, "."),
