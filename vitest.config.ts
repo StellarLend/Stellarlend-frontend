@@ -69,12 +69,15 @@ export default defineConfig({
         extends: true,
 
         test: {
-          name: "unit",
+          name: "unit-specific",
           environment: "node",
 
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
+            "app/api/webhooks/transactions/route.test.ts",
+            "lib/webhooks/verify.test.ts",
+            "lib/config.test.ts",
           ],
         },
       },
@@ -84,11 +87,26 @@ export default defineConfig({
       reporter: ["text", "json"],
 
       include: [
+        "app/api/**",
+        "lib/**",
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/layout/TopNav.tsx",
         "types/enums.ts",
         "app/api/transactions/route.ts",
+        "app/api/webhooks/transactions/route.ts",
+        "lib/webhooks/verify.ts",
+        "lib/webhooks/types.ts",
+        "lib/transactions/store.ts",
+        "lib/config.ts",
+        "lib/server-config.ts",
       ],
+      exclude: ["lib/utils/cn.ts", "**/*.stories.*", "**/*.test.*"],
+      thresholds: {
+        lines: 95,
+        functions: 95,
+        branches: 90,
+        statements: 95,
+      },
     },
   },
 });

@@ -1,0 +1,741 @@
+openapi: "3.1.0"
+
+info:
+  title: Stellarlend API
+  version: "1.0.0"
+  description: |
+    Server-side API routes for the Stellarlend DeFi lending platform.
+    All routes live under `/api/` and are implemented as Next.js App Router
+    route handlers (`app/api/*/route.ts`).
+
+    **Authentication**
+    Protected routes require a valid session cookie (`session`).
+    A session is obtained via `POST /api/auth/session` and is stored as an
+    HttpOnly, SameSite=strict cookie.
+
+    **Caching**
+    Public read routes use an in-memory SWR cache (lib/cache).
+    Responses include an `X-Cache: HIT | MISS | STALE | BYPASS` header.
+    Cache is bypassed whenever an `Authorization` header, `session` / `token`
+    cookie, or `x-user-id` header is present.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: health
+    description: Platform health check
+  - name: auth
+    description: Session management
+  - name: prices
+    description: Real-time asset prices
+  - name: markets
+    description: Per-asset supply/borrow APR and utilization
+  - name: positions
+    description: User lending and borrowing positions
+  - name: transactions
+    description: Transaction history and creation
+  - name: quote
+    description: Lending / borrowing quote calculations
+  - name: notifications
+    description: In-app notifications for the authenticated user
+
+paths:
+
+  # ---------------------------------------------------------------------------
+  # Health
+  # ---------------------------------------------------------------------------
+  /api/health:
+    get:
+      operationId: getHealth
+      tags: [health]
+      summary: Platform health check
+      description: |
+        Checks internal service status and Stellar Horizon reachability.
+        Returns 200 when healthy, 503 when degraded or unhealthy.
+      responses:
+        "200":
+          description: Platform is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Platform is degraded or unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  # ---------------------------------------------------------------------------
+  # Auth
+  # ---------------------------------------------------------------------------
+  /api/auth/session:
+    post:
+      operationId: createSession
+      tags: [auth]
+      summary: Create a session
+      description: Authenticates the user and sets an HttpOnly session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Session created
+          headers:
+            Set-Cookie:
+              description: HttpOnly session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    get:
+      operationId: getSession
+      tags: [auth]
+      summary: Check session status
+      responses:
+        "200":
+          description: Session is active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    delete:
+      operationId: deleteSession
+      tags: [auth]
+      summary: Destroy session (logout)
+      responses:
+        "200":
+          description: Session cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  # ---------------------------------------------------------------------------
+  # Prices
+  # ---------------------------------------------------------------------------
+  /api/prices:
+    get:
+      operationId: getPrices
+      tags: [prices]
+      summary: Fetch asset spot prices
+      description: |
+        Returns current USD prices for supported assets.
+        Responses are publicly cached (TTL 5 s, SWR 10 s) unless
+        authentication credentials are present.
+      parameters:
+        - name: assets
+          in: query
+          description: >
+            Comma-separated list of asset symbols to filter
+            (e.g. `XLM,USDC`). Omit for all assets.
+          required: false
+          schema:
+            type: string
+            example: XLM,USDC
+      responses:
+        "200":
+          description: Asset prices
+          headers:
+            X-Cache:
+              $ref: "#/components/headers/XCache"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricesResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Markets
+  # ---------------------------------------------------------------------------
+  /api/markets:
+    get:
+      operationId: getMarkets
+      tags: [markets]
+      summary: Per-asset supply/borrow APR and utilization
+      description: |
+        Returns live market data for each supported asset sourced from the
+        Stellarlend Soroban lending pool contract.
+        Responses are publicly cached (TTL 30 s, SWR 60 s) unless
+        authentication credentials are present.
+
+        The lending page (`app/lending/page.tsx`) uses this endpoint to
+        populate default interest rates instead of hardcoded literals.
+      parameters:
+        - name: asset
+          in: query
+          description: >
+            Comma-separated list of AssetSymbol values to filter
+            (e.g. `?asset=XLM,USDC`). Omit for all assets.
+          required: false
+          schema:
+            type: string
+            example: XLM,USDC
+      responses:
+        "200":
+          description: Market data for the requested assets
+          headers:
+            X-Cache:
+              $ref: "#/components/headers/XCache"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketsResponse"
+        "400":
+          description: Unknown asset symbol(s) in the `asset` query param
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Unknown asset(s): FAKE. Supported: XLM, USDC, BTC, ETH"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Positions
+  # ---------------------------------------------------------------------------
+  /api/positions:
+    get:
+      operationId: getPositions
+      tags: [positions]
+      summary: Fetch user positions
+      description: |
+        Returns lending/borrowing position data.
+        When called without authentication, returns public aggregate data.
+        When called with `x-user-id` header or session cookie, returns
+        user-specific positions and bypasses the public cache.
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: x-user-id
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Position data
+          headers:
+            X-Cache:
+              $ref: "#/components/headers/XCache"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionsResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Transactions
+  # ---------------------------------------------------------------------------
+  /api/transactions:
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: List transactions with optional filters
+      parameters:
+        - name: asset
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AssetSymbol"
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TransactionType"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TransactionStatus"
+      responses:
+        "200":
+          description: Transaction list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transaction"
+        "400":
+          description: Invalid filter value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createTransaction
+      tags: [transactions]
+      summary: Create a transaction record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionInput"
+      responses:
+        "201":
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transaction:
+                    $ref: "#/components/schemas/Transaction"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/transactions/export:
+    get:
+      operationId: exportTransactions
+      tags: [transactions]
+      summary: Export transactions as CSV
+      parameters:
+        - name: asset
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AssetSymbol"
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TransactionType"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/TransactionStatus"
+      responses:
+        "200":
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # ---------------------------------------------------------------------------
+  # Quote
+  # ---------------------------------------------------------------------------
+  /api/quote:
+    post:
+      operationId: calculateQuote
+      tags: [quote]
+      summary: Calculate a lending or borrowing quote
+      description: |
+        Accepts lending parameters and returns projected earnings (lend)
+        or repayment schedule (borrow).  Backed by lib/lending/quote.ts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "200":
+          description: Quote result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # ---------------------------------------------------------------------------
+  # Notifications
+  # ---------------------------------------------------------------------------
+  /api/notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for the authenticated user
+      description: |
+        Returns all notifications scoped to the caller's user ID
+        along with the current unread count (useful for nav-badge rendering).
+        Requires an active session cookie.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/notifications/{id}:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      description: |
+        Sets `read: true` on the specified notification.
+        Only affects notifications owned by the authenticated user.
+        Requires an active session cookie.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notification:
+                    $ref: "#/components/schemas/Notification"
+        "400":
+          description: Missing or blank notification id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Notification not found for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+# =============================================================================
+# Components
+# =============================================================================
+components:
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+
+  headers:
+    XCache:
+      description: "Cache resolution status: HIT | MISS | STALE | BYPASS"
+      schema:
+        type: string
+        enum: [HIT, MISS, STALE, BYPASS]
+    CacheControl:
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: No valid session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: Unauthorized
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: Failed to fetch market data
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    AssetSymbol:
+      type: string
+      enum: [XLM, USDC, BTC, ETH]
+      description: Canonical Stellarlend asset identifier
+
+    TransactionType:
+      type: string
+      enum: [Deposit, Withdrawal, "Lend Funds", "Loan Payment"]
+
+    TransactionStatus:
+      type: string
+      enum: [Completed, Processing, Failed]
+
+    Transaction:
+      type: object
+      required: [id, asset, type, status, amount, date, time]
+      properties:
+        id:
+          type: string
+          example: TXN1716800000000
+        asset:
+          $ref: "#/components/schemas/AssetSymbol"
+        type:
+          $ref: "#/components/schemas/TransactionType"
+        status:
+          $ref: "#/components/schemas/TransactionStatus"
+        amount:
+          type: number
+          example: 500.0
+        date:
+          type: string
+          format: date
+          example: "2026-05-27"
+        time:
+          type: string
+          example: "14:30"
+
+    TransactionInput:
+      type: object
+      required: [asset, type, status, amount, date, time]
+      properties:
+        asset:
+          $ref: "#/components/schemas/AssetSymbol"
+        type:
+          $ref: "#/components/schemas/TransactionType"
+        status:
+          $ref: "#/components/schemas/TransactionStatus"
+        amount:
+          type: number
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+
+    HealthResponse:
+      type: object
+      required: [status, timestamp, environment, version, checks]
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        environment:
+          type: string
+          enum: [development, staging, production]
+        version:
+          type: string
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+            api:
+              type: string
+            stellar:
+              type: string
+              enum: [healthy, degraded, unhealthy]
+
+    PricesResponse:
+      type: object
+      required: [prices, timestamp, source]
+      properties:
+        prices:
+          type: object
+          additionalProperties:
+            type: number
+          example:
+            XLM: 0.1245
+            USDC: 1.00
+            BTC: 67340.50
+            ETH: 3480.20
+        timestamp:
+          type: string
+          format: date-time
+        source:
+          type: string
+
+    AssetMarket:
+      type: object
+      required: [asset, supplyApr, borrowApr, utilization, totalSupply, totalBorrow]
+      properties:
+        asset:
+          $ref: "#/components/schemas/AssetSymbol"
+        supplyApr:
+          type: number
+          description: Annual percentage rate for lending (e.g. 8.5 = 8.5%)
+          example: 8.5
+        borrowApr:
+          type: number
+          description: Annual percentage rate for borrowing
+          example: 12.0
+        utilization:
+          type: number
+          description: Ratio of borrowed to supplied capital (0–1)
+          minimum: 0
+          maximum: 1
+          example: 0.71
+        totalSupply:
+          type: number
+          description: Total supplied liquidity in USD
+          example: 2500000
+        totalBorrow:
+          type: number
+          description: Total borrowed in USD
+          example: 1775000
+
+    MarketsResponse:
+      type: object
+      required: [markets, timestamp, source]
+      properties:
+        markets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetMarket"
+        timestamp:
+          type: string
+          format: date-time
+        source:
+          type: string
+
+    PositionsResponse:
+      type: object
+      properties:
+        positions:
+          type: array
+          items:
+            type: object
+        userId:
+          type: string
+        mode:
+          type: string
+          enum: [public, authenticated]
+
+    QuoteRequest:
+      type: object
+      required: [type, asset, amount, interestRate]
+      properties:
+        type:
+          type: string
+          enum: [lend, borrow]
+        asset:
+          $ref: "#/components/schemas/AssetSymbol"
+        amount:
+          type: number
+        interestRate:
+          type: number
+          description: Annual percentage rate
+        duration:
+          type: integer
+          description: Duration in days (required for borrow)
+        collateral:
+          $ref: "#/components/schemas/AssetSymbol"
+        collateralAmount:
+          type: number
+
+    QuoteResponse:
+      type: object
+      properties:
+        totalEarnings:
+          type: number
+        dailyEarnings:
+          type: number
+        totalRepayment:
+          type: number
+          description: Present only for borrow quotes
+        monthlyPayment:
+          type: number
+          description: Present only for borrow quotes
+
+    NotificationType:
+      type: string
+      enum: [info, success, warning, error]
+
+    Notification:
+      type: object
+      required: [id, userId, title, message, read, createdAt, type]
+      properties:
+        id:
+          type: string
+          example: notif-1
+        userId:
+          type: string
+        title:
+          type: string
+          example: Deposit Confirmed
+        message:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        type:
+          $ref: "#/components/schemas/NotificationType"
+
+    NotificationsResponse:
+      type: object
+      required: [notifications, unreadCount]
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        unreadCount:
+          type: integer
+          minimum: 0
+          example: 2

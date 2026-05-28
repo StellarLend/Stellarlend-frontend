@@ -9,6 +9,7 @@ import {
 } from "@/types/enums";
 import { fetchTransactions } from "@/types/Transaction";
 import type { Transaction } from "@/types/Transaction";
+import { withIdempotency } from "@/lib/api/idempotency";
 
 export const runtime = "nodejs";
 
@@ -58,54 +59,56 @@ export async function GET(req: NextRequest) {
  *  Validates asset, type, and status against canonical enums.
  */
 export async function POST(req: NextRequest) {
-  let body: Partial<Transaction>;
+  return withIdempotency(req, async (request) => {
+    let body: Partial<Transaction>;
 
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-  const { asset, type, status, amount, date, time } = body;
+    const { asset, type, status, amount, date, time } = body;
 
-  if (!isAssetSymbol(asset)) {
-    return NextResponse.json(
-      { error: `Unknown asset "${asset}". Supported: ${ASSET_SYMBOLS.join(", ")}` },
-      { status: 400 }
-    );
-  }
+    if (!isAssetSymbol(asset)) {
+      return NextResponse.json(
+        { error: `Unknown asset "${asset}". Supported: ${ASSET_SYMBOLS.join(", ")}` },
+        { status: 400 }
+      );
+    }
 
-  if (!isTransactionType(type)) {
-    return NextResponse.json(
-      { error: `Unknown type "${type}". Supported: ${TRANSACTION_TYPES.join(", ")}` },
-      { status: 400 }
-    );
-  }
+    if (!isTransactionType(type)) {
+      return NextResponse.json(
+        { error: `Unknown type "${type}". Supported: ${TRANSACTION_TYPES.join(", ")}` },
+        { status: 400 }
+      );
+    }
 
-  if (!isTransactionStatus(status)) {
-    return NextResponse.json(
-      { error: `Unknown status "${status}". Supported: ${TRANSACTION_STATUSES.join(", ")}` },
-      { status: 400 }
-    );
-  }
+    if (!isTransactionStatus(status)) {
+      return NextResponse.json(
+        { error: `Unknown status "${status}". Supported: ${TRANSACTION_STATUSES.join(", ")}` },
+        { status: 400 }
+      );
+    }
 
-  if (typeof amount !== "number") {
-    return NextResponse.json({ error: "amount must be a number" }, { status: 400 });
-  }
+    if (typeof amount !== "number") {
+      return NextResponse.json({ error: "amount must be a number" }, { status: 400 });
+    }
 
-  if (!date || !time) {
-    return NextResponse.json({ error: "date and time are required" }, { status: 400 });
-  }
+    if (!date || !time) {
+      return NextResponse.json({ error: "date and time are required" }, { status: 400 });
+    }
 
-  const transaction: Transaction = {
-    id: `TXN${Date.now()}`,
-    asset,
-    type,
-    status,
-    amount,
-    date,
-    time,
-  };
+    const transaction: Transaction = {
+      id: `TXN${Date.now()}`,
+      asset,
+      type,
+      status,
+      amount,
+      date,
+      time,
+    };
 
-  return NextResponse.json({ transaction }, { status: 201 });
+    return NextResponse.json({ transaction }, { status: 201 });
+  });
 }
