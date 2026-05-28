@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
 import LendingForm from "./LendingForm";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

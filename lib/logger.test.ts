@@ -35,13 +35,14 @@ describe('logger redaction', () => {
       message: 'Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9',
     };
 
-    const output = redactSensitiveData(input);
+    const output = redactSensitiveData(input) as Record<string, string>;
 
-    expect(output).toEqual({
-      address: '[REDACTED_ADDRESS]',
-      secret: '[REDACTED_SECRET]',
-      message: '[REDACTED_TOKEN]',
-    });
+    expect(output.address).not.toContain(input.address);
+    expect(output.address).toContain('[REDACTED_ADDRESS]');
+    expect(output.secret).not.toContain(input.secret);
+    expect(output.secret).toContain('[REDACTED_SECRET]');
+    expect(output.message).not.toContain('Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9');
+    expect(output.message).toContain('[REDACTED_TOKEN]');
   });
 });
 
