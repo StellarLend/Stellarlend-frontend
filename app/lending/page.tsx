@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LendingForm from '@/components/features/lending/components/LendingForm';
 import BorrowingForm from '@/components/features/lending/components/BorrowingForm';
 import InterestCalculator from '@/components/features/lending/components/InterestCalculator';
@@ -29,6 +29,23 @@ export default function LendingPage() {
   });
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Hydrate default interest rates from the live /api/markets endpoint.
+  // Falls back silently to the hardcoded values above if the fetch fails.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/markets?asset=XLM', { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { markets?: Array<{ asset: string; supplyApr: number; borrowApr: number }> } | null) => {
+        if (!data?.markets) return;
+        const xlm = data.markets.find((m) => m.asset === 'XLM');
+        if (!xlm) return;
+        setLendingData((prev) => ({ ...prev, interestRate: xlm.supplyApr }));
+        setBorrowingData((prev) => ({ ...prev, interestRate: xlm.borrowApr }));
+      })
+      .catch(() => { /* keep hardcoded fallback */ });
+    return () => controller.abort();
+  }, []);
 
   const handleLendingSubmit = (data: LendingData) => {
     setLendingData(data);
