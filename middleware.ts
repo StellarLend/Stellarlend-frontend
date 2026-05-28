@@ -1,55 +1,67 @@
-import { NextResponse, NextRequest } from 'next/server';
-import { getUser } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit } from '@/lib/rate-limit';
+import appConfig from '@/lib/config';
 
-/**
- Middleware to protect dashboard and account routes.
- *
- * - Protected page routes: `/dashboard/**` and `/account/**`
- * - Protected API routes under the same base paths.
- *
- * Unauthenticated users are redirected to `/login` for page requests.
- * API requests receive a 401 JSON response.
- */
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Define protected base paths
-  const protectedBases = ['/dashboard', '/account'];
-  const isProtected = protectedBases.some((base) => pathname.startsWith(base));
-
-  // If not a protected route, continue.
-  if (!isProtected) {
+  // 1. Path Filter: Only apply to API routes
+  if (!pathname.startsWith('/api')) {
     return NextResponse.next();
   }
 
-  // Perform session check using the real auth utility.
-  const user = await getUser();
-
-  // If a user object is present, allow the request.
-  if (user) {
+  // 2. Exemption: Health checks should never be rate limited
+  if (pathname === '/api/health') {
     return NextResponse.next();
   }
 
-  // Determine if the request targets an API route.
-  const isApi = pathname.includes('/api/');
-
-  // Unauthenticated API request → 401 response.
-  if (isApi) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // 3. Exemption: Authenticated internal calls
+  // We check for the existence of the session cookie defined in our auth system
+  const sessionCookieName = appConfig.rateLimit ? (process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session') : 'session';
+  const isAuth = request.cookies.has(sessionCookieName);
+  
+  if (isAuth) {
+    return NextResponse.next();
   }
 
-  // Unauthenticated page request → redirect to login.
-  const loginUrl = new URL('/login', request.url);
-  return NextResponse.redirect(loginUrl);
+  // 4. Identification (IP-based for anonymous requests)
+  const ip = request.ip || request.headers.get('x-forwarded-for') || '127.0.0.1';
+  const identifier = `api-ratelimit:${ip}`;
+
+  const { success, limit, remaining, reset } = rateLimit(
+    identifier,
+    appConfig.rateLimit.max,
+    appConfig.rateLimit.window
+  );
+
+  // 5. Prepare Response
+  let response: NextResponse;
+
+  if (success) {
+    response = NextResponse.next();
+  } else {
+    response = new NextResponse(
+      JSON.stringify({ 
+        error: 'Too Many Requests',
+        message: 'Rate limit exceeded. Please try again later.' 
+      }), 
+      { status: 429, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // 6. Standard Rate Limit Headers
+  response.headers.set('X-RateLimit-Limit', limit.toString());
+  response.headers.set('X-RateLimit-Remaining', remaining.toString());
+  response.headers.set('X-RateLimit-Reset', Math.floor(reset / 1000).toString());
+
+  if (!success) {
+    const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+    response.headers.set('Retry-After', Math.max(0, retryAfter).toString());
+  }
+
+  return response;
 }
 
-/**
- * Matcher configuration for Next.js middleware.
- * This ensures the middleware runs only on the intended routes.
- */
 export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/account/:path*',
-  ],
+  matcher: '/api/:path*',
 };
