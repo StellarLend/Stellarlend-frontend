@@ -18,6 +18,9 @@ interface Config {
     googleAnalyticsId?: string;
     mixpanelToken?: string;
   };
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
+  };
 }
 
 const config: Config = {
@@ -39,6 +42,9 @@ const config: Config = {
   analytics: {
     googleAnalyticsId: process.env.NEXT_PUBLIC_GA_TRACKING_ID,
     mixpanelToken: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
+  },
+  logging: {
+    level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
   },
 };
 

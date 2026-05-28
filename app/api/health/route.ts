@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import config from '@/lib/config';
+<<<<<<< HEAD
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
+import { withHandler } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
-async function checkStellarNetwork(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
     await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
@@ -15,18 +17,76 @@ async function checkStellarNetwork(): Promise<'healthy' | 'degraded' | 'unhealth
   }
 }
 
-export async function GET() {
+async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    const stellarStatus = await checkStellarNetwork();
+    await httpGet(`${config.stellar.sorobanRpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
+}
+
+async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+  try {
+    await httpGet(`${config.api.baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
+}
+
+async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+  try {
+    await httpGet(`${config.api.baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
+}
+
+export async function GET() {
+=======
+import { withRequestLogging } from '@/lib/api/handler';
+
+export const runtime = 'nodejs';
+
+async function handleHealth() {
+>>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
+  try {
+    const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
+      checkHorizon(),
+      checkSorobanRpc(),
+      checkApi(),
+      checkDatabase(),
+    ]);
+
+    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy' 
+      ? 'unhealthy' 
+      : horizonStatus === 'degraded' || sorobanStatus === 'degraded'
+      ? 'degraded'
+      : 'healthy';
+
+    const overallStatus = 
+      stellarStatus === 'unhealthy' || apiStatus === 'unhealthy' || dbStatus === 'unhealthy'
+        ? 'unhealthy'
+        : stellarStatus === 'degraded' || apiStatus === 'degraded' || dbStatus === 'degraded'
+        ? 'degraded'
+        : 'healthy';
 
     const healthData = {
-      status: stellarStatus === 'unhealthy' ? 'unhealthy' : 'healthy',
+      status: overallStatus,
       timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
       checks: {
-        database: 'healthy',
-        api: 'healthy',
+        database: dbStatus,
+        api: apiStatus,
         stellar: stellarStatus,
       },
     };
@@ -44,3 +104,8 @@ export async function GET() {
     );
   }
 }
+<<<<<<< HEAD
+=======
+
+export const GET = withRequestLogging('/api/health', handleHealth);
+>>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))

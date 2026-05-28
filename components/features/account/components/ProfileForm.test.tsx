@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, fireEvent, waitFor } from "@/test/test-utils";
 import ProfileForm from "./ProfileForm";
 import { describe, it, expect, vi } from "vitest";
