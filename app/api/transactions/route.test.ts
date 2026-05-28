@@ -56,6 +56,14 @@ describe("GET /api/transactions – accepted values", () => {
     expect(res.status).toBe(200);
   });
 
+  it("supports pagination parameters", async () => {
+    const res = await GET(makeGetRequest({ page: "2", pageSize: "2" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.transactions).toHaveLength(2);
+    expect(body.total).toBeGreaterThanOrEqual(2);
+  });
+
   it("filters by asset correctly", async () => {
     const res = await GET(makeGetRequest({ asset: "XLM" }));
     const { transactions } = await res.json();

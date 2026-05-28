@@ -16,77 +16,12 @@ import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
-
-export type TransactionStatus = "Completed" | "Processing" | "Failed";
-export type Transaction = {
-  id: string;
-  type: string;
-  amount: number;
-  asset: "XLM" | "BTC" | "STRK";
-  date: string;
-  time: string;
-  status: TransactionStatus;
-};
-
-export const fetchTransactions = async (): Promise<Transaction[]> => {
-  await new Promise((res) => setTimeout(res, 300));
-  return [
-    {
-      id: "TXN12345",
-      type: "Deposit",
-      amount: 2000,
-      asset: "XLM",
-      date: "2025-04-12",
-      time: "09:32AM",
-      status: "Completed",
-    },
-    {
-      id: "TXN12346",
-      type: "Loan Payment",
-      amount: -250,
-      asset: "BTC",
-      date: "2025-03-10",
-      time: "11:15AM",
-      status: "Processing",
-    },
-    {
-      id: "TXN12347",
-      type: "Withdrawal",
-      amount: -7500,
-      asset: "STRK",
-      date: "2025-02-28",
-      time: "04:45PM",
-      status: "Completed",
-    },
-    {
-      id: "TXN12348",
-      type: "Lend Funds",
-      amount: -1500,
-      asset: "XLM",
-      date: "2025-01-05",
-      time: "08:00AM",
-      status: "Completed",
-    },
-    {
-      id: "TXN12349",
-      type: "Lend Funds",
-      amount: -607.87,
-      asset: "BTC",
-      date: "2024-12-20",
-      time: "10:20PM",
-      status: "Failed",
-    },
-    {
-      id: "TXN12350",
-      type: "Deposit",
-      amount: 20000,
-      asset: "STRK",
-      date: "2024-11-15",
-      time: "01:05PM",
-      status: "Completed",
-    },
-  ];
-};
+import {
+  fetchTransactions,
+  type Transaction,
+  type TransactionStatus,
+  type FetchTransactionsResponse,
+} from "@/types/Transaction";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -101,10 +36,11 @@ interface TransactionsProps {
 
 export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"All" | TransactionStatus>("All");
-  const [sortBy, setSortBy] = useState("date");
-  const [sortDir, setSortDir] = useState("desc");
+  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -116,40 +52,43 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const sortRef = useRef<HTMLDivElement>(null);
   const [dateFromObj, setDateFromObj] = useState<Date | null>(null);
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
   const router = useRouter();
 
   useEffect(() => {
-    setLoading(true);
-    fetchTransactions().then((data) => {
-      setTransactions(data);
-      setLoading(false);
-    });
-  }, []);
+    setCurrentPage(1);
+  }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
-  let filtered = transactions.filter((txn) => {
-    const matchesSearch =
-      txn.type.toLowerCase().includes(search.toLowerCase()) ||
-      txn.id.toLowerCase().includes(search.toLowerCase()) ||
-      txn.asset.toLowerCase().includes(search.toLowerCase()) ||
-      txn.amount.toString().includes(search);
-    const matchesStatus = status === "All" || txn.status === status;
-    const matchesDateFrom =
-      !dateFrom || new Date(txn.date) >= new Date(dateFrom);
-    const matchesDateTo = !dateTo || new Date(txn.date) <= new Date(dateTo);
-    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
-  });
+  useEffect(() => {
+    const loadTransactions = async () => {
+      setLoading(true);
 
-  filtered = filtered.sort((a, b) => {
-    if (sortBy === "date") {
-      const aDate = new Date(a.date);
-      const bDate = new Date(b.date);
-      return sortDir === "asc"
-        ? aDate.getTime() - bDate.getTime()
-        : bDate.getTime() - aDate.getTime();
-    } else {
-      return sortDir === "asc" ? a.amount - b.amount : b.amount - a.amount;
-    }
-  });
+      try {
+        const payload: FetchTransactionsResponse = await fetchTransactions({
+          page: currentPage,
+          pageSize: itemsPerPage,
+          search: search || undefined,
+          status: status === "All" ? undefined : status,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          sortBy,
+          sortDir,
+        });
+
+        setTransactions(payload.transactions);
+        setTotalCount(payload.total);
+      } catch (err) {
+        console.error(err);
+        setTransactions([]);
+        setTotalCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTransactions();
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -234,21 +173,6 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
     );
   });
   CustomDateInput.displayName = "CustomDateInput";
-
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
-
-  // Reset to first page when filtering/searching
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
-
-  // Calculate paginated data
-  const paginatedTransactions = filtered.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
 
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
@@ -410,7 +334,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       <div className="">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Loading...</div>
-        ) : filtered.length === 0 ? (
+        ) : transactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -436,7 +360,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedTransactions.map((txn, idx) => (
+                  {transactions.map((txn, idx) => (
                     <tr
                       key={idx}
                       className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
@@ -474,7 +398,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                     </tr>
                   ))}
 
-                  {filtered.length === 0 && !loading && (
+                  {transactions.length === 0 && !loading && (
                     <tr>
                       <td colSpan={5} className="text-center py-6">
                         No transactions found.
@@ -487,7 +411,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {paginatedTransactions.map((txn, idx) => (
+              {transactions.map((txn, idx) => (
                 <div
                   key={idx}
                   className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
@@ -554,7 +478,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                 </div>
               ))}
 
-              {filtered.length === 0 && !loading && (
+              {transactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
@@ -565,9 +489,9 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
 
         <div className="">
-          {showPagination && filtered.length > 0 && (
+          {showPagination && totalCount > 0 && (
             <Pagination
-              totalItems={filtered.length}
+              totalItems={totalCount}
               itemsPerPage={itemsPerPage}
               currentPage={currentPage}
               setCurrentPage={setCurrentPage}

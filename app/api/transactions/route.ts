@@ -7,15 +7,39 @@ import {
   isTransactionType,
   isTransactionStatus,
 } from "@/types/enums";
-import { fetchTransactions } from "@/types/Transaction";
+import { fetchTransactions as fetchTransactionRecords, filterTransactions } from "@/lib/transactions/repository";
 import type { Transaction } from "@/types/Transaction";
 import { withIdempotency } from "@/lib/api/idempotency";
 
 export const runtime = "nodejs";
 
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_SIZE = 6;
+const MAX_PAGE_SIZE = 100;
+
+function parsePageParam(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parsePageSizeParam(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+  return Math.min(parsed, MAX_PAGE_SIZE);
+}
+
+function parseSortBy(value: string | null): "date" | "amount" {
+  return value === "amount" ? "amount" : "date";
+}
+
+function parseSortDir(value: string | null): "asc" | "desc" {
+  return value === "asc" ? "asc" : "desc";
+}
+
 /** GET /api/transactions
- *  Optional query params: asset, type, status
- *  Returns 400 with a descriptive error for any unknown vocabulary value.
+ *  Optional query params: page, pageSize, asset, type, status, search, dateFrom, dateTo,
+ *  sortBy, sortDir
+ *  Returns typed transaction pages with total count.
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -23,6 +47,13 @@ export async function GET(req: NextRequest) {
   const asset = searchParams.get("asset");
   const type = searchParams.get("type");
   const status = searchParams.get("status");
+  const search = searchParams.get("search");
+  const dateFrom = searchParams.get("dateFrom");
+  const dateTo = searchParams.get("dateTo");
+  const page = parsePageParam(searchParams.get("page"), DEFAULT_PAGE);
+  const pageSize = parsePageSizeParam(searchParams.get("pageSize"), DEFAULT_PAGE_SIZE);
+  const sortBy = parseSortBy(searchParams.get("sortBy"));
+  const sortDir = parseSortDir(searchParams.get("sortDir"));
 
   if (asset !== null && !isAssetSymbol(asset)) {
     return NextResponse.json(
@@ -45,13 +76,31 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  let transactions = await fetchTransactions();
+  const allTransactions = await fetchTransactionRecords();
+  let transactions = filterTransactions(allTransactions, {
+    search: search ?? undefined,
+    status: status ?? undefined,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
+  });
 
   if (asset) transactions = transactions.filter((t) => t.asset === asset);
   if (type) transactions = transactions.filter((t) => t.type === type);
   if (status) transactions = transactions.filter((t) => t.status === status);
 
-  return NextResponse.json({ transactions });
+  const total = transactions.length;
+  transactions = transactions.sort((a, b) => {
+    if (sortBy === "amount") {
+      return sortDir === "asc" ? a.amount - b.amount : b.amount - a.amount;
+    }
+
+    return sortDir === "asc"
+      ? new Date(a.date).getTime() - new Date(b.date).getTime()
+      : new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+
+  const paginated = transactions.slice((page - 1) * pageSize, page * pageSize);
+  return NextResponse.json({ transactions: paginated, total });
 }
 
 /** POST /api/transactions
