@@ -81,6 +81,16 @@ export default defineConfig({
           ],
         },
       },
+      {
+        test: {
+          name: "server",
+          environment: "node",
+          include: ["test/server/**/*.test.ts"],
+          alias: {
+            "@": path.resolve(dirname, "."),
+          },
+        },
+      },
     ],
 
     coverage: {
