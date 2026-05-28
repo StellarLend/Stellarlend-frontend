@@ -1,25 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components";
-
-// Import both the fetch function and the type
-import { fetchTransactions, Transactions, type Transaction } from "@/components/shared/common/Transaction";
+import { Transactions } from "@/components/shared/common/Transaction";
 import { Bank } from "@/components/shared/ui/icons/Bank";
 import { PageHeader } from "@/components/shared/common";
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-
-  useEffect(() => {
-    const getData = async () => {
-      const data = await fetchTransactions();
-      setTransactions(data);
-    };
-
-    getData();
-  }, []);
-
   return (
     <DashboardLayout>
       <div className="pt-10 border-t px-6 md:px-12 ">
@@ -34,7 +20,7 @@ export default function TransactionsPage() {
           }
         />
       </div>
-      <Transactions  />
+      <Transactions />
     </DashboardLayout>
   );
 }

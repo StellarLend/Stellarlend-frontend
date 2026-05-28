@@ -13,9 +13,33 @@ import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_SIZE = 6;
+const MAX_PAGE_SIZE = 100;
+
+function parsePageParam(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parsePageSizeParam(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
+  return Math.min(parsed, MAX_PAGE_SIZE);
+}
+
+function parseSortBy(value: string | null): "date" | "amount" {
+  return value === "amount" ? "amount" : "date";
+}
+
+function parseSortDir(value: string | null): "asc" | "desc" {
+  return value === "asc" ? "asc" : "desc";
+}
+
 /** GET /api/transactions
- *  Optional query params: asset, type, status
- *  Returns 400 with a descriptive error for any unknown vocabulary value.
+ *  Optional query params: page, pageSize, asset, type, status, search, dateFrom, dateTo,
+ *  sortBy, sortDir
+ *  Returns typed transaction pages with total count.
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -45,13 +69,31 @@ async function handleGetTransactions(req: NextRequest) {
     );
   }
 
-  let transactions = await fetchTransactions();
+  const allTransactions = await fetchTransactionRecords();
+  let transactions = filterTransactions(allTransactions, {
+    search: search ?? undefined,
+    status: status ?? undefined,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
+  });
 
   if (asset) transactions = transactions.filter((t) => t.asset === asset);
   if (type) transactions = transactions.filter((t) => t.type === type);
   if (status) transactions = transactions.filter((t) => t.status === status);
 
-  return NextResponse.json({ transactions });
+  const total = transactions.length;
+  transactions = transactions.sort((a, b) => {
+    if (sortBy === "amount") {
+      return sortDir === "asc" ? a.amount - b.amount : b.amount - a.amount;
+    }
+
+    return sortDir === "asc"
+      ? new Date(a.date).getTime() - new Date(b.date).getTime()
+      : new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+
+  const paginated = transactions.slice((page - 1) * pageSize, page * pageSize);
+  return NextResponse.json({ transactions: paginated, total });
 }
 
 /** POST /api/transactions
@@ -67,7 +109,7 @@ async function handlePostTransactions(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { asset, type, status, amount, date, time } = body;
+    const { asset, type, status, amount, date, time } = body;
 
   if (!isAssetSymbol(asset)) {
     return NextResponse.json(
@@ -98,17 +140,18 @@ async function handlePostTransactions(req: NextRequest) {
     return NextResponse.json({ error: 'date and time are required' }, { status: 400 });
   }
 
-  const transaction: Transaction = {
-    id: `TXN${Date.now()}`,
-    asset,
-    type,
-    status,
-    amount,
-    date,
-    time,
-  };
+    const transaction: Transaction = {
+      id: `TXN${Date.now()}`,
+      asset,
+      type,
+      status,
+      amount,
+      date,
+      time,
+    };
 
-  return NextResponse.json({ transaction }, { status: 201 });
+    return NextResponse.json({ transaction }, { status: 201 });
+  });
 }
 
 export const GET = withRequestLogging('/api/transactions', handleGetTransactions);

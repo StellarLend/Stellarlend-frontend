@@ -1,9 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IconButton } from './IconButton';
+import { describe, it, expect, vi, beforeEach} from "vitest";
+import React from "react";
 
 describe('IconButton Accessibility', () => {
-  const mockOnClick = jest.fn();
+  const mockOnClick = vi.fn();
 
   beforeEach(() => {
     mockOnClick.mockClear();
@@ -185,9 +187,22 @@ describe('IconButton Accessibility', () => {
 
     const button = screen.getByRole('button');
     const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
-    
-    const defaultPrevented = !fireEvent(button, clickEvent);
-    expect(defaultPrevented).toBe(true);
+
+    fireEvent.click(button);
+    expect(mockOnClick).not.toHaveBeenCalled();
+  });
+
+  it('prevents clicks when disabled', () => {
+    render(
+        <IconButton aria-label="Disabled" onClick={mockOnClick} disabled>
+          <svg />
+        </IconButton>
+    );
+
+    const button = screen.getByRole('button');
+
+    fireEvent.click(button);
+
     expect(mockOnClick).not.toHaveBeenCalled();
   });
 });

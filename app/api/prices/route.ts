@@ -1,57 +1,106 @@
+/**
+ * Price Oracle Proxy API Route
+ * GET /api/prices - Fetch cached asset prices with optional asset filtering
+ * 
+ * Query Parameters:
+ *   - assets: Comma-separated list of assets (XLM, USDC, BTC, ETH)
+ *     If omitted, all supported assets are returned
+ * 
+ * Security Features:
+ *   - API keys kept server-side only
+ *   - Request-level cache bypass for authenticated requests
+ *   - Input validation against supported asset list
+ *   - Proper HTTP cache headers for CDN/browser caching
+ * 
+ * Caching Strategy:
+ *   - TTL: 5 seconds (fresh cache)
+ *   - SWR: 10 seconds (stale-while-revalidate)
+ *   - Background revalidation for stale entries
+ * 
+ * @example
+ * GET /api/prices - Get all supported assets
+ * GET /api/prices?assets=XLM,USDC - Get specific assets
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { globalCache } from '../../../lib/cache';
+import { globalCache } from '@/lib/cache';
+import {
+  validateAssetsQuery,
+  generateCacheKey,
+  hasNoApiKeys,
+} from '@/lib/prices/validation';
+import { fetchUpstreamPrices, isValidUpstreamResponse } from '@/lib/prices/fetcher';
+import { PRICE_CACHE_CONFIG } from '@/lib/prices/constants';
+import type { PriceResponse, PriceErrorResponse, SupportedAsset } from '@/lib/prices/types';
 
-// Mock upstream price fetcher with simulated network latency
-async function fetchUpstreamPrices(assetsList: string[]): Promise<any> {
-  // Simulate 300ms upstream network latency
-  await new Promise((resolve) => setTimeout(resolve, 300));
+export const runtime = 'nodejs';
 
-  const basePrices: Record<string, number> = {
-    XLM: 0.1245 + (Math.random() - 0.5) * 0.002,
-    USDC: 1.00,
-    BTC: 67340.50 + (Math.random() - 0.5) * 100,
-    ETH: 3480.20 + (Math.random() - 0.5) * 10,
-  };
+/**
+ * Determines if request should bypass cache
+ * Authenticated requests always bypass to get fresh data for user-specific operations
+ */
+function shouldBypassCache(request: NextRequest): boolean {
+  const authHeader = request.headers.get('Authorization');
+  const hasAuthCookie = request.cookies.has('session') || request.cookies.has('token');
+  const hasUserHeader = request.headers.has('x-user-id');
+  return !!(authHeader || hasAuthCookie || hasUserHeader);
+}
 
-  const filteredPrices: Record<string, number> = {};
-  assetsList.forEach((asset) => {
-    const upperAsset = asset.toUpperCase().trim();
-    if (basePrices[upperAsset] !== undefined) {
-      filteredPrices[upperAsset] = basePrices[upperAsset];
-    }
-  });
+/**
+ * Fetches and formats prices from upstream source
+ */
+async function getPriceData(assets: SupportedAsset[]): Promise<PriceResponse> {
+  const upstreamData = await fetchUpstreamPrices(assets);
 
-  // If no specific valid assets were requested, return all of them
-  const prices = Object.keys(filteredPrices).length > 0 ? filteredPrices : basePrices;
+  if (!isValidUpstreamResponse(upstreamData)) {
+    throw new Error('Invalid upstream price response structure');
+  }
+
+  // Ensure no API keys are accidentally included
+  if (!hasNoApiKeys(upstreamData)) {
+    console.error('SECURITY ALERT: API keys detected in upstream response!');
+    throw new Error('Security validation failed');
+  }
 
   return {
-    prices,
-    timestamp: new Date().toISOString(),
-    source: 'Upstream price feed (Simulated)',
+    prices: upstreamData.prices,
+    timestamp: upstreamData.timestamp,
+    source: 'Stellar Price Oracle Proxy',
   };
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse<PriceResponse | PriceErrorResponse>> {
   try {
     const { searchParams } = new URL(request.url);
-    const assetsParam = searchParams.get('assets') || '';
-    
-    // Parse assets list and clean them
-    const assetsList = assetsParam
-      ? assetsParam.split(',').map((a) => a.trim().toUpperCase()).filter(Boolean)
-      : [];
+    const assetsParam = searchParams.get('assets');
 
-    // Security Check & Cache Bypass check:
-    // If the request contains authentication credentials, we must bypass the cache
-    const authHeader = request.headers.get('Authorization');
-    const hasAuthCookie = request.cookies.has('session') || request.cookies.has('token');
-    const hasUserHeader = request.headers.has('x-user-id');
-    const bypassCache = !!(authHeader || hasAuthCookie || hasUserHeader);
+    // Validate and normalize assets query parameter
+    const validation = validateAssetsQuery(assetsParam);
+
+    if (!validation.valid) {
+      const errorResponse: PriceErrorResponse = {
+        error: `Invalid assets query: ${validation.errors.join('; ')}`,
+        code: 'INVALID_ASSETS_QUERY',
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(errorResponse, {
+        status: 400,
+        headers: {
+          'Cache-Control': 'no-cache, no-store',
+        },
+      });
+    }
+
+    const assets = validation.assets;
+
+    // Check if this is an authenticated request that should bypass cache
+    const bypassCache = shouldBypassCache(request);
 
     if (bypassCache) {
-      // Direct upstream fetch with no-store headers
-      const freshData = await fetchUpstreamPrices(assetsList);
-      return NextResponse.json(freshData, {
+      // Authenticated requests always fetch fresh data
+      const priceData = await getPriceData(assets);
+
+      return NextResponse.json(priceData, {
         status: 200,
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -62,35 +111,43 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Public request: Construct a safe, sanitized cache key (No Secrets!)
-    // Sort assets list to ensure key order invariance (e.g. ?assets=USDC,XLM matches ?assets=XLM,USDC)
-    const sortedAssetsKey = assetsList.sort().join(',');
-    const cacheKey = `price:assets:${sortedAssetsKey || 'all'}`;
+    // Public request: Use cache with TTL and SWR
+    const cacheKey = generateCacheKey(assets);
 
-    // Caching configuration: TTL = 5 seconds, SWR = 10 seconds
-    const cacheOptions = {
-      ttl: 5 * 1000,
-      swr: 10 * 1000,
-    };
-
-    const { value, status } = await globalCache.getOrFetch(
+    const { value: priceData, status: cacheStatus } = await globalCache.getOrFetch(
       cacheKey,
-      () => fetchUpstreamPrices(assetsList),
-      cacheOptions
+      () => getPriceData(assets),
+      PRICE_CACHE_CONFIG
     );
 
-    return NextResponse.json(value, {
+    // Add cache metadata to response
+    const response: PriceResponse & { cached: boolean; cacheAge?: number } = {
+      ...priceData,
+      cached: cacheStatus !== 'MISS',
+    };
+
+    return NextResponse.json(response, {
       status: 200,
       headers: {
-        'Cache-Control': `public, max-age=5, stale-while-revalidate=10`,
-        'X-Cache': status,
+        'Cache-Control': `public, max-age=${PRICE_CACHE_CONFIG.ttl / 1000}, stale-while-revalidate=${PRICE_CACHE_CONFIG.swr / 1000}`,
+        'X-Cache': cacheStatus,
+        'Vary': 'Accept-Encoding',
       },
     });
   } catch (error) {
     console.error('Price proxy route error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch prices' },
-      { status: 500 }
-    );
+
+    const errorResponse: PriceErrorResponse = {
+      error: error instanceof Error ? error.message : 'Failed to fetch prices',
+      code: 'PRICE_FETCH_ERROR',
+      timestamp: new Date().toISOString(),
+    };
+
+    return NextResponse.json(errorResponse, {
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-cache, no-store',
+      },
+    });
   }
 }
