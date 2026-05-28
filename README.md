@@ -204,6 +204,7 @@ This will automatically convert SVGs to React components in `components/shared/u
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs) - Utility-first CSS framework
 - [Stellar Documentation](https://developers.stellar.org/docs) - Stellar blockchain development guide
 - [Soroban Documentation](https://soroban.stellar.org/docs) - Soroban smart contracts
+- [Idempotency contract and key lifetime](docs/idempotency.md) - API replay protection and cache retention guidance
 
 ### Development Tools
 - [Storybook](https://storybook.js.org/docs) - Component development environment

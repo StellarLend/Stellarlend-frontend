@@ -3,6 +3,7 @@
 // This shows how to set session cookies after user authentication
 
 import { NextRequest, NextResponse } from "next/server";
+import { withIdempotency } from "@/lib/api/idempotency";
 
 /**
  * Example payload structure for session creation
@@ -31,76 +32,78 @@ interface CreateSessionRequest {
  * });
  */
 export async function POST(request: NextRequest) {
-  try {
-    const body: CreateSessionRequest = await request.json();
+  return withIdempotency(request, async (request) => {
+    try {
+      const body: CreateSessionRequest = await request.json();
 
-    // Validate required fields
-    if (!body.userId || !body.email || !body.name) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
+      // Validate required fields
+      if (!body.userId || !body.email || !body.name) {
+        return NextResponse.json(
+          { error: "Missing required fields" },
+          { status: 400 }
+        );
+      }
 
-    // Create JWT payload
-    const now = Math.floor(Date.now() / 1000);
-    const expiresIn = (parseInt(process.env.AUTH_SESSION_EXPIRY || "24") * 3600); // hours to seconds
+      // Create JWT payload
+      const now = Math.floor(Date.now() / 1000);
+      const expiresIn = (parseInt(process.env.AUTH_SESSION_EXPIRY || "24") * 3600); // hours to seconds
 
-    const payload = {
-      sub: body.userId,
-      userId: body.userId,
-      email: body.email,
-      name: body.name,
-      walletAddress: body.walletAddress,
-      iat: now,
-      exp: now + expiresIn,
-    };
-
-    // In production, create a proper JWT using jose or jsonwebtoken:
-    // import { SignJWT } from 'jose';
-    // const token = await new SignJWT(payload)
-    //   .setProtectedHeader({ alg: "HS256" })
-    //   .setIssuedAt()
-    //   .setExpirationTime("24h")
-    //   .sign(new TextEncoder().encode(process.env.AUTH_SECRET!));
-
-    // For demo purposes, create a mock JWT
-    const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString(
-      "base64url"
-    );
-    const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-    const signature = Buffer.from("mock-signature").toString("base64url");
-    const token = `${header}.${payloadEncoded}.${signature}`;
-
-    // Create response with session cookie
-    const response = NextResponse.json({
-      success: true,
-      message: "Session created",
-      user: {
-        id: body.userId,
+      const payload = {
+        sub: body.userId,
+        userId: body.userId,
         email: body.email,
         name: body.name,
-      },
-    });
+        walletAddress: body.walletAddress,
+        iat: now,
+        exp: now + expiresIn,
+      };
 
-    // Set httpOnly cookie (XSS-safe)
-    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
-    response.cookies.set(cookieName, token, {
-      httpOnly: true, // Prevent JavaScript access
-      secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      sameSite: "strict", // CSRF protection
-      maxAge: expiresIn, // Cookie expiry in seconds
-      path: "/", // Available to all routes
-    });
+      // In production, create a proper JWT using jose or jsonwebtoken:
+      // import { SignJWT } from 'jose';
+      // const token = await new SignJWT(payload)
+      //   .setProtectedHeader({ alg: "HS256" })
+      //   .setIssuedAt()
+      //   .setExpirationTime("24h")
+      //   .sign(new TextEncoder().encode(process.env.AUTH_SECRET!));
 
-    return response;
-  } catch (error) {
-    console.error("Session creation error:", error);
-    return NextResponse.json(
-      { error: "Failed to create session" },
-      { status: 500 }
-    );
-  }
+      // For demo purposes, create a mock JWT
+      const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString(
+        "base64url"
+      );
+      const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+      const signature = Buffer.from("mock-signature").toString("base64url");
+      const token = `${header}.${payloadEncoded}.${signature}`;
+
+      // Create response with session cookie
+      const response = NextResponse.json({
+        success: true,
+        message: "Session created",
+        user: {
+          id: body.userId,
+          email: body.email,
+          name: body.name,
+        },
+      });
+
+      // Set httpOnly cookie (XSS-safe)
+      const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
+      response.cookies.set(cookieName, token, {
+        httpOnly: true, // Prevent JavaScript access
+        secure: process.env.NODE_ENV === "production", // HTTPS only in production
+        sameSite: "strict", // CSRF protection
+        maxAge: expiresIn, // Cookie expiry in seconds
+        path: "/", // Available to all routes
+      });
+
+      return response;
+    } catch (error) {
+      console.error("Session creation error:", error);
+      return NextResponse.json(
+        { error: "Failed to create session" },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 /**
@@ -146,22 +149,24 @@ export async function GET(request: NextRequest) {
  * await fetch("/api/auth/session", { method: "DELETE" });
  */
 export async function DELETE(request: NextRequest) {
-  try {
-    const response = NextResponse.json({
-      success: true,
-      message: "Session cleared",
-    });
+  return withIdempotency(request, async () => {
+    try {
+      const response = NextResponse.json({
+        success: true,
+        message: "Session cleared",
+      });
 
-    // Clear the session cookie
-    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
-    response.cookies.delete(cookieName);
+      // Clear the session cookie
+      const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
+      response.cookies.delete(cookieName);
 
-    return response;
-  } catch (error) {
-    console.error("Session deletion error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete session" },
-      { status: 500 }
-    );
-  }
+      return response;
+    } catch (error) {
+      console.error("Session deletion error:", error);
+      return NextResponse.json(
+        { error: "Failed to delete session" },
+        { status: 500 }
+      );
+    }
+  });
 }
