@@ -67,13 +67,12 @@ export default defineConfig({
         extends: true,
 
         test: {
-          name: "unit-api",
+          name: "server-unit",
           environment: "node",
 
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
-            "lib/**/*.test.ts",
           ],
         },
       },

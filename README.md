@@ -63,7 +63,9 @@ Edit `.env.local` with your configuration:
 ```env
 # Stellar Network Configuration
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
-NEXT_PUBLIC_HORIZON_URL=https://horizon-testnet.stellar.org
+NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+NEXT_PUBLIC_SOROBAN_CONTRACT_ID=GXXXXXXXXXXXXXXX...YOUR_CONTRACT_ID
 
 # API Configuration (if applicable)
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
