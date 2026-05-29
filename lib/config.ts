@@ -26,29 +26,50 @@ interface Config {
   };
 }
 
-// Determine if we are in a production build. NEXT_PUBLIC_APP_ENV is validated to be one of the allowed values.
-const isProd = validatedEnv.NEXT_PUBLIC_APP_ENV === 'production';
-
 const config: Config = {
   app: {
-    name: isProd ? validatedEnv.NEXT_PUBLIC_APP_NAME : (process.env.NEXT_PUBLIC_APP_NAME || 'Stellarlend'),
-    version: isProd ? validatedEnv.NEXT_PUBLIC_APP_VERSION : (process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0'),
+    name: validatedEnv.NEXT_PUBLIC_APP_NAME,
+    version: validatedEnv.NEXT_PUBLIC_APP_VERSION,
     environment: validatedEnv.NEXT_PUBLIC_APP_ENV,
   },
   api: {
-    baseUrl: isProd ? validatedEnv.NEXT_PUBLIC_API_BASE_URL : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'),
+    baseUrl: validatedEnv.NEXT_PUBLIC_API_BASE_URL,
     timeout: 10000,
   },
   stellar: {
-    network: isProd ? validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK : (process.env.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet'),
-    horizonUrl: isProd ? validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL : (process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org'),
-    sorobanRpcUrl: isProd ? validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL : (process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org'),
+    network: validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK,
+    horizonUrl: validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL,
+    sorobanRpcUrl: validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL,
   },
   analytics: {
-    googleAnalyticsId: process.env.NEXT_PUBLIC_GA_TRACKING_ID,
-    mixpanelToken: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
+    googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,
+    mixpanelToken: validatedEnv.NEXT_PUBLIC_MIXPANEL_TOKEN,
   },
 };
 
-
+// Export the full server config (includes everything). For client side we only expose public values.
 export default config;
+
+/**
+ * Public config that will be serialized and sent to the client. It contains only
+ * the NEXT_PUBLIC_* variables; any server‑only secrets should NOT be added here.
+ */
+export const publicConfig = {
+  app: {
+    name: config.app.name,
+    version: config.app.version,
+    environment: config.app.environment,
+  },
+  api: {
+    baseUrl: config.api.baseUrl,
+  },
+  stellar: {
+    network: config.stellar.network,
+    horizonUrl: config.stellar.horizonUrl,
+    sorobanRpcUrl: config.stellar.sorobanRpcUrl,
+  },
+  analytics: {
+    googleAnalyticsId: config.analytics.googleAnalyticsId,
+    mixpanelToken: config.analytics.mixpanelToken,
+  },
+} as const;
