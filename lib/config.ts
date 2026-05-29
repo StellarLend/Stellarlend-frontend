@@ -19,10 +19,14 @@ interface Config {
     network: string;
     horizonUrl: string;
     sorobanRpcUrl: string;
+    sorobanContractId: string;
   };
   analytics: {
     googleAnalyticsId?: string;
     mixpanelToken?: string;
+  };
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
   };
 }
 
@@ -37,13 +41,28 @@ const config: Config = {
     timeout: 10000,
   },
   stellar: {
-    network: validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK,
-    horizonUrl: validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL,
-    sorobanRpcUrl: validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL,
+stellar: {
+  network:
+    validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
+
+  horizonUrl:
+    validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
+    'https://horizon-testnet.stellar.org',
+
+  sorobanRpcUrl:
+    validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+    'https://soroban-testnet.stellar.org',
+
+  sorobanContractId:
+    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
+},
   },
   analytics: {
     googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,
     mixpanelToken: validatedEnv.NEXT_PUBLIC_MIXPANEL_TOKEN,
+  },
+  logging: {
+    level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
   },
 };
 

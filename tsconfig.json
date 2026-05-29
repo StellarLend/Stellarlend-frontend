@@ -13,8 +13,8 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".",  // <-- Required for path aliases
-    "ignoreDeprecations": "5.0",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "types": ["node", "vitest/globals"],
     "paths": {
       "@/*": ["./*"]
