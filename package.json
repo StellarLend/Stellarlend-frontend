@@ -15,7 +15,8 @@
     "svg": "node scripts/svgToComponent.js",
     "generate-component": "plop",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "create-pr": "node scripts/create-pr.js"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
