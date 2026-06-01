@@ -46,9 +46,10 @@ export const SideNav = () => {
               {isMobile && (
                 <button
                   onClick={() => closeSidebar()}
-                  className="text-black dark:text-white p-2"
+                  className="text-black dark:text-white p-2 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2"
+                  aria-label="Close sidebar"
                 >
-                  <X size={24} />
+                  <X size={24} aria-hidden="true" />
                 </button>
               )}
             </div>
