@@ -1,12 +1,124 @@
 "use client";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
 import { DashboardLayout } from "@/components";
-import { PageHeader } from "@/components/shared/common";
+import { AlertBanner, PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
+import type { AlertBannerSeverity } from "@/components/shared/common/AlertBanner";
+
+interface PositionMetrics {
+  nextDue: string;
+  healthFactor: number;
+}
+
+interface DashboardAlertData {
+  title: string;
+  message: string;
+  severity: AlertBannerSeverity;
+  dismissKey: string;
+}
+
+const parseNextDueDays = (nextDue: string): number | undefined => {
+  const match = nextDue.match(/(\d+)\s*days?/i);
+  return match ? Number(match[1]) : undefined;
+};
+
+const getDashboardAlertData = (position: PositionMetrics): DashboardAlertData | null => {
+  const dueDays = parseNextDueDays(position.nextDue);
+  const dueSeverity: AlertBannerSeverity | undefined = dueDays === undefined
+    ? undefined
+    : dueDays <= 1
+    ? "critical"
+    : dueDays <= 3
+    ? "warning"
+    : dueDays <= 7
+    ? "info"
+    : undefined;
+
+  const healthSeverity: AlertBannerSeverity | undefined = position.healthFactor <= 1.15
+    ? "critical"
+    : position.healthFactor <= 1.25
+    ? "warning"
+    : position.healthFactor <= 1.35
+    ? "info"
+    : undefined;
+
+  const severity: AlertBannerSeverity | undefined =
+    dueSeverity === "critical" || healthSeverity === "critical"
+      ? "critical"
+      : dueSeverity === "warning" || healthSeverity === "warning"
+      ? "warning"
+      : dueSeverity === "info" || healthSeverity === "info"
+      ? "info"
+      : undefined;
+
+  if (!severity) {
+    return null;
+  }
+
+  if (severity === "critical") {
+    if (dueSeverity === "critical") {
+      return {
+        title: "Immediate action required",
+        message: `Your next payment of ${position.nextDue} is due very soon. Add collateral or repay now to avoid liquidation risk.`,
+        severity,
+        dismissKey: `dashboard-alert-banner-${severity}`,
+      };
+    }
+
+    return {
+      title: "Collateral is critically weak",
+      message: `Your health factor is ${position.healthFactor.toFixed(2)}, which puts your position at high liquidation risk.`,
+      severity,
+      dismissKey: `dashboard-alert-banner-${severity}`,
+    };
+  }
+
+  if (severity === "warning") {
+    if (dueSeverity === "warning") {
+      return {
+        title: "Payment due soon",
+        message: `Your next payment of ${position.nextDue} is approaching. Keep an eye on your collateral health.`,
+        severity,
+        dismissKey: `dashboard-alert-banner-${severity}`,
+      };
+    }
+
+    return {
+      title: "Collateral health warning",
+      message: `Your health factor is ${position.healthFactor.toFixed(2)}. Consider rebalancing to avoid escalation.`,
+      severity,
+      dismissKey: `dashboard-alert-banner-${severity}`,
+    };
+  }
+
+  return {
+    title: "Upcoming payment",
+    message: `Your next payment of ${position.nextDue} is due within the next week.`,
+    severity,
+    dismissKey: `dashboard-alert-banner-${severity}`,
+  };
+};
 
 export default function Dashboard() {
+  const [alertData, setAlertData] = useState<DashboardAlertData | null>(null);
+
+  useEffect(() => {
+    fetch("/api/positions")
+      .then((response) => response.json())
+      .then((data) => {
+        const alert = getDashboardAlertData({
+          nextDue: data.nextDue,
+          healthFactor: data.healthFactor,
+        });
+
+        setAlertData(alert);
+      })
+      .catch(console.error);
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="">
@@ -38,6 +150,18 @@ export default function Dashboard() {
               </>
             }
           />
+
+          {alertData ? (
+            <div className="mb-6">
+              <AlertBanner
+                title={alertData.title}
+                message={alertData.message}
+                severity={alertData.severity}
+                dismissKey={alertData.dismissKey}
+              />
+            </div>
+          ) : null}
+
           <MetricsCards />
         </div>
 

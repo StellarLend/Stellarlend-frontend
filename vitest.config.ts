@@ -59,6 +59,7 @@ export default defineConfig({
           include: [
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
+            "components/shared/common/**/*.test.tsx",
           ],
         },
       },
