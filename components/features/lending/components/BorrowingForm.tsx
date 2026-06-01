@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { LendingData } from '@/app/lending/page';
-import { Input } from '@/components/shared/ui/Input';
+import { AmountInput } from '@/components/shared/ui/AmountInput';
 import Button from '@/components/shared/ui/Button';
 import { cn } from '@/lib/utils/cn';
 import { ASSETS } from '@/lib/assets';
@@ -80,6 +80,7 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
     if (validateForm()) {
       setIsSubmitting(true);
       try {
+        // Simulate validation/processing
         await new Promise(resolve => setTimeout(resolve, 800));
         setSubmitStatus('success');
         setSubmitMessage('Details validated successfully.');
@@ -157,15 +158,11 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
         </div>
 
         {/* Borrow Amount */}
-        <Input
+        <AmountInput
           label="Amount to Borrow"
-          type="number"
-          step="0.01"
-          placeholder="0.00"
-          value={formData.amount || ''}
-          error={errors.amount}
-          onChange={(e) => {
-            setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }));
+          value={formData.amount || 0}
+          onChange={(val) => {
+            setFormData(prev => ({ ...prev, amount: val }));
             if (errors.amount) {
               setErrors(prev => {
                 const next = { ...prev };
@@ -174,6 +171,9 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
               });
             }
           }}
+          precision={selectedAsset?.precision ?? 2}
+          placeholder="0.00"
+          error={errors.amount}
         />
 
         {/* Loan Duration */}
