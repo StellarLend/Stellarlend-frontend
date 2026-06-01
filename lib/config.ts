@@ -12,10 +12,14 @@ interface Config {
     network: string;
     horizonUrl: string;
     sorobanRpcUrl: string;
+    sorobanContractId: string;
   };
   analytics: {
     googleAnalyticsId?: string;
     mixpanelToken?: string;
+  };
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
   };
 }
 
@@ -33,10 +37,14 @@ const config: Config = {
     network: process.env.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
     horizonUrl: process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org',
     sorobanRpcUrl: process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org',
+    sorobanContractId: process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
   },
   analytics: {
     googleAnalyticsId: process.env.NEXT_PUBLIC_GA_TRACKING_ID,
     mixpanelToken: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
+  },
+  logging: {
+    level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
   },
 };
 

@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "@/app/api/transactions/route";
+import { globalCache } from "@/lib/cache";
 import { ASSET_SYMBOLS, TRANSACTION_TYPES, TRANSACTION_STATUSES } from "@/types/enums";
 
 // ---------------------------------------------------------------------------
@@ -13,13 +14,20 @@ function makeGetRequest(params: Record<string, string> = {}) {
   return new NextRequest(url);
 }
 
-function makePostRequest(body: unknown) {
+function makePostRequest(body: unknown, headers: Record<string, string> = {}) {
   return new NextRequest("http://localhost/api/transactions", {
     method: "POST",
     body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...headers,
+    },
   });
 }
+
+beforeEach(() => {
+  globalCache.clear();
+});
 
 // ---------------------------------------------------------------------------
 // GET – accepted values
@@ -46,6 +54,14 @@ describe("GET /api/transactions – accepted values", () => {
   it.each([...TRANSACTION_STATUSES])("accepts status=%s", async (status) => {
     const res = await GET(makeGetRequest({ status }));
     expect(res.status).toBe(200);
+  });
+
+  it("supports pagination parameters", async () => {
+    const res = await GET(makeGetRequest({ page: "2", pageSize: "2" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.transactions).toHaveLength(2);
+    expect(body.total).toBeGreaterThanOrEqual(2);
   });
 
   it("filters by asset correctly", async () => {
@@ -112,6 +128,36 @@ describe("POST /api/transactions – accepted values", () => {
     const body = await res.json();
     expect(body.transaction).toMatchObject(validBody);
     expect(body.transaction.id).toMatch(/^TXN/);
+  });
+
+  it("replays the original response for duplicate idempotency keys", async () => {
+    const first = await POST(makePostRequest(validBody, { "Idempotency-Key": "txn-idempotent" }));
+    expect(first.status).toBe(201);
+    const firstBody = await first.json();
+
+    const duplicate = await POST(makePostRequest(validBody, { "Idempotency-Key": "txn-idempotent" }));
+    expect(duplicate.status).toBe(201);
+    const duplicateBody = await duplicate.json();
+
+    expect(duplicateBody).toEqual(firstBody);
+    expect(duplicateBody.transaction.id).toBe(firstBody.transaction.id);
+  });
+
+  it("returns a conflict when the same key is reused with a different payload", async () => {
+    const first = await POST(makePostRequest(validBody, { "Idempotency-Key": "txn-conflict" }));
+    expect(first.status).toBe(201);
+
+    const conflictingBody = {
+      ...validBody,
+      amount: 999,
+    };
+
+    const conflict = await POST(makePostRequest(conflictingBody, { "Idempotency-Key": "txn-conflict" }));
+    expect(conflict.status).toBe(409);
+
+    const conflictBody = await conflict.json();
+    expect(conflictBody.error.code).toBe("IDEMPOTENCY_CONFLICT");
+    expect(conflictBody.error.message).toContain("txn-conflict");
   });
 
   it.each([...ASSET_SYMBOLS])("accepts asset=%s", async (asset) => {

@@ -10,6 +10,7 @@ This frontend application provides a modern, responsive web interface for intera
 
 - **Lending & Borrowing**: Earn interest by lending assets or borrow against collateral
 - **Multi-Asset Support**: Support for XLM, USDC, BTC, ETH, and other Stellar-based assets
+- **Real-Time Asset Pricing**: Cached price oracle proxy for secure price feeds
 - **Real-Time Calculations**: Dynamic interest rate and payment calculations
 - **Transaction Management**: Track all lending, borrowing, and payment transactions
 - **Dashboard Analytics**: Comprehensive metrics and insights
@@ -62,14 +63,31 @@ Edit `.env.local` with your configuration:
 ```env
 # Stellar Network Configuration
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
-NEXT_PUBLIC_HORIZON_URL=https://horizon-testnet.stellar.org
+NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+NEXT_PUBLIC_SOROBAN_CONTRACT_ID=GXXXXXXXXXXXXXXX...YOUR_CONTRACT_ID
 
 # API Configuration (if applicable)
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 # Feature Flags
 NEXT_PUBLIC_ENABLE_ANALYTICS=false
+
+# Server Logging Configuration
+SERVER_LOG_LEVEL=info
 ```
+
+Logging is emitted as structured JSON by `lib/logger.ts` and includes:
+- `timestamp`
+- `level`
+- `route`
+- `method`
+- `status`
+- `durationMs`
+- `message`
+- `context`
+
+Sensitive information such as authorization headers, API keys, auth tokens, and Stellar public/secret keys are redacted automatically.
 
 > **Note**: For production, use the Stellar mainnet configuration and secure your environment variables.
 
@@ -195,6 +213,30 @@ npm run svg
 
 This will automatically convert SVGs to React components in `components/shared/ui/icons/`.
 
+## 🗄️ Backend & API
+
+The server-side API surface is documented in two places:
+
+| Resource | Description |
+|---|---|
+| [`docs/backend-architecture.md`](docs/backend-architecture.md) | Architecture overview — lib/ modules, caching model, security, and how to add a new route |
+| [`openapi.yaml`](openapi.yaml) | OpenAPI 3.1 spec for all `app/api/*` routes, params, and response shapes |
+
+### Available API Routes
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/health` | Public | Platform & Stellar network health |
+| `POST/GET/DELETE` | `/api/auth/session` | — | Session lifecycle |
+| `GET` | `/api/prices` | Public | Asset spot prices (cached 5 s) |
+| `GET` | `/api/markets` | Public | Per-asset supply/borrow APR & utilization (cached 30 s) |
+| `GET` | `/api/positions` | Optional | User lending/borrowing positions |
+| `GET/POST` | `/api/transactions` | Public | Transaction history and creation |
+| `GET` | `/api/transactions/export` | Public | Transactions CSV export |
+| `POST` | `/api/quote` | Public | Lending/borrowing quote calculation |
+| `GET` | `/api/notifications` | Required | List in-app notifications |
+| `PATCH` | `/api/notifications/:id` | Required | Mark notification as read |
+
 ## 🔗 Helpful Links
 
 ### Documentation
@@ -204,6 +246,7 @@ This will automatically convert SVGs to React components in `components/shared/u
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs) - Utility-first CSS framework
 - [Stellar Documentation](https://developers.stellar.org/docs) - Stellar blockchain development guide
 - [Soroban Documentation](https://soroban.stellar.org/docs) - Soroban smart contracts
+- [Idempotency contract and key lifetime](docs/idempotency.md) - API replay protection and cache retention guidance
 
 ### Development Tools
 - [Storybook](https://storybook.js.org/docs) - Component development environment

@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, waitFor } from "@/test/test-utils";
 import { Transactions } from "./Transaction";
 import { describe, it, expect, vi, beforeEach } from "vitest";
