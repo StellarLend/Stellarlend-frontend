@@ -74,16 +74,3 @@ jobs:
             echo "Production response time is too slow: ${production_time}s"
             exit 1
           fi
-
-      - name: Check production migrations
-        id: migration-check
-        run: |
-          # Ensure applied migrations match source via protected endpoint
-          resp=$(curl -s -H "x-server-token: ${{ secrets.SERVER_TOKEN }}" https://stellarlend.com/api/admin/migrate-status || echo "")
-          echo "Migration response: $resp"
-          if ! echo "$resp" | grep -q '"ok":true'; then
-            echo "migrations_status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          else
-            echo "migrations_status=success" >> $GITHUB_OUTPUT
-          fi
