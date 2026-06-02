@@ -168,3 +168,12 @@ export async function markNotificationRead(
 export async function clearStore(): Promise<void> {
   await db.delete(notificationsTable);
 }
+
+/** Removes all notifications for a specific user (used during account deletion). */
+export function removeNotificationsByUserId(userId: string): number {
+  const notifications = store.get(userId);
+  if (!notifications) return 0;
+  const count = notifications.length;
+  store.delete(userId);
+  return count;
+}

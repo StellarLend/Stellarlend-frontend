@@ -1,6 +1,5 @@
 import 'server-only';
 
-// Runtime guard to prevent client-side imports
 if (typeof window !== 'undefined') {
   throw new Error('Internal Error: server-config.ts cannot be imported on the client side.');
 }

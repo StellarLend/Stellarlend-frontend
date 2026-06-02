@@ -1,4 +1,4 @@
-import { pgTable, text, doublePrecision } from 'drizzle-orm/pg-core';
+import { doublePrecision, index, pgTable, text } from 'drizzle-orm/pg-core';
 
 export const transactions = pgTable('transactions', {
   id: text('id').primaryKey(),
@@ -8,7 +8,9 @@ export const transactions = pgTable('transactions', {
   date: text('date').notNull(),
   time: text('time').notNull(),
   status: text('status').notNull(),
-});
+}, (table) => ({
+  dateIdIdx: index('transactions_date_id_idx').on(table.date, table.id),
+}));
 
 export type DBTransaction = typeof transactions.$inferSelect;
 export type NewDBTransaction = typeof transactions.$inferInsert;

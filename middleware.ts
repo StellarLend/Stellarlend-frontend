@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import appConfig from '@/lib/config';
+import { getOrCreateRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
+
+function getRequestIdHeaders(request: NextRequest) {
+  const { requestId } = getOrCreateRequestId(request.headers);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set(REQUEST_ID_HEADER, requestId);
+
+  return { requestId, requestHeaders };
+}
+
+function setRequestIdHeader(response: NextResponse, requestId: string): NextResponse {
+  response.headers.set(REQUEST_ID_HEADER, requestId);
+  return response;
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,9 +24,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const { requestId, requestHeaders } = getRequestIdHeaders(request);
+
   // 2. Exemption: Health checks should never be rate limited
   if (pathname === '/api/health') {
-    return NextResponse.next();
+    return setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
   }
 
   // 3. Exemption: Authenticated internal calls
@@ -21,11 +37,11 @@ export function middleware(request: NextRequest) {
   const isAuth = request.cookies.has(sessionCookieName);
   
   if (isAuth) {
-    return NextResponse.next();
+    return setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
   }
 
   // 4. Identification (IP-based for anonymous requests)
-  const ip = request.ip || request.headers.get('x-forwarded-for') || '127.0.0.1';
+  const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
   const identifier = `api-ratelimit:${ip}`;
 
   const { success, limit, remaining, reset } = rateLimit(
@@ -38,7 +54,7 @@ export function middleware(request: NextRequest) {
   let response: NextResponse;
 
   if (success) {
-    response = NextResponse.next();
+    response = NextResponse.next({ request: { headers: requestHeaders } });
   } else {
     response = new NextResponse(
       JSON.stringify({ 
@@ -59,7 +75,7 @@ export function middleware(request: NextRequest) {
     response.headers.set('Retry-After', Math.max(0, retryAfter).toString());
   }
 
-  return response;
+  return setRequestIdHeader(response, requestId);
 }
 
 export const config = {

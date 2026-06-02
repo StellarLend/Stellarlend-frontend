@@ -1,8 +1,8 @@
 export {
-  getAssetRegistry,
-  getAssetMetadata,
-  getAllAssets,
-  validateRegistry,
-  type AssetMetadata,
-  type AssetRegistry,
+  getRegistry,
+  getAsset,
+  getAssets,
+  getAssetSymbols,
+  isValidAsset,
 } from './registry';
+export type { AssetMetadata, Registry } from './registry';
