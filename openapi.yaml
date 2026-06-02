@@ -455,6 +455,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/notifications/stream:
+    get:
+      operationId: streamNotifications
+      tags: [notifications]
+      summary: Server-Sent Events stream for per-user notifications
+      description: |
+        Opens a per-session Server-Sent Events (SSE) connection that pushes
+        new notifications and unread-count updates for the authenticated user.
+
+        Event types:
+        - `notification`: contains a single `Notification` object
+        - `unreadCount`: contains `{ unreadCount: number }`
+
+        Clients SHOULD subscribe to this endpoint to receive live updates.
+        Polling the `/api/notifications` GET endpoint remains a supported
+        fallback for environments that do not support SSE.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: SSE stream (text/event-stream)
+          content:
+            text/event-stream: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
 # =============================================================================
 # Components
 # =============================================================================
