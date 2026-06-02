@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
 import { markNotificationRead } from '@/lib/notifications/repository';
+import { withCsrfProtection } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
@@ -20,10 +21,10 @@ export const runtime = 'nodejs';
  *    401  – no valid session
  *    404  – notification not found for this user
  */
-export async function PATCH(
-  _req: NextRequest,
+const patchHandler = async (
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
-) {
+) => {
   const user = await getUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -41,4 +42,6 @@ export async function PATCH(
   }
 
   return NextResponse.json({ notification });
-}
+};
+
+export const PATCH = withCsrfProtection(patchHandler);
