@@ -59,6 +59,9 @@ export default defineConfig({
           include: [
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
+            "components/shared/common/Skeleton.test.tsx",
+            "components/shared/common/EmptyState.test.tsx",
+            "components/shared/common/PageHeader.test.tsx",
           ],
         },
       },
@@ -96,6 +99,7 @@ export default defineConfig({
         "lib/**",
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/layout/TopNav.tsx",
+        "components/shared/common/Skeleton.tsx",
         "types/enums.ts",
         "app/api/transactions/route.ts",
         "app/api/webhooks/transactions/route.ts",
