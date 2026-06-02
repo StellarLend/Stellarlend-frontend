@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { metrics } from '@/lib/metrics/registry';
-import { verifyCsrfToken } from '@/lib/security/csrf';
 import { chaosInject } from '@/lib/chaos/inject';
 
 function serializeError(error: unknown) {

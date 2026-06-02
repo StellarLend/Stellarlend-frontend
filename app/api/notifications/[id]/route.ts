@@ -36,7 +36,7 @@ const patchHandler = async (
     return NextResponse.json({ error: 'Invalid notification id' }, { status: 400 });
   }
 
-  const notification = markNotificationRead(user.id, id.trim());
+  const notification = await markNotificationRead(user.id, id.trim());
   if (!notification) {
     return NextResponse.json({ error: 'Notification not found' }, { status: 404 });
   }
