@@ -4,6 +4,6 @@ export { default as Searchbar, type SearchBarProps as SearchbarProps } from '@/c
 
 export { RecentTransactions } from './RecentTransactions';
 export { PageHeader } from './PageHeader';
+export { AlertBanner } from './AlertBanner';
 export type { PageHeaderProps, PageHeaderTone } from './PageHeader';
-export { Skeleton, TransactionRowSkeleton, TransactionCardSkeleton, TransactionsSkeleton } from './Skeleton';
-export type { SkeletonProps } from './Skeleton';
+export type { AlertBannerSeverity, AlertBannerProps } from './AlertBanner';
