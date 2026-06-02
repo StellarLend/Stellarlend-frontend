@@ -32,6 +32,7 @@
     "lucide-react": "^0.484.0",
     "motion": "^12.6.2",
     "next": "15.2.8",
+    "nextjs-toploader": "3.7.15",
     "react": "^19.0.0",
     "react-datepicker": "^8.3.0",
     "react-dom": "^19.0.0",
