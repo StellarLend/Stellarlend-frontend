@@ -26,6 +26,17 @@ class Counter {
   }
 }
 
+class Gauge {
+  private value = 0;
+  constructor(private name: string, private help: string) {}
+  set(value: number) {
+    this.value = value;
+  }
+  collect(): string {
+    return `# HELP ${this.name} ${this.help}\n# TYPE ${this.name} gauge\n${this.name} ${this.value}\n`;
+  }
+}
+
 class Histogram {
   private buckets = new Map<string, number>();
   private sum = 0;
@@ -80,6 +91,11 @@ class Registry {
   outboundRequests = new Counter('outbound_http_requests_total', 'Outbound HTTP requests');
   outboundRequestDuration = new Histogram('outbound_http_request_duration_seconds', 'Outbound HTTP request duration seconds');
   horizonSelections = new Counter('horizon_selection_total', 'Horizon endpoint selections');
+  schedulerIsLeader = new Gauge('scheduler_is_leader', 'Whether this replica currently owns the cron scheduler advisory lock');
+
+  setSchedulerIsLeader(value: 0 | 1): void {
+    this.schedulerIsLeader.set(value);
+  }
 
   collect(): string {
     // Return concatenated exposition
@@ -92,6 +108,7 @@ class Registry {
     out += this.outboundRequests.collect();
     out += this.outboundRequestDuration.collect();
     out += this.horizonSelections.collect();
+    out += this.schedulerIsLeader.collect();
     return out;
   }
 }
