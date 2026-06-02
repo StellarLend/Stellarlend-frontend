@@ -40,7 +40,6 @@ Key fields used by the API layer:
 
 | Path | Env var | Default |
 |---|---|---|
-| `stellar.sorobanRpcUrl` | `NEXT_PUBLIC_SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` |
 | `stellar.horizonUrl` | `NEXT_PUBLIC_STELLAR_HORIZON_URL` | `https://horizon-testnet.stellar.org` |
 | `api.timeout` | — | 10 000 ms |
 

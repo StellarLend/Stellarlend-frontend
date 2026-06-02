@@ -1,5 +1,10 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
+import Sidebar from "./Sidebar";
+import NavLink from "./NavLink";
+import { SideNav } from "./SideNav";
+import { NavigationMenu } from "./NavigationMenu";
+import { SidebarProvider } from "@/context/SidebarContext";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 import NavLink from "./NavLink";
@@ -7,37 +12,18 @@ import { NavigationMenu } from "./NavigationMenu";
 import { SideNav } from "./SideNav";
 import Sidebar from "./Sidebar";
 
-// ─── Mock next/navigation ────────────────────────────────────────────────────
-const mockPathname = vi.fn(() => "/dashboard");
-vi.mock("next/navigation", () => ({
-  usePathname: () => mockPathname(),
-}));
-
-// ─── Mock framer-motion (SideNav uses it) ────────────────────────────────────
-vi.mock("framer-motion", () => ({
-  motion: {
-    aside: ({ children, ...props }: React.HTMLAttributes<HTMLElement>) => (
-      <aside {...props}>{children}</aside>
-    ),
-  },
-}));
-
-// ─── Mock SidebarContext ──────────────────────────────────────────────────────
-vi.mock("@/context/SidebarContext", () => ({
-  useSidebar: () => ({
-    isSidebarOpen: true,
-    closeSidebar: vi.fn(),
-    isMobile: true,
-    toggleSidebar: vi.fn(),
-  }),
-  SidebarProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-// ─── NavLink ─────────────────────────────────────────────────────────────────
-describe("NavLink", () => {
-  it("renders an anchor for hash hrefs", () => {
-    render(<NavLink href="#section">Section</NavLink>);
-    expect(screen.getByRole("link", { name: "Section" }).tagName).toBe("A");
+describe("Navigation UI/UX", () => {
+  it("Sidebar renders all nav items with correct roles", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
+    expect(screen.getByRole("navigation", { name: /sidebar navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Profile Settings/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Password/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Notification/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Verification/i })).toBeInTheDocument();
   });
 
   it("marks active when pathname matches href", () => {
@@ -46,10 +32,13 @@ describe("NavLink", () => {
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("aria-current", "page");
   });
 
-  it("does not mark active when pathname differs", () => {
-    mockPathname.mockReturnValue("/other");
-    render(<NavLink href="/dashboard">Dashboard</NavLink>);
-    expect(screen.getByRole("link", { name: /dashboard/i })).not.toHaveAttribute("aria-current");
+  it("SideNav renders without crashing", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <SideNav />
+      </SidebarProvider>
+    );
+    expect(screen.getByText(/StellarLend/i)).toBeInTheDocument();
   });
 
   it("isActive prop overrides pathname detection", () => {

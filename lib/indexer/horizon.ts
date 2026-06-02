@@ -10,6 +10,8 @@ import {
 import { HorizonSelector } from '@/lib/http/horizon-selector';
 import type { HorizonOperation as RawHorizonOperation, IndexerOptions } from './types';
 import { getLatestCursor, saveCursorCheckpoint } from './cursor';
+import { validateMemo, resolveAccountByMemo, isStrictModeEnabled } from '../stellar/memo';
+import type { HorizonOperation, HorizonPage, IndexerOptions } from './types';
 
 export interface HorizonOperation extends RawHorizonOperation {
   paging_token: string;
