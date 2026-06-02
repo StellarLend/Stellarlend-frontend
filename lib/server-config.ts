@@ -15,6 +15,9 @@ interface ServerConfig {
   server: {
     token: string;
   };
+  db: {
+    url: string;
+  };
 }
 
 const serverConfig: ServerConfig = {
@@ -26,6 +29,9 @@ const serverConfig: ServerConfig = {
   },
   server: {
     token: process.env.SERVER_TOKEN || '',
+  },
+  db: {
+    url: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/stellarlend',
   },
 };
 

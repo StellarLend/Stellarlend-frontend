@@ -2,6 +2,8 @@ import type { Transaction, TransactionFilters } from './types';
 import type { Transaction as IndexerTransaction } from '@/types/Transaction';
 import { indexAccountTransactions } from '@/lib/indexer';
 import { logger } from '@/lib/logger';
+import { db } from '../db';
+import { transactions as transactionsTable } from '../db/schema/transactions';
 
 const ROUTE = 'lib/transactions/repository';
 
@@ -14,8 +16,35 @@ const MOCK_TRANSACTIONS: Transaction[] = [
   { id: 'TXN12350', type: 'Deposit',      amount:  20000,   asset: 'STRK', date: '2024-11-15', time: '01:05PM', status: 'Completed'  },
 ];
 
+async function seedTransactions() {
+  for (const txn of MOCK_TRANSACTIONS) {
+    await db.insert(transactionsTable).values({
+      id: txn.id,
+      type: txn.type,
+      amount: txn.amount,
+      asset: txn.asset,
+      date: txn.date,
+      time: txn.time,
+      status: txn.status,
+    }).onConflictDoNothing();
+  }
+}
+
 export async function fetchTransactions(): Promise<Transaction[]> {
-  return MOCK_TRANSACTIONS;
+  const rows = await db.select().from(transactionsTable);
+  if (rows.length === 0) {
+    await seedTransactions();
+    return MOCK_TRANSACTIONS;
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type,
+    amount: r.amount,
+    asset: r.asset as any,
+    date: r.date,
+    time: r.time,
+    status: r.status as any,
+  }));
 }
 
 /**
@@ -44,7 +73,8 @@ export async function fetchTransactionRecords(
     }
   }
 
-  return MOCK_TRANSACTIONS as unknown as IndexerTransaction[];
+  const txs = await fetchTransactions();
+  return txs as unknown as IndexerTransaction[];
 }
 
 export function filterTransactions(
