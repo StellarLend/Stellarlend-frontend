@@ -137,9 +137,7 @@ export default function BorrowingForm({
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Borrow Asset Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Asset to Borrow
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Asset to Borrow <Tooltip content="The asset you wish to borrow (must be collateralized)."><IconButton aria-label="Help" size="sm" variant="ghost" /></Tooltip></label>
           <div className="grid grid-cols-2 gap-4">
             <AssetSelector
               assets={ASSETS}
@@ -157,7 +155,7 @@ export default function BorrowingForm({
         </div>
 
         {/* Borrow Amount */}
-        <Input
+        <AmountInput
           label="Amount to Borrow"
           type="number"
           step="0.01"
@@ -177,6 +175,9 @@ export default function BorrowingForm({
               });
             }
           }}
+          precision={selectedAsset?.precision ?? 2}
+          placeholder="0.00"
+          error={errors.amount}
         />
 
         {/* Loan Duration */}

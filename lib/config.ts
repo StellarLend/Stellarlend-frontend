@@ -1,3 +1,10 @@
+import { validatedEnv } from './configValidation';
+
+/**
+ * Application configuration. Values are sourced from environment variables.
+ * In production we enforce explicit values via validation; in development we keep
+ * existing fallbacks for convenience.
+ */
 interface Config {
   app: {
     name: string;
@@ -25,27 +32,63 @@ interface Config {
 
 const config: Config = {
   app: {
-    name: process.env.NEXT_PUBLIC_APP_NAME || 'Stellarlend',
-    version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
-    environment: (process.env.NEXT_PUBLIC_APP_ENV as Config['app']['environment']) || 'development',
+    name: validatedEnv.NEXT_PUBLIC_APP_NAME,
+    version: validatedEnv.NEXT_PUBLIC_APP_VERSION,
+    environment: validatedEnv.NEXT_PUBLIC_APP_ENV,
   },
   api: {
-    baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001',
+    baseUrl: validatedEnv.NEXT_PUBLIC_API_BASE_URL,
     timeout: 10000,
   },
   stellar: {
-    network: process.env.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
-    horizonUrl: process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org',
-    sorobanRpcUrl: process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org',
-    sorobanContractId: process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
+stellar: {
+  network:
+    validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
+
+  horizonUrl:
+    validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
+    'https://horizon-testnet.stellar.org',
+
+  sorobanRpcUrl:
+    validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+    'https://soroban-testnet.stellar.org',
+
+  sorobanContractId:
+    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
+},
   },
   analytics: {
-    googleAnalyticsId: process.env.NEXT_PUBLIC_GA_TRACKING_ID,
-    mixpanelToken: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
+    googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,
+    mixpanelToken: validatedEnv.NEXT_PUBLIC_MIXPANEL_TOKEN,
   },
   logging: {
     level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
   },
 };
 
+// Export the full server config (includes everything). For client side we only expose public values.
 export default config;
+
+/**
+ * Public config that will be serialized and sent to the client. It contains only
+ * the NEXT_PUBLIC_* variables; any server‑only secrets should NOT be added here.
+ */
+export const publicConfig = {
+  app: {
+    name: config.app.name,
+    version: config.app.version,
+    environment: config.app.environment,
+  },
+  api: {
+    baseUrl: config.api.baseUrl,
+  },
+  stellar: {
+    network: config.stellar.network,
+    horizonUrl: config.stellar.horizonUrl,
+    sorobanRpcUrl: config.stellar.sorobanRpcUrl,
+  },
+  analytics: {
+    googleAnalyticsId: config.analytics.googleAnalyticsId,
+    mixpanelToken: config.analytics.mixpanelToken,
+  },
+} as const;
