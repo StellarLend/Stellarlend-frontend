@@ -1,4 +1,5 @@
 import config from '@/lib/config';
+import { recordHttpRetry } from '@/lib/metrics';
 import {
   HttpError,
   NetworkError,
@@ -10,10 +11,14 @@ import {
 export interface RequestOptions extends Omit<RequestInit, 'signal'> {
   /** Override the global timeout from config.api.timeout (ms). */
   timeoutMs?: number;
-  /** Number of retry attempts for idempotent GET requests (default: 3). */
+  /** Number of retry attempts for idempotent GET/HEAD requests (default: 3). */
   retries?: number;
   /** Base backoff delay in ms; doubles on each attempt (default: 200). */
   backoffMs?: number;
+  /** Allow retries on POST requests when true (default: false). */
+  retryOnPost?: boolean;
+  /** Upper bound for Retry-After wait (ms, default 30000). */
+  retryAfterUpperBoundMs?: number;
 }
 
 async function fetchOnce<T>(url: string, options: RequestOptions): Promise<T> {
@@ -59,39 +64,93 @@ function sleep(ms: number): Promise<void> {
  */
 export async function httpGet<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase();
-  const maxRetries = method === 'GET' ? (options.retries ?? 3) : 1;
+  const isIdempotent = method === 'GET' || method === 'HEAD';
+  const maxRetries = (isIdempotent || (method === 'POST' && options.retryOnPost)) ? (options.retries ?? 3) : 1;
   const backoffMs = options.backoffMs ?? 200;
+  const retryAfterUpperBoundMs = options.retryAfterUpperBoundMs ?? 30000;
 
   let lastError: HttpError | undefined;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await fetchOnce<T>(url, options);
+      // Perform fetch with timeout handling similar to fetchOnce but expose response for Retry-After
+      const timeoutMs = options.timeoutMs ?? config.api.timeout;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const { timeoutMs: _t, retries: _r, backoffMs: _b, retryOnPost: _rp, retryAfterUpperBoundMs: _rao, ...fetchOptions } = options;
+      let response: Response;
+      try {
+        response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+      } catch (err) {
+        clearTimeout(timer);
+        if ((err as Error).name === 'AbortError') {
+          throw new TimeoutError(url, timeoutMs);
+        }
+        throw new NetworkError(url, err);
+      }
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        // Handle Retry-After for 429
+        if (response.status === 429) {
+          const header = response.headers.get('Retry-After');
+          let waitMs = 0;
+          if (header) {
+            const retrySec = parseInt(header, 10);
+            if (!isNaN(retrySec)) {
+              waitMs = retrySec * 1000;
+            } else {
+              const date = new Date(header);
+              if (!isNaN(date.getTime())) {
+                waitMs = date.getTime() - Date.now();
+              }
+            }
+            // Clamp to upper bound
+            waitMs = Math.min(Math.max(waitMs, 0), retryAfterUpperBoundMs);
+          }
+          recordHttpRetry(method, '429');
+          if (attempt < maxRetries && waitMs > 0) {
+            await sleep(waitMs);
+          }
+        }
+        // Emit metric for other server errors
+        if (response.status >= 500) {
+          recordHttpRetry(method, '5xx');
+        }
+        throw new UpstreamHttpError(url, response.status);
+      }
+
+      // Successful response
+      try {
+        return (await response.json()) as T;
+      } catch (err) {
+        throw new HttpError('PARSE_ERROR', `Failed to parse JSON from ${url}`, undefined, err);
+      }
     } catch (err) {
       lastError = err instanceof HttpError ? err : new NetworkError(url, err);
-
-      // Don't retry on 4xx — those are client errors that won't resolve.
-      if (lastError instanceof UpstreamHttpError && lastError.status! < 500) {
+      // Don't retry on client errors (4xx except 429 already handled)
+      if (lastError instanceof UpstreamHttpError && lastError.status! < 500 && lastError.status! === 429) {
         throw lastError;
       }
-      // Don't retry on timeout — the upstream is backed up; retrying immediately makes it worse.
       if (lastError instanceof TimeoutError) {
         throw lastError;
       }
-
       if (attempt < maxRetries) {
+        // exponential backoff for network errors or 5xx without Retry-After
         await sleep(backoffMs * 2 ** (attempt - 1));
       }
     }
   }
 
   throw new RetryExhaustedError(url, maxRetries, lastError!);
+
 }
 
 /**
  * Typed POST — single attempt, with timeout.
  */
 export async function httpPost<T>(url: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+  // POST is non‑idempotent; by default we do NOT retry. Pass `retryOnPost: true` if retries are desired.
   return fetchOnce<T>(url, {
     ...options,
     method: 'POST',
