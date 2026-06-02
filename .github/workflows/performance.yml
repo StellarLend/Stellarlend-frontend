@@ -9,7 +9,7 @@ on:
 jobs:
   lighthouse:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,17 +39,35 @@ jobs:
           npm run build
           npx bundlewatch --config bundlewatch.config.json
 
+      - name: Set up k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run API load tests
+        env:
+          BASE_URL: https://stellarlend-staging.vercel.app
+        run: |
+          mkdir -p performance-results
+          k6 run --summary-export performance-results/transactions.json test/load/transactions.k6.js
+          k6 run --summary-export performance-results/prices.json test/load/prices.k6.js
+          k6 run --summary-export performance-results/tx-submit.json test/load/tx-submit.k6.js
+
+      - name: Upload k6 performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-performance-results
+          path: performance-results/*.json
+
       - name: Comment PR with performance results
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
         with:
           script: |
-            const fs = require('fs');
             let comment = '## 📊 Performance Report\n\n';
             comment += '✅ Lighthouse CI completed successfully!\n';
-            comment += '📦 Bundle size analysis completed!\n\n';
+            comment += '📦 Bundle size analysis completed!\n';
+            comment += '🚀 k6 API load tests completed for `/api/transactions`, `/api/prices`, and `/api/tx/submit`.\n\n';
             comment += 'Check the full report in the Actions tab.';
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
