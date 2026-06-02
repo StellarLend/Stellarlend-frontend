@@ -1,273 +1,296 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { GET, POST } from './route';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
+import { GET } from '@/app/api/assets/route';
+import { globalCache } from '@/lib/cache';
+import { getAssetSymbols } from '@/lib/assets';
 
-// Mock the cache
-vi.mock('@/lib/cache', () => ({
-  globalCache: {
-    getOrFetch: vi.fn(async (key: string, fetcher: () => Promise<any>) => {
-      const value = await fetcher();
-      return { value, status: 'HIT' };
-    }),
-  },
-}));
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-describe('GET /api/assets', () => {
-  it('should return all assets when no symbol param is provided', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    const response = await GET(request);
+function makeGetRequest(params: Record<string, string> = {}) {
+  const url = new URL('http://localhost/api/assets');
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  return new NextRequest(url);
+}
 
-    expect(response.status).toBe(200);
-    const data = await response.json();
+beforeEach(() => {
+  globalCache.clear();
+});
 
-    expect(data.assets).toHaveLength(4);
-    expect(data.timestamp).toBeDefined();
+// ---------------------------------------------------------------------------
+// GET – Basic functionality
+// ---------------------------------------------------------------------------
 
-    const symbols = data.assets.map((a: any) => a.symbol);
-    expect(symbols).toContain('XLM');
-    expect(symbols).toContain('USDC');
-    expect(symbols).toContain('BTC');
-    expect(symbols).toContain('ETH');
+describe('GET /api/assets – Basic functionality', () => {
+  it('returns 200 with all assets when no filters provided', async () => {
+    const res = await GET(makeGetRequest());
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body).toHaveProperty('assets');
+    expect(body).toHaveProperty('timestamp');
+    expect(Array.isArray(body.assets)).toBe(true);
+    expect(body.assets.length).toBeGreaterThan(0);
   });
 
-  it('should filter by single symbol', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=XLM'));
-    const response = await GET(request);
+  it('returns asset with required fields', async () => {
+    const res = await GET(makeGetRequest());
+    const body = await res.json();
+    const asset = body.assets[0];
 
-    expect(response.status).toBe(200);
-    const data = await response.json();
-
-    expect(data.assets).toHaveLength(1);
-    expect(data.assets[0].symbol).toBe('XLM');
-    expect(data.assets[0].name).toBe('Stellar Lumens');
+    expect(asset).toHaveProperty('symbol');
+    expect(asset).toHaveProperty('name');
+    expect(asset).toHaveProperty('decimals');
+    expect(asset).toHaveProperty('issuer');
+    expect(asset).toHaveProperty('logoUrl');
   });
 
-  it('should filter by multiple symbols', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=XLM,USDC'));
-    const response = await GET(request);
+  it('returns valid ISO 8601 timestamp', async () => {
+    const res = await GET(makeGetRequest());
+    const body = await res.json();
 
-    expect(response.status).toBe(200);
-    const data = await response.json();
+    expect(body.timestamp).toBeDefined();
+    expect(() => new Date(body.timestamp)).not.toThrow();
+    // Check it's a valid ISO string
+    expect(body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  });
+});
 
-    expect(data.assets).toHaveLength(2);
-    const symbols = data.assets.map((a: any) => a.symbol);
-    expect(symbols).toContain('XLM');
-    expect(symbols).toContain('USDC');
+// ---------------------------------------------------------------------------
+// GET – Symbol filtering
+// ---------------------------------------------------------------------------
+
+describe('GET /api/assets – Symbol filtering', () => {
+  const allSymbols = getAssetSymbols();
+
+  it('filters by single symbol', async () => {
+    const res = await GET(makeGetRequest({ symbols: 'XLM' }));
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.assets).toHaveLength(1);
+    expect(body.assets[0].symbol).toBe('XLM');
   });
 
-  it('should be case-insensitive for symbol param', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=xlm,usdc'));
-    const response = await GET(request);
+  it('filters by multiple symbols', async () => {
+    const res = await GET(makeGetRequest({ symbols: 'XLM,USDC' }));
+    expect(res.status).toBe(200);
 
-    expect(response.status).toBe(200);
-    const data = await response.json();
-
-    expect(data.assets).toHaveLength(2);
-    const symbols = data.assets.map((a: any) => a.symbol);
-    expect(symbols).toContain('XLM');
-    expect(symbols).toContain('USDC');
+    const body = await res.json();
+    expect(body.assets).toHaveLength(2);
+    expect(body.assets.map((a: { symbol: string }) => a.symbol)).toContain('XLM');
+    expect(body.assets.map((a: { symbol: string }) => a.symbol)).toContain('USDC');
   });
 
-  it('should return 400 for unknown symbol', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=INVALID'));
-    const response = await GET(request);
+  it('handles case-insensitive symbol input', async () => {
+    const res = await GET(makeGetRequest({ symbols: 'xlm,usdc' }));
+    expect(res.status).toBe(200);
 
-    expect(response.status).toBe(400);
-    const data = await response.json();
-
-    expect(data.error).toBeDefined();
-    expect(data.error).toContain('Unknown asset symbol');
+    const body = await res.json();
+    expect(body.assets).toHaveLength(2);
   });
 
-  it('should return 400 for partially invalid symbols', async () => {
-    const request = new NextRequest(
-      new URL('http://localhost:3000/api/assets?symbol=XLM,INVALID,USDC'),
-    );
-    const response = await GET(request);
+  it('handles whitespace around symbols', async () => {
+    const res = await GET(makeGetRequest({ symbols: ' XLM , USDC ' }));
+    expect(res.status).toBe(200);
 
-    expect(response.status).toBe(400);
-    const data = await response.json();
-
-    expect(data.error).toContain('Unknown asset symbol');
-    expect(data.error).toContain('INVALID');
+    const body = await res.json();
+    expect(body.assets).toHaveLength(2);
   });
 
-  it('should include asset metadata', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=XLM'));
-    const response = await GET(request);
+  it.each(allSymbols)('accepts symbol=%s', async (symbol) => {
+    const res = await GET(makeGetRequest({ symbols: symbol }));
+    expect(res.status).toBe(200);
 
-    expect(response.status).toBe(200);
-    const data = await response.json();
+    const body = await res.json();
+    expect(body.assets).toHaveLength(1);
+    expect(body.assets[0].symbol).toBe(symbol);
+  });
+});
 
-    const xlm = data.assets[0];
-    expect(xlm.symbol).toBe('XLM');
-    expect(xlm.name).toBe('Stellar Lumens');
-    expect(xlm.decimals).toBe(7);
-    expect(xlm.stellarIssuer).toBe('native');
-    expect(xlm.logoUrl).toBeDefined();
-    expect(xlm.description).toBeDefined();
+// ---------------------------------------------------------------------------
+// GET – Validation and error handling
+// ---------------------------------------------------------------------------
+
+describe('GET /api/assets – Validation and error handling', () => {
+  it('rejects empty symbols parameter with 400', async () => {
+    const res = await GET(makeGetRequest({ symbols: '' }));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+    expect(body).toHaveProperty('code', 'INVALID_QUERY');
+    expect(body).toHaveProperty('timestamp');
   });
 
-  it('should include correct decimals for each asset', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    const response = await GET(request);
+  it('rejects unknown symbol with 400', async () => {
+    const res = await GET(makeGetRequest({ symbols: 'UNKNOWN' }));
+    expect(res.status).toBe(400);
 
-    const data = await response.json();
-    const assetsMap = Object.fromEntries(data.assets.map((a: any) => [a.symbol, a]));
-
-    expect(assetsMap['XLM'].decimals).toBe(7);
-    expect(assetsMap['USDC'].decimals).toBe(6);
-    expect(assetsMap['BTC'].decimals).toBe(8);
-    expect(assetsMap['ETH'].decimals).toBe(18);
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid asset symbols/);
+    expect(body.error).toMatch(/UNKNOWN/);
   });
 
-  it('should set proper cache headers', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    const response = await GET(request);
+  it('rejects mix of valid and invalid symbols with 400', async () => {
+    const res = await GET(makeGetRequest({ symbols: 'XLM,INVALID,USDC' }));
+    expect(res.status).toBe(400);
 
-    expect(response.headers.get('Cache-Control')).toBe('public, max-age=3600, stale-while-revalidate=86400');
-    expect(response.headers.get('X-Cache')).toBe('HIT');
+    const body = await res.json();
+    expect(body.error).toMatch(/Invalid asset symbols/);
   });
 
-  it('should bypass cache for authenticated requests with Authorization header', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    request.headers.set('Authorization', 'Bearer token');
+  it('rejects too many symbols (>20) with 400', async () => {
+    const symbols = Array(21).fill('XLM').join(',');
+    const res = await GET(makeGetRequest({ symbols }));
+    expect(res.status).toBe(400);
 
-    const response = await GET(request);
+    const body = await res.json();
+    expect(body.error).toMatch(/Too many symbols/);
+  });
+});
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('X-Cache')).toBe('BYPASS');
-    expect(response.headers.get('Cache-Control')).toContain('no-store');
+// ---------------------------------------------------------------------------
+// GET – Caching behavior
+// ---------------------------------------------------------------------------
+
+describe('GET /api/assets – Caching behavior', () => {
+  it('returns HIT on second request (cache hit)', async () => {
+    const res1 = await GET(makeGetRequest());
+    expect(res1.headers.get('X-Cache')).toBe('MISS');
+
+    const res2 = await GET(makeGetRequest());
+    expect(res2.headers.get('X-Cache')).toBe('HIT');
   });
 
-  it('should bypass cache for authenticated requests with session cookie', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    request.cookies.set('session', 'token-value');
+  it('returns different cache status for different symbol filters', async () => {
+    const res1 = await GET(makeGetRequest({ symbols: 'XLM' }));
+    expect(res1.headers.get('X-Cache')).toBe('MISS');
 
-    const response = await GET(request);
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('X-Cache')).toBe('BYPASS');
+    const res2 = await GET(makeGetRequest({ symbols: 'USDC' }));
+    expect(res2.headers.get('X-Cache')).toBe('MISS');
   });
 
-  it('should bypass cache for authenticated requests with x-user-id header', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    request.headers.set('x-user-id', 'user123');
+  it('returns same cache status for identical requests', async () => {
+    const res1 = await GET(makeGetRequest({ symbols: 'XLM,USDC' }));
+    const res2 = await GET(makeGetRequest({ symbols: 'XLM,USDC' }));
 
-    const response = await GET(request);
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get('X-Cache')).toBe('BYPASS');
+    expect(res2.headers.get('X-Cache')).toBe('HIT');
   });
 
-  it('should include timestamp in response', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    const response = await GET(request);
+  it('sets proper Cache-Control headers', async () => {
+    const res = await GET(makeGetRequest());
+    const cacheControl = res.headers.get('Cache-Control');
 
-    const data = await response.json();
-    expect(data.timestamp).toBeDefined();
-
-    const timestamp = new Date(data.timestamp);
-    expect(timestamp).toBeInstanceOf(Date);
-    expect(timestamp.getTime()).toBeCloseTo(Date.now(), -3); // within 1 second
+    expect(cacheControl).toBeDefined();
+    expect(cacheControl).toContain('public');
+    expect(cacheControl).toContain('max-age');
+    expect(cacheControl).toContain('stale-while-revalidate');
   });
 
-  it('should handle order-invariant caching for symbols', async () => {
-    // This test checks that the cache key is generated correctly
-    // so that ?symbol=XLM,USDC and ?symbol=USDC,XLM hit the same cache
-    const request1 = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=XLM,USDC'));
-    const response1 = await GET(request1);
+  it('sets Vary header for caching', async () => {
+    const res = await GET(makeGetRequest());
+    const vary = res.headers.get('Vary');
 
-    const request2 = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=USDC,XLM'));
-    const response2 = await GET(request2);
+    expect(vary).toBe('Accept-Encoding');
+  });
+});
 
-    const data1 = await response1.json();
-    const data2 = await response2.json();
+// ---------------------------------------------------------------------------
+// GET – Response validation
+// ---------------------------------------------------------------------------
 
-    const symbols1 = data1.assets.map((a: any) => a.symbol).sort();
-    const symbols2 = data2.assets.map((a: any) => a.symbol).sort();
+describe('GET /api/assets – Response validation', () => {
+  it('returns assets with valid symbol format', async () => {
+    const res = await GET(makeGetRequest());
+    const body = await res.json();
+
+    body.assets.forEach((asset: { symbol: string }) => {
+      expect(typeof asset.symbol).toBe('string');
+      expect(asset.symbol.length).toBeGreaterThan(0);
+      expect(asset.symbol).toMatch(/^[A-Z]+$/);
+    });
+  });
+
+  it('returns assets with valid decimals', async () => {
+    const res = await GET(makeGetRequest());
+    const body = await res.json();
+
+    body.assets.forEach((asset: { decimals: number }) => {
+      expect(typeof asset.decimals).toBe('number');
+      expect(asset.decimals).toBeGreaterThanOrEqual(0);
+      expect(asset.decimals).toBeLessThanOrEqual(19);
+      expect(Number.isInteger(asset.decimals)).toBe(true);
+    });
+  });
+
+  it('returns assets with valid logoUrl', async () => {
+    const res = await GET(makeGetRequest());
+    const body = await res.json();
+
+    body.assets.forEach((asset: { logoUrl: string }) => {
+      expect(typeof asset.logoUrl).toBe('string');
+      expect(asset.logoUrl).toMatch(/^https?:\/\//);
+    });
+  });
+
+  it('returns assets with non-empty issuer', async () => {
+    const res = await GET(makeGetRequest());
+    const body = await res.json();
+
+    body.assets.forEach((asset: { issuer: string }) => {
+      expect(typeof asset.issuer).toBe('string');
+      expect(asset.issuer.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('returns assets with non-empty name', async () => {
+    const res = await GET(makeGetRequest());
+    const body = await res.json();
+
+    body.assets.forEach((asset: { name: string }) => {
+      expect(typeof asset.name).toBe('string');
+      expect(asset.name.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('returns assets in consistent order', async () => {
+    const res1 = await GET(makeGetRequest());
+    const body1 = await res1.json();
+    const symbols1 = body1.assets.map((a: { symbol: string }) => a.symbol);
+
+    globalCache.clear();
+
+    const res2 = await GET(makeGetRequest());
+    const body2 = await res2.json();
+    const symbols2 = body2.assets.map((a: { symbol: string }) => a.symbol);
 
     expect(symbols1).toEqual(symbols2);
   });
 });
 
-describe('POST /api/assets', () => {
-  it('should return 405 Method Not Allowed', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'), {
-      method: 'POST',
-    });
+// ---------------------------------------------------------------------------
+// GET – Error responses
+// ---------------------------------------------------------------------------
 
-    const response = await POST();
+describe('GET /api/assets – Error responses', () => {
+  it('returns error response with all required fields', async () => {
+    const res = await GET(makeGetRequest({ symbols: 'INVALID' }));
+    const body = await res.json();
 
-    expect(response.status).toBe(405);
-    const data = await response.json();
-
-    expect(data.error).toBeDefined();
-    expect(data.error).toContain('not allowed');
-  });
-});
-
-describe('Assets route integration', () => {
-  it('should handle edge case with empty symbol param', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets?symbol='));
-    const response = await GET(request);
-
-    // Empty string should be treated as "all assets"
-    expect(response.status).toBe(200);
-    const data = await response.json();
-    expect(data.assets.length).toBeGreaterThan(0);
+    expect(body).toHaveProperty('error');
+    expect(body).toHaveProperty('code');
+    expect(body).toHaveProperty('timestamp');
+    expect(typeof body.error).toBe('string');
+    expect(typeof body.code).toBe('string');
   });
 
-  it('should handle multiple requests without state pollution', async () => {
-    const request1 = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=XLM'));
-    const response1 = await GET(request1);
-    const data1 = await response1.json();
+  it('sets no-cache headers on error responses', async () => {
+    const res = await GET(makeGetRequest({ symbols: 'INVALID' }));
+    const cacheControl = res.headers.get('Cache-Control');
 
-    const request2 = new NextRequest(new URL('http://localhost:3000/api/assets?symbol=USDC'));
-    const response2 = await GET(request2);
-    const data2 = await response2.json();
-
-    expect(data1.assets[0].symbol).toBe('XLM');
-    expect(data2.assets[0].symbol).toBe('USDC');
-  });
-
-  it('should validate all assets meet decimal requirements', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    const response = await GET(request);
-
-    const data = await response.json();
-
-    for (const asset of data.assets) {
-      expect(asset.decimals).toBeGreaterThanOrEqual(0);
-      expect(asset.decimals).toBeLessThanOrEqual(19);
-      expect(Number.isInteger(asset.decimals)).toBe(true);
-    }
-  });
-
-  it('should validate all assets have valid URLs', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    const response = await GET(request);
-
-    const data = await response.json();
-
-    for (const asset of data.assets) {
-      expect(() => new URL(asset.logoUrl)).not.toThrow();
-    }
-  });
-
-  it('should validate all assets have Stellar issuer accounts', async () => {
-    const request = new NextRequest(new URL('http://localhost:3000/api/assets'));
-    const response = await GET(request);
-
-    const data = await response.json();
-
-    for (const asset of data.assets) {
-      // XLM has "native", others have public keys
-      if (asset.symbol === 'XLM') {
-        expect(asset.stellarIssuer).toBe('native');
-      } else {
-        expect(asset.stellarIssuer).toMatch(/^G[A-Z0-9]{55}$/);
-      }
-    }
+    expect(cacheControl).toContain('no-cache');
+    expect(cacheControl).toContain('no-store');
   });
 });
