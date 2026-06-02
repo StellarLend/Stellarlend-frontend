@@ -18,8 +18,16 @@ interface Config {
   stellar: {
     network: string;
     horizonUrl: string;
-    sorobanRpcUrl: string;
     sorobanContractId: string;
+  };
+  rateLimit: {
+    max: number;
+    window: number;
+    account: {
+      limit: number;
+      windowMs: number;
+      burst: number;
+    };
   };
   analytics: {
     googleAnalyticsId?: string;
@@ -41,21 +49,21 @@ const config: Config = {
     timeout: 10000,
   },
   stellar: {
-stellar: {
-  network:
-    validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
-
-  horizonUrl:
-    validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
-    'https://horizon-testnet.stellar.org',
-
-  sorobanRpcUrl:
-    validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
-    'https://soroban-testnet.stellar.org',
-
-  sorobanContractId:
-    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
-},
+    network: validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
+    horizonUrl:
+      validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
+      'https://horizon-testnet.stellar.org',
+    sorobanContractId:
+      process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
+  },
+  rateLimit: {
+    max: validatedEnv.API_RATE_LIMIT_MAX,
+    window: validatedEnv.API_RATE_LIMIT_WINDOW_MS,
+    account: {
+      limit: validatedEnv.TX_ACCOUNT_RATE_LIMIT_MAX,
+      windowMs: validatedEnv.TX_ACCOUNT_RATE_LIMIT_WINDOW_MS,
+      burst: validatedEnv.TX_ACCOUNT_RATE_LIMIT_BURST,
+    },
   },
   analytics: {
     googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,
@@ -66,7 +74,7 @@ stellar: {
   },
 };
 
-// Export the full server config (includes everything). For client side we only expose public values.
+// Shared config that is safe to import from both the server and the client.
 export default config;
 
 /**
@@ -85,7 +93,6 @@ export const publicConfig = {
   stellar: {
     network: config.stellar.network,
     horizonUrl: config.stellar.horizonUrl,
-    sorobanRpcUrl: config.stellar.sorobanRpcUrl,
   },
   analytics: {
     googleAnalyticsId: config.analytics.googleAnalyticsId,

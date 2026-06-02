@@ -59,15 +59,16 @@ export default defineConfig({
 
       {
         extends: true,
-
         test: {
           name: "accessibility",
           environment: "jsdom",
           setupFiles: "./vitest.setup.ts",
 
           include: [
+            "app/lending/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
+            "components/shared/layout/**/*.test.tsx",
             "components/shared/common/**/*.test.tsx",
           ],
         },
