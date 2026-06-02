@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
@@ -51,12 +51,12 @@ async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
 
 async function handleHealth() {
   try {
-    const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
-      checkHorizon(),
-      checkSorobanRpc(),
-      checkApi(),
-      checkDatabase(),
-    ]);
+    await httpGet(url, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (error) {
+    if (error instanceof TimeoutError || error instanceof UpstreamHttpError) {
+      return 'degraded';
+    }
 
     const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy'
       ? 'unhealthy'

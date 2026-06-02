@@ -143,6 +143,101 @@ paths:
                   message:
                     type: string
 
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and revoke session
+      description: |
+        Revokes the current session server-side and clears the session cookie.
+        This endpoint ensures that:
+        - The session token is invalidated immediately
+        - The cookie is removed from the browser
+        - Other devices using the same session cannot replay the token
+        - An audit log entry is recorded for security compliance
+
+        Requires an active session cookie. Used by the navbar disconnect action
+        in wallet-authenticated flows.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Successfully logged out
+          headers:
+            Set-Cookie:
+              description: Clears the HttpOnly session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+                  walletAddress:
+                    type: string
+                    description: |
+                      The wallet address that was logged out.
+                      Included for navbar UI state management.
+                    example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        "401":
+          description: No active session to logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "No active session"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: logoutDelete
+      tags: [auth]
+      summary: Logout and revoke session (alternative endpoint)
+      description: |
+        Same as POST /api/auth/logout.
+        Provided for REST semantics preference.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Successfully logged out
+          headers:
+            Set-Cookie:
+              description: Clears the HttpOnly session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+                  walletAddress:
+                    type: string
+                    example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        "401":
+          description: No active session to logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   # ---------------------------------------------------------------------------
   # Admin
   # ---------------------------------------------------------------------------
@@ -263,6 +358,54 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/internal/cache/invalidate:
+    post:
+      operationId: invalidateCache
+      tags: [auth]
+      summary: Invalidate cache namespaces (internal only)
+      description: |
+        Internal-only endpoint used by deployment tooling to invalidate
+        specific cache namespaces (e.g. `prices`, `markets`, `idempotency`).
+        This route is protected by an internal server token and should only
+        be invoked from trusted CI/CD workflows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespaces]
+              properties:
+                namespaces:
+                  type: array
+                  items:
+                    type: string
+                  example: ["prices", "markets"]
+      responses:
+        "200":
+          description: Number of cache keys deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deletedCount:
+                    type: integer
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   # ---------------------------------------------------------------------------
   # Positions
   # ---------------------------------------------------------------------------
@@ -297,6 +440,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PositionsResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/positions/history:
+    get:
+      operationId: getPositionsHistory
+      tags: [positions]
+      summary: Fetch historical position snapshots
+      description: |
+        Returns daily snapshots of user lending/borrowing positions over time,
+        including supplied/borrowed balances and effective APY.
+        
+        Data is bucketed by the specified interval (1h, 1d, 7d, 30d) with the
+        first snapshot of each bucket returned. Responses are cached per wallet
+        with a 5-minute TTL.
+        
+        Requires authentication. Returns data only for the authenticated wallet.
+      security:
+        - session: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Start timestamp in milliseconds (default 90 days ago)
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            example: 1700000000000
+        - name: to
+          in: query
+          required: false
+          description: End timestamp in milliseconds (default now)
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            example: 1702592000000
+        - name: interval
+          in: query
+          required: false
+          description: Time bucketing interval
+          schema:
+            type: string
+            enum: [1h, 1d, 7d, 30d]
+            default: 1d
+      responses:
+        "200":
+          description: Historical position snapshots
+          headers:
+            X-Cache:
+              $ref: "#/components/headers/XCache"
+            Cache-Control:
+              description: Cache-Control header
+              schema:
+                type: string
+                example: "max-age=300, public"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionHistoryResponse"
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Bad Request
+                message: time range cannot exceed 365 days
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -366,6 +581,99 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /api/transactions/{id}:
+    get:
+      operationId: getTransactionDetail
+      tags: [transactions]
+      summary: Retrieve detailed transaction records with operations
+      description: |
+        Returns the normalized transaction record with embedded operation logs, fee, and explorer links.
+        Accepts mock transaction IDs (TXN\d+) and 64-character hexadecimal Soroban/Stellar transaction hashes.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The transaction identifier (either mock TXN\d+ or a 64-character hex hash)
+          schema:
+            type: string
+            pattern: "^(TXN\\d+|[0-9a-fA-F]{64})$"
+            example: TXN12345
+      responses:
+        "200":
+          description: Detailed transaction found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transaction]
+                properties:
+                  transaction:
+                    type: object
+                    required: [id, asset, type, status, amount, date, time, fee, explorerUrl, operations]
+                    properties:
+                      id:
+                        type: string
+                        example: TXN12345
+                      asset:
+                        $ref: "#/components/schemas/AssetSymbol"
+                      type:
+                        $ref: "#/components/schemas/TransactionType"
+                      status:
+                        $ref: "#/components/schemas/TransactionStatus"
+                      amount:
+                        type: number
+                        example: 2000
+                      date:
+                        type: string
+                        format: date
+                        example: "2025-04-12"
+                      time:
+                        type: string
+                        example: "09:32AM"
+                      fee:
+                        type: string
+                        example: "0.0001000 XLM"
+                      explorerUrl:
+                        type: string
+                        format: uri
+                        example: "https://stellar.expert/explorer/testnet/tx/TXN12345"
+                      operations:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, type, source, destination, amount, asset]
+                          properties:
+                            id:
+                              type: string
+                              example: "op_TXN12345_1"
+                            type:
+                              type: string
+                              example: "payment"
+                            source:
+                              type: string
+                              example: "GA2C5RFPE6GCKMY3AA3H6AOF5Q4G5S4GX6TQCGEAAS624JBZ2G2UQHGD"
+                            destination:
+                              type: string
+                              example: "GBXQ2P5Z5U67G6Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66"
+                            amount:
+                              type: string
+                              example: "2000.0000000"
+                            asset:
+                              type: string
+                              example: "XLM"
+        "400":
+          description: Invalid transaction ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/transactions/export:
     get:
       operationId: exportTransactions
@@ -424,6 +732,77 @@ paths:
                 $ref: "#/components/schemas/QuoteResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+
+  # ---------------------------------------------------------------------------
+  # Admin
+  # ---------------------------------------------------------------------------
+  /api/admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all platform users (admin only)
+      description: |
+        Returns a paginated, searchable list of platform users.
+        **Requires** an authenticated session JWT that carries a `role: admin` claim.
+        Response fields are limited to a safe allow-list; hashed credentials and
+        session tokens are never included.
+        Every successful call emits a structured audit event.
+      security:
+        - sessionCookie: []
+        - adminBearerToken: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: 1-based page number (default: 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            example: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Records per page, 1-100 (default: 20)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: search
+          in: query
+          required: false
+          description: Case-insensitive substring match on email and name (max 100 chars)
+          schema:
+            type: string
+            maxLength: 100
+            example: alice
+      responses:
+        "200":
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUsersResponse"
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Authenticated but does not hold the admin role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Forbidden
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   # ---------------------------------------------------------------------------
   # Notifications
@@ -491,6 +870,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/notifications/stream:
+    get:
+      operationId: streamNotifications
+      tags: [notifications]
+      summary: Server-Sent Events stream for per-user notifications
+      description: |
+        Opens a per-session Server-Sent Events (SSE) connection that pushes
+        new notifications and unread-count updates for the authenticated user.
+
+        Event types:
+        - `notification`: contains a single `Notification` object
+        - `unreadCount`: contains `{ unreadCount: number }`
+
+        Clients SHOULD subscribe to this endpoint to receive live updates.
+        Polling the `/api/notifications` GET endpoint remains a supported
+        fallback for environments that do not support SSE.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: SSE stream (text/event-stream)
+          content:
+            text/event-stream: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
 # =============================================================================
 # Components
 # =============================================================================
@@ -501,6 +906,14 @@ components:
       type: apiKey
       in: cookie
       name: session
+    adminBearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT bearing a `role: admin` claim.
+        Issued at login; include in `Authorization: Bearer <token>` header.
+        Required for all `/api/admin/*` endpoints.
 
   headers:
     XCache:
@@ -715,6 +1128,60 @@ components:
         mode:
           type: string
           enum: [public, authenticated]
+
+    PositionSnapshot:
+      type: object
+      required: [timestamp, supplied, borrowed, effectiveSupplyApy, effectiveBorrowApy]
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp in milliseconds
+          example: 1700000000000
+        supplied:
+          type: number
+          description: Total supplied balance in USD
+          minimum: 0
+          example: 5000
+        borrowed:
+          type: number
+          description: Total borrowed balance in USD
+          minimum: 0
+          example: 2000
+        effectiveSupplyApy:
+          type: number
+          description: Weighted average supply APY (percentage)
+          minimum: 0
+          example: 2.5
+        effectiveBorrowApy:
+          type: number
+          description: Weighted average borrow APY (percentage)
+          minimum: 0
+          example: 8.5
+
+    PositionHistoryResponse:
+      type: object
+      required: [walletAddress, snapshots, interval, bucketCount]
+      properties:
+        walletAddress:
+          type: string
+          description: Stellar wallet address
+          example: GBTEST123...
+        snapshots:
+          type: array
+          description: Array of position snapshots bucketed by interval
+          items:
+            $ref: "#/components/schemas/PositionSnapshot"
+        interval:
+          type: string
+          description: Time bucketing interval
+          enum: [1h, 1d, 7d, 30d]
+          example: 1d
+        bucketCount:
+          type: integer
+          description: Number of snapshot buckets returned
+          minimum: 0
+          example: 30
 
     QuoteRequest:
       type: object
