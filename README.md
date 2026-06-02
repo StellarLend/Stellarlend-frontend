@@ -10,6 +10,7 @@ This frontend application provides a modern, responsive web interface for intera
 
 - **Lending & Borrowing**: Earn interest by lending assets or borrow against collateral
 - **Multi-Asset Support**: Support for XLM, USDC, BTC, ETH, and other Stellar-based assets
+- **Real-Time Asset Pricing**: Cached price oracle proxy for secure price feeds
 - **Real-Time Calculations**: Dynamic interest rate and payment calculations
 - **Transaction Management**: Track all lending, borrowing, and payment transactions
 - **Dashboard Analytics**: Comprehensive metrics and insights
@@ -62,14 +63,44 @@ Edit `.env.local` with your configuration:
 ```env
 # Stellar Network Configuration
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
-NEXT_PUBLIC_HORIZON_URL=https://horizon-testnet.stellar.org
+NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+STELLAR_HORIZON_URLS=https://horizon-testnet.stellar.org,https://horizon-backup.stellar.org
+NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+NEXT_PUBLIC_SOROBAN_CONTRACT_ID=GXXXXXXXXXXXXXXX...YOUR_CONTRACT_ID
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 
 # API Configuration (if applicable)
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
 
 # Feature Flags
 NEXT_PUBLIC_ENABLE_ANALYTICS=false
+
+# Server Logging Configuration
+SERVER_LOG_LEVEL=info
+
+# Transaction Rate Limiting
+API_RATE_LIMIT_MAX=100
+API_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_MAX=30
+TX_ACCOUNT_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_BURST=60
 ```
+
+The Tx relay routes `/api/tx/build` and `/api/tx/submit` are protected by an account-scoped wallet limit. If a wallet exceeds the configured burst or window, the response returns `429` with `Retry-After` and standard `RateLimit-*` headers.
+
+Migration note: if you previously used `NEXT_PUBLIC_SOROBAN_RPC_URL`, rename it to `SOROBAN_RPC_URL` and restart the dev server or rebuild your deployment. The RPC endpoint now stays server-only so browsers cannot bypass the relay and its rate limits.
+
+Logging is emitted as structured JSON by `lib/logger.ts` and includes:
+- `timestamp`
+- `level`
+- `route`
+- `method`
+- `status`
+- `durationMs`
+- `message`
+- `context`
+
+Sensitive information such as authorization headers, API keys, auth tokens, and Stellar public/secret keys are redacted automatically.
 
 > **Note**: For production, use the Stellar mainnet configuration and secure your environment variables.
 
@@ -91,7 +122,25 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-### 5. Build for Production
+### 5. Database Setup (Drizzle ORM & PostgreSQL)
+
+Stellarlend uses **Drizzle ORM** with a **PostgreSQL** database backend to persist accounts, sessions, notifications, transactions, and audit logs.
+
+1. Ensure your `.env.local` contains the database connection URL:
+   ```env
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/stellarlend
+   ```
+
+2. Run the migrations to initialize your local database:
+   ```bash
+   # Using npm
+   npm run db:migrate
+
+   # Using pnpm
+   pnpm db:migrate
+   ```
+
+### 6. Build for Production
 
 ```bash
 npm run build
@@ -195,6 +244,30 @@ npm run svg
 
 This will automatically convert SVGs to React components in `components/shared/ui/icons/`.
 
+## 🗄️ Backend & API
+
+The server-side API surface is documented in two places:
+
+| Resource | Description |
+|---|---|
+| [`docs/backend-architecture.md`](docs/backend-architecture.md) | Architecture overview — lib/ modules, caching model, security, and how to add a new route |
+| [`openapi.yaml`](openapi.yaml) | OpenAPI 3.1 spec for all `app/api/*` routes, params, and response shapes |
+
+### Available API Routes
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/health` | Public | Platform & Stellar network health |
+| `POST/GET/DELETE` | `/api/auth/session` | — | Session lifecycle |
+| `GET` | `/api/prices` | Public | Asset spot prices (cached 5 s) |
+| `GET` | `/api/markets` | Public | Per-asset supply/borrow APR & utilization (cached 30 s) |
+| `GET` | `/api/positions` | Optional | User lending/borrowing positions |
+| `GET/POST` | `/api/transactions` | Public | Transaction history and creation |
+| `GET` | `/api/transactions/export` | Public | Transactions CSV export |
+| `POST` | `/api/quote` | Public | Lending/borrowing quote calculation |
+| `GET` | `/api/notifications` | Required | List in-app notifications |
+| `PATCH` | `/api/notifications/:id` | Required | Mark notification as read |
+
 ## 🔗 Helpful Links
 
 ### Documentation
@@ -204,6 +277,7 @@ This will automatically convert SVGs to React components in `components/shared/u
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs) - Utility-first CSS framework
 - [Stellar Documentation](https://developers.stellar.org/docs) - Stellar blockchain development guide
 - [Soroban Documentation](https://soroban.stellar.org/docs) - Soroban smart contracts
+- [Idempotency contract and key lifetime](docs/idempotency.md) - API replay protection and cache retention guidance
 
 ### Development Tools
 - [Storybook](https://storybook.js.org/docs) - Component development environment

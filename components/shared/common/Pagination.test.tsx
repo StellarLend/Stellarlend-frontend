@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, fireEvent } from "@/test/test-utils";
 import { Pagination } from "./Pagination";
 import { describe, it, expect, vi } from "vitest";

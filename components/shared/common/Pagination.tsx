@@ -28,7 +28,7 @@ export const Pagination = ({
         <button
           onClick={() => setCurrentPage(currentPage - 1)}
           disabled={currentPage === 1}
-          className="p-2 text-black w-8 h-8 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200"
+          className="p-2 text-black w-8 h-8 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
           aria-label="Previous page"
         >
           &lt;
@@ -40,7 +40,7 @@ export const Pagination = ({
             <button
               key={page}
               onClick={() => setCurrentPage(page)}
-              className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
+              className={`w-8 h-8 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
                 currentPage === page
                   ? "bg-green-600 text-white shadow-sm"
                   : "hover:bg-gray-100 text-gray-700 border border-gray-200"
@@ -55,7 +55,7 @@ export const Pagination = ({
         <button
           onClick={() => setCurrentPage(currentPage + 1)}
           disabled={currentPage === totalPages || totalPages === 0}
-          className="p-2 text-black w-8 h-8 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200"
+          className="p-2 text-black w-8 h-8 rounded-lg hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
           aria-label="Next page"
         >
           &gt;

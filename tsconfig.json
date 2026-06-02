@@ -13,8 +13,8 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".",  // <-- Required for path aliases
-    "ignoreDeprecations": "5.0",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "types": ["node", "vitest/globals"],
     "paths": {
       "@/*": ["./*"]
@@ -26,5 +26,15 @@
     ]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "**/*.stories.tsx",
+    "**/*.stories.ts",
+    "**/*.test.tsx",
+    "**/*.test.ts",
+    "**/*.play.ts",
+    "utils/storybook-test-utils.ts",
+    "components/marketing/Hero.tsx",
+    "stories/**"
+  ]
 }

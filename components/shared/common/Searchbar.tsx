@@ -1,24 +1,10 @@
-import React from 'react';
+/**
+ * @deprecated This component has been consolidated into components/molecules/SearchBar
+ * Please import from there instead: import SearchBar from '@/components/molecules/SearchBar'
+ *
+ * This file is kept for backward compatibility only and will be removed in a future version.
+ */
 
-type SearchbarProps = {
-  placeholder?: string;
-};
+export { default } from '@/components/molecules/SearchBar';
+export type { SearchBarProps } from '@/components/molecules/SearchBar';
 
-const Searchbar: React.FC<SearchbarProps> = ({ placeholder = "Search..." }) => {
-  return (
-    <div className="w-full max-w-md">
-      <div className="w-full">
-        <input
-          type="text"
-          placeholder={placeholder}
-          className="w-full px-4 py-3 rounded-xl font-semibold text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-[var(--New-outline,#71B48D)] focus:border-transparent hover:border-[var(--New-outline,#71B48D)]"
-          style={{
-            border: '1px solid var(--New-outline,rgb(83, 204, 133))',
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
-export default Searchbar;

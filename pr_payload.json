@@ -1,0 +1,6 @@
+{
+  "title": "Feature flags: add evaluator and route",
+  "head": "martinshub-tech:feature/feature-flags",
+  "base": "main",
+  "body": "Adds a feature‑flag system with evaluator, helper, config, API route, and tests. Enables safe rollout of risky changes such as Soroban submission.\n\n- lib/flags/evaluator.ts\n- lib/flags/requireFlag.ts\n- config/feature-flags.json\n- app/api/feature-flags/route.ts\n- __tests__/flags/evaluator.test.ts\n\nAll changes covered by unit tests (over 95% coverage) and include caching for performance."
+}

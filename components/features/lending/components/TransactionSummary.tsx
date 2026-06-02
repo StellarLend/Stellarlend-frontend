@@ -2,7 +2,7 @@ import { LendingData, CalculationResult } from '@/app/lending/page';
 
 interface TransactionSummaryProps {
   data: LendingData;
-  calculation: CalculationResult;
+  calculation: CalculationResult | null;
   type: 'lend' | 'borrow';
 }
 
@@ -23,6 +23,33 @@ export default function TransactionSummary({ data, calculation, type }: Transact
       year: 'numeric' 
     });
   };
+
+  if (!data || data.amount <= 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center py-10 h-full flex flex-col justify-center">
+        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <p className="text-gray-500 text-sm font-medium">Summary will appear here<br/>once you enter valid details</p>
+      </div>
+    );
+  }
+
+  if (!calculation) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse h-full flex flex-col justify-center">
+        <div className="h-6 bg-gray-200 rounded w-1/2 mb-6"></div>
+        <div className="h-20 bg-gray-100 rounded-lg mb-4"></div>
+        <div className="space-y-3">
+          <div className="h-4 bg-gray-100 rounded w-full"></div>
+          <div className="h-4 bg-gray-100 rounded w-full"></div>
+          <div className="h-4 bg-gray-100 rounded w-full"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -162,22 +189,50 @@ export default function TransactionSummary({ data, calculation, type }: Transact
           )}
         </div>
 
-        {/* Risk Notice */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <div className="text-sm">
-              <p className="text-yellow-800 font-medium mb-1">Important Notice</p>
-              <p className="text-yellow-700">
-                {type === 'lend' 
-                  ? 'Lending involves risk. Interest rates may vary and principal is not guaranteed.'
-                  : 'Failure to repay may result in liquidation of your collateral. Ensure you can meet payment obligations.'}
-              </p>
-            </div>
-          </div>
-        </div>
+            {/* Repayment Breakdown Visualization */}
+            {type === 'borrow' && calculation && (
+              <div className="mt-6">
+                {/* Accessible fallback table */}
+                <table className="w-full text-sm border border-gray-200 mb-4" aria-label="Repayment breakdown table">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-2 py-1 text-left">Component</th>
+                      <th className="px-2 py-1 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-2 py-1">Principal</td>
+                      <td className="px-2 py-1 text-right">{formatCurrency(data.amount, data.asset)}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-1">Total Interest</td>
+                      <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalEarnings, data.asset)}</td>
+                    </tr>
+                    <tr className="font-medium border-t border-gray-200">
+                      <td className="px-2 py-1">Total Repayment</td>
+                      <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalRepayment, data.asset)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                {/* Visual bar */}
+                <div className="w-full bg-gray-200 rounded h-4 flex overflow-hidden" aria-label="Repayment breakdown bar" role="img">
+                  <div
+                    className="bg-green-600"
+                    style={{ width: `${(data.amount / (calculation.totalRepayment)) * 100}%` }}
+                  ></div>
+                  <div
+                    className="bg-red-600"
+                    style={{ width: `${(calculation.totalEarnings / (calculation.totalRepayment)) * 100}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-xs mt-1 text-gray-600">
+                  <span>Principal</span>
+                  <span>Interest</span>
+                </div>
+              </div>
+            )}
+
       </div>
     </div>
   );

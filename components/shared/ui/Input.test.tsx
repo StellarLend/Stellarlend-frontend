@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, fireEvent } from "@/test/test-utils";
 import { Input } from "./Input";
 import { describe, it, expect, vi } from "vitest";
