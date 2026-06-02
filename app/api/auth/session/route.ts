@@ -2,7 +2,8 @@
 // Example API endpoint for session management
 // This shows how to set session cookies after user authentication
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
+import { isAccountId } from '@/lib/validation/stellar';
 import { withIdempotency } from "@/lib/api/idempotency";
 
 /**
@@ -35,6 +36,10 @@ export async function POST(request: NextRequest) {
   return withIdempotency(request, async (request) => {
     try {
       const body: CreateSessionRequest = await request.json();
+// Validate wallet address if provided
+if (body.walletAddress && !isAccountId(body.walletAddress)) {
+  return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 });
+}
 
       // Validate required fields
       if (!body.userId || !body.email || !body.name) {
