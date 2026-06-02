@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { validateProfile } from "@/lib/account/validation";
-import { profileRepository } from "@/lib/account/repository";
-import { withCsrfProtection } from "@/lib/api/handler";
+import { profileRepository, ProfileRecord } from "@/lib/account/repository";
+import { db } from "@/lib/db/client";
+import { outboxEvents } from "@/lib/db/schema";
+import { auditLogger } from "@/lib/audit-logger";
+import crypto from "crypto";
 
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -48,7 +51,31 @@ const putHandler = async (req: NextRequest): Promise<NextResponse> => {
         return NextResponse.json({ errors: validation.errors }, { status: 422 });
     }
 
-    const record = await profileRepository.upsert(user.id, validation.data);
+    const record = db.transaction((tx) => {
+        // 1. Update the profile
+        const updatedRecord = profileRepository.upsert(user.id, validation.data, tx) as ProfileRecord;
+
+        // 2. Queue in-app notification event in the outbox
+        tx.insert(outboxEvents).values({
+            id: crypto.randomUUID(),
+            type: 'notification',
+            payload: JSON.stringify({
+                userId: user.id,
+                title: 'Profile Updated',
+                message: 'Your profile has been successfully updated.',
+                type: 'success',
+            }),
+            status: 'PENDING',
+            attempts: 0,
+            createdAt: new Date(),
+        }).run();
+
+        // 3. Queue audit log event in the outbox
+        auditLogger.log(tx, user.id, 'profile_update', validation.data);
+
+        return updatedRecord;
+    });
+
     return NextResponse.json(record);
 };
 

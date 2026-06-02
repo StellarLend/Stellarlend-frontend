@@ -1,9 +1,6 @@
 import type { Transaction } from "@/types/Transaction";
 import type { TransactionStatus } from "@/types/enums";
-import { db } from "../db";
-import { transactions as transactionsTable } from "../db/schema/transactions";
-import { eq } from "drizzle-orm";
-import { fetchTransactions as fetchMockTransactions } from "./repository";
+import { fetchTransactions } from "@/lib/transactions/repository";
 
 async function ensureSeeded() {
   const rows = await db.select().from(transactionsTable);

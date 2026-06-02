@@ -23,9 +23,23 @@ function resetRelevantEnv() {
 describe('config modules', () => {
   beforeEach(() => {
     vi.resetModules();
-    vi.unstubAllGlobals();
-    process.env = { ...ORIGINAL_ENV };
-    resetRelevantEnv();
+
+    // Clear public env vars
+    delete process.env.NEXT_PUBLIC_APP_NAME;
+    delete process.env.NEXT_PUBLIC_APP_VERSION;
+    delete process.env.NEXT_PUBLIC_APP_ENV;
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    delete process.env.NEXT_PUBLIC_STELLAR_NETWORK;
+    delete process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL;
+    delete process.env.NEXT_PUBLIC_SOROBAN_RPC_URL;
+    delete process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID;
+    delete process.env.NEXT_PUBLIC_GA_TRACKING_ID;
+    delete process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
+
+    // Clear server env vars
+    delete process.env.PRICE_ORACLE_API_KEY;
+    delete process.env.AUTH_SIGNING_SECRET;
+    delete process.env.SERVER_TOKEN;
   });
 
   afterEach(() => {
@@ -44,7 +58,26 @@ describe('config modules', () => {
     const { envSchema } = await import('./configValidation');
     const result = envSchema.safeParse(process.env);
 
-    expect(result.success).toBe(true);
+    if (!res1.success) {
+      expect(res1.error.issues[0].message).toContain(
+        'APP_NAME is required'
+      );
+    }
+
+    const badEnv2 = {
+      ...process.env,
+      NEXT_PUBLIC_API_BASE_URL: 'not-a-url',
+    };
+
+    const res2 = envSchema.safeParse(badEnv2);
+
+    expect(res2.success).toBe(false);
+
+    if (!res2.success) {
+      expect(res2.error.issues[0].message).toContain(
+        'API_BASE_URL must be a valid URL'
+      );
+    }
   });
 
   it('rejects invalid production public config', async () => {
@@ -63,16 +96,30 @@ describe('config modules', () => {
 
     const configModule = await import('./config');
 
-    expect(configModule.default.stellar).toEqual({
-      network: 'testnet',
-      horizonUrl: 'https://horizon-testnet.stellar.org',
-      sorobanContractId: '',
-    });
-    expect(configModule.publicConfig.stellar).toEqual({
-      network: 'testnet',
-      horizonUrl: 'https://horizon-testnet.stellar.org',
-    });
-    expect('sorobanRpcUrl' in configModule.publicConfig.stellar).toBe(false);
+  it('throws an error if imported without any environment configuration', async () => {
+    process.env.NEXT_PUBLIC_APP_ENV = 'invalid-env';
+    await expect(import('./configValidation')).rejects.toThrow();
+  });
+
+  it('public config loads defaults when no env vars are defined', async () => {
+    process.env.NEXT_PUBLIC_APP_ENV = 'development';
+    const configModule = await import('./config');
+    const config = configModule.default;
+
+    expect(config.app.name).toBe('Stellarlend');
+    expect(config.app.version).toBe('1.0.0');
+    expect(config.app.environment).toBe('development');
+    expect(config.api.baseUrl).toBe('http://localhost:3001');
+    expect(config.stellar.network).toBe('testnet');
+    expect(config.stellar.horizonUrl).toBe(
+      'https://horizon-testnet.stellar.org'
+    );
+    expect(config.stellar.sorobanRpcUrl).toBe(
+      'https://soroban-testnet.stellar.org'
+    );
+    expect(config.stellar.sorobanContractId).toBe('');
+    expect(config.analytics.googleAnalyticsId).toBeUndefined();
+    expect(config.analytics.mixpanelToken).toBeUndefined();
   });
 
   it('loads public config values from environment variables', async () => {

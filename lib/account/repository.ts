@@ -1,5 +1,5 @@
-import { db } from '../db';
-import { accounts } from '../db/schema/accounts';
+import { db } from '@/lib/db/client';
+import { profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export interface ProfileRecord {
@@ -12,54 +12,63 @@ export interface ProfileRecord {
 }
 
 export interface ProfileRepository {
-    getByUserId(userId: string): Promise<ProfileRecord | null>;
+    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null>;
 
     upsert(
         userId: string,
-        data: Omit<ProfileRecord, "userId" | "updatedAt">
-    ): Promise<ProfileRecord>;
-
-    anonymizeByUserId(userId: string): Promise<boolean>;
+        data: Omit<ProfileRecord, "userId" | "updatedAt">,
+        tx?: any
+    ): ProfileRecord | Promise<ProfileRecord>;
 }
 
-const ANONYMIZED_MARKER = "[deleted]";
+class DrizzleProfileRepository implements ProfileRepository {
+    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null> {
+        const client = tx || db;
+        const query = client
+            .select()
+            .from(profiles)
+            .where(eq(profiles.userId, userId))
+            .limit(1);
 
-class InMemoryProfileRepository implements ProfileRepository {
-    private store = new Map<string, ProfileRecord>();
-
-    async getByUserId(userId: string): Promise<ProfileRecord | null> {
-        const rows = await db.select().from(accounts).where(eq(accounts.userId, userId)).limit(1);
-        return rows[0] ?? null;
+        if (tx) {
+            const results = query.all();
+            return results[0] ?? null;
+        } else {
+            return query.then((results: any[]) => results[0] ?? null);
+        }
     }
 
-    async upsert(
+    upsert(
         userId: string,
-        data: Omit<ProfileRecord, "userId" | "updatedAt">
-    ): Promise<ProfileRecord> {
-        const now = new Date();
-        const record = {
-            userId,
-            displayName: data.displayName,
-            bio: data.bio,
-            website: data.website,
-            timezone: data.timezone,
-            updatedAt: now,
-        };
-
-        await db.insert(accounts)
-            .values(record)
+        data: Omit<ProfileRecord, "userId" | "updatedAt">,
+        tx?: any
+    ): ProfileRecord | Promise<ProfileRecord> {
+        const client = tx || db;
+        const query = client
+            .insert(profiles)
+            .values({
+                userId,
+                ...data,
+                updatedAt: new Date(),
+            })
             .onConflictDoUpdate({
-                target: accounts.userId,
+                target: profiles.userId,
                 set: {
                     displayName: data.displayName,
                     bio: data.bio,
                     website: data.website,
                     timezone: data.timezone,
-                    updatedAt: now,
+                    updatedAt: new Date(),
                 },
-            });
+            })
+            .returning();
 
-        return record;
+        if (tx) {
+            const results = query.all();
+            return results[0];
+        } else {
+            return query.then((results: any[]) => results[0]);
+        }
     }
 
     async anonymizeByUserId(userId: string): Promise<boolean> {

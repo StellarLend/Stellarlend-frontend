@@ -31,6 +31,7 @@ export default defineConfig({
       'app/api/**/*.test.ts',
       'src/jobs/**/*.test.ts',
       'types/enums.test.ts',
+      '__tests__/**/*.test.ts',
     ],
     env: {
       NEXT_PUBLIC_APP_NAME: 'Stellarlend',

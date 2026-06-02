@@ -49,21 +49,13 @@ const config: Config = {
     timeout: 10000,
   },
   stellar: {
-    network: validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
+    network:
+      validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
     horizonUrl:
       validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
       'https://horizon-testnet.stellar.org',
     sorobanContractId:
       process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
-  },
-  rateLimit: {
-    max: validatedEnv.API_RATE_LIMIT_MAX,
-    window: validatedEnv.API_RATE_LIMIT_WINDOW_MS,
-    account: {
-      limit: validatedEnv.TX_ACCOUNT_RATE_LIMIT_MAX,
-      windowMs: validatedEnv.TX_ACCOUNT_RATE_LIMIT_WINDOW_MS,
-      burst: validatedEnv.TX_ACCOUNT_RATE_LIMIT_BURST,
-    },
   },
   analytics: {
     googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,

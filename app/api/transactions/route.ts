@@ -7,6 +7,10 @@ import {
   isTransactionType,
   isTransactionStatus,
 } from '@/types/enums';
+import {
+  fetchTransactionRecords,
+  filterTransactions,
+} from '@/lib/transactions/repository';
 import type { Transaction } from '@/types/Transaction';
 import {
   fetchTransactionRecords,
@@ -14,8 +18,7 @@ import {
   paginateTransactionsByCursor,
 } from '@/lib/transactions/repository';
 import { withRequestLogging } from '@/lib/api/handler';
-import { parseCursorParams } from '@/lib/api/cursor';
-import { withIdempotency } from '@/lib/api/idempotency';
+import { withIdempotency } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -83,6 +86,14 @@ async function handleGetTransactions(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  const page = parsePageParam(searchParams.get('page'), DEFAULT_PAGE);
+  const pageSize = parsePageSizeParam(searchParams.get('pageSize'), DEFAULT_PAGE_SIZE);
+  const search = searchParams.get('search');
+  const dateFrom = searchParams.get('dateFrom');
+  const dateTo = searchParams.get('dateTo');
+  const sortBy = parseSortBy(searchParams.get('sortBy'));
+  const sortDir = parseSortDir(searchParams.get('sortDir'));
 
   const allTransactions = await fetchTransactionRecords();
   let transactions = filterTransactions(allTransactions, {
@@ -202,4 +213,6 @@ async function createTransaction(req: NextRequest) {
 }
 
 export const GET = withRequestLogging('/api/transactions', handleGetTransactions);
-export const POST = withRequestLogging('/api/transactions', handlePostTransactions);
+export const POST = withRequestLogging('/api/transactions', (req: NextRequest) =>
+  withIdempotency(req, handlePostTransactions)
+);

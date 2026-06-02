@@ -1,7 +1,7 @@
 import type { Transaction } from '@/types/Transaction';
 import { logger } from '@/lib/logger';
 import type { IndexerOptions } from './types';
-import { fetchAccountOperations } from './horizon';
+import { enqueueAccountIndex, fetchAccountOperations } from './horizon';
 import { normalizeOperations } from './normalizer';
 import { IndexerCache, DEFAULT_TTL_MS } from './cache';
 
@@ -14,6 +14,8 @@ export interface IndexAccountOptions extends IndexerOptions {
   cacheTtlMs?: number;
   /** Skip the cache and force a fresh Horizon fetch. */
   bypassCache?: boolean;
+  /** Skip enqueueing background job. */
+  skipQueue?: boolean;
 }
 
 /**
@@ -29,13 +31,28 @@ export async function indexAccountTransactions(
   accountId: string,
   options: IndexAccountOptions = {},
 ): Promise<Transaction[]> {
-  const { cacheTtlMs = DEFAULT_TTL_MS, bypassCache = false, ...fetchOptions } = options;
+  const { cacheTtlMs = DEFAULT_TTL_MS, bypassCache = false, skipQueue = false, ...fetchOptions } = options;
 
-  if (!bypassCache) {
-    const hit = cache.get(accountId);
-    if (hit) {
-      logger.debug('Returning cached transactions for account', ROUTE, { accountId });
-      return hit;
+  if (!skipQueue) {
+    logger.debug('Enqueueing background indexer job for account', ROUTE, { accountId });
+    enqueueAccountIndex(accountId).catch((err) => {
+      logger.warn('Failed to enqueue indexer job', ROUTE, { error: String(err) });
+    });
+
+    if (!bypassCache) {
+      const hit = cache.get(accountId);
+      if (hit) {
+        logger.debug('Returning cached transactions (non-blocking background refresh)', ROUTE, { accountId });
+        return hit;
+      }
+    }
+  } else {
+    if (!bypassCache) {
+      const hit = cache.get(accountId);
+      if (hit) {
+        logger.debug('Returning cached transactions for account', ROUTE, { accountId });
+        return hit;
+      }
     }
   }
 

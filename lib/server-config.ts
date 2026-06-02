@@ -14,19 +14,7 @@ interface ServerConfig {
   server: {
     token: string;
   };
-  horizon: {
-    urls: string[];
-    primaryUrl: string;
-  };
-}
-
-function normalizeUrl(rawUrl: string): string {
-  try {
-    const url = new URL(rawUrl.trim());
-    return url.toString().replace(/\/+$/, '');
-  } catch {
-    throw new Error(`Invalid Horizon URL: ${rawUrl}`);
-  }
+  redisUrl: string;
 }
 
 function parseHorizonUrls(rawValue?: string): string[] {
@@ -54,10 +42,7 @@ const serverConfig: ServerConfig = {
   server: {
     token: process.env.SERVER_TOKEN || '',
   },
-  horizon: {
-    urls: horizonUrls,
-    primaryUrl: horizonUrls[0],
-  },
+  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 };
 
 export const AUDIT_RETENTION_DAYS = Number(process.env.AUDIT_RETENTION_DAYS ?? '30');

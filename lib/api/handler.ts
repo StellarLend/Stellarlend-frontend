@@ -60,15 +60,56 @@ export function withCsrfProtection<T extends (...args: any[]) => Promise<NextRes
 export function withRequestLogging<T extends (...args: any[]) => Promise<NextResponse> | NextResponse>(route: string, handler: T) {
   return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     const request = args[0] as NextRequest | undefined;
-    const { requestId } = request ? getOrCreateRequestId(request.headers) : { requestId: getOrCreateRequestId(new Headers()).requestId };
+    const method = request?.method ?? 'UNKNOWN';
+    let requestContext: any = null;
 
-    return runWithRequestContext({ requestId }, async () => {
-      const startedAt = Date.now();
-      const method = request?.method ?? 'UNKNOWN';
-      const sessionId = request?.cookies.get('session')?.value;
+    const chaosResponse = await chaosInject(request as NextRequest);
+    if (chaosResponse) {
+      return chaosResponse;
+    }
 
-      const requestContext = {
-        requestId,
+    try {
+      requestContext = {
+        method,
+        route,
+        query: request?.nextUrl?.searchParams.toString() ?? '',
+        headers: {
+          authorization: request?.headers?.get('authorization'),
+          'x-forwarded-for': request?.headers?.get('x-forwarded-for'),
+        },
+      };
+
+      const response = await handler(...args);
+      const durationMs = Date.now() - startedAt;
+      const status = typeof (response as any)?.status === 'number' ? (response as any).status : 0;
+
+      try {
+        metrics.httpRequests.inc({ method, route, status: String(status) });
+        metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: String(status) });
+      } catch (e) {
+        // swallow metrics errors
+      }
+
+      logger.info('request completed', route, {
+        status,
+        durationMs,
+        request: requestContext,
+      });
+
+      return response;
+    } catch (error) {
+      const durationMs = Date.now() - startedAt;
+
+      try {
+        metrics.httpRequests.inc({ method, route, status: '500' });
+        metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: '500' });
+        metrics.httpErrors.inc({ route, error: (error as Error)?.name ?? 'Error' });
+      } catch (e) {
+        // swallow metrics errors
+      }
+
+      captureServerError(error, {
+        route,
         method,
         route,
         query: request?.nextUrl?.searchParams.toString() ?? '',
