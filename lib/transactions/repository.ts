@@ -1,5 +1,7 @@
 import type { Transaction, TransactionFilters } from './types';
 import type { Transaction as IndexerTransaction } from '@/types/Transaction';
+export { paginateTransactionsByCursor } from './cursor-pagination';
+export type { CursorPaginatedTransactions, CursorPaginationOptions } from './cursor-pagination';
 import { indexAccountTransactions } from '@/lib/indexer';
 import { logger } from '@/lib/logger';
 import { db } from '../db';

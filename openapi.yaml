@@ -594,6 +594,10 @@ paths:
       operationId: listTransactions
       tags: [transactions]
       summary: List transactions with optional filters
+      description: |
+        Supports the existing offset pagination (`page` and `pageSize`) and optional cursor pagination (`cursor` and `limit`).
+
+        Offset pagination is convenient for jumping to an approximate page and remains backward compatible, but large offsets can become inefficient and may miss or duplicate rows when new transactions are inserted between requests. Cursor pagination uses a stable `(date, id)` keyset ordered by `sortDir`, so forward and reverse iteration stays efficient and consistent for sequential scans. Cursor pagination is intentionally limited to `sortBy=date`; use offset pagination when sorting by amount.
       parameters:
         - name: asset
           in: query
@@ -610,6 +614,52 @@ paths:
           required: false
           schema:
             $ref: "#/components/schemas/TransactionStatus"
+        - name: page
+          in: query
+          required: false
+          description: 1-based offset page number used when cursor/limit is omitted.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Offset page size, capped at 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 6
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned as nextCursor or prevCursor. Supplying cursor or limit enables keyset pagination.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Cursor page size, capped at 100. Supplying limit enables keyset pagination from the beginning of the ordered result set.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 6
+        - name: sortBy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [date, amount]
+            default: date
+        - name: sortDir
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
       responses:
         "200":
           description: Transaction list
@@ -617,13 +667,25 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [transactions, total, nextCursor, prevCursor]
                 properties:
                   transactions:
                     type: array
                     items:
                       $ref: "#/components/schemas/Transaction"
+                  total:
+                    type: integer
+                    minimum: 0
+                  nextCursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for the next page when cursor pagination has another page.
+                  prevCursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for the previous page when cursor pagination has an earlier page.
         "400":
-          description: Invalid filter value
+          description: Invalid filter or cursor pagination value
           content:
             application/json:
               schema:
