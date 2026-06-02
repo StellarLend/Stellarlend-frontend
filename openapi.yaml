@@ -19,6 +19,12 @@ info:
     Cache is bypassed whenever an `Authorization` header, `session` / `token`
     cookie, or `x-user-id` header is present.
 
+    **Request correlation**
+    API clients may send `x-request-id` as a ULID to correlate logs across
+    Stellarlend and upstream services. If it is omitted or malformed, the
+    middleware generates a fresh ULID, returns it in the `x-request-id`
+    response header, and forwards it on outbound service calls.
+
 servers:
   - url: http://localhost:3000
     description: Local development
@@ -60,9 +66,14 @@ paths:
       description: |
         Checks internal service status and Stellar Horizon reachability.
         Returns 200 when healthy, 503 when degraded or unhealthy.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
       responses:
         "200":
           description: Platform is healthy
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/XRequestId"
           content:
             application/json:
               schema:
@@ -1069,7 +1080,24 @@ components:
         Issued at login; include in `Authorization: Bearer <token>` header.
         Required for all `/api/admin/*` endpoints.
 
+  parameters:
+    XRequestId:
+      name: x-request-id
+      in: header
+      required: false
+      description: Optional client-provided ULID used for end-to-end request correlation. Malformed values are ignored and replaced.
+      schema:
+        type: string
+        pattern: '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+        example: '01HZ0000000000000000000000'
+
   headers:
+    XRequestId:
+      description: ULID used to correlate this request across middleware, logs, and upstream HTTP calls.
+      schema:
+        type: string
+        pattern: '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+        example: '01HZ0000000000000000000000'
     XCache:
       description: "Cache resolution status: HIT | MISS | STALE | BYPASS"
       schema:
