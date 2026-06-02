@@ -380,6 +380,10 @@ npm start
 
 For more deployment options, see the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying).
 
+### Scheduled jobs
+
+Cron registration is protected by Postgres advisory-lock leader election so only one application replica schedules retention, snapshot, and indexer health-check jobs. See [docs/scheduler-leader-election.md](docs/scheduler-leader-election.md) and [docs/infrastructure/README.md](docs/infrastructure/README.md) for failover and recovery procedures.
+
 ## 📝 Scripts Reference
 
 | Command | Description |

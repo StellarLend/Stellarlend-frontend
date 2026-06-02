@@ -50,4 +50,7 @@ export const SESSION_RETENTION_DAYS = Number(process.env.SESSION_RETENTION_DAYS 
 export const SNAPSHOT_RETENTION_DAYS = Number(process.env.SNAPSHOT_RETENTION_DAYS ?? '30');
 
 export default serverConfig;
+export const CIRCUIT_FAILURE_RATE = Number(process.env.CIRCUIT_FAILURE_RATE ?? '0.5');
+export const CIRCUIT_MIN_CALLS = Number(process.env.CIRCUIT_MIN_CALLS ?? '20');
+export const CIRCUIT_COOLDOWN_MS = Number(process.env.CIRCUIT_COOLDOWN_MS ?? '60000'); // 60 seconds
 export const ENABLE_CHAOS_INJECTION = process.env.ENABLE_CHAOS_INJECTION === 'true';
