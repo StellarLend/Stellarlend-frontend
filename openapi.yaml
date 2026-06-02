@@ -43,7 +43,7 @@ tags:
   - name: notifications
     description: In-app notifications for the authenticated user
   - name: admin
-    description: Administrative endpoints (admin role required)
+    description: Internal admin-only routes for deployment and maintenance
 
 paths:
 
@@ -233,6 +233,40 @@ paths:
                     example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
         "401":
           description: No active session to logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Admin
+  # ---------------------------------------------------------------------------
+  /api/admin/migrate-status:
+    get:
+      operationId: getMigrateStatus
+      tags: [admin]
+      summary: Check migration drift status
+      description: |
+        Compares applied Drizzle migrations to the repository source manifest.
+        Intended for deploy verification and monitoring.
+      parameters:
+        - name: x-server-token
+          in: header
+          description: Server token used to authenticate internal admin requests
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Migration status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationStatusResponse"
+        "403":
+          description: Unauthorized admin request
           content:
             application/json:
               schema:
@@ -1009,72 +1043,20 @@ components:
         error:
           type: string
 
-    AdminUser:
+    MigrationStatusResponse:
       type: object
-      required: [id, email, name, role, status, createdAt, updatedAt]
-      description: |
-        Sanitised user record returned by admin endpoints.
-        Does NOT include hashed passwords, session tokens, or private keys.
+      required: [applied, pending, ok]
       properties:
-        id:
-          type: string
-          example: usr_001
-        email:
-          type: string
-          format: email
-          example: alice@stellarlend.io
-        name:
-          type: string
-          example: Alice Nakamoto
-        walletAddress:
-          type: string
-          description: Optional Stellar public key
-          example: GABC1234567890
-        role:
-          type: string
-          enum: [user, ops, admin]
-          example: user
-        status:
-          type: string
-          enum: [active, suspended, pending]
-          example: active
-        createdAt:
-          type: string
-          format: date-time
-          example: "2025-01-10T09:00:00.000Z"
-        updatedAt:
-          type: string
-          format: date-time
-          example: "2025-01-10T09:00:00.000Z"
-
-    AdminPagination:
-      type: object
-      required: [page, pageSize, total, totalPages]
-      properties:
-        page:
-          type: integer
-          example: 1
-        pageSize:
-          type: integer
-          example: 20
-        total:
-          type: integer
-          description: Total number of matching records
-          example: 42
-        totalPages:
-          type: integer
-          example: 3
-
-    AdminUsersResponse:
-      type: object
-      required: [users, pagination]
-      properties:
-        users:
+        applied:
           type: array
           items:
-            $ref: "#/components/schemas/AdminUser"
-        pagination:
-          $ref: "#/components/schemas/AdminPagination"
+            type: string
+        pending:
+          type: array
+          items:
+            type: string
+        ok:
+          type: boolean
 
     AssetSymbol:
       type: string

@@ -15,6 +15,7 @@ access cookies, perform crypto operations, and use Node-only packages.
 app/api/
 ├── auth/session/route.ts      POST | GET | DELETE  – session lifecycle
 ├── health/route.ts            GET                  – platform health check
+├── admin/migrate-status/route.ts GET               – admin migration drift status
 ├── markets/route.ts           GET                  – per-asset APR & utilization  ← #193
 ├── notifications/
 │   ├── route.ts               GET                  – list user notifications       ← #195
@@ -171,6 +172,9 @@ The `Transaction` interface lives in `types/Transaction.ts`.
 
 * **Secrets isolation:** `lib/server-config.ts` imports `server-only`; any
   accidental client import fails at build time.
+* **Admin endpoint protection:** internal maintenance routes such as
+  `/api/admin/migrate-status` require a server token in the `x-server-token`
+  header, rejecting unauthorized callers with a structured error envelope.
 * **Session tokens:** HttpOnly + SameSite=strict cookie prevents XSS and CSRF.
 * **Cache bypass:** Authenticated requests always skip the shared cache to
   prevent cross-user data leakage.
