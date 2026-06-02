@@ -9,6 +9,20 @@ import {
 } from './errors';
 import { metrics } from '@/lib/metrics/registry';
 
+const CSRF_COOKIE_NAME = process.env.CSRF_COOKIE_NAME || 'csrf-token';
+
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === CSRF_COOKIE_NAME) {
+      return decodeURIComponent(value);
+    }
+  }
+  return null;
+}
+
 export interface RequestOptions extends Omit<RequestInit, 'signal'> {
   /** Override the global timeout from config.api.timeout (ms). */
   timeoutMs?: number;
@@ -16,10 +30,54 @@ export interface RequestOptions extends Omit<RequestInit, 'signal'> {
   retries?: number;
   /** Base backoff delay in ms; doubles on each attempt (default: 200). */
   backoffMs?: number;
-  /** Allow retries on POST requests when true (default: false). */
-  retryOnPost?: boolean;
-  /** Upper bound for Retry-After wait (ms, default 30000). */
-  retryAfterUpperBoundMs?: number;
+}
+
+async function fetchOnce<T>(url: string, options: RequestOptions): Promise<T> {
+  const start = Date.now();
+  const timeoutMs = options.timeoutMs ?? config.api.timeout;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  const { timeoutMs: _t, retries: _r, backoffMs: _b, ...fetchOptions } = options;
+  
+  const method = (options.method ?? 'GET').toUpperCase();
+  const headers = new Headers(fetchOptions.headers);
+  const csrfToken = getCsrfToken();
+  
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && csrfToken) {
+    headers.set('x-csrf-token', csrfToken);
+  }
+
+  try {
+    let response: Response;
+    try {
+      response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') {
+        throw new TimeoutError(url, timeoutMs);
+      }
+      throw new NetworkError(url, err);
+    }
+
+    if (!response.ok) {
+      throw new UpstreamHttpError(url, response.status);
+    }
+
+    try {
+      const json = (await response.json()) as T;
+      try {
+        const dur = (Date.now() - start) / 1000;
+        const host = new URL(url).host;
+        metrics.outboundRequests.inc({ method, host, status: String(response.status) });
+        metrics.outboundRequestDuration.observe(dur, { method, host, status: String(response.status) });
+      } catch (e) {}
+      return json;
+    } catch (err) {
+      throw new HttpError('PARSE_ERROR', `Failed to parse JSON from ${url}`, undefined, err);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function sleep(ms: number): Promise<void> {

@@ -16,6 +16,9 @@ import {
   extractSubmitResult,
   isTxSubmitRequest,
 } from '@/lib/soroban/tx';
+import { withCsrfProtection } from '@/lib/api/handler';
+import { getSession } from '@/lib/auth';
+import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
 
 export const runtime = 'nodejs';
 
@@ -36,7 +39,7 @@ const rpcFailure = () =>
     { status: 502 },
   );
 
-export async function POST(request: NextRequest) {
+const postHandler = async (request: NextRequest) => {
   let body: unknown;
 
   try {
@@ -129,4 +132,6 @@ export async function POST(request: NextRequest) {
       { status: 502 },
     );
   }
-}
+};
+
+export const POST = withCsrfProtection(postHandler);
