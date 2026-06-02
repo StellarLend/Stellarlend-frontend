@@ -64,6 +64,8 @@ Edit `.env.local` with your configuration:
 # Stellar Network Configuration
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
 NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+STELLAR_HORIZON_URLS=https://horizon-testnet.stellar.org,https://horizon-backup.stellar.org
+NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 NEXT_PUBLIC_SOROBAN_CONTRACT_ID=GXXXXXXXXXXXXXXX...YOUR_CONTRACT_ID
 SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 

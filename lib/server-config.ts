@@ -15,31 +15,35 @@ interface ServerConfig {
   server: {
     token: string;
   };
-  stellar: {
-    sorobanRpcUrl: string;
+  horizon: {
+    urls: string[];
+    primaryUrl: string;
   };
 }
 
-const DEFAULT_SOROBAN_RPC_URL = 'https://soroban-testnet.stellar.org';
-
-function readSorobanRpcUrl(): string {
-  const isProd = process.env.NEXT_PUBLIC_APP_ENV === 'production';
-  const rawValue = process.env.SOROBAN_RPC_URL?.trim();
-
-  if (!rawValue) {
-    if (isProd) {
-      throw new Error('SOROBAN_RPC_URL is required in production.');
-    }
-
-    return DEFAULT_SOROBAN_RPC_URL;
-  }
-
+function normalizeUrl(rawUrl: string): string {
   try {
-    return new URL(rawValue).toString();
+    const url = new URL(rawUrl.trim());
+    return url.toString().replace(/\/+$/, '');
   } catch {
-    throw new Error('SOROBAN_RPC_URL must be a valid URL.');
+    throw new Error(`Invalid Horizon URL: ${rawUrl}`);
   }
 }
+
+function parseHorizonUrls(rawValue?: string): string[] {
+  const rawList = rawValue?.trim() || '';
+  const urls = rawList
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(normalizeUrl);
+
+  return urls.length ? Array.from(new Set(urls)) : ['https://horizon-testnet.stellar.org'];
+}
+
+const horizonUrls = parseHorizonUrls(
+  process.env.STELLAR_HORIZON_URLS || process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL,
+);
 
 const serverConfig: ServerConfig = {
   oracle: {
@@ -51,8 +55,9 @@ const serverConfig: ServerConfig = {
   server: {
     token: process.env.SERVER_TOKEN || '',
   },
-  stellar: {
-    sorobanRpcUrl: readSorobanRpcUrl(),
+  horizon: {
+    urls: horizonUrls,
+    primaryUrl: horizonUrls[0],
   },
 };
 

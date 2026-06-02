@@ -46,7 +46,8 @@ Key fields used by the API layer:
 ### lib/server-config.ts — Server-only secrets
 
 Imports `server-only` to prevent accidental client bundle inclusion.
-Reads `PRICE_ORACLE_API_KEY`, `AUTH_SIGNING_SECRET`, `SERVER_TOKEN`, and `SOROBAN_RPC_URL` from env.
+Reads `AUTH_SECRET`, `AUTH_ORACLE_API_KEY`, `SERVER_TOKEN`, and Horizon endpoint configuration from env.
+Horizon failover uses `STELLAR_HORIZON_URLS` with health-weighted selection.
 
 ### lib/auth.ts — Session management
 

@@ -110,11 +110,41 @@ describe('config modules', () => {
 
     const serverConfigModule = await import('./server-config');
 
-    expect(serverConfigModule.default.oracle.apiKey).toBe('oracle-key-123');
-    expect(serverConfigModule.default.auth.signingSecret).toBe('signing-secret-456');
-    expect(serverConfigModule.default.server.token).toBe('server-token-789');
-    expect(serverConfigModule.default.stellar.sorobanRpcUrl).toBe(
-      'https://rpc.stellarlend.example/',
+    expect(serverConfig.oracle.apiKey).toBe('oracle-key-123');
+    expect(serverConfig.auth.signingSecret).toBe('signing-secret-456');
+    expect(serverConfig.server.token).toBe('server-token-789');
+  });
+
+  it('server config loads horizon URLs from STELLAR_HORIZON_URLS', async () => {
+    vi.resetModules();
+    process.env.STELLAR_HORIZON_URLS = 'https://primary.example.com,https://secondary.example.com/';
+
+    const serverConfigModule = await import('./server-config');
+    const serverConfig = serverConfigModule.default;
+
+    expect(serverConfig.horizon.urls).toEqual([
+      'https://primary.example.com',
+      'https://secondary.example.com',
+    ]);
+    expect(serverConfig.horizon.primaryUrl).toBe('https://primary.example.com');
+
+    delete process.env.STELLAR_HORIZON_URLS;
+  });
+
+  it('server config falls back to empty strings when env vars are missing', async () => {
+    const serverConfigModule = await import('./server-config');
+    const serverConfig = serverConfigModule.default;
+
+    expect(serverConfig.oracle.apiKey).toBe('');
+    expect(serverConfig.auth.signingSecret).toBe('');
+    expect(serverConfig.server.token).toBe('');
+  });
+
+  it('server config throws an error if window is defined (browser environment)', async () => {
+    vi.stubGlobal('window', {});
+
+    await expect(import('./server-config')).rejects.toThrow(
+      'Internal Error: server-config.ts cannot be imported on the client side.'
     );
   });
 
