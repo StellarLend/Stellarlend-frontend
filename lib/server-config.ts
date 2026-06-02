@@ -1,6 +1,5 @@
 import 'server-only';
 
-// Runtime guard to prevent client-side imports
 if (typeof window !== 'undefined') {
   throw new Error('Internal Error: server-config.ts cannot be imported on the client side.');
 }
@@ -15,6 +14,9 @@ interface ServerConfig {
   server: {
     token: string;
   };
+  sentry: {
+    dsn: string;
+  };
 }
 
 const serverConfig: ServerConfig = {
@@ -26,6 +28,9 @@ const serverConfig: ServerConfig = {
   },
   server: {
     token: process.env.SERVER_TOKEN || '',
+  },
+  sentry: {
+    dsn: process.env.SENTRY_DSN || '',
   },
 };
 
