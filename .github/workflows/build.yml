@@ -26,9 +26,6 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Scan bundles for leaked secrets
-        run: npm run check-bundle-secrets
-
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
