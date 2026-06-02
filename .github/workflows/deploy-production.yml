@@ -10,7 +10,7 @@ environment: production
 jobs:
   deploy-production:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,6 +34,8 @@ jobs:
           NEXT_PUBLIC_SOROBAN_RPC_URL: ${{ secrets.SOROBAN_RPC_URL }}
           NEXT_PUBLIC_GA_TRACKING_ID: ${{ secrets.GA_TRACKING_ID }}
           NEXT_PUBLIC_MIXPANEL_TOKEN: ${{ secrets.MIXPANEL_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_RELEASE: ${{ github.ref_name }}
 
       - name: Deploy to Vercel (Production)
         uses: amondnet/vercel-action@v25
@@ -52,14 +54,14 @@ jobs:
           release_name: Release ${{ github.ref }}
           body: |
             🚀 **Stellarlend Frontend Release ${{ github.ref }}**
-            
+
             **Changes in this Release:**
             ${{ github.event.head_commit.message }}
-            
+
             **Deployment:**
             - ✅ Production deployment successful
             - 🔗 Live at: https://stellarlend.com
-            
+
             **What's New:**
             - Bug fixes and improvements
             - Performance optimizations

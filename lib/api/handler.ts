@@ -36,6 +36,8 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
     const startedAt = Date.now();
     const request = args[0] as NextRequest | undefined;
     const method = request?.method ?? 'UNKNOWN';
+    const sessionId = request?.cookies.get('session')?.value;
+
     const requestContext = {
       method,
       route,
@@ -56,7 +58,6 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
       const durationMs = Date.now() - startedAt;
       const status = typeof (response as any)?.status === 'number' ? (response as any).status : 0;
 
-      // Metrics
       try {
         metrics.httpRequests.inc({ method, route, status: String(status) });
         metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: String(status) });
@@ -78,7 +79,15 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
         metrics.httpRequests.inc({ method, route, status: '500' });
         metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: '500' });
         metrics.httpErrors.inc({ route, error: (error as Error)?.name ?? 'Error' });
-      } catch (e) {}
+      } catch (e) {
+        // swallow metrics errors
+      }
+
+      captureServerError(error, {
+        route,
+        method,
+        sessionId,
+      });
 
       logger.error('request failed', route, {
         durationMs,

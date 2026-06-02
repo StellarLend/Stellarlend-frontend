@@ -6,27 +6,19 @@ import { withRequestLogging } from '@/lib/api/handler';
 export const runtime = 'nodejs';
 
 async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
-  const results = await Promise.all(
-    serverConfig.horizon.urls.map(async (url) => {
-      try {
-        await httpGet(`${url}/`, { timeoutMs: 5000, retries: 1 });
-        return 'healthy' as const;
-      } catch (err) {
-        if (err instanceof TimeoutError) return 'degraded' as const;
-        if (err instanceof UpstreamHttpError) return 'degraded' as const;
-        return 'unhealthy' as const;
-      }
-    }),
-  );
-
-  if (results.includes('healthy')) return 'healthy';
-  if (results.includes('degraded')) return 'degraded';
-  return 'unhealthy';
+  try {
+    await httpGet(${config.stellar.horizonUrl}/, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
 }
 
 async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.stellar.sorobanRpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(${config.stellar.sorobanRpcUrl}/health, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -37,7 +29,7 @@ async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> 
 
 async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(${config.api.baseUrl}/health, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -48,7 +40,7 @@ async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
 
 async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(${config.api.baseUrl}/health, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
