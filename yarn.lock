@@ -1240,6 +1240,11 @@
   resolved "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-15.2.5.tgz"
   integrity sha512-tBDNVUcI7U03+3oMvJ11zrtVin5p0NctiuKmTGyaTIEAVj9Q77xukLXGXRnWxKRIIdFG4OTA2rUVGZDYOwgmAA==
 
+"@next/swc-linux-x64-musl@15.2.5":
+  version "15.2.5"
+  resolved "https://registry.npmjs.org/@next/swc-linux-x64-musl/-/swc-linux-x64-musl-15.2.5.tgz"
+  integrity sha512-y7EeQuSkQbTAkCEQnJXm1asRUuGSWAchGJ3c+Qtxh8LVjXleZast8Mn/rL7tZOm7o35QeIpIcid6ufG7EVTTcA==
+
 "@noble/curves@^1.9.7":
   version "1.9.7"
   resolved "https://registry.npmjs.org/@noble/curves/-/curves-1.9.7.tgz"
@@ -4132,6 +4137,13 @@ extend@^3.0.2:
   resolved "https://registry.npmjs.org/extend/-/extend-3.0.2.tgz"
   integrity sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==
 
+fast-check@^4.8.0:
+  version "4.8.0"
+  resolved "https://registry.npmjs.org/fast-check/-/fast-check-4.8.0.tgz"
+  integrity sha512-GOJ158CUMnN6cSahsv4+ExARvIDuzzinFjkp0E9WtiBa5zcVeLozVkWaE4IzFcc+Y48Wp1EDlUZsXRyAztQcSg==
+  dependencies:
+    pure-rand "^8.0.0"
+
 fast-deep-equal@^3.1.1, fast-deep-equal@^3.1.3:
   version "3.1.3"
   resolved "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz"
@@ -7002,6 +7014,11 @@ pure-rand@^7.0.0:
   resolved "https://registry.npmjs.org/pure-rand/-/pure-rand-7.0.1.tgz"
   integrity sha512-oTUZM/NAZS8p7ANR3SHh30kXB+zK2r2BPcEn/awJIbOvq82WoMN4p62AWWp3Hhw50G0xMsw1mhIBLqHw64EcNQ==
 
+pure-rand@^8.0.0:
+  version "8.4.0"
+  resolved "https://registry.npmjs.org/pure-rand/-/pure-rand-8.4.0.tgz"
+  integrity sha512-IoM8YF/jY0hiugFo/wOWqfmarlE6J0wc6fDK1PhftMk7MGhVZl88sZimmqBBFomLOCSmcCCpsfj7wXASCpvK9A==
+
 queue-microtask@^1.2.2:
   version "1.2.3"
   resolved "https://registry.npmjs.org/queue-microtask/-/queue-microtask-1.2.3.tgz"
@@ -7080,9 +7097,9 @@ react-docgen@^8.0.0:
   integrity sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==
 
 "react-is-19@npm:react-is@^19.2.5":
-  version "19.2.6"
-  resolved "https://registry.npmjs.org/react-is/-/react-is-19.2.6.tgz"
-  integrity sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==
+  version "19.2.7"
+  resolved "https://registry.npmjs.org/react-is/-/react-is-19.2.7.tgz"
+  integrity sha512-kZFnouyVv7eP/Phmrlo9FK+zcAdriZJvzxXHF1Sl1P377WSGe2G/JxVolhTrB/jeV47lKImhNUsijjHAAbcl/A==
 
 react-is@^16.13.1:
   version "16.13.1"

@@ -15,6 +15,21 @@ function serializeError(error: unknown) {
   return String(error);
 }
 
+export function withCsrfProtection<T extends (...args: unknown[]) => Promise<NextResponse> | NextResponse>(handler: T) {
+  return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
+    const request = args[0] as NextRequest | undefined;
+    if (request) {
+      const method = request.method;
+      if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        if (!verifyCsrfToken(request)) {
+          return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 }) as ReturnType<T>;
+        }
+      }
+    }
+    return handler(...args);
+  };
+}
+
 export function withRequestLogging<T extends (...args: unknown[]) => Promise<NextResponse> | NextResponse>(route: string, handler: T) {
   return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     const startedAt = Date.now();

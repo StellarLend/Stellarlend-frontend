@@ -16,41 +16,68 @@ interface SidebarContextProps {
   isMobile: boolean;
 }
 
+interface SidebarProviderProps {
+  children: ReactNode;
+  initialSidebarOpen?: boolean;
+  initialIsMobile?: boolean;
+}
+
 const SidebarContext = createContext<SidebarContextProps | undefined>(
   undefined
 );
 
-export const SidebarProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const [isMobile, setIsMobile] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+export const SidebarProvider: FC<SidebarProviderProps> = ({
+  children,
+  initialSidebarOpen,
+  initialIsMobile,
+}) => {
+  const [isMobile, setIsMobile] = useState(initialIsMobile ?? false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    initialSidebarOpen ?? true
+  );
 
   useEffect(() => {
-    // Check mobile status after component mounts
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (initialIsMobile !== undefined) {
+      return;
+    }
+
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-      // Close sidebar by default on mobile
-      if (window.innerWidth < 768) {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
         setIsSidebarOpen(false);
       }
     };
 
     checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, [initialIsMobile]);
 
-    // Load saved state only after we know we're on client
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (initialSidebarOpen !== undefined) {
+      return;
+    }
+
     const saved = localStorage.getItem("sidebarOpen");
     if (saved !== null) {
       setIsSidebarOpen(saved === "true");
     }
-
-    window.addEventListener("resize", checkIsMobile);
-    return () => window.removeEventListener("resize", checkIsMobile);
-  }, []);
+  }, [initialSidebarOpen]);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isMobile && initialSidebarOpen === undefined) {
       localStorage.setItem("sidebarOpen", isSidebarOpen.toString());
     }
-  }, [isSidebarOpen, isMobile]);
+  }, [isSidebarOpen, isMobile, initialSidebarOpen]);
 
   const toggleSidebar = () => {
     setIsSidebarOpen((prev) => !prev);
