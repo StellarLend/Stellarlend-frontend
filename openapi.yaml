@@ -42,6 +42,8 @@ tags:
     description: Lending / borrowing quote calculations
   - name: notifications
     description: In-app notifications for the authenticated user
+  - name: liquidation
+    description: Liquidation risk assessment for user positions
   - name: admin
     description: Internal admin-only routes for deployment and maintenance
 
@@ -512,6 +514,73 @@ paths:
               example:
                 error: Bad Request
                 message: time range cannot exceed 365 days
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Liquidation
+  # ---------------------------------------------------------------------------
+  /api/liquidations:
+    get:
+      operationId: getLiquidations
+      tags: [liquidation]
+      summary: List user positions ranked by liquidation risk
+      description: |
+        Returns all borrowing positions for the authenticated user, ranked by
+        proximity to liquidation. Each position includes the computed health
+        factor, the price level at which the position becomes liquidatable, and
+        a normalized risk score between 0 (safe) and 1 (liquidatable).
+
+        Collateral factors are sourced from `lib/markets/registry.ts`.
+
+        **Risk score formula:**
+        ```
+        riskScore = clamp(1 - (healthFactor - 1) / (SAFE_HF - 1), 0, 1)
+        ```
+        where SAFE_HF = 2.0. A health factor ≤ 1 yields riskScore = 1;
+        a health factor ≥ 2 yields riskScore = 0.
+
+        **Health factor formula:**
+        ```
+        healthFactor = (collateralAmount × collateralFactor) / borrowedAmount
+        ```
+
+        **Liquidation price factor formula:**
+        ```
+        liquidationPriceFactor = borrowedAmount / (collateralAmount × collateralFactor)
+        ```
+        This is the fraction of the current price at which the position becomes
+        liquidatable. A value of 0.8 means a 20% price decline triggers liquidation.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: wallet
+          in: query
+          required: false
+          description: >
+            Override wallet address for admin inspection.
+            Must be a valid Stellar public key (max 56 chars).
+          schema:
+            type: string
+            maxLength: 56
+            example: GA-test-address
+      responses:
+        "200":
+          description: Liquidation risk assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidationsResponse"
+        "400":
+          description: Invalid wallet address parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid wallet address
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -1267,6 +1336,68 @@ components:
           description: Number of snapshot buckets returned
           minimum: 0
           example: 30
+
+    LiquidationPosition:
+      type: object
+      required: [asset, borrowedAmount, collateralAsset, collateralAmount, collateralFactor, healthFactor, liquidationPriceFactor, riskScore]
+      properties:
+        asset:
+          $ref: "#/components/schemas/AssetSymbol"
+          description: The borrowed asset
+        borrowedAmount:
+          type: number
+          description: Amount borrowed in USD
+          minimum: 0
+          example: 1500
+        collateralAsset:
+          $ref: "#/components/schemas/AssetSymbol"
+          description: The asset posted as collateral
+        collateralAmount:
+          type: number
+          description: Collateral value in USD
+          minimum: 0
+          example: 5000
+        collateralFactor:
+          type: number
+          description: Collateral factor of the collateral asset (0-1)
+          minimum: 0
+          maximum: 1
+          example: 0.75
+        healthFactor:
+          type: number
+          description: Current health factor (≥1 is safe, <1 is liquidatable)
+          example: 2.5
+        liquidationPriceFactor:
+          type: number
+          description: Price multiplier at which liquidation triggers (0 = no borrow)
+          minimum: 0
+          example: 0.4
+        riskScore:
+          type: number
+          description: Normalized risk score — 0 (safe) to 1 (liquidatable)
+          minimum: 0
+          maximum: 1
+          example: 0.25
+
+    LiquidationsResponse:
+      type: object
+      required: [positions, totalRiskScore, timestamp]
+      properties:
+        positions:
+          type: array
+          description: Positions ranked by risk score (most at risk first)
+          items:
+            $ref: "#/components/schemas/LiquidationPosition"
+        totalRiskScore:
+          type: number
+          description: Aggregate risk — the maximum risk score across all positions
+          minimum: 0
+          maximum: 1
+          example: 0.83
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the computation
 
     QuoteRequest:
       type: object

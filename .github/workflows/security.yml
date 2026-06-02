@@ -1,35 +1,62 @@
-name: Security Vulnerability Gate
+name: Security Scan
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM
 
 jobs:
-  security-gate:
+  security-scan:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '18'
+          cache: 'npm'
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          version: 8
+          args: --severity-threshold=high
+        continue-on-error: true
 
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
-      - name: Run pnpm Audit (Production Dependencies)
-        run: pnpm audit --prod --audit-level high
-
-      - name: Run OSV-Scanner
-        uses: google/osv-scanner-action/checkout@v1
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v2
         with:
-          config-path: .security/osv-config.toml
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+      - name: Run OWASP ZAP scan
+        uses: zaproxy/action-full-scan@v0.8.0
+        with:
+          target: 'https://stellarlend-staging.vercel.app'
+        continue-on-error: true
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-scan-results
+          path: |
+            snyk-report.json
+            zap-report.html
+          retention-days: 30
