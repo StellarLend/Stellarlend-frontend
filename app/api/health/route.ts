@@ -1,20 +1,27 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
-<<<<<<< HEAD
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
-import { withHandler } from '@/lib/api/handler';
+import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
 async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
-  try {
-    await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
-    return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
-  }
+  const results = await Promise.all(
+    serverConfig.horizon.urls.map(async (url) => {
+      try {
+        await httpGet(`${url}/`, { timeoutMs: 5000, retries: 1 });
+        return 'healthy' as const;
+      } catch (err) {
+        if (err instanceof TimeoutError) return 'degraded' as const;
+        if (err instanceof UpstreamHttpError) return 'degraded' as const;
+        return 'unhealthy' as const;
+      }
+    }),
+  );
+
+  if (results.includes('healthy')) return 'healthy';
+  if (results.includes('degraded')) return 'degraded';
+  return 'unhealthy';
 }
 
 async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
@@ -50,29 +57,22 @@ async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   }
 }
 
-export async function GET() {
-=======
-import { withRequestLogging } from '@/lib/api/handler';
-
-export const runtime = 'nodejs';
-
 async function handleHealth() {
->>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
   try {
-    const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
-      checkHorizon(),
-      checkSorobanRpc(),
-      checkApi(),
-      checkDatabase(),
-    ]);
+    await httpGet(url, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (error) {
+    if (error instanceof TimeoutError || error instanceof UpstreamHttpError) {
+      return 'degraded';
+    }
 
-    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy' 
-      ? 'unhealthy' 
+    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy'
+      ? 'unhealthy'
       : horizonStatus === 'degraded' || sorobanStatus === 'degraded'
       ? 'degraded'
       : 'healthy';
 
-    const overallStatus = 
+    const overallStatus =
       stellarStatus === 'unhealthy' || apiStatus === 'unhealthy' || dbStatus === 'unhealthy'
         ? 'unhealthy'
         : stellarStatus === 'degraded' || apiStatus === 'degraded' || dbStatus === 'degraded'
@@ -104,8 +104,5 @@ async function handleHealth() {
     );
   }
 }
-<<<<<<< HEAD
-=======
 
 export const GET = withRequestLogging('/api/health', handleHealth);
->>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))

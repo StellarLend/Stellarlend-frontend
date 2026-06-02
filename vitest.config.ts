@@ -25,6 +25,15 @@ export default defineConfig({
 
   test: {
     globals: true,
+    env: {
+      NEXT_PUBLIC_APP_NAME: 'Stellarlend',
+      NEXT_PUBLIC_APP_VERSION: '1.0.0',
+      NEXT_PUBLIC_APP_ENV: 'development',
+      NEXT_PUBLIC_API_BASE_URL: 'http://localhost:3001',
+      NEXT_PUBLIC_STELLAR_NETWORK: 'testnet',
+      NEXT_PUBLIC_STELLAR_HORIZON_URL: 'https://horizon-testnet.stellar.org',
+      NEXT_PUBLIC_SOROBAN_RPC_URL: 'https://soroban-testnet.stellar.org',
+    },
 
     projects: [
       {
@@ -58,9 +67,11 @@ export default defineConfig({
           include: [
             "app/lending/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
+            "components/atoms/Button/Button.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
             "components/shared/layout/**/*.test.tsx",
             "components/shared/common/**/*.test.tsx",
+            "components/shared/ui/**/*.test.tsx",
           ],
         },
       },

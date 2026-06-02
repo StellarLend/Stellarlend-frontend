@@ -14,10 +14,35 @@ interface ServerConfig {
   server: {
     token: string;
   };
-  sentry: {
-    dsn: string;
+  horizon: {
+    urls: string[];
+    primaryUrl: string;
   };
 }
+
+function normalizeUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl.trim());
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    throw new Error(`Invalid Horizon URL: ${rawUrl}`);
+  }
+}
+
+function parseHorizonUrls(rawValue?: string): string[] {
+  const rawList = rawValue?.trim() || '';
+  const urls = rawList
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(normalizeUrl);
+
+  return urls.length ? Array.from(new Set(urls)) : ['https://horizon-testnet.stellar.org'];
+}
+
+const horizonUrls = parseHorizonUrls(
+  process.env.STELLAR_HORIZON_URLS || process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL,
+);
 
 const serverConfig: ServerConfig = {
   oracle: {
@@ -29,8 +54,9 @@ const serverConfig: ServerConfig = {
   server: {
     token: process.env.SERVER_TOKEN || '',
   },
-  sentry: {
-    dsn: process.env.SENTRY_DSN || '',
+  horizon: {
+    urls: horizonUrls,
+    primaryUrl: horizonUrls[0],
   },
 };
 

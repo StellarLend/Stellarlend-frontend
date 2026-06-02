@@ -22,9 +22,6 @@ export const envSchema = z.object({
   NEXT_PUBLIC_STELLAR_HORIZON_URL: isProd
     ? z.string().url({ message: 'STELLAR_HORIZON_URL must be a valid URL' })
     : z.string().url().default('https://horizon-testnet.stellar.org'),
-  NEXT_PUBLIC_SOROBAN_RPC_URL: isProd
-    ? z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' })
-    : z.string().url().default('https://soroban-testnet.stellar.org'),
   // API rate limit settings (server-only)
   API_RATE_LIMIT_MAX: z.preprocess(
     (value) => Number(value),

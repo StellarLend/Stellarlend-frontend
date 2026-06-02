@@ -9,10 +9,23 @@ vi.mock('@/lib/config', () => ({
     stellar: {
       network: 'testnet',
       horizonUrl: 'https://horizon-testnet.stellar.org',
-      sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
     },
     analytics: {},
   },
+}));
+
+vi.mock('@/lib/server-config', () => ({
+  default: {
+    stellar: { sorobanRpcUrl: 'https://private-rpc.test' },
+  },
+}));
+
+const httpGetMock = vi.fn();
+
+vi.mock('@/lib/http', () => ({
+  httpGet: (...args: unknown[]) => httpGetMock(...args),
+  TimeoutError: class TimeoutError extends Error {},
+  UpstreamHttpError: class UpstreamHttpError extends Error {},
 }));
 
 function makeRequest(headers: Record<string, string> = {}): NextRequest {
@@ -20,7 +33,10 @@ function makeRequest(headers: Record<string, string> = {}): NextRequest {
 }
 
 describe('GET /api/health', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    httpGetMock.mockResolvedValue({ ok: true });
+  });
 
   it('returns 200 with a healthy status body', async () => {
     const res = await GET(makeRequest());
@@ -29,6 +45,20 @@ describe('GET /api/health', () => {
     expect(body.status).toBe('healthy');
     expect(body.environment).toBe('test');
     expect(body.version).toBe('1.0.0');
+    expect(body.checks).toEqual({
+      api: 'healthy',
+      database: 'healthy',
+      stellar: 'healthy',
+    });
+  });
+
+  it('checks the server-only Soroban RPC health endpoint', async () => {
+    await GET(makeRequest());
+
+    expect(httpGetMock).toHaveBeenCalledWith(
+      'https://private-rpc.test/health',
+      expect.objectContaining({ retries: 1, timeoutMs: 5000 }),
+    );
   });
 
   it('includes ETag header on 200 response', async () => {
@@ -49,12 +79,9 @@ describe('GET /api/health', () => {
   });
 
   it('returns 304 when If-None-Match matches current ETag', async () => {
-    // First request — capture the ETag
     const first = await GET(makeRequest());
     const etag = first.headers.get('ETag')!;
-    expect(etag).toBeTruthy();
 
-    // Second request — supply the ETag
     const second = await GET(makeRequest({ 'if-none-match': etag }));
     expect(second.status).toBe(304);
   });
@@ -78,16 +105,5 @@ describe('GET /api/health', () => {
   it('returns 200 when If-None-Match does not match', async () => {
     const res = await GET(makeRequest({ 'if-none-match': '"stale-etag"' }));
     expect(res.status).toBe(200);
-  });
-
-  it('returns 200 when no If-None-Match header is sent', async () => {
-    const res = await GET(makeRequest());
-    expect(res.status).toBe(200);
-  });
-
-  it('returns same ETag on subsequent identical requests', async () => {
-    const first = await GET(makeRequest());
-    const second = await GET(makeRequest());
-    expect(first.headers.get('ETag')).toBe(second.headers.get('ETag'));
   });
 });

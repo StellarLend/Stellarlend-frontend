@@ -6,7 +6,6 @@ import simulateSuccessFixture from '@/lib/soroban/__fixtures__/simulate-success.
 vi.mock('@/lib/config', () => ({
   default: {
     stellar: {
-      sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
       network: 'testnet',
       sorobanContractId: 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     },
@@ -16,6 +15,14 @@ vi.mock('@/lib/config', () => ({
         windowMs: 60000,
         burst: 2,
       },
+    },
+  },
+}));
+
+vi.mock('@/lib/server-config', () => ({
+  default: {
+    stellar: {
+      sorobanRpcUrl: 'https://private-rpc.test',
     },
   },
 }));
@@ -75,6 +82,10 @@ describe('POST /api/tx/submit', () => {
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json).toEqual({ status: 'submitted', hash: 'tx-hash-123' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://private-rpc.test',
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 
   it('pre-simulates signed XDR when simulate=true is set', async () => {

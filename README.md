@@ -64,8 +64,10 @@ Edit `.env.local` with your configuration:
 # Stellar Network Configuration
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
 NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+STELLAR_HORIZON_URLS=https://horizon-testnet.stellar.org,https://horizon-backup.stellar.org
 NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 NEXT_PUBLIC_SOROBAN_CONTRACT_ID=GXXXXXXXXXXXXXXX...YOUR_CONTRACT_ID
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 
 # API Configuration (if applicable)
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
@@ -85,6 +87,8 @@ TX_ACCOUNT_RATE_LIMIT_BURST=60
 ```
 
 The Tx relay routes `/api/tx/build` and `/api/tx/submit` are protected by an account-scoped wallet limit. If a wallet exceeds the configured burst or window, the response returns `429` with `Retry-After` and standard `RateLimit-*` headers.
+
+Migration note: if you previously used `NEXT_PUBLIC_SOROBAN_RPC_URL`, rename it to `SOROBAN_RPC_URL` and restart the dev server or rebuild your deployment. The RPC endpoint now stays server-only so browsers cannot bypass the relay and its rate limits.
 
 Logging is emitted as structured JSON by `lib/logger.ts` and includes:
 - `timestamp`
