@@ -4,78 +4,80 @@
  * Next.js App Router loading boundary for the /lending route.
  *
  * Mirrors the real layout:
- *   Full-page gradient background (green-700 → black)
- *   └── PageHeader skeleton
- *   └── TabSelector skeleton
- *   └── Two-column grid
- *       ├── Left (2/3): Form skeleton
- *       └── Right (1/3): InterestCalculator + TransactionSummary skeletons
+ *   Light page canvas with a branded gradient accent
+ *   - Hero card skeleton
+ *   - TabSelector skeleton
+ *   - Two-column grid
+ *     - Left (2/3): Form skeleton
+ *     - Right (1/3): InterestCalculator + TransactionSummary skeletons
  */
 
 export default function LendingLoading() {
   return (
     <div
-      className="min-h-screen p-6 bg-gradient-to-b from-green-700 to-black"
+      className="relative min-h-screen overflow-hidden bg-slate-50 px-4 py-6 sm:px-6 lg:px-8"
       aria-busy="true"
-      aria-label="Loading lending page…"
+      aria-label="Loading lending page..."
     >
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* PageHeader skeleton */}
-        <div className="space-y-2 pt-2">
-          <div className="skeleton h-7 w-56" />
-          <div className="skeleton h-4 w-80" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[linear-gradient(180deg,rgba(21,163,80,0.24)_0%,rgba(21,163,80,0.1)_38%,rgba(248,250,252,0)_100%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-20 top-8 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl"
+      />
+
+      <div className="relative mx-auto max-w-7xl space-y-6">
+        <div className="overflow-hidden rounded-[32px] border border-emerald-100 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="h-2 bg-gradient-to-r from-green-600 via-emerald-500 to-black" />
+          <div className="space-y-2 p-6 sm:p-8">
+            <div className="skeleton-light h-7 w-56" />
+            <div className="skeleton-light h-4 w-80" />
+          </div>
         </div>
 
-        {/* TabSelector skeleton */}
-        <div className="flex gap-2">
-          <div className="skeleton h-10 w-24 rounded-lg" />
-          <div className="skeleton h-10 w-24 rounded-lg" />
+        <div className="rounded-[28px] border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur">
+          <div className="flex gap-2">
+            <div className="skeleton-light h-10 w-24 rounded-lg" />
+            <div className="skeleton-light h-10 w-24 rounded-lg" />
+          </div>
         </div>
 
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* ── Left: Form skeleton (2 cols) ─────────────────────────────── */}
-          <div className="lg:col-span-2 bg-white/5 rounded-2xl p-6 space-y-5">
-            {/* Asset selector row */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-5 rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm">
             <div className="space-y-1">
-              <div className="skeleton h-4 w-20" />
-              <div className="skeleton h-11 w-full rounded-lg" />
+              <div className="skeleton-light h-4 w-20" />
+              <div className="skeleton-light h-11 w-full rounded-lg" />
             </div>
-            {/* Amount input */}
             <div className="space-y-1">
-              <div className="skeleton h-4 w-24" />
-              <div className="skeleton h-11 w-full rounded-lg" />
+              <div className="skeleton-light h-4 w-24" />
+              <div className="skeleton-light h-11 w-full rounded-lg" />
             </div>
-            {/* Interest rate */}
             <div className="space-y-1">
-              <div className="skeleton h-4 w-28" />
-              <div className="skeleton h-11 w-full rounded-lg" />
+              <div className="skeleton-light h-4 w-28" />
+              <div className="skeleton-light h-11 w-full rounded-lg" />
             </div>
-            {/* Duration (borrow only) */}
             <div className="space-y-1">
-              <div className="skeleton h-4 w-20" />
-              <div className="skeleton h-11 w-full rounded-lg" />
+              <div className="skeleton-light h-4 w-20" />
+              <div className="skeleton-light h-11 w-full rounded-lg" />
             </div>
-            {/* Submit button */}
-            <div className="skeleton h-12 w-full rounded-lg mt-2" />
+            <div className="skeleton-light mt-2 h-12 w-full rounded-lg" />
           </div>
 
-          {/* ── Right: Calculator + Summary skeletons ────────────────────── */}
           <div className="space-y-6">
-            {/* InterestCalculator card */}
-            <div className="bg-white/5 rounded-2xl p-5 space-y-4">
-              <div className="skeleton h-5 w-40" />
-              <div className="skeleton h-4 w-full" />
-              <div className="skeleton h-4 w-3/4" />
-              <div className="skeleton h-10 w-full rounded-lg" />
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+              <div className="skeleton-light h-5 w-40" />
+              <div className="skeleton-light h-4 w-full" />
+              <div className="skeleton-light h-4 w-3/4" />
+              <div className="skeleton-light h-10 w-full rounded-lg" />
             </div>
-            {/* TransactionSummary card */}
-            <div className="bg-white/5 rounded-2xl p-5 space-y-3">
-              <div className="skeleton h-5 w-36" />
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+              <div className="skeleton-light h-5 w-36" />
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="flex justify-between">
-                  <div className="skeleton h-4 w-28" />
-                  <div className="skeleton h-4 w-16" />
+                  <div className="skeleton-light h-4 w-28" />
+                  <div className="skeleton-light h-4 w-16" />
                 </div>
               ))}
             </div>

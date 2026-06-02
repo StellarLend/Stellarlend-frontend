@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { metrics } from '@/lib/metrics/registry';
+import { chaosInject } from '@/lib/chaos/inject';
+import { verifyCsrfToken } from '@/lib/security/csrf';
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
@@ -12,6 +14,21 @@ function serializeError(error: unknown) {
   }
 
   return String(error);
+}
+
+export function withCsrfProtection<T extends (...args: unknown[]) => Promise<NextResponse> | NextResponse>(handler: T) {
+  return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
+    const request = args[0] as NextRequest | undefined;
+    if (request) {
+      const method = request.method;
+      if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        if (!verifyCsrfToken(request)) {
+          return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 }) as ReturnType<T>;
+        }
+      }
+    }
+    return handler(...args);
+  };
 }
 
 export function withRequestLogging<T extends (...args: unknown[]) => Promise<NextResponse> | NextResponse>(route: string, handler: T) {
@@ -41,7 +58,6 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
       const durationMs = Date.now() - startedAt;
       const status = typeof (response as any)?.status === 'number' ? (response as any).status : 0;
 
-      // Metrics
       try {
         metrics.httpRequests.inc({ method, route, status: String(status) });
         metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: String(status) });
@@ -63,7 +79,15 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
         metrics.httpRequests.inc({ method, route, status: '500' });
         metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: '500' });
         metrics.httpErrors.inc({ route, error: (error as Error)?.name ?? 'Error' });
-      } catch (e) {}
+      } catch (e) {
+        // swallow metrics errors
+      }
+
+      captureServerError(error, {
+        route,
+        method,
+        sessionId,
+      });
 
       logger.error('request failed', route, {
         durationMs,

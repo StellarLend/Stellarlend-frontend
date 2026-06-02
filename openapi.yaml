@@ -28,6 +28,8 @@ tags:
     description: Platform health check
   - name: auth
     description: Session management
+  - name: account
+    description: Account management including deletion
   - name: prices
     description: Real-time asset prices
   - name: markets
@@ -40,6 +42,10 @@ tags:
     description: Lending / borrowing quote calculations
   - name: notifications
     description: In-app notifications for the authenticated user
+  - name: liquidation
+    description: Liquidation risk assessment for user positions
+  - name: admin
+    description: Internal admin-only routes for deployment and maintenance
 
 paths:
 
@@ -140,6 +146,135 @@ paths:
                 properties:
                   message:
                     type: string
+
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and revoke session
+      description: |
+        Revokes the current session server-side and clears the session cookie.
+        This endpoint ensures that:
+        - The session token is invalidated immediately
+        - The cookie is removed from the browser
+        - Other devices using the same session cannot replay the token
+        - An audit log entry is recorded for security compliance
+
+        Requires an active session cookie. Used by the navbar disconnect action
+        in wallet-authenticated flows.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Successfully logged out
+          headers:
+            Set-Cookie:
+              description: Clears the HttpOnly session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+                  walletAddress:
+                    type: string
+                    description: |
+                      The wallet address that was logged out.
+                      Included for navbar UI state management.
+                    example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        "401":
+          description: No active session to logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "No active session"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: logoutDelete
+      tags: [auth]
+      summary: Logout and revoke session (alternative endpoint)
+      description: |
+        Same as POST /api/auth/logout.
+        Provided for REST semantics preference.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Successfully logged out
+          headers:
+            Set-Cookie:
+              description: Clears the HttpOnly session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+                  walletAddress:
+                    type: string
+                    example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        "401":
+          description: No active session to logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Admin
+  # ---------------------------------------------------------------------------
+  /api/admin/migrate-status:
+    get:
+      operationId: getMigrateStatus
+      tags: [admin]
+      summary: Check migration drift status
+      description: |
+        Compares applied Drizzle migrations to the repository source manifest.
+        Intended for deploy verification and monitoring.
+      parameters:
+        - name: x-server-token
+          in: header
+          description: Server token used to authenticate internal admin requests
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Migration status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationStatusResponse"
+        "403":
+          description: Unauthorized admin request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   # ---------------------------------------------------------------------------
   # Prices
@@ -312,6 +447,145 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/positions/history:
+    get:
+      operationId: getPositionsHistory
+      tags: [positions]
+      summary: Fetch historical position snapshots
+      description: |
+        Returns daily snapshots of user lending/borrowing positions over time,
+        including supplied/borrowed balances and effective APY.
+        
+        Data is bucketed by the specified interval (1h, 1d, 7d, 30d) with the
+        first snapshot of each bucket returned. Responses are cached per wallet
+        with a 5-minute TTL.
+        
+        Requires authentication. Returns data only for the authenticated wallet.
+      security:
+        - session: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Start timestamp in milliseconds (default 90 days ago)
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            example: 1700000000000
+        - name: to
+          in: query
+          required: false
+          description: End timestamp in milliseconds (default now)
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            example: 1702592000000
+        - name: interval
+          in: query
+          required: false
+          description: Time bucketing interval
+          schema:
+            type: string
+            enum: [1h, 1d, 7d, 30d]
+            default: 1d
+      responses:
+        "200":
+          description: Historical position snapshots
+          headers:
+            X-Cache:
+              $ref: "#/components/headers/XCache"
+            Cache-Control:
+              description: Cache-Control header
+              schema:
+                type: string
+                example: "max-age=300, public"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionHistoryResponse"
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Bad Request
+                message: time range cannot exceed 365 days
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ---------------------------------------------------------------------------
+  # Liquidation
+  # ---------------------------------------------------------------------------
+  /api/liquidations:
+    get:
+      operationId: getLiquidations
+      tags: [liquidation]
+      summary: List user positions ranked by liquidation risk
+      description: |
+        Returns all borrowing positions for the authenticated user, ranked by
+        proximity to liquidation. Each position includes the computed health
+        factor, the price level at which the position becomes liquidatable, and
+        a normalized risk score between 0 (safe) and 1 (liquidatable).
+
+        Collateral factors are sourced from `lib/markets/registry.ts`.
+
+        **Risk score formula:**
+        ```
+        riskScore = clamp(1 - (healthFactor - 1) / (SAFE_HF - 1), 0, 1)
+        ```
+        where SAFE_HF = 2.0. A health factor ≤ 1 yields riskScore = 1;
+        a health factor ≥ 2 yields riskScore = 0.
+
+        **Health factor formula:**
+        ```
+        healthFactor = (collateralAmount × collateralFactor) / borrowedAmount
+        ```
+
+        **Liquidation price factor formula:**
+        ```
+        liquidationPriceFactor = borrowedAmount / (collateralAmount × collateralFactor)
+        ```
+        This is the fraction of the current price at which the position becomes
+        liquidatable. A value of 0.8 means a 20% price decline triggers liquidation.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: wallet
+          in: query
+          required: false
+          description: >
+            Override wallet address for admin inspection.
+            Must be a valid Stellar public key (max 56 chars).
+          schema:
+            type: string
+            maxLength: 56
+            example: GA-test-address
+      responses:
+        "200":
+          description: Liquidation risk assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidationsResponse"
+        "400":
+          description: Invalid wallet address parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Invalid wallet address
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   # ---------------------------------------------------------------------------
   # Transactions
   # ---------------------------------------------------------------------------
@@ -378,6 +652,99 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /api/transactions/{id}:
+    get:
+      operationId: getTransactionDetail
+      tags: [transactions]
+      summary: Retrieve detailed transaction records with operations
+      description: |
+        Returns the normalized transaction record with embedded operation logs, fee, and explorer links.
+        Accepts mock transaction IDs (TXN\d+) and 64-character hexadecimal Soroban/Stellar transaction hashes.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The transaction identifier (either mock TXN\d+ or a 64-character hex hash)
+          schema:
+            type: string
+            pattern: "^(TXN\\d+|[0-9a-fA-F]{64})$"
+            example: TXN12345
+      responses:
+        "200":
+          description: Detailed transaction found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transaction]
+                properties:
+                  transaction:
+                    type: object
+                    required: [id, asset, type, status, amount, date, time, fee, explorerUrl, operations]
+                    properties:
+                      id:
+                        type: string
+                        example: TXN12345
+                      asset:
+                        $ref: "#/components/schemas/AssetSymbol"
+                      type:
+                        $ref: "#/components/schemas/TransactionType"
+                      status:
+                        $ref: "#/components/schemas/TransactionStatus"
+                      amount:
+                        type: number
+                        example: 2000
+                      date:
+                        type: string
+                        format: date
+                        example: "2025-04-12"
+                      time:
+                        type: string
+                        example: "09:32AM"
+                      fee:
+                        type: string
+                        example: "0.0001000 XLM"
+                      explorerUrl:
+                        type: string
+                        format: uri
+                        example: "https://stellar.expert/explorer/testnet/tx/TXN12345"
+                      operations:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, type, source, destination, amount, asset]
+                          properties:
+                            id:
+                              type: string
+                              example: "op_TXN12345_1"
+                            type:
+                              type: string
+                              example: "payment"
+                            source:
+                              type: string
+                              example: "GA2C5RFPE6GCKMY3AA3H6AOF5Q4G5S4GX6TQCGEAAS624JBZ2G2UQHGD"
+                            destination:
+                              type: string
+                              example: "GBXQ2P5Z5U67G6Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66"
+                            amount:
+                              type: string
+                              example: "2000.0000000"
+                            asset:
+                              type: string
+                              example: "XLM"
+        "400":
+          description: Invalid transaction ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/transactions/export:
     get:
       operationId: exportTransactions
@@ -436,6 +803,77 @@ paths:
                 $ref: "#/components/schemas/QuoteResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+
+  # ---------------------------------------------------------------------------
+  # Admin
+  # ---------------------------------------------------------------------------
+  /api/admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all platform users (admin only)
+      description: |
+        Returns a paginated, searchable list of platform users.
+        **Requires** an authenticated session JWT that carries a `role: admin` claim.
+        Response fields are limited to a safe allow-list; hashed credentials and
+        session tokens are never included.
+        Every successful call emits a structured audit event.
+      security:
+        - sessionCookie: []
+        - adminBearerToken: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: 1-based page number (default: 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+            example: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Records per page, 1-100 (default: 20)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: search
+          in: query
+          required: false
+          description: Case-insensitive substring match on email and name (max 100 chars)
+          schema:
+            type: string
+            maxLength: 100
+            example: alice
+      responses:
+        "200":
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUsersResponse"
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Authenticated but does not hold the admin role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Forbidden
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   # ---------------------------------------------------------------------------
   # Notifications
@@ -529,6 +967,89 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  # ---------------------------------------------------------------------------
+  # Account Deletion (GDPR/CCPA)
+  # ---------------------------------------------------------------------------
+  /api/account/delete/challenge:
+    get:
+      operationId: getDeletionChallenge
+      tags: [account]
+      summary: Get a deletion challenge
+      description: |
+        Returns a time-limited challenge string that must be submitted
+        with the DELETE request to confirm account deletion.
+        The challenge expires after 5 minutes and can only be used once.
+        Requires an active session cookie.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Deletion challenge issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionChallengeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/account/delete:
+    delete:
+      operationId: deleteAccount
+      tags: [account]
+      summary: Delete account (GDPR/CCPA)
+      description: |
+        Initiates account deletion by anonymizing PII, revoking sessions,
+        and enqueueing async cleanup of derived data.
+        Requires a valid deletion challenge obtained from `GET /api/account/delete/challenge`.
+
+        **Deletion flow:**
+        1. `GET /api/account/delete/challenge` to obtain a challenge
+        2. `DELETE /api/account/delete` with the challenge in the request body
+
+        **What is deleted immediately:**
+        - Profile PII (displayName, bio, website, timezone) is anonymized
+        - All user notifications are removed
+
+        **What is scheduled for later deletion (retention-respecting):**
+        - Backup anonymization (30-day retention)
+        - Derived data removal (7-day retention)
+        - Cache entry cleanup (1-day retention)
+        - Audit log purge (90-day retention for compliance)
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge]
+              properties:
+                challenge:
+                  type: string
+                  description: The deletion challenge string from GET /api/account/delete/challenge
+      responses:
+        "200":
+          description: Account deletion initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionResponse"
+        "400":
+          description: Missing or invalid challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid, expired, or mismatched challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 # =============================================================================
 # Components
 # =============================================================================
@@ -539,6 +1060,14 @@ components:
       type: apiKey
       in: cookie
       name: session
+    adminBearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT bearing a `role: admin` claim.
+        Issued at login; include in `Authorization: Bearer <token>` header.
+        Required for all `/api/admin/*` endpoints.
 
   headers:
     XCache:
@@ -582,6 +1111,21 @@ components:
       properties:
         error:
           type: string
+
+    MigrationStatusResponse:
+      type: object
+      required: [applied, pending, ok]
+      properties:
+        applied:
+          type: array
+          items:
+            type: string
+        pending:
+          type: array
+          items:
+            type: string
+        ok:
+          type: boolean
 
     AssetSymbol:
       type: string
@@ -739,6 +1283,122 @@ components:
           type: string
           enum: [public, authenticated]
 
+    PositionSnapshot:
+      type: object
+      required: [timestamp, supplied, borrowed, effectiveSupplyApy, effectiveBorrowApy]
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp in milliseconds
+          example: 1700000000000
+        supplied:
+          type: number
+          description: Total supplied balance in USD
+          minimum: 0
+          example: 5000
+        borrowed:
+          type: number
+          description: Total borrowed balance in USD
+          minimum: 0
+          example: 2000
+        effectiveSupplyApy:
+          type: number
+          description: Weighted average supply APY (percentage)
+          minimum: 0
+          example: 2.5
+        effectiveBorrowApy:
+          type: number
+          description: Weighted average borrow APY (percentage)
+          minimum: 0
+          example: 8.5
+
+    PositionHistoryResponse:
+      type: object
+      required: [walletAddress, snapshots, interval, bucketCount]
+      properties:
+        walletAddress:
+          type: string
+          description: Stellar wallet address
+          example: GBTEST123...
+        snapshots:
+          type: array
+          description: Array of position snapshots bucketed by interval
+          items:
+            $ref: "#/components/schemas/PositionSnapshot"
+        interval:
+          type: string
+          description: Time bucketing interval
+          enum: [1h, 1d, 7d, 30d]
+          example: 1d
+        bucketCount:
+          type: integer
+          description: Number of snapshot buckets returned
+          minimum: 0
+          example: 30
+
+    LiquidationPosition:
+      type: object
+      required: [asset, borrowedAmount, collateralAsset, collateralAmount, collateralFactor, healthFactor, liquidationPriceFactor, riskScore]
+      properties:
+        asset:
+          $ref: "#/components/schemas/AssetSymbol"
+          description: The borrowed asset
+        borrowedAmount:
+          type: number
+          description: Amount borrowed in USD
+          minimum: 0
+          example: 1500
+        collateralAsset:
+          $ref: "#/components/schemas/AssetSymbol"
+          description: The asset posted as collateral
+        collateralAmount:
+          type: number
+          description: Collateral value in USD
+          minimum: 0
+          example: 5000
+        collateralFactor:
+          type: number
+          description: Collateral factor of the collateral asset (0-1)
+          minimum: 0
+          maximum: 1
+          example: 0.75
+        healthFactor:
+          type: number
+          description: Current health factor (≥1 is safe, <1 is liquidatable)
+          example: 2.5
+        liquidationPriceFactor:
+          type: number
+          description: Price multiplier at which liquidation triggers (0 = no borrow)
+          minimum: 0
+          example: 0.4
+        riskScore:
+          type: number
+          description: Normalized risk score — 0 (safe) to 1 (liquidatable)
+          minimum: 0
+          maximum: 1
+          example: 0.25
+
+    LiquidationsResponse:
+      type: object
+      required: [positions, totalRiskScore, timestamp]
+      properties:
+        positions:
+          type: array
+          description: Positions ranked by risk score (most at risk first)
+          items:
+            $ref: "#/components/schemas/LiquidationPosition"
+        totalRiskScore:
+          type: number
+          description: Aggregate risk — the maximum risk score across all positions
+          minimum: 0
+          maximum: 1
+          example: 0.83
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the computation
+
     QuoteRequest:
       type: object
       required: [type, asset, amount, interestRate]
@@ -813,3 +1473,39 @@ components:
           type: integer
           minimum: 0
           example: 2
+
+    DeletionChallengeResponse:
+      type: object
+      required: [challenge, expiresAt, message]
+      properties:
+        challenge:
+          type: string
+          description: Hex-encoded challenge string (64 characters)
+          example: "a1b2c3d4e5f6..."
+        expiresAt:
+          type: string
+          format: date-time
+          description: ISO timestamp when the challenge expires
+        message:
+          type: string
+          example: "Sign this challenge with your wallet to confirm account deletion"
+
+    AccountDeletionResponse:
+      type: object
+      required: [message, anonymizedAt, notificationsRemoved, cleanupJobsEnqueued]
+      properties:
+        message:
+          type: string
+          example: "Account deletion initiated"
+        anonymizedAt:
+          type: string
+          format: date-time
+          description: ISO timestamp when PII was anonymized
+        notificationsRemoved:
+          type: integer
+          description: Number of user notifications removed
+          example: 5
+        cleanupJobsEnqueued:
+          type: integer
+          description: Number of async cleanup jobs scheduled
+          example: 3

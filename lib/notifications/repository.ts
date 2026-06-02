@@ -1,5 +1,8 @@
 import type { Notification } from './types';
 import { notificationHub } from '@/lib/streams/notification-hub';
+import { db } from '../db';
+import { notifications as notificationsTable } from '../db/schema/notifications';
+import { eq, and, desc } from 'drizzle-orm';
 
 // Seeded demo notifications used to populate new users' inboxes.
 const SEED_NOTIFICATIONS: Omit<Notification, 'userId'>[] = [
@@ -29,27 +32,89 @@ const SEED_NOTIFICATIONS: Omit<Notification, 'userId'>[] = [
   },
 ];
 
-// In-process store keyed by userId.
-// Replace with a database-backed repository (e.g. Prisma, Supabase) in production.
-const store = new Map<string, Notification[]>();
+async function seedUser(userId: string): Promise<Notification[]> {
+  const seeded = SEED_NOTIFICATIONS.map((n) => ({
+    id: `${userId}-${n.id}`,
+    userId,
+    title: n.title,
+    message: n.message,
+    read: n.read,
+    createdAt: new Date(n.createdAt),
+    type: n.type,
+  }));
 
-function seedUser(userId: string): Notification[] {
-  const notifications = SEED_NOTIFICATIONS.map((n) => ({ ...n, userId }));
-  store.set(userId, notifications);
-  return notifications;
+  for (const item of seeded) {
+    await db.insert(notificationsTable).values(item).onConflictDoNothing();
+  }
+
+  return seeded.map((x) => ({
+    id: x.id.replace(`${userId}-`, ''),
+    userId: x.userId,
+    title: x.title,
+    message: x.message,
+    read: x.read,
+    createdAt: x.createdAt.toISOString(),
+    type: x.type as any,
+  }));
 }
 
 /** Returns all notifications for `userId`, seeding demo data on first access. */
-export function getNotifications(userId: string): Notification[] {
-  if (!store.has(userId)) seedUser(userId);
-  return store.get(userId)!;
+export async function getNotifications(userId: string): Promise<Notification[]> {
+  const rows = await db
+    .select()
+    .from(notificationsTable)
+    .where(eq(notificationsTable.userId, userId))
+    .orderBy(desc(notificationsTable.createdAt));
+
+  if (rows.length === 0) {
+    return await seedUser(userId);
+  }
+
+  return rows.map((r) => ({
+    id: r.id.replace(`${userId}-`, ''),
+    userId: r.userId,
+    title: r.title,
+    message: r.message,
+    read: r.read,
+    createdAt: r.createdAt.toISOString(),
+    type: r.type as any,
+  }));
 }
 
 /** Adds a new notification for userId, emits hub events, and returns it. */
-export function addNotification(userId: string, n: Omit<Notification, 'userId'>): Notification {
-  const notifications = getNotifications(userId);
-  const notification: Notification = { ...n, userId };
-  notifications.unshift(notification);
+export async function addNotification(
+  userId: string,
+  n: Omit<Notification, 'userId'>,
+): Promise<Notification> {
+  const dbId = `${userId}-${n.id}`;
+  const record = {
+    id: dbId,
+    userId,
+    title: n.title,
+    message: n.message,
+    read: n.read,
+    createdAt: new Date(n.createdAt || new Date().toISOString()),
+    type: n.type,
+  };
+
+  await db
+    .insert(notificationsTable)
+    .values(record)
+    .onConflictDoUpdate({
+      target: notificationsTable.id,
+      set: {
+        title: n.title,
+        message: n.message,
+        read: n.read,
+        createdAt: record.createdAt,
+        type: n.type,
+      },
+    });
+
+  const notification: Notification = {
+    ...n,
+    userId,
+  };
 
   // Emit the raw notification event
   try {
@@ -59,8 +124,9 @@ export function addNotification(userId: string, n: Omit<Notification, 'userId'>)
   }
 
   // Emit updated unread count
-  const unreadCount = notifications.filter((x) => !x.read).length;
   try {
+    const list = await getNotifications(userId);
+    const unreadCount = list.filter((x) => !x.read).length;
     notificationHub.publish(userId, { type: 'unreadCount', unreadCount });
   } catch (e) {
     // noop
@@ -73,12 +139,29 @@ export function addNotification(userId: string, n: Omit<Notification, 'userId'>)
  * Marks notification `id` as read for `userId`.
  * Returns the updated notification, or null if not found.
  */
-export function markNotificationRead(userId: string, id: string): Notification | null {
-  const notifications = getNotifications(userId);
-  const notif = notifications.find((n) => n.id === id);
-  if (!notif) return null;
-  notif.read = true;
-  return notif;
+export async function markNotificationRead(
+  userId: string,
+  id: string,
+): Promise<Notification | null> {
+  const dbId = `${userId}-${id}`;
+
+  const [row] = await db
+    .update(notificationsTable)
+    .set({ read: true })
+    .where(and(eq(notificationsTable.id, dbId), eq(notificationsTable.userId, userId)))
+    .returning();
+
+  if (!row) return null;
+
+  return {
+    id: row.id.replace(`${userId}-`, ''),
+    userId: row.userId,
+    title: row.title,
+    message: row.message,
+    read: row.read,
+    createdAt: row.createdAt.toISOString(),
+    type: row.type as any,
+  };
 }
 
 /**
@@ -99,6 +182,15 @@ export function addNotification(
 }
 
 /** Clears all stored notifications (used in tests). */
-export function clearStore(): void {
-  store.clear();
+export async function clearStore(): Promise<void> {
+  await db.delete(notificationsTable);
+}
+
+/** Removes all notifications for a specific user (used during account deletion). */
+export function removeNotificationsByUserId(userId: string): number {
+  const notifications = store.get(userId);
+  if (!notifications) return 0;
+  const count = notifications.length;
+  store.delete(userId);
+  return count;
 }
