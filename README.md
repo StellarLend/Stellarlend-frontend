@@ -120,7 +120,25 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-### 5. Build for Production
+### 5. Database Setup (Drizzle ORM & PostgreSQL)
+
+Stellarlend uses **Drizzle ORM** with a **PostgreSQL** database backend to persist accounts, sessions, notifications, transactions, and audit logs.
+
+1. Ensure your `.env.local` contains the database connection URL:
+   ```env
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/stellarlend
+   ```
+
+2. Run the migrations to initialize your local database:
+   ```bash
+   # Using npm
+   npm run db:migrate
+
+   # Using pnpm
+   pnpm db:migrate
+   ```
+
+### 6. Build for Production
 
 ```bash
 npm run build

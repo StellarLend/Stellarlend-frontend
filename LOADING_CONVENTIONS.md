@@ -95,7 +95,7 @@ muted color instead.
 | Route        | File                        | Background style          |
 | ------------ | --------------------------- | ------------------------- |
 | `/dashboard` | `app/dashboard/loading.tsx` | Dark green (`#15A350`)    |
-| `/lending`   | `app/lending/loading.tsx`   | Gradient green → black    |
+| `/lending`   | `app/lending/loading.tsx`   | Light canvas + brand accent |
 | `/account/*` | `app/account/loading.tsx`   | Light gray (`bg-gray-50`) |
 
 ---
