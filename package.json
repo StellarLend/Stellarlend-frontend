@@ -26,6 +26,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.4",
     "@material-tailwind/react": "^2.1.10",
+    "@sentry/nextjs": "^10.55.0",
     "@stellar/stellar-sdk": "^15.1.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
