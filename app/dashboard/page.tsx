@@ -1,12 +1,36 @@
 "use client";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
+import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { DashboardLayout } from "@/components";
 import { PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
 
 export default function Dashboard() {
+  const [positionData, setPositionData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPositionData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/positions");
+        if (response.ok) {
+          const data = await response.json();
+          setPositionData(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch position data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPositionData();
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="">
@@ -38,6 +62,10 @@ export default function Dashboard() {
               </>
             }
           />
+          
+          {/* Position Summary Hero Section */}
+          <PositionSummary data={positionData} isLoading={isLoading} />
+          
           <MetricsCards />
         </div>
 
