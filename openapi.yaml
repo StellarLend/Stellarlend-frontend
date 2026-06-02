@@ -143,6 +143,101 @@ paths:
                   message:
                     type: string
 
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and revoke session
+      description: |
+        Revokes the current session server-side and clears the session cookie.
+        This endpoint ensures that:
+        - The session token is invalidated immediately
+        - The cookie is removed from the browser
+        - Other devices using the same session cannot replay the token
+        - An audit log entry is recorded for security compliance
+
+        Requires an active session cookie. Used by the navbar disconnect action
+        in wallet-authenticated flows.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Successfully logged out
+          headers:
+            Set-Cookie:
+              description: Clears the HttpOnly session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+                  walletAddress:
+                    type: string
+                    description: |
+                      The wallet address that was logged out.
+                      Included for navbar UI state management.
+                    example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        "401":
+          description: No active session to logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "No active session"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: logoutDelete
+      tags: [auth]
+      summary: Logout and revoke session (alternative endpoint)
+      description: |
+        Same as POST /api/auth/logout.
+        Provided for REST semantics preference.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Successfully logged out
+          headers:
+            Set-Cookie:
+              description: Clears the HttpOnly session cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+                  walletAddress:
+                    type: string
+                    example: "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        "401":
+          description: No active session to logout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   # ---------------------------------------------------------------------------
   # Prices
   # ---------------------------------------------------------------------------

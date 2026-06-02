@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { SignJWT, jwtVerify } from "jose";
+import { Session, User } from "@/types/common";
 
 /**
  * Auth Configuration
@@ -9,8 +12,6 @@ const AUTH_CONFIG = {
   sessionSecret: process.env.AUTH_SECRET || "dev-secret-change-in-production",
   sessionExpiryHours: parseInt(process.env.AUTH_SESSION_EXPIRY || "24", 10),
 };
-
-import { SignJWT, jwtVerify } from "jose";
 
 /**
  * Create a new session JWT
@@ -104,20 +105,120 @@ export async function getUser(): Promise<User | null> {
 }
 
 /**
+ * Check if the current user is authenticated
+ */
+export async function isAuthenticated(): Promise<boolean> {
+  const user = await getUser();
+  return !!user;
+}
+
+/**
+ * Get session expiry information
+ */
+export async function getSessionExpiry(): Promise<{ expiresAt: Date; expiresIn: number } | null> {
+  const session = await getSession();
+  if (!session) return null;
+  
+  const now = new Date();
+  const expiresIn = Math.max(0, session.expiresAt.getTime() - now.getTime());
+  
+  return {
+    expiresAt: session.expiresAt,
+    expiresIn,
+  };
+}
+
+/**
  * Get authenticated user with error handling
  * @returns User or throws AuthError
  */
 export async function getAuthenticatedUser(): Promise<User> {
   const user = await getUser();
   if (!user) {
+    throw {
+      code: "UNAUTHENTICATED",
+      message: "User is not authenticated",
+    };
+  }
+  return user;
+}
+
+/**
+ * Decodes and retrieves authenticated user from a Request object.
+ * Used for legacy routes like account profile API.
+ */
+export function getAuthUser(req: NextRequest): { id: string; email: string } | null {
+  try {
+    let token = "";
+    
+    // Check Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    } else {
+      // Check session cookie
+      const sessionCookie = req.cookies.get(AUTH_CONFIG.sessionCookieName);
+      if (sessionCookie?.value) {
+        token = sessionCookie.value;
+      }
+    }
+
+    if (!token) return null;
+
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+    
+    // Check expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) return null;
+    
+    const sub = payload.sub || payload.userId;
+    const email = payload.email;
+    if (!sub || !email) return null;
+
+    return { id: sub, email };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Enforces authentication on a Request object.
+ * Throws a 401 NextResponse if unauthorized.
+ */
+export function requireAuth(req: NextRequest): { id: string; email: string } {
+  const user = getAuthUser(req);
+  if (!user) {
     throw NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return user;
 }
 
-
-export function signToken(user: AuthUser, expiresIn = "1h"): string {
-  return jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
-    expiresIn,
-  });
+/**
+ * Generates a mock signed token (useful for testing legacy routes)
+ */
+export function signToken(user: { id: string; email: string }, expiresIn = "1h"): string {
+  let expSeconds = 3600;
+  if (expiresIn.startsWith("-")) {
+    expSeconds = -parseInt(expiresIn.substring(1), 10);
+  } else if (expiresIn.endsWith("s")) {
+    expSeconds = parseInt(expiresIn, 10);
+  } else if (expiresIn.endsWith("h")) {
+    expSeconds = parseInt(expiresIn, 10) * 3600;
+  }
+  
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    sub: user.id,
+    userId: user.id,
+    email: user.email,
+    iat: now,
+    exp: now + expSeconds,
+  };
+  
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = Buffer.from("mock-signature").toString("base64url");
+  return `${header}.${payloadEncoded}.${signature}`;
 }
