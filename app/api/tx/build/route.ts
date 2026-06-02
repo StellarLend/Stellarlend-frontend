@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
+import serverConfig from '@/lib/server-config';
 import { httpPost } from '@/lib/http/client';
 import { getSession } from '@/lib/auth';
 import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
+import {
+  buildSorobanSimulationApiError,
+  getSorobanSimulationStatus,
+  simulateSorobanTransaction,
+} from '@/lib/soroban/simulate';
 import {
   buildSorobanRpcError,
   buildSorobanTransactionRpcRequest,
@@ -90,7 +96,7 @@ export async function POST(request: NextRequest) {
   );
 
   try {
-    const rpcResponse = await httpPost<unknown>(config.stellar.sorobanRpcUrl, payload, {
+    const rpcResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
     });
 
@@ -106,7 +112,19 @@ export async function POST(request: NextRequest) {
       return rpcFailure();
     }
 
-    return NextResponse.json({ unsignedXdr }, { status: 200 });
+    try {
+      const simulation = await simulateSorobanTransaction(
+        config.stellar.sorobanRpcUrl,
+        unsignedXdr,
+      );
+
+      return NextResponse.json({ unsignedXdr, simulation }, { status: 200 });
+    } catch (error) {
+      return NextResponse.json(
+        { error: buildSorobanSimulationApiError(error) },
+        { status: getSorobanSimulationStatus(error) },
+      );
+    }
   } catch (error) {
     return NextResponse.json(
       { error: buildSorobanRpcError(error) },

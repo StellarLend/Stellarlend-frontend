@@ -23,12 +23,23 @@ export default defineConfig({
     },
   },
   test: {
+    globals: true,
     name: 'server',
     environment: 'node',
     include: [
       'lib/**/*.test.ts',
       'app/api/**/*.test.ts',
+      'src/jobs/**/*.test.ts',
       'types/enums.test.ts',
     ],
+    env: {
+      NEXT_PUBLIC_APP_NAME: 'Stellarlend',
+      NEXT_PUBLIC_APP_VERSION: '1.0.0',
+      NEXT_PUBLIC_APP_ENV: 'development',
+      NEXT_PUBLIC_API_BASE_URL: 'http://localhost:3001',
+      NEXT_PUBLIC_STELLAR_NETWORK: 'testnet',
+      NEXT_PUBLIC_STELLAR_HORIZON_URL: 'https://horizon-testnet.stellar.org',
+      NEXT_PUBLIC_SOROBAN_RPC_URL: 'https://soroban-testnet.stellar.org',
+    },
   },
 });

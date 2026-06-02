@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { validateProfile } from "@/lib/account/validation";
 import { profileRepository } from "@/lib/account/repository";
+import { withCsrfProtection } from "@/lib/api/handler";
 
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -20,7 +21,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             userId: user.id,
             displayName: "",
             bio: "",
-            website: "",
             timezone: "UTC",
             updatedAt: null,
         }
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 }
 
 
-export async function PUT(req: NextRequest): Promise<NextResponse> {
+const putHandler = async (req: NextRequest): Promise<NextResponse> => {
     let user;
     try {
         user = requireAuth(req);
@@ -50,4 +50,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
 
     const record = await profileRepository.upsert(user.id, validation.data);
     return NextResponse.json(record);
-}
+};
+
+export const PUT = withCsrfProtection(putHandler);

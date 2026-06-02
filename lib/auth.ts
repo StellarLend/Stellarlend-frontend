@@ -115,11 +115,90 @@ export async function getUser(): Promise<User | null> {
 }
 
 /**
+ * Check if the current user is authenticated
+ */
+export async function isAuthenticated(): Promise<boolean> {
+  const user = await getUser();
+  return !!user;
+}
+
+/**
+ * Get session expiry information
+ */
+export async function getSessionExpiry(): Promise<{ expiresAt: Date; expiresIn: number } | null> {
+  const session = await getSession();
+  if (!session) return null;
+  
+  const now = new Date();
+  const expiresIn = Math.max(0, session.expiresAt.getTime() - now.getTime());
+  
+  return {
+    expiresAt: session.expiresAt,
+    expiresIn,
+  };
+}
+
+/**
  * Get authenticated user with error handling
  * @returns User or throws AuthError
  */
 export async function getAuthenticatedUser(): Promise<User> {
   const user = await getUser();
+  if (!user) {
+    throw {
+      code: "UNAUTHENTICATED",
+      message: "User is not authenticated",
+    };
+  }
+  return user;
+}
+
+/**
+ * Decodes and retrieves authenticated user from a Request object.
+ * Used for legacy routes like account profile API.
+ */
+export function getAuthUser(req: NextRequest): { id: string; email: string } | null {
+  try {
+    let token = "";
+    
+    // Check Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    } else {
+      // Check session cookie
+      const sessionCookie = req.cookies.get(AUTH_CONFIG.sessionCookieName);
+      if (sessionCookie?.value) {
+        token = sessionCookie.value;
+      }
+    }
+
+    if (!token) return null;
+
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+    
+    // Check expiration
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) return null;
+    
+    const sub = payload.sub || payload.userId;
+    const email = payload.email;
+    if (!sub || !email) return null;
+
+    return { id: sub, email };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Enforces authentication on a Request object.
+ * Throws a 401 NextResponse if unauthorized.
+ */
+export function requireAuth(req: NextRequest): { id: string; email: string } {
+  const user = getAuthUser(req);
   if (!user) {
     throw NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
