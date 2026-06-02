@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyWalletSignature } from '@/lib/auth/wallet';
-import { createSession, setSessionCookie } from '@/lib/auth';
+import { createSession } from '@/lib/auth';
+import { generateCsrfToken, setCsrfCookie } from '@/lib/security/csrf';
 
 export async function POST(request: Request) {
   try {
@@ -13,16 +14,28 @@ export async function POST(request: Request) {
 
     const walletAddress = await verifyWalletSignature(transaction);
 
-    // Create session for user
-    // Since it's a wallet-centric app, we use the wallet address as the user ID
     const token = await createSession({
       id: walletAddress,
       walletAddress: walletAddress,
     });
 
-    await setSessionCookie(token);
+    const response = NextResponse.json({ success: true, walletAddress });
+    
+    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session';
+    const sessionExpiryHours = parseInt(process.env.AUTH_SESSION_EXPIRY || '24', 10);
+    
+    response.cookies.set(cookieName, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: sessionExpiryHours * 60 * 60,
+    });
 
-    return NextResponse.json({ success: true, walletAddress });
+    const csrfToken = generateCsrfToken();
+    setCsrfCookie(response, csrfToken);
+
+    return response;
   } catch (error: any) {
     console.error('Verification error:', error);
     return NextResponse.json({ error: error.message || 'Verification failed' }, { status: 401 });

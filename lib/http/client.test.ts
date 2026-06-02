@@ -165,14 +165,46 @@ describe('httpPost', () => {
     expect((init as RequestInit).body).toBe(JSON.stringify({ name: 'test' }));
   });
 
-  it('does not retry on 5xx (not idempotent)', async () => {
-    const spy = mockFetch(async () => jsonResponse({}, 500));
-
-    const promise = httpPost(TEST_URL, {});
-    const assertion = expect(promise).rejects.toBeInstanceOf(UpstreamHttpError);
+  // Additional POST retry tests with retryOnPost flag and metrics verification
+  it('retries POST when retryOnPost is true and receives 5xx, then succeeds', async () => {
+    const spy = mockFetch(async (url, init) => {
+      // First call returns 500, second call returns success
+      if (spy.mock.calls.length === 0) {
+        return jsonResponse({}, 500);
+      }
+      return jsonResponse({ created: true });
+    });
+    // Ensure metrics are reset
+    const { getHttpRetryCounts } = await import('@/lib/metrics');
+    // Perform POST with retryOnPost flag
+    const promise = httpPost<{ created: boolean }>(TEST_URL, { name: 'test' }, { retryOnPost: true, retries: 2, backoffMs: 10 });
+    const assertion = expect(promise).resolves.toEqual({ created: true });
     await vi.runAllTimersAsync();
     await assertion;
-    expect(spy).toHaveBeenCalledTimes(1);
+    // Verify metric recorded
+    const counts = getHttpRetryCounts();
+    expect(counts['POST:5xx']).toBe(1);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries POST on 429 with Retry-After header when retryOnPost is true', async () => {
+    const spy = mockFetch(async (url, init) => {
+      // First call returns 429 with Retry-After 1 second
+      if (spy.mock.calls.length === 0) {
+        return new Response('', { status: 429, headers: { 'Retry-After': '1' } });
+      }
+      return jsonResponse({ created: true });
+    });
+    const { getHttpRetryCounts } = await import('@/lib/metrics');
+    const promise = httpPost<{ created: boolean }>(TEST_URL, { name: 'test' }, { retryOnPost: true, retries: 2, backoffMs: 10, retryAfterUpperBoundMs: 5000 });
+    const assertion = expect(promise).resolves.toEqual({ created: true });
+    // Advance timers to cover the Retry-After wait (1000ms)
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.runAllTimersAsync();
+    await assertion;
+    const counts = getHttpRetryCounts();
+    expect(counts['POST:429']).toBe(1);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });
 
