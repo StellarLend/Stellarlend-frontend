@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Copy } from "lucide-react";
+import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -143,7 +144,7 @@ export default function MetricsCards() {
           subLabel="Earnings from Lending"
           subValue={data.earnings}
         />
-      </ScrollCues>
-    </div>
+      </div>
+    </ScrollCues>
   );
 }

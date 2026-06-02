@@ -1,5 +1,5 @@
 // src/jobs/retention.worker.ts
-import { Worker, Queue, QueueScheduler, Job } from 'bullmq';
+import { Worker, Queue, Job } from 'bullmq';
 import pool from '../../lib/db/pool';
 import {
   AUDIT_RETENTION_DAYS,
@@ -71,8 +71,6 @@ const queue = new Queue(queueName, {
     // BullMQ will use default Redis connection env vars (REDIS_URL etc.)
   },
 });
-const scheduler = new QueueScheduler(queueName);
-
 export const retentionWorker = new Worker(
   queueName,
   async (job: Job) => {
@@ -94,7 +92,7 @@ export async function scheduleRetentionJob(): Promise<void> {
       'daily-retention',
       {},
       {
-        repeat: { cron: '0 2 * * *' }, // every day at 02:00 UTC
+        repeat: { pattern: '0 2 * * *' }, // every day at 02:00 UTC
         removeOnComplete: true,
         removeOnFail: true,
       }
@@ -103,4 +101,5 @@ export async function scheduleRetentionJob(): Promise<void> {
   }
 }
 
-scheduleRetentionJob().catch((e) => console.error('Failed to schedule retention job', e));
+// Scheduling is coordinated by lib/jobs/scheduler.ts and src/jobs/cron.ts so
+// multi-replica deployments only register repeatable jobs from the elected leader.
