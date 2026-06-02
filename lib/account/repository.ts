@@ -18,9 +18,15 @@ export interface ProfileRepository {
         userId: string,
         data: Omit<ProfileRecord, "userId" | "updatedAt">
     ): Promise<ProfileRecord>;
+
+    anonymizeByUserId(userId: string): Promise<boolean>;
 }
 
-class DrizzleProfileRepository implements ProfileRepository {
+const ANONYMIZED_MARKER = "[deleted]";
+
+class InMemoryProfileRepository implements ProfileRepository {
+    private store = new Map<string, ProfileRecord>();
+
     async getByUserId(userId: string): Promise<ProfileRecord | null> {
         const rows = await db.select().from(accounts).where(eq(accounts.userId, userId)).limit(1);
         return rows[0] ?? null;
@@ -54,6 +60,22 @@ class DrizzleProfileRepository implements ProfileRepository {
             });
 
         return record;
+    }
+
+    async anonymizeByUserId(userId: string): Promise<boolean> {
+        const existing = this.store.get(userId);
+        if (!existing) return false;
+
+        const anonymized: ProfileRecord = {
+            userId: existing.userId,
+            displayName: ANONYMIZED_MARKER,
+            bio: "",
+            website: "",
+            timezone: "UTC",
+            updatedAt: new Date(),
+        };
+        this.store.set(userId, anonymized);
+        return true;
     }
 }
 

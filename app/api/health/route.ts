@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
-import serverConfig from '@/lib/server-config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
+import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
@@ -57,7 +57,7 @@ async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   }
 }
 
-export async function GET() {
+async function handleHealth() {
   try {
     await httpGet(url, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
@@ -104,3 +104,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = withRequestLogging('/api/health', handleHealth);

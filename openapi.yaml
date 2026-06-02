@@ -28,6 +28,8 @@ tags:
     description: Platform health check
   - name: auth
     description: Session management
+  - name: account
+    description: Account management including deletion
   - name: prices
     description: Real-time asset prices
   - name: markets
@@ -862,6 +864,89 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  # ---------------------------------------------------------------------------
+  # Account Deletion (GDPR/CCPA)
+  # ---------------------------------------------------------------------------
+  /api/account/delete/challenge:
+    get:
+      operationId: getDeletionChallenge
+      tags: [account]
+      summary: Get a deletion challenge
+      description: |
+        Returns a time-limited challenge string that must be submitted
+        with the DELETE request to confirm account deletion.
+        The challenge expires after 5 minutes and can only be used once.
+        Requires an active session cookie.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Deletion challenge issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionChallengeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/account/delete:
+    delete:
+      operationId: deleteAccount
+      tags: [account]
+      summary: Delete account (GDPR/CCPA)
+      description: |
+        Initiates account deletion by anonymizing PII, revoking sessions,
+        and enqueueing async cleanup of derived data.
+        Requires a valid deletion challenge obtained from `GET /api/account/delete/challenge`.
+
+        **Deletion flow:**
+        1. `GET /api/account/delete/challenge` to obtain a challenge
+        2. `DELETE /api/account/delete` with the challenge in the request body
+
+        **What is deleted immediately:**
+        - Profile PII (displayName, bio, website, timezone) is anonymized
+        - All user notifications are removed
+
+        **What is scheduled for later deletion (retention-respecting):**
+        - Backup anonymization (30-day retention)
+        - Derived data removal (7-day retention)
+        - Cache entry cleanup (1-day retention)
+        - Audit log purge (90-day retention for compliance)
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge]
+              properties:
+                challenge:
+                  type: string
+                  description: The deletion challenge string from GET /api/account/delete/challenge
+      responses:
+        "200":
+          description: Account deletion initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionResponse"
+        "400":
+          description: Missing or invalid challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid, expired, or mismatched challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 # =============================================================================
 # Components
 # =============================================================================
@@ -1275,3 +1360,39 @@ components:
           type: integer
           minimum: 0
           example: 2
+
+    DeletionChallengeResponse:
+      type: object
+      required: [challenge, expiresAt, message]
+      properties:
+        challenge:
+          type: string
+          description: Hex-encoded challenge string (64 characters)
+          example: "a1b2c3d4e5f6..."
+        expiresAt:
+          type: string
+          format: date-time
+          description: ISO timestamp when the challenge expires
+        message:
+          type: string
+          example: "Sign this challenge with your wallet to confirm account deletion"
+
+    AccountDeletionResponse:
+      type: object
+      required: [message, anonymizedAt, notificationsRemoved, cleanupJobsEnqueued]
+      properties:
+        message:
+          type: string
+          example: "Account deletion initiated"
+        anonymizedAt:
+          type: string
+          format: date-time
+          description: ISO timestamp when PII was anonymized
+        notificationsRemoved:
+          type: integer
+          description: Number of user notifications removed
+          example: 5
+        cleanupJobsEnqueued:
+          type: integer
+          description: Number of async cleanup jobs scheduled
+          example: 3
