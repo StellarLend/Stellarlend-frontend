@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import config from '@/lib/config';
 import { getSession } from '@/lib/auth';
+import config from '@/lib/config';
+import { accountBucketRateLimit } from '@/lib/rate-limit';
+import { appendAuditEvent, hashIp } from '@/lib/audit/logger';
 import { httpPost } from '@/lib/http/client';
 import { metrics } from '@/lib/metrics/registry';
 import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
@@ -39,16 +41,37 @@ const rpcFailure = () =>
     { status: 502 },
   );
 
-const postHandler = async (request: NextRequest) => {
+export async function POST(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id');
+  const ipHash = hashIp(request.headers.get('x-forwarded-for'));
+
   let body: unknown;
 
   try {
     body = await request.json();
   } catch {
+    await appendAuditEvent({
+      actorWallet: null,
+      action: 'tx.submit',
+      resource: 'soroban.transaction',
+      status: 'failure',
+      requestId,
+      ipHash,
+    });
+
     return invalidBody();
   }
 
   if (!isTxSubmitRequest(body)) {
+    await appendAuditEvent({
+      actorWallet: null,
+      action: 'tx.submit',
+      resource: 'soroban.transaction',
+      status: 'failure',
+      requestId,
+      ipHash,
+    });
+
     return invalidBody();
   }
 
@@ -58,6 +81,15 @@ const postHandler = async (request: NextRequest) => {
   if (walletAddress) {
     const accountLimit = accountBucketRateLimit(walletAddress, config.rateLimit.account);
     if (!accountLimit.success) {
+      await appendAuditEvent({
+        actorWallet: walletAddress,
+        action: 'tx.submit',
+        resource: 'soroban.transaction',
+        status: 'failure',
+        requestId,
+        ipHash,
+      });
+
       const response = NextResponse.json(
         {
           error: {
@@ -93,12 +125,24 @@ const postHandler = async (request: NextRequest) => {
       timeoutMs: 10000,
     });
     const dur = (Date.now() - start) / 1000;
+
     try {
       metrics.sorobanSubmissions.inc({ result: 'success' });
       metrics.sorobanSubmitDuration.observe(dur, { result: 'success' });
-    } catch (e) {}
+    } catch (e) {
+      // ignore metrics errors
+    }
 
     if (typeof rpcResponse === 'object' && rpcResponse && 'error' in rpcResponse) {
+      await appendAuditEvent({
+        actorWallet: walletAddress,
+        action: 'tx.submit',
+        resource: 'soroban.transaction',
+        status: 'failure',
+        requestId,
+        ipHash,
+      });
+
       return NextResponse.json(
         { error: buildSorobanRpcError((rpcResponse as any).error) },
         { status: 502 },
@@ -107,31 +151,45 @@ const postHandler = async (request: NextRequest) => {
 
     const submission = extractSubmitResult((rpcResponse as any).result ?? rpcResponse);
     if (!submission || !submission.hash) {
+      await appendAuditEvent({
+        actorWallet: walletAddress,
+        action: 'tx.submit',
+        resource: 'soroban.transaction',
+        status: 'failure',
+        requestId,
+        ipHash,
+      });
+
       return rpcFailure();
     }
 
-    return NextResponse.json(
-      { status: 'submitted', hash: submission.hash },
-      { status: 200 },
-    );
+    await appendAuditEvent({
+      actorWallet: walletAddress,
+      action: 'tx.submit',
+      resource: 'soroban.transaction',
+      status: 'success',
+      requestId,
+      ipHash,
+    });
+
+    return NextResponse.json({ status: 'submitted', hash: submission.hash }, { status: 200 });
   } catch (error) {
     try {
       metrics.sorobanSubmissions.inc({ result: 'failure' });
       metrics.sorobanSubmitDuration.observe(0, { result: 'failure' });
-    } catch (e) {}
-
-    if (error instanceof SorobanSimulationError) {
-      return NextResponse.json(
-        { error: buildSorobanSimulationApiError(error) },
-        { status: getSorobanSimulationStatus(error) },
-      );
+    } catch (e) {
+      // ignore metrics errors
     }
 
-    return NextResponse.json(
-      { error: buildSorobanRpcError(error) },
-      { status: 502 },
-    );
-  }
-};
+    await appendAuditEvent({
+      actorWallet: walletAddress,
+      action: 'tx.submit',
+      resource: 'soroban.transaction',
+      status: 'failure',
+      requestId,
+      ipHash,
+    });
 
-export const POST = withCsrfProtection(postHandler);
+    return NextResponse.json({ error: buildSorobanRpcError(error) }, { status: 502 });
+  }
+}

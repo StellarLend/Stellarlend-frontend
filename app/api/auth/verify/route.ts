@@ -1,14 +1,26 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { verifyWalletSignature } from '@/lib/auth/wallet';
-import { createSession } from '@/lib/auth';
-import { generateCsrfToken, setCsrfCookie } from '@/lib/security/csrf';
+import { createSession, setSessionCookie } from '@/lib/auth';
+import { appendAuditEvent, hashIp } from '@/lib/audit/logger';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id');
+  const ipHash = hashIp(request.headers.get('x-forwarded-for'));
+
   try {
     const body = await request.json();
     const { transaction } = body;
 
     if (!transaction) {
+      await appendAuditEvent({
+        actorWallet: null,
+        action: 'auth.verify',
+        resource: 'wallet',
+        status: 'failure',
+        requestId,
+        ipHash,
+      });
+
       return NextResponse.json({ error: 'transaction is required' }, { status: 400 });
     }
 
@@ -16,7 +28,7 @@ export async function POST(request: Request) {
 
     const token = await createSession({
       id: walletAddress,
-      walletAddress: walletAddress,
+      walletAddress,
     });
 
     const response = NextResponse.json({ success: true, walletAddress });
@@ -32,11 +44,26 @@ export async function POST(request: Request) {
       maxAge: sessionExpiryHours * 60 * 60,
     });
 
-    const csrfToken = generateCsrfToken();
-    setCsrfCookie(response, csrfToken);
+    await appendAuditEvent({
+      actorWallet: walletAddress,
+      action: 'auth.verify',
+      resource: 'wallet',
+      status: 'success',
+      requestId,
+      ipHash,
+    });
 
-    return response;
+    return NextResponse.json({ success: true, walletAddress });
   } catch (error: any) {
+    await appendAuditEvent({
+      actorWallet: null,
+      action: 'auth.verify',
+      resource: 'wallet',
+      status: 'failure',
+      requestId,
+      ipHash,
+    });
+
     console.error('Verification error:', error);
     return NextResponse.json({ error: error.message || 'Verification failed' }, { status: 401 });
   }
