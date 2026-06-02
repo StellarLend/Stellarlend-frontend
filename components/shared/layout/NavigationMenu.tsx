@@ -11,6 +11,7 @@ import { Bank } from "../ui/icons/Bank";
 import { CoinIcon } from "../ui/icons/CoinIcon";
 import { TransactionIcon } from "../ui/icons/TransactionIcon";
 import Link from "next/link";
+import { navClasses, navTokens } from "@/constants/design-tokens";
 
 type NavigationMenuProps = {
   visibleLinks?: string[];
@@ -123,7 +124,9 @@ export const NavigationMenu = ({
                 aria-label={link.link}
               >
                 <span
-                  className={`absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
+                  className={`absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] transition-opacity ${
+                    isActive ? "opacity-100" : "opacity-0 group-hover:opacity-50"
+                  }`}
                   aria-hidden="true"
                 />
                 <div className={`flex items-center gap-3 relative z-20 ${isCollapsed ? "justify-center" : ""}`}>

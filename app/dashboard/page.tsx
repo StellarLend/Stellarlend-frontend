@@ -1,8 +1,10 @@
 "use client";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
+import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { DashboardLayout } from "@/components";
 import { AlertBanner, PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";

@@ -50,13 +50,13 @@ export default defineConfig({
 
       {
         extends: true,
-
         test: {
           name: "accessibility",
           environment: "jsdom",
           setupFiles: "./vitest.setup.ts",
 
           include: [
+            "app/lending/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
             "components/shared/layout/**/*.test.tsx",
@@ -98,6 +98,11 @@ export default defineConfig({
         "lib/**",
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/layout/TopNav.tsx",
+        "components/shared/layout/NavLink.tsx",
+        "components/shared/layout/NavigationMenu.tsx",
+        "components/shared/layout/Navbar.tsx",
+        "components/shared/layout/SideNav.tsx",
+        "constants/design-tokens.ts",
         "types/enums.ts",
         "app/api/transactions/route.ts",
         "app/api/webhooks/transactions/route.ts",

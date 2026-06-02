@@ -28,6 +28,7 @@ export default defineConfig({
     include: [
       'lib/**/*.test.ts',
       'app/api/**/*.test.ts',
+      'src/jobs/**/*.test.ts',
       'types/enums.test.ts',
     ],
   },

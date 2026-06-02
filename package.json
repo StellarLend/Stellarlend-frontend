@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "db:migrate": "ts-node lib/db/migrate.ts",
     "dev": "next dev",
     "check-secrets": "node scripts/check-client-secrets.js",
     "build": "npm run check-secrets && next build",
@@ -10,17 +11,16 @@
     "lint": "next lint && npm run check-secrets",
     "type-check": "tsc --noEmit",
     "test": "vitest",
-    "test:server": "vitest run --config vitest.server.config.ts",
-    "test:server:coverage": "vitest run --config vitest.server.config.ts --coverage",
-    "test:coverage": "vitest --coverage",
     "test:server": "vitest run --project server",
     "test:server:coverage": "vitest run --project server --coverage",
+    "test:coverage": "vitest --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "svg": "node scripts/svgToComponent.js",
     "generate-component": "plop",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "create-pr": "node scripts/create-pr.js"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
@@ -33,13 +33,18 @@
     "lucide-react": "^0.484.0",
     "motion": "^12.6.2",
     "next": "15.2.8",
+    "nextjs-toploader": "3.7.15",
     "react": "^19.0.0",
     "react-datepicker": "^8.3.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.3.1",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.5",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
+    "axe-core": "^4.11.3",
     "@axe-core/react": "^4.10.2",
     "@chromatic-com/storybook": "^4.0.1",
     "@eslint/js": "^9.31.0",
@@ -47,7 +52,6 @@
     "@playwright/test": "^1.58.1",
     "@storybook/addon-a11y": "^9.0.18",
     "@storybook/addon-docs": "^9.0.18",
-    "@storybook/addon-essentials": "^8.6.14",
     "@storybook/addon-onboarding": "^9.0.18",
     "@storybook/addon-vitest": "^9.0.18",
     "@storybook/cli": "^9.0.18",
@@ -82,7 +86,9 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "drizzle-kit": "^0.30.1",
+    "@types/pg": "^8.11.10"
   },
   "husky": {
     "hooks": {

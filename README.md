@@ -75,7 +75,16 @@ NEXT_PUBLIC_ENABLE_ANALYTICS=false
 
 # Server Logging Configuration
 SERVER_LOG_LEVEL=info
+
+# Transaction Rate Limiting
+API_RATE_LIMIT_MAX=100
+API_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_MAX=30
+TX_ACCOUNT_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_BURST=60
 ```
+
+The Tx relay routes `/api/tx/build` and `/api/tx/submit` are protected by an account-scoped wallet limit. If a wallet exceeds the configured burst or window, the response returns `429` with `Retry-After` and standard `RateLimit-*` headers.
 
 Logging is emitted as structured JSON by `lib/logger.ts` and includes:
 - `timestamp`
@@ -109,7 +118,25 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-### 5. Build for Production
+### 5. Database Setup (Drizzle ORM & PostgreSQL)
+
+Stellarlend uses **Drizzle ORM** with a **PostgreSQL** database backend to persist accounts, sessions, notifications, transactions, and audit logs.
+
+1. Ensure your `.env.local` contains the database connection URL:
+   ```env
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/stellarlend
+   ```
+
+2. Run the migrations to initialize your local database:
+   ```bash
+   # Using npm
+   npm run db:migrate
+
+   # Using pnpm
+   pnpm db:migrate
+   ```
+
+### 6. Build for Production
 
 ```bash
 npm run build
