@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpPost } from '@/lib/http/client';
+import { getSession } from '@/lib/auth';
+import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
 import {
   buildSorobanRpcError,
   buildSorobanSubmitRpcRequest,
@@ -38,6 +40,34 @@ export async function POST(request: NextRequest) {
 
   if (!isTxSubmitRequest(body)) {
     return invalidBody();
+  }
+
+  const session = await getSession();
+  const walletAddress = session?.user?.walletAddress;
+
+  if (walletAddress) {
+    const accountLimit = accountBucketRateLimit(walletAddress, config.rateLimit.account);
+    if (!accountLimit.success) {
+      const response = NextResponse.json(
+        {
+          error: {
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Account rate limit exceeded. Please try again later.',
+            limit: accountLimit.limit,
+            remaining: accountLimit.remaining,
+            reset: accountLimit.reset,
+            retryAfter: accountLimit.retryAfter,
+          },
+        },
+        { status: 429 },
+      );
+
+      response.headers.set('X-RateLimit-Limit', accountLimit.limit.toString());
+      response.headers.set('X-RateLimit-Remaining', accountLimit.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', accountLimit.reset.toString());
+      response.headers.set('Retry-After', accountLimit.retryAfter.toString());
+      return response;
+    }
   }
 
   const payload = buildSorobanSubmitRpcRequest(body.signedEnvelopeXdr);
