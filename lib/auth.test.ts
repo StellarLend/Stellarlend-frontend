@@ -8,6 +8,33 @@ vi.mock("next/headers", () => ({
   cookies: vi.fn(),
 }));
 
+// Mock jose
+vi.mock("jose", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("jose")>();
+  return {
+    ...actual,
+    jwtVerify: vi.fn().mockImplementation(async (token) => {
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+          throw new Error("Invalid JWT format");
+        }
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+        
+        // If the expiration time has passed, throw an error to simulate expiration
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp && payload.exp < now) {
+          throw new Error("JWTExpired");
+        }
+        
+        return { payload };
+      } catch (err) {
+        throw err;
+      }
+    }),
+  };
+});
+
 describe("Authentication Module", () => {
   const mockUser = {
     id: "user-123",
@@ -19,6 +46,7 @@ describe("Authentication Module", () => {
 
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + 24);
+  expiresAt.setMilliseconds(0);
 
   // Create a mock JWT token (format: header.payload.signature)
   const createMockJWT = (user = mockUser, expiry = expiresAt) => {
