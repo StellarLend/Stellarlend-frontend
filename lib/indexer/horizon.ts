@@ -1,5 +1,6 @@
 import config from '@/lib/config';
 import { logger } from '@/lib/logger';
+import { enqueue } from '@/lib/queue';
 import type { HorizonOperation, HorizonPage, IndexerOptions } from './types';
 
 const ROUTE = 'lib/indexer/horizon';
@@ -92,4 +93,11 @@ export async function fetchAccountOperations(
   });
 
   return operations;
+}
+
+/**
+ * Schedules an asynchronous account indexing job.
+ */
+export async function enqueueAccountIndex(accountId: string): Promise<void> {
+  await enqueue('indexer', { accountId });
 }

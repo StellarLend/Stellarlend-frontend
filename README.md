@@ -283,6 +283,49 @@ We use [Conventional Commits](https://www.conventionalcommits.org/). Examples:
 
 For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## ⚙️ Background Workers & Job Queues
+
+Stellarlend uses **BullMQ** (backed by Redis) to process long-running, asynchronous tasks outside the Next.js API request lifecycle. This guarantees that user-facing API routes remain responsive and non-blocking.
+
+### Available Queues & Workers
+
+- **`indexer-queue`**: Periodically indexes on-chain transactions for Stellar accounts.
+  - Consumer worker: `src/jobs/indexer.worker.ts`
+- **`notifications-queue`**: Dispatches in-app notifications and manages user notification fan-out.
+  - Consumer worker: `src/jobs/notifications.worker.ts`
+
+### Configuration
+
+Set the `REDIS_URL` environment variable in your production or local configuration to point to your running Redis instance:
+
+```env
+REDIS_URL=redis://localhost:6379
+```
+
+### Worker Deployment
+
+In production environments, background workers should be run as persistent, standalone processes separate from the web server. You can run them using a process manager like PM2:
+
+```bash
+# Run Next.js web application
+npm start
+
+# Run background workers (using custom scripts or entrypoint)
+node dist/jobs/indexer.worker.js
+node dist/jobs/notifications.worker.js
+```
+
+Workers register graceful shutdown handlers for `SIGINT` and `SIGTERM`, so queue connections are closed cleanly during deploy rollouts or container termination.
+
+### Dead-letter queues
+
+Jobs that exhaust retries are copied into dedicated dead-letter queues for investigation and replay:
+
+- `indexer-dead-letter-queue`
+- `notifications-dead-letter-queue`
+
+Each dead-letter payload includes the original job id, input payload, error reason, and failure timestamp.
+
 ## 🚢 Deployment
 
 ### Vercel (Recommended)

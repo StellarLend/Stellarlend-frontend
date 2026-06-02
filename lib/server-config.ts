@@ -15,6 +15,7 @@ interface ServerConfig {
   server: {
     token: string;
   };
+  redisUrl: string;
 }
 
 const serverConfig: ServerConfig = {
@@ -27,6 +28,7 @@ const serverConfig: ServerConfig = {
   server: {
     token: process.env.SERVER_TOKEN || '',
   },
+  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 };
 
 export default serverConfig;

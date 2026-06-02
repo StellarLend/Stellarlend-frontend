@@ -8,6 +8,7 @@ import {
 import { SIGNATURE_HEADER } from "@/lib/webhooks/types";
 import type { WebhookPayload } from "@/lib/webhooks/types";
 import { updateTransactionStatus } from "@/lib/transactions/store";
+import { enqueueNotificationInBackground } from "@/lib/notifications/repository";
 
 export const runtime = "nodejs";
 
@@ -128,6 +129,13 @@ export async function POST(req: NextRequest) {
       { status: 404 },
     );
   }
+
+  // Enqueue notification fan-out job (fire-and-forget)
+  enqueueNotificationInBackground('demo-user', {
+    title: 'Transaction Status Update',
+    message: `Your transaction ${payload.data.transaction_id} is now ${payload.data.status}.`,
+    type: payload.data.status === 'Completed' ? 'success' : payload.data.status === 'Failed' ? 'error' : 'info',
+  });
 
   return NextResponse.json({ success: true, transaction: updated });
 }
