@@ -227,6 +227,54 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/internal/cache/invalidate:
+    post:
+      operationId: invalidateCache
+      tags: [auth]
+      summary: Invalidate cache namespaces (internal only)
+      description: |
+        Internal-only endpoint used by deployment tooling to invalidate
+        specific cache namespaces (e.g. `prices`, `markets`, `idempotency`).
+        This route is protected by an internal server token and should only
+        be invoked from trusted CI/CD workflows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespaces]
+              properties:
+                namespaces:
+                  type: array
+                  items:
+                    type: string
+                  example: ["prices", "markets"]
+      responses:
+        "200":
+          description: Number of cache keys deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deletedCount:
+                    type: integer
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   # ---------------------------------------------------------------------------
   # Positions
   # ---------------------------------------------------------------------------
