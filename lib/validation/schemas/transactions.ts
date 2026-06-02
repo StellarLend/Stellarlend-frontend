@@ -35,6 +35,11 @@ export const transactionResponseSchema = z.object({
   memo: z.string().optional(),
 });
 
+export const transactionIdSchema = z.string().regex(/^(TXN\d+|[0-9a-fA-F]{64})$/, {
+  message: "Invalid transaction ID format. Must be either a mock ID (TXN followed by digits) or a 64-character hex transaction hash.",
+});
+
 export type TransactionQueryInput = z.infer<typeof transactionQuerySchema>;
 export type TransactionBodyInput = z.infer<typeof transactionBodySchema>;
 export type TransactionResponse = z.infer<typeof transactionResponseSchema>;
+
