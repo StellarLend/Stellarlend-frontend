@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fetchTransactions, filterTransactions } from './repository';
+import { fetchTransactions, filterTransactions, getTransactionDetail } from './repository';
 
 vi.mock('@/lib/db', () => {
   const mockSelect = vi.fn(() => ({
@@ -27,6 +27,24 @@ vi.mock('@/lib/db', () => {
   };
 });
 
+vi.mock('./store', () => {
+  return {
+    getTransaction: vi.fn(async (id: string) => {
+      if (id === 'TXN12345') {
+        return {
+          id: 'TXN12345',
+          type: 'Deposit',
+          amount: 2000,
+          asset: 'XLM' as const,
+          date: '2025-04-12',
+          time: '09:32AM',
+          status: 'Completed' as const,
+        };
+      }
+      return undefined;
+    }),
+  };
+});
 
 describe('fetchTransactions', () => {
   it('returns a non-empty array of transactions', async () => {
@@ -122,3 +140,20 @@ describe('filterTransactions', () => {
     expect(result).toHaveLength(0);
   });
 });
+
+describe('getTransactionDetail', () => {
+  it('returns null if transaction does not exist', async () => {
+    const detail = await getTransactionDetail('TXN99999');
+    expect(detail).toBeNull();
+  });
+
+  it('returns detailed transaction with fee, explorerUrl, and operations if it exists', async () => {
+    const detail = await getTransactionDetail('TXN12345');
+    expect(detail).not.toBeNull();
+    expect(detail?.id).toBe('TXN12345');
+    expect(detail?.fee).toBeDefined();
+    expect(detail?.explorerUrl).toContain('stellar.expert');
+    expect(detail?.operations).toHaveLength(1);
+  });
+});
+

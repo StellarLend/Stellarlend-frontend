@@ -4,8 +4,23 @@ import { indexAccountTransactions } from '@/lib/indexer';
 import { logger } from '@/lib/logger';
 import { db } from '../db';
 import { transactions as transactionsTable } from '../db/schema/transactions';
+import { getTransaction } from './store';
+import config from '@/lib/config';
 
 const ROUTE = 'lib/transactions/repository';
+
+export interface DetailedTransaction extends Transaction {
+  fee: string;
+  explorerUrl: string;
+  operations: Array<{
+    id: string;
+    type: string;
+    source: string;
+    destination: string;
+    amount: string;
+    asset: string;
+  }>;
+}
 
 const MOCK_TRANSACTIONS: Transaction[] = [
   { id: 'TXN12345', type: 'Deposit',      amount:  2000,    asset: 'XLM',  date: '2025-04-12', time: '09:32AM', status: 'Completed'  },
@@ -101,4 +116,36 @@ export function filterTransactions(
 
     return true;
   });
+}
+
+/**
+ * Retrieves a detailed transaction record by its ID,
+ * complete with mock/on-chain operation histories, transaction fees, and network explorer link.
+ */
+export async function getTransactionDetail(id: string): Promise<DetailedTransaction | null> {
+  const tx = await getTransaction(id);
+  if (!tx) return null;
+
+  // Compile network sub-path
+  const net = config.stellar.network.toLowerCase() === 'public' || config.stellar.network.toLowerCase() === 'mainnet' ? 'public' : 'testnet';
+  const explorerUrl = `https://stellar.expert/explorer/${net}/tx/${id}`;
+
+  const fee = tx.type === 'Deposit' ? '0.0001000 XLM' : '0.0001500 XLM';
+  const operations = [
+    {
+      id: `op_${tx.id}_1`,
+      type: tx.type.toLowerCase() === 'deposit' ? 'payment' : 'invoke_host_function',
+      source: 'GA2C5RFPE6GCKMY3AA3H6AOF5Q4G5S4GX6TQCGEAAS624JBZ2G2UQHGD',
+      destination: 'GBXQ2P5Z5U67G6Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66',
+      amount: Math.abs(tx.amount).toFixed(7),
+      asset: tx.asset,
+    }
+  ];
+
+  return {
+    ...tx,
+    fee,
+    explorerUrl,
+    operations,
+  };
 }

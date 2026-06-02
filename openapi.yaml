@@ -378,6 +378,99 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /api/transactions/{id}:
+    get:
+      operationId: getTransactionDetail
+      tags: [transactions]
+      summary: Retrieve detailed transaction records with operations
+      description: |
+        Returns the normalized transaction record with embedded operation logs, fee, and explorer links.
+        Accepts mock transaction IDs (TXN\d+) and 64-character hexadecimal Soroban/Stellar transaction hashes.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The transaction identifier (either mock TXN\d+ or a 64-character hex hash)
+          schema:
+            type: string
+            pattern: "^(TXN\\d+|[0-9a-fA-F]{64})$"
+            example: TXN12345
+      responses:
+        "200":
+          description: Detailed transaction found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transaction]
+                properties:
+                  transaction:
+                    type: object
+                    required: [id, asset, type, status, amount, date, time, fee, explorerUrl, operations]
+                    properties:
+                      id:
+                        type: string
+                        example: TXN12345
+                      asset:
+                        $ref: "#/components/schemas/AssetSymbol"
+                      type:
+                        $ref: "#/components/schemas/TransactionType"
+                      status:
+                        $ref: "#/components/schemas/TransactionStatus"
+                      amount:
+                        type: number
+                        example: 2000
+                      date:
+                        type: string
+                        format: date
+                        example: "2025-04-12"
+                      time:
+                        type: string
+                        example: "09:32AM"
+                      fee:
+                        type: string
+                        example: "0.0001000 XLM"
+                      explorerUrl:
+                        type: string
+                        format: uri
+                        example: "https://stellar.expert/explorer/testnet/tx/TXN12345"
+                      operations:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, type, source, destination, amount, asset]
+                          properties:
+                            id:
+                              type: string
+                              example: "op_TXN12345_1"
+                            type:
+                              type: string
+                              example: "payment"
+                            source:
+                              type: string
+                              example: "GA2C5RFPE6GCKMY3AA3H6AOF5Q4G5S4GX6TQCGEAAS624JBZ2G2UQHGD"
+                            destination:
+                              type: string
+                              example: "GBXQ2P5Z5U67G6Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66Z66"
+                            amount:
+                              type: string
+                              example: "2000.0000000"
+                            asset:
+                              type: string
+                              example: "XLM"
+        "400":
+          description: Invalid transaction ID format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/transactions/export:
     get:
       operationId: exportTransactions
