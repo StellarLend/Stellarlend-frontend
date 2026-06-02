@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+import { constants as zlibConstants, createBrotliCompress, createGzip } from 'node:zlib';
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import { metrics } from '@/lib/metrics/registry';
@@ -6,6 +8,27 @@ import { verifyCsrfToken } from '@/lib/security/csrf';
 import { captureServerError } from '@/lib/telemetry/sentry';
 import { getOrCreateRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
 import { runWithRequestContext } from '@/lib/request-context';
+
+export const RESPONSE_COMPRESSION_MIN_BYTES = 1024;
+export const RESPONSE_COMPRESSION_OPT_OUT_HEADER = 'X-Stellarlend-Compression';
+
+type CompressionEncoding = 'br' | 'gzip';
+
+async function captureRequestError(
+  error: unknown,
+  context: {
+    route?: string;
+    method?: string;
+    sessionId?: string;
+  }
+) {
+  try {
+    const { captureServerError } = await import('@/lib/telemetry/sentry');
+    captureServerError(error, context);
+  } catch {
+    // Sentry must never prevent returning the API error response.
+  }
+}
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {

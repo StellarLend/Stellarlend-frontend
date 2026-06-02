@@ -147,6 +147,18 @@ CSV export, filtering helpers, and validation used by `/api/transactions/export`
 `generateETag(data)` — deterministic ETag for conditional GET (`If-None-Match`).
 Used by read routes to return `304 Not Modified` and save bandwidth.
 
+### lib/api/handler.ts — Request logging and response compression
+
+`withRequestLogging(route, handler)` records structured request metrics and applies response compression negotiation for large read responses. If the client sends `Accept-Encoding: br` or `Accept-Encoding: gzip`, compressible responses at or above 1 KiB are returned with `Content-Encoding` and `Vary: Accept-Encoding`. Brotli is preferred when both encodings are acceptable.
+
+Compression is intentionally skipped for responses that are already encoded, empty/conditional responses (`HEAD`, `204`, `304`), and content types that are already compressed or should remain stream-native, including `text/csv` exports and `text/event-stream`. Content-length-delimited streams are piped through gzip/brotli transforms so large payloads do not need to be buffered before sending.
+
+Performance-sensitive callers can opt out per request by sending:
+
+```http
+X-Stellarlend-Compression: off
+```
+
 ---
 
 ## Type Definitions
