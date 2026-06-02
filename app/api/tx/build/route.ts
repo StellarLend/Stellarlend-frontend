@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
+import serverConfig from '@/lib/server-config';
 import { httpPost } from '@/lib/http/client';
 import { getSession } from '@/lib/auth';
 import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
   );
 
   try {
-    const rpcResponse = await httpPost<unknown>(config.stellar.sorobanRpcUrl, payload, {
+    const rpcResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
     });
 

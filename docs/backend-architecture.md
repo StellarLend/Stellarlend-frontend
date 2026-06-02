@@ -40,14 +40,13 @@ Key fields used by the API layer:
 
 | Path | Env var | Default |
 |---|---|---|
-| `stellar.sorobanRpcUrl` | `NEXT_PUBLIC_SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` |
 | `stellar.horizonUrl` | `NEXT_PUBLIC_STELLAR_HORIZON_URL` | `https://horizon-testnet.stellar.org` |
 | `api.timeout` | — | 10 000 ms |
 
 ### lib/server-config.ts — Server-only secrets
 
 Imports `server-only` to prevent accidental client bundle inclusion.
-Reads `AUTH_SECRET`, `AUTH_ORACLE_API_KEY`, `SERVER_TOKEN` from env.
+Reads `PRICE_ORACLE_API_KEY`, `AUTH_SIGNING_SECRET`, `SERVER_TOKEN`, and `SOROBAN_RPC_URL` from env.
 
 ### lib/auth.ts — Session management
 

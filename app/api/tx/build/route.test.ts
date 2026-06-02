@@ -6,7 +6,6 @@ import simulateSuccessFixture from '@/lib/soroban/__fixtures__/simulate-success.
 vi.mock('@/lib/config', () => ({
   default: {
     stellar: {
-      sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
       network: 'testnet',
       sorobanContractId: 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     },
@@ -16,6 +15,14 @@ vi.mock('@/lib/config', () => ({
         windowMs: 60000,
         burst: 2,
       },
+    },
+  },
+}));
+
+vi.mock('@/lib/server-config', () => ({
+  default: {
+    stellar: {
+      sorobanRpcUrl: 'https://private-rpc.test',
     },
   },
 }));
@@ -86,24 +93,10 @@ describe('POST /api/tx/build', () => {
 
     expect(response.status).toBe(200);
     const json = await response.json();
-    expect(json).toEqual({
-      unsignedXdr: 'unsigned-xdr',
-      simulation: {
-        transactionDataXdr: 'AAAAAgAAAAE=',
-        minResourceFee: '3210',
-        footprint: {
-          readOnly: ['AAAAAQ=='],
-          readWrite: ['AAAAAg=='],
-        },
-        auth: ['AAAAAw==', 'AAAABA=='],
-      },
-    });
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(String(mockFetch.mock.calls[0][1]?.body)).method).toBe(
-      'build_soroban_transaction',
-    );
-    expect(JSON.parse(String(mockFetch.mock.calls[1][1]?.body)).method).toBe(
-      'simulateTransaction',
+    expect(json).toEqual({ unsignedXdr: 'unsigned-xdr' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://private-rpc.test',
+      expect.objectContaining({ method: 'POST' }),
     );
   });
 

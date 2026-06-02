@@ -15,9 +15,30 @@ interface ServerConfig {
   server: {
     token: string;
   };
-  db: {
-    url: string;
+  stellar: {
+    sorobanRpcUrl: string;
   };
+}
+
+const DEFAULT_SOROBAN_RPC_URL = 'https://soroban-testnet.stellar.org';
+
+function readSorobanRpcUrl(): string {
+  const isProd = process.env.NEXT_PUBLIC_APP_ENV === 'production';
+  const rawValue = process.env.SOROBAN_RPC_URL?.trim();
+
+  if (!rawValue) {
+    if (isProd) {
+      throw new Error('SOROBAN_RPC_URL is required in production.');
+    }
+
+    return DEFAULT_SOROBAN_RPC_URL;
+  }
+
+  try {
+    return new URL(rawValue).toString();
+  } catch {
+    throw new Error('SOROBAN_RPC_URL must be a valid URL.');
+  }
 }
 
 const serverConfig: ServerConfig = {
@@ -30,8 +51,8 @@ const serverConfig: ServerConfig = {
   server: {
     token: process.env.SERVER_TOKEN || '',
   },
-  db: {
-    url: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/stellarlend',
+  stellar: {
+    sorobanRpcUrl: readSorobanRpcUrl(),
   },
 };
 
