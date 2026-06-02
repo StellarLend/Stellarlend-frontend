@@ -1,6 +1,7 @@
-import { render, screen, fireEvent, waitFor } from "@/test/test-utils";
+import React from 'react';
+import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
 import BorrowingForm from "./BorrowingForm";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe("BorrowingForm Component", () => {
   const mockInitialData = {
@@ -11,6 +12,14 @@ describe("BorrowingForm Component", () => {
     duration: 30,
   };
   const mockOnSubmit = vi.fn();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("renders correctly", () => {
     render(<BorrowingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
@@ -38,6 +47,8 @@ describe("BorrowingForm Component", () => {
     fireEvent.click(submitButton);
     
     expect(await screen.findByText(/Insufficient collateral balance/i)).toBeInTheDocument();
+    // Verify our new top-level error banner
+    expect(screen.getByText(/Please fix the errors in the form before continuing/i)).toBeInTheDocument();
   });
 
   it("submits successfully with valid data", async () => {
@@ -48,7 +59,14 @@ describe("BorrowingForm Component", () => {
     const submitButton = screen.getByText(/Review Loan Request/i);
     fireEvent.click(submitButton);
     
+    // Fast-forward through the 800ms simulated loading delay
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    
     await waitFor(() => {
+      // Verify our new success banner
+      expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
       expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({
         amount: 10,
         collateral: 'XLM'
