@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "assets": {
+    "XLM": {
+      "name": "Stellar Lumens",
+      "decimals": 7,
+      "issuer": null,
+      "logo": "https://stellar.org/assets/logo-seal-reverse.svg"
+    },
+    "USDC": {
+      "name": "USD Coin",
+      "decimals": 6,
+      "issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4GZ5PFLYGOWENDLLMEKLMDTIDS6DPV",
+      "logo": "https://raw.githubusercontent.com/circlefin/stablecoin-evm/master/images/usdc.png"
+    },
+    "BTC": {
+      "name": "Bitcoin",
+      "decimals": 8,
+      "issuer": "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
+      "logo": "https://raw.githubusercontent.com/spesmilo/electrum/master/electrum/icons/electrum.png"
+    },
+    "ETH": {
+      "name": "Ethereum",
+      "decimals": 18,
+      "issuer": "GBBD47UZQ5PBC4MUE4RMTK2VYQABXE2HLB6CEZ7VYLQUE2THC5H2M65D",
+      "logo": "https://raw.githubusercontent.com/ethereum/ethereum-org-website/master/public/images/eth-diamond-rainbow.png"
+    }
+  }
+}
