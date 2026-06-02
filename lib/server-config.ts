@@ -34,3 +34,4 @@ export const SESSION_RETENTION_DAYS = Number(process.env.SESSION_RETENTION_DAYS 
 export const SNAPSHOT_RETENTION_DAYS = Number(process.env.SNAPSHOT_RETENTION_DAYS ?? '30');
 
 export default serverConfig;
+export const ENABLE_CHAOS_INJECTION = process.env.ENABLE_CHAOS_INJECTION === 'true';

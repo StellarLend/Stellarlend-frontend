@@ -7,6 +7,7 @@ import {
   TimeoutError,
   UpstreamHttpError,
 } from './errors';
+import { metrics } from '@/lib/metrics/registry';
 
 export interface RequestOptions extends Omit<RequestInit, 'signal'> {
   /** Override the global timeout from config.api.timeout (ms). */
