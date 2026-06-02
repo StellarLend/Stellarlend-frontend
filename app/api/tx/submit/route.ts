@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpPost } from '@/lib/http/client';
-import { getSession } from '@/lib/auth';
-import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
+import { metrics } from '@/lib/metrics/registry';
 import {
   buildSorobanRpcError,
   buildSorobanSubmitRpcRequest,
@@ -73,9 +72,15 @@ export async function POST(request: NextRequest) {
   const payload = buildSorobanSubmitRpcRequest(body.signedEnvelopeXdr);
 
   try {
+    const start = Date.now();
     const rpcResponse = await httpPost<unknown>(config.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
     });
+    const dur = (Date.now() - start) / 1000;
+    try {
+      metrics.sorobanSubmissions.inc({ result: 'success' });
+      metrics.sorobanSubmitDuration.observe(dur, { result: 'success' });
+    } catch (e) {}
 
     if (typeof rpcResponse === 'object' && rpcResponse && 'error' in rpcResponse) {
       return NextResponse.json(
@@ -93,7 +98,12 @@ export async function POST(request: NextRequest) {
       { status: 'submitted', hash: submission.hash },
       { status: 200 },
     );
-  } catch (error) {
+    } catch (error) {
+    try {
+      metrics.sorobanSubmissions.inc({ result: 'failure' });
+      metrics.sorobanSubmitDuration.observe(0, { result: 'failure' });
+    } catch (e) {}
+
     return NextResponse.json(
       { error: buildSorobanRpcError(error) },
       { status: 502 },
