@@ -47,6 +47,30 @@ export function getNotifications(userId: string): Notification[] {
   return store.get(userId)!;
 }
 
+/** Adds a new notification for userId, emits hub events, and returns it. */
+export function addNotification(userId: string, n: Omit<Notification, 'userId'>): Notification {
+  const notifications = getNotifications(userId);
+  const notification: Notification = { ...n, userId };
+  notifications.unshift(notification);
+
+  // Emit the raw notification event
+  try {
+    notificationHub.publish(userId, { type: 'notification', notification });
+  } catch (e) {
+    // Swallow errors from the hub to avoid breaking producers
+  }
+
+  // Emit updated unread count
+  const unreadCount = notifications.filter((x) => !x.read).length;
+  try {
+    notificationHub.publish(userId, { type: 'unreadCount', unreadCount });
+  } catch (e) {
+    // noop
+  }
+
+  return notification;
+}
+
 /**
  * Marks notification `id` as read for `userId`.
  * Returns the updated notification, or null if not found.

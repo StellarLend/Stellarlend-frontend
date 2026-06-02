@@ -32,3 +32,4 @@ const serverConfig: ServerConfig = {
 };
 
 export default serverConfig;
+export const ENABLE_CHAOS_INJECTION = process.env.ENABLE_CHAOS_INJECTION === 'true';

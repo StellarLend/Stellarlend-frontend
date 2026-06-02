@@ -75,7 +75,16 @@ NEXT_PUBLIC_ENABLE_ANALYTICS=false
 
 # Server Logging Configuration
 SERVER_LOG_LEVEL=info
+
+# Transaction Rate Limiting
+API_RATE_LIMIT_MAX=100
+API_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_MAX=30
+TX_ACCOUNT_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_BURST=60
 ```
+
+The Tx relay routes `/api/tx/build` and `/api/tx/submit` are protected by an account-scoped wallet limit. If a wallet exceeds the configured burst or window, the response returns `429` with `Retry-After` and standard `RateLimit-*` headers.
 
 Logging is emitted as structured JSON by `lib/logger.ts` and includes:
 - `timestamp`

@@ -21,6 +21,15 @@ interface Config {
     sorobanRpcUrl: string;
     sorobanContractId: string;
   };
+  rateLimit: {
+    max: number;
+    window: number;
+    account: {
+      limit: number;
+      windowMs: number;
+      burst: number;
+    };
+  };
   analytics: {
     googleAnalyticsId?: string;
     mixpanelToken?: string;
