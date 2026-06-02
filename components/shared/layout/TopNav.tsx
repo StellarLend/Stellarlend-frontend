@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import Searchbar from "../common/Searchbar";
+import SearchBar from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu } from "lucide-react";
 
@@ -25,8 +25,8 @@ const TopNav = () => {
   return (
       <div className="w-full flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between bg-green-600 px-6 md:px-12 py-4 rounded-md gap-4 sm:gap-0">
         {/* Search Bar */}
-        <div className="w-full sm:flex-1 max-w-full sm:max-w-md text-white">
-          <Searchbar placeholder="Search for token, asset, wallet address" />
+        <div className="w-full sm:flex-1">
+          <SearchBar placeholder="Search for token, asset, wallet address" />
         </div>
 
         {/* Desktop Controls */}
