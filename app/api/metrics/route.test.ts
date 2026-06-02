@@ -20,5 +20,7 @@ describe('GET /api/metrics', () => {
     expect(ct).toMatch(/text\/plain/);
     const body = await res.text();
     expect(body).toMatch(/# HELP http_requests_total/);
+    expect(body).toMatch(/# HELP scheduler_is_leader/);
+    expect(body).toMatch(/scheduler_is_leader 0/);
   });
 });
