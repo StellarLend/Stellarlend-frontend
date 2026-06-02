@@ -1,4 +1,5 @@
 import type { Notification } from './types';
+import { notificationHub } from '@/lib/streams/notification-hub';
 
 // Seeded demo notifications used to populate new users' inboxes.
 const SEED_NOTIFICATIONS: Omit<Notification, 'userId'>[] = [
@@ -42,6 +43,30 @@ function seedUser(userId: string): Notification[] {
 export function getNotifications(userId: string): Notification[] {
   if (!store.has(userId)) seedUser(userId);
   return store.get(userId)!;
+}
+
+/** Adds a new notification for userId, emits hub events, and returns it. */
+export function addNotification(userId: string, n: Omit<Notification, 'userId'>): Notification {
+  const notifications = getNotifications(userId);
+  const notification: Notification = { ...n, userId };
+  notifications.unshift(notification);
+
+  // Emit the raw notification event
+  try {
+    notificationHub.publish(userId, { type: 'notification', notification });
+  } catch (e) {
+    // Swallow errors from the hub to avoid breaking producers
+  }
+
+  // Emit updated unread count
+  const unreadCount = notifications.filter((x) => !x.read).length;
+  try {
+    notificationHub.publish(userId, { type: 'unreadCount', unreadCount });
+  } catch (e) {
+    // noop
+  }
+
+  return notification;
 }
 
 /**

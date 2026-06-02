@@ -29,6 +29,11 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
       },
     };
 
+    const chaosResponse = await chaosInject(request as NextRequest);
+    if (chaosResponse) {
+      return chaosResponse;
+    }
+
     try {
       const response = await handler(...args);
       const durationMs = Date.now() - startedAt;

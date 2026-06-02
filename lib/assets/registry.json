@@ -1,0 +1,42 @@
+{
+  "assets": [
+    {
+      "symbol": "XLM",
+      "name": "Stellar Lumens",
+      "decimals": 7,
+      "stellarIssuer": "native",
+      "logoUrl": "https://raw.githubusercontent.com/StellarCN/stellar-asset-images/master/logos/xlm.png",
+      "description": "The native asset of the Stellar network"
+    },
+    {
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "decimals": 6,
+      "stellarIssuer": "GA5ZSEJYB37JRC5AVCIA5MOP4SHABUQWERA7EBQWFQ6E3EMI5HCTV3P",
+      "logoUrl": "https://raw.githubusercontent.com/StellarCN/stellar-asset-images/master/logos/usdc.png",
+      "description": "USD Coin on Stellar network"
+    },
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "decimals": 8,
+      "stellarIssuer": "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
+      "logoUrl": "https://raw.githubusercontent.com/StellarCN/stellar-asset-images/master/logos/btc.png",
+      "description": "Bitcoin bridged to Stellar network"
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "decimals": 18,
+      "stellarIssuer": "GBBD47UZQ5Dtjvuo6SNVYATZT5TMSFYRT3UOIWVVVW7GDEHFX2PZGZD2",
+      "logoUrl": "https://raw.githubusercontent.com/StellarCN/stellar-asset-images/master/logos/eth.png",
+      "description": "Ethereum bridged to Stellar network"
+    }
+  ],
+  "version": "1.0.0",
+  "lastUpdated": "2026-06-02T00:00:00Z",
+  "metadata": {
+    "source": "canonical",
+    "validated": true
+  }
+}

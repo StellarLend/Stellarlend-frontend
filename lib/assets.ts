@@ -1,5 +1,15 @@
 import type { AssetSymbol } from "@/types/enums";
 
+// Re-export new registry API
+export {
+  getAssetRegistry,
+  getAssetMetadata,
+  getAllAssets,
+  validateRegistry,
+  type AssetMetadata,
+  type AssetRegistry,
+} from './assets/registry';
+
 export interface AssetInfo {
   symbol: AssetSymbol;
   name: string;

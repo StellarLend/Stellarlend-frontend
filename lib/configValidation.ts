@@ -25,6 +25,27 @@ export const envSchema = z.object({
   NEXT_PUBLIC_SOROBAN_RPC_URL: isProd
     ? z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' })
     : z.string().url().default('https://soroban-testnet.stellar.org'),
+  // API rate limit settings (server-only)
+  API_RATE_LIMIT_MAX: z.preprocess(
+    (value) => Number(value),
+    z.number().int().positive().default(100),
+  ),
+  API_RATE_LIMIT_WINDOW_MS: z.preprocess(
+    (value) => Number(value),
+    z.number().int().positive().default(60000),
+  ),
+  TX_ACCOUNT_RATE_LIMIT_MAX: z.preprocess(
+    (value) => Number(value),
+    z.number().int().positive().default(30),
+  ),
+  TX_ACCOUNT_RATE_LIMIT_WINDOW_MS: z.preprocess(
+    (value) => Number(value),
+    z.number().int().positive().default(60000),
+  ),
+  TX_ACCOUNT_RATE_LIMIT_BURST: z.preprocess(
+    (value) => Number(value),
+    z.number().int().positive().default(60),
+  ),
   // Optional analytics ids
   NEXT_PUBLIC_GA_TRACKING_ID: z.string().optional(),
   NEXT_PUBLIC_MIXPANEL_TOKEN: z.string().optional(),
