@@ -31,7 +31,18 @@ export async function POST(request: NextRequest) {
       walletAddress,
     });
 
-    await setSessionCookie(token);
+    const response = NextResponse.json({ success: true, walletAddress });
+    
+    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session';
+    const sessionExpiryHours = parseInt(process.env.AUTH_SESSION_EXPIRY || '24', 10);
+    
+    response.cookies.set(cookieName, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: sessionExpiryHours * 60 * 60,
+    });
 
     await appendAuditEvent({
       actorWallet: walletAddress,

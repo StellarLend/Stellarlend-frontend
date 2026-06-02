@@ -1,3 +1,6 @@
+import { db } from '../db';
+import { accounts } from '../db/schema/accounts';
+import { eq } from 'drizzle-orm';
 
 export interface ProfileRecord {
     userId: string;
@@ -17,26 +20,42 @@ export interface ProfileRepository {
     ): Promise<ProfileRecord>;
 }
 
-class InMemoryProfileRepository implements ProfileRepository {
-    private store = new Map<string, ProfileRecord>();
-
+class DrizzleProfileRepository implements ProfileRepository {
     async getByUserId(userId: string): Promise<ProfileRecord | null> {
-        return this.store.get(userId) ?? null;
+        const rows = await db.select().from(accounts).where(eq(accounts.userId, userId)).limit(1);
+        return rows[0] ?? null;
     }
 
     async upsert(
         userId: string,
         data: Omit<ProfileRecord, "userId" | "updatedAt">
     ): Promise<ProfileRecord> {
-        const record: ProfileRecord = {
+        const now = new Date();
+        const record = {
             userId,
-            ...data,
-            updatedAt: new Date(),
+            displayName: data.displayName,
+            bio: data.bio,
+            website: data.website,
+            timezone: data.timezone,
+            updatedAt: now,
         };
-        this.store.set(userId, record);
+
+        await db.insert(accounts)
+            .values(record)
+            .onConflictDoUpdate({
+                target: accounts.userId,
+                set: {
+                    displayName: data.displayName,
+                    bio: data.bio,
+                    website: data.website,
+                    timezone: data.timezone,
+                    updatedAt: now,
+                },
+            });
+
         return record;
     }
 }
 
 export const profileRepository: ProfileRepository =
-    new InMemoryProfileRepository();
+    new DrizzleProfileRepository();

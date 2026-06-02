@@ -5,12 +5,22 @@ import { accountBucketRateLimit } from '@/lib/rate-limit';
 import { appendAuditEvent, hashIp } from '@/lib/audit/logger';
 import { httpPost } from '@/lib/http/client';
 import { metrics } from '@/lib/metrics/registry';
+import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
+import {
+  buildSorobanSimulationApiError,
+  getSorobanSimulationStatus,
+  simulateSorobanTransaction,
+  SorobanSimulationError,
+} from '@/lib/soroban/simulate';
 import {
   buildSorobanRpcError,
   buildSorobanSubmitRpcRequest,
   extractSubmitResult,
   isTxSubmitRequest,
 } from '@/lib/soroban/tx';
+import { withCsrfProtection } from '@/lib/api/handler';
+import { getSession } from '@/lib/auth';
+import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
 
 export const runtime = 'nodejs';
 
@@ -103,8 +113,13 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = buildSorobanSubmitRpcRequest(body.signedEnvelopeXdr);
+  const shouldSimulate = new URL(request.url).searchParams.get('simulate') === 'true';
 
   try {
+    if (shouldSimulate) {
+      await simulateSorobanTransaction(config.stellar.sorobanRpcUrl, body.signedEnvelopeXdr);
+    }
+
     const start = Date.now();
     const rpcResponse = await httpPost<unknown>(config.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
