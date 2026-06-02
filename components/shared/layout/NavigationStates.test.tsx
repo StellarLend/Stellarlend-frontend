@@ -4,17 +4,22 @@ import Sidebar from "./Sidebar";
 import NavLink from "./NavLink";
 import { SideNav } from "./SideNav";
 import { NavigationMenu } from "./NavigationMenu";
+import { SidebarProvider } from "@/context/SidebarContext";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 
 describe("Navigation UI/UX", () => {
   it("Sidebar renders all nav items with correct roles", () => {
-    render(<Sidebar />);
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
     expect(screen.getByRole("navigation", { name: /sidebar navigation/i })).toBeInTheDocument();
-    expect(screen.getByText(/Profile Settings/i)).toBeInTheDocument();
-    expect(screen.getByText(/Password/i)).toBeInTheDocument();
-    expect(screen.getByText(/Notification/i)).toBeInTheDocument();
-    expect(screen.getByText(/Verification/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Profile Settings/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Password/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Notification/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Verification/i })).toBeInTheDocument();
   });
 
   it("NavLink renders with active and focus styles", () => {
@@ -26,7 +31,11 @@ describe("Navigation UI/UX", () => {
   });
 
   it("SideNav renders without crashing", () => {
-    render(<SideNav />);
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <SideNav />
+      </SidebarProvider>
+    );
     expect(screen.getByText(/StellarLend/i)).toBeInTheDocument();
   });
 
