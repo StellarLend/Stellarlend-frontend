@@ -312,6 +312,78 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/positions/history:
+    get:
+      operationId: getPositionsHistory
+      tags: [positions]
+      summary: Fetch historical position snapshots
+      description: |
+        Returns daily snapshots of user lending/borrowing positions over time,
+        including supplied/borrowed balances and effective APY.
+        
+        Data is bucketed by the specified interval (1h, 1d, 7d, 30d) with the
+        first snapshot of each bucket returned. Responses are cached per wallet
+        with a 5-minute TTL.
+        
+        Requires authentication. Returns data only for the authenticated wallet.
+      security:
+        - session: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Start timestamp in milliseconds (default 90 days ago)
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            example: 1700000000000
+        - name: to
+          in: query
+          required: false
+          description: End timestamp in milliseconds (default now)
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            example: 1702592000000
+        - name: interval
+          in: query
+          required: false
+          description: Time bucketing interval
+          schema:
+            type: string
+            enum: [1h, 1d, 7d, 30d]
+            default: 1d
+      responses:
+        "200":
+          description: Historical position snapshots
+          headers:
+            X-Cache:
+              $ref: "#/components/headers/XCache"
+            Cache-Control:
+              description: Cache-Control header
+              schema:
+                type: string
+                example: "max-age=300, public"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionHistoryResponse"
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Bad Request
+                message: time range cannot exceed 365 days
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   # ---------------------------------------------------------------------------
   # Transactions
   # ---------------------------------------------------------------------------
@@ -738,6 +810,60 @@ components:
         mode:
           type: string
           enum: [public, authenticated]
+
+    PositionSnapshot:
+      type: object
+      required: [timestamp, supplied, borrowed, effectiveSupplyApy, effectiveBorrowApy]
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp in milliseconds
+          example: 1700000000000
+        supplied:
+          type: number
+          description: Total supplied balance in USD
+          minimum: 0
+          example: 5000
+        borrowed:
+          type: number
+          description: Total borrowed balance in USD
+          minimum: 0
+          example: 2000
+        effectiveSupplyApy:
+          type: number
+          description: Weighted average supply APY (percentage)
+          minimum: 0
+          example: 2.5
+        effectiveBorrowApy:
+          type: number
+          description: Weighted average borrow APY (percentage)
+          minimum: 0
+          example: 8.5
+
+    PositionHistoryResponse:
+      type: object
+      required: [walletAddress, snapshots, interval, bucketCount]
+      properties:
+        walletAddress:
+          type: string
+          description: Stellar wallet address
+          example: GBTEST123...
+        snapshots:
+          type: array
+          description: Array of position snapshots bucketed by interval
+          items:
+            $ref: "#/components/schemas/PositionSnapshot"
+        interval:
+          type: string
+          description: Time bucketing interval
+          enum: [1h, 1d, 7d, 30d]
+          example: 1d
+        bucketCount:
+          type: integer
+          description: Number of snapshot buckets returned
+          minimum: 0
+          example: 30
 
     QuoteRequest:
       type: object
