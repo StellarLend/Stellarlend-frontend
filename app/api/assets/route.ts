@@ -1,118 +1,171 @@
+/**
+ * Asset Registry API Route
+ * GET /api/assets - Serves canonical asset metadata
+ *
+ * Query Parameters:
+ *   - symbols: Comma-separated list of asset symbols (XLM, USDC, BTC, ETH)
+ *     If omitted, all supported assets are returned
+ *
+ * Response Format:
+ *   - assets: Array of asset metadata with symbol, name, decimals, issuer, and logo URL
+ *   - timestamp: ISO 8601 timestamp of response
+ *
+ * Caching Strategy:
+ *   - TTL: 60 seconds (fresh cache)
+ *   - SWR: 300 seconds (stale-while-revalidate)
+ *   - Static data cached for performance
+ *
+ * @example
+ * GET /api/assets - Get all supported assets
+ * GET /api/assets?symbols=XLM,USDC - Get specific assets
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { globalCache } from '@/lib/cache';
-import { ASSET_SYMBOLS, isAssetSymbol, type AssetSymbol } from '@/types/enums';
-import { getAllAssets, getAssetMetadata, type AssetMetadata } from '@/lib/assets';
+import { getAssets, isValidAsset, type AssetMetadata } from '@/lib/assets';
+import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
-export interface AssetsResponse {
+// Cache configuration for static asset data
+const ASSETS_CACHE_CONFIG = {
+  ttl: 60000, // 60 seconds
+  swr: 300000, // 5 minutes stale-while-revalidate
+} as const;
+
+interface AssetsResponse {
   assets: AssetMetadata[];
   timestamp: string;
 }
 
+interface AssetsErrorResponse {
+  error: string;
+  code: string;
+  timestamp: string;
+}
+
 /**
- * GET /api/assets
- *
- * Returns the canonical asset registry with metadata for all supported assets.
- *
- * Query params:
- *    symbol  – optional, comma-separated AssetSymbol list (e.g. ?symbol=XLM,USDC).
- *              Omit to return all supported assets.
- *
- * Response shape:  AssetsResponse
- *    { assets: AssetMetadata[], timestamp: string }
- *
- * Caching:  public, TTL 1 hour / SWR 24 hours.
- *           Bypassed when Authorization header, session cookie, or x-user-id
- *           header is present (returns X-Cache: BYPASS).
- *
- * Errors:
- *    400  – unknown asset symbol(s) in the ?symbol param
- *    500  – registry loading failure
+ * Validates and normalizes the symbols query parameter
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+function validateSymbolsQuery(
+  symbolsParam: string | null
+): { valid: true; symbols?: string[] } | { valid: false; error: string } {
+  // If no parameter provided, return all symbols
+  if (symbolsParam === null) {
+    return { valid: true }; // All symbols
+  }
+
+  // If empty string or only whitespace, reject
+  if (!symbolsParam.trim()) {
+    return { valid: false, error: 'symbols parameter cannot be empty' };
+  }
+
+  const symbols = symbolsParam
+    .split(',')
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean);
+
+  if (symbols.length === 0) {
+    return { valid: false, error: 'symbols parameter cannot be empty' };
+  }
+
+  if (symbols.length > 20) {
+    return { valid: false, error: 'Too many symbols requested (max 20)' };
+  }
+
+  // Validate each symbol
+  const invalidSymbols = symbols.filter(symbol => !isValidAsset(symbol));
+  if (invalidSymbols.length > 0) {
+    return {
+      valid: false,
+      error: `Invalid asset symbols: ${invalidSymbols.join(', ')}`,
+    };
+  }
+
+  return { valid: true, symbols };
+}
+
+/**
+ * Generates cache key for assets query
+ */
+function generateAssetsCacheKey(symbols?: string[]): string {
+  if (!symbols || symbols.length === 0) {
+    return 'assets:all';
+  }
+  return `assets:${symbols.sort().join(',')}`;
+}
+
+/**
+ * Fetches assets from registry
+ */
+async function fetchAssetsData(symbols?: string[]): Promise<AssetsResponse> {
+  const assets = getAssets(symbols);
+
+  return {
+    assets,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/**
+ * Handles GET requests to /api/assets
+ */
+async function handleGetAssets(request: NextRequest): Promise<NextResponse<AssetsResponse | AssetsErrorResponse>> {
   try {
     const { searchParams } = new URL(request.url);
-    const symbolParam = searchParams.get('symbol') || '';
+    const symbolsParam = searchParams.get('symbols');
 
-    // Parse and validate requested assets
-    let symbols: AssetSymbol[];
-    if (symbolParam) {
-      const requested = symbolParam.split(',').map((s) => s.trim().toUpperCase());
-      const invalid = requested.filter((s) => !isAssetSymbol(s));
-      if (invalid.length > 0) {
-        return NextResponse.json(
-          { error: `Unknown asset symbol(s): ${invalid.join(', ')}. Supported: ${ASSET_SYMBOLS.join(', ')}` },
-          { status: 400 },
-        );
-      }
-      symbols = requested as AssetSymbol[];
-    } else {
-      symbols = [...ASSET_SYMBOLS];
-    }
+    // Validate query parameters
+    const validation = validateSymbolsQuery(symbolsParam);
 
-    // Cache bypass for authenticated requests
-    const authHeader = request.headers.get('Authorization');
-    const hasAuthCookie = request.cookies.has('session') || request.cookies.has('token');
-    const hasUserHeader = request.headers.has('x-user-id');
-    const bypassCache = !!(authHeader || hasAuthCookie || hasUserHeader);
-
-    if (bypassCache) {
-      const assets = symbols.map((symbol) => getAssetMetadata(symbol)!);
-      const response: AssetsResponse = {
-        assets,
+    if (!validation.valid) {
+      const errorResponse: AssetsErrorResponse = {
+        error: validation.error,
+        code: 'INVALID_QUERY',
         timestamp: new Date().toISOString(),
       };
-
-      return NextResponse.json(response, {
-        status: 200,
+      return NextResponse.json(errorResponse, {
+        status: 400,
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'X-Cache': 'BYPASS',
+          'Cache-Control': 'no-cache, no-store',
         },
       });
     }
 
-    // Sort to make the cache key order-invariant (?symbol=USDC,XLM == ?symbol=XLM,USDC)
-    const cacheKey = `assets:symbols:${[...symbols].sort().join(',')}`;
-    const cacheOptions = { ttl: 60 * 60 * 1000, swr: 24 * 60 * 60 * 1000 };
+    const symbols = validation.symbols;
+    const cacheKey = generateAssetsCacheKey(symbols);
 
-    const { value: response, status: cacheStatus } = await globalCache.getOrFetch(
+    // Use cache with TTL and SWR for static data
+    const { value: assetsData, status: cacheStatus } = await globalCache.getOrFetch(
       cacheKey,
-      async () => {
-        const assets = symbols.map((symbol) => getAssetMetadata(symbol)!);
-        return {
-          assets,
-          timestamp: new Date().toISOString(),
-        };
-      },
-      cacheOptions,
+      () => fetchAssetsData(symbols),
+      ASSETS_CACHE_CONFIG
     );
 
-    return NextResponse.json(response, {
+    return NextResponse.json(assetsData, {
       status: 200,
       headers: {
-        'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+        'Cache-Control': `public, max-age=${ASSETS_CACHE_CONFIG.ttl / 1000}, stale-while-revalidate=${ASSETS_CACHE_CONFIG.swr / 1000}`,
         'X-Cache': cacheStatus,
+        'Vary': 'Accept-Encoding',
       },
     });
   } catch (error) {
     console.error('Assets route error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch asset registry' },
-      { status: 500 },
-    );
+
+    const errorResponse: AssetsErrorResponse = {
+      error: error instanceof Error ? error.message : 'Failed to fetch assets',
+      code: 'INTERNAL_ERROR',
+      timestamp: new Date().toISOString(),
+    };
+
+    return NextResponse.json(errorResponse, {
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-cache, no-store',
+      },
+    });
   }
 }
 
-/**
- * POST endpoint is not supported for the read-only asset registry.
- */
-export async function POST(): Promise<NextResponse> {
-  return NextResponse.json(
-    { error: 'POST not allowed; asset registry is read-only' },
-    { status: 405 },
-  );
-}
+export const GET = withRequestLogging('/api/assets', handleGetAssets);

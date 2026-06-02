@@ -70,6 +70,22 @@ class DrizzleProfileRepository implements ProfileRepository {
             return query.then((results: any[]) => results[0]);
         }
     }
+
+    async anonymizeByUserId(userId: string): Promise<boolean> {
+        const existing = this.store.get(userId);
+        if (!existing) return false;
+
+        const anonymized: ProfileRecord = {
+            userId: existing.userId,
+            displayName: ANONYMIZED_MARKER,
+            bio: "",
+            website: "",
+            timezone: "UTC",
+            updatedAt: new Date(),
+        };
+        this.store.set(userId, anonymized);
+        return true;
+    }
 }
 
 export const profileRepository: ProfileRepository =

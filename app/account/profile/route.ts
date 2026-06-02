@@ -24,7 +24,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             userId: user.id,
             displayName: "",
             bio: "",
-            website: "",
             timezone: "UTC",
             updatedAt: null,
         }
@@ -32,7 +31,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 }
 
 
-export async function PUT(req: NextRequest): Promise<NextResponse> {
+const putHandler = async (req: NextRequest): Promise<NextResponse> => {
     let user;
     try {
         user = requireAuth(req);
@@ -78,4 +77,6 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     });
 
     return NextResponse.json(record);
-}
+};
+
+export const PUT = withCsrfProtection(putHandler);

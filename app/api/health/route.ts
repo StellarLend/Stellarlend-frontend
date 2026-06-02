@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(${config.stellar.horizonUrl}/, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -18,7 +18,7 @@ async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
 
 async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.stellar.sorobanRpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(${config.stellar.sorobanRpcUrl}/health, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -29,7 +29,7 @@ async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> 
 
 async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(${config.api.baseUrl}/health, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -40,7 +40,7 @@ async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
 
 async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(${config.api.baseUrl}/health, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -53,20 +53,20 @@ import { generateETag, isNotModified, cacheHeaders, notModifiedResponse } from '
 
 async function handleHealth(req: NextRequest) {
   try {
-    const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
-      checkHorizon(),
-      checkSorobanRpc(),
-      checkApi(),
-      checkDatabase(),
-    ]);
+    await httpGet(url, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (error) {
+    if (error instanceof TimeoutError || error instanceof UpstreamHttpError) {
+      return 'degraded';
+    }
 
-    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy' 
-      ? 'unhealthy' 
+    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy'
+      ? 'unhealthy'
       : horizonStatus === 'degraded' || sorobanStatus === 'degraded'
       ? 'degraded'
       : 'healthy';
 
-    const overallStatus = 
+    const overallStatus =
       stellarStatus === 'unhealthy' || apiStatus === 'unhealthy' || dbStatus === 'unhealthy'
         ? 'unhealthy'
         : stellarStatus === 'degraded' || apiStatus === 'degraded' || dbStatus === 'degraded'

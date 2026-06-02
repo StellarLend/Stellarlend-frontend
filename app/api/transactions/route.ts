@@ -12,6 +12,7 @@ import {
   filterTransactions,
 } from '@/lib/transactions/repository';
 import type { Transaction } from '@/types/Transaction';
+import { fetchTransactionRecords, filterTransactions } from '@/lib/transactions/repository';
 import { withRequestLogging } from '@/lib/api/handler';
 import { withIdempotency } from '@/lib/api';
 
@@ -51,6 +52,14 @@ async function handleGetTransactions(req: NextRequest) {
   const asset = searchParams.get('asset');
   const type = searchParams.get('type');
   const status = searchParams.get('status');
+
+  const page = parsePageParam(searchParams.get('page'), DEFAULT_PAGE);
+  const pageSize = parsePageSizeParam(searchParams.get('pageSize'), DEFAULT_PAGE_SIZE);
+  const search = searchParams.get('search');
+  const dateFrom = searchParams.get('dateFrom');
+  const dateTo = searchParams.get('dateTo');
+  const sortBy = parseSortBy(searchParams.get('sortBy'));
+  const sortDir = parseSortDir(searchParams.get('sortDir'));
 
   if (asset !== null && !isAssetSymbol(asset)) {
     return NextResponse.json(

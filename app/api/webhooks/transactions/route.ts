@@ -22,6 +22,8 @@ const nonceStore = new NonceStore();
  * Verifies HMAC-SHA256 signature, validates timestamp + nonce to prevent
  * replays, and updates the transaction status in the data layer.
  *
+ * Now enforces and validates Stellar memos for inbound deposits.
+ *
  * @see WEBHOOKS.md for the full contract documentation.
  */
 export async function POST(req: NextRequest) {
@@ -115,6 +117,42 @@ export async function POST(req: NextRequest) {
       },
       { status: 400 },
     );
+  }
+
+  // ── 7.5. Validate & Enforce Stellar Memo ────────────────────────────────
+  const rawData = payload.data as any;
+  const memo = rawData.memo;
+  const memoType = rawData.memo_type;
+
+  if (memo || memoType) {
+    const type = (memoType || 'MEMO_TEXT') as any;
+    const value = memo || '';
+
+    // Validate format
+    if (!validateMemo(value, type)) {
+      return NextResponse.json(
+        { error: `Invalid memo format: "${value}" for type "${type}"` },
+        { status: 400 },
+      );
+    }
+
+    // Resolve account
+    const accountId = resolveAccountByMemo(value, type);
+    if (!accountId && isStrictModeEnabled()) {
+      return NextResponse.json(
+        { error: `Strict Mode Rejection: Unknown or unregistered memo: "${value}"` },
+        { status: 400 },
+      );
+    }
+  } else if (isStrictModeEnabled()) {
+    // If in strict mode, ensure inbound deposits always specify a memo.
+    const existingTx = await getTransaction(payload.data.transaction_id);
+    if (existingTx && existingTx.type === 'Deposit') {
+      return NextResponse.json(
+        { error: `Strict Mode Rejection: Inbound deposits must have a valid memo` },
+        { status: 400 },
+      );
+    }
   }
 
   // ── 8. Update transaction ───────────────────────────────────────────────
