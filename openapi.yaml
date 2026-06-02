@@ -40,6 +40,8 @@ tags:
     description: Lending / borrowing quote calculations
   - name: notifications
     description: In-app notifications for the authenticated user
+  - name: admin
+    description: Internal admin-only routes for deployment and maintenance
 
 paths:
 
@@ -140,6 +142,40 @@ paths:
                 properties:
                   message:
                     type: string
+
+  # ---------------------------------------------------------------------------
+  # Admin
+  # ---------------------------------------------------------------------------
+  /api/admin/migrate-status:
+    get:
+      operationId: getMigrateStatus
+      tags: [admin]
+      summary: Check migration drift status
+      description: |
+        Compares applied Drizzle migrations to the repository source manifest.
+        Intended for deploy verification and monitoring.
+      parameters:
+        - name: x-server-token
+          in: header
+          description: Server token used to authenticate internal admin requests
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Migration status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationStatusResponse"
+        "403":
+          description: Unauthorized admin request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   # ---------------------------------------------------------------------------
   # Prices
@@ -508,6 +544,21 @@ components:
       properties:
         error:
           type: string
+
+    MigrationStatusResponse:
+      type: object
+      required: [applied, pending, ok]
+      properties:
+        applied:
+          type: array
+          items:
+            type: string
+        pending:
+          type: array
+          items:
+            type: string
+        ok:
+          type: boolean
 
     AssetSymbol:
       type: string
