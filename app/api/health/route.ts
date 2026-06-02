@@ -2,19 +2,11 @@ import { NextResponse, NextRequest } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
+import { cacheHeaders, generateETag, isNotModified, notModifiedResponse } from '@/lib/api/etag';
 
 export const runtime = 'nodejs';
 
-async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
-  try {
-    await httpGet(${config.stellar.horizonUrl}/, { timeoutMs: 5000, retries: 1 });
-    return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
-  }
-}
+type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 
 async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
@@ -60,18 +52,27 @@ async function handleHealth(req: NextRequest) {
       return 'degraded';
     }
 
-    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy'
-      ? 'unhealthy'
-      : horizonStatus === 'degraded' || sorobanStatus === 'degraded'
-      ? 'degraded'
-      : 'healthy';
+    return 'unhealthy';
+  }
+}
 
-    const overallStatus =
-      stellarStatus === 'unhealthy' || apiStatus === 'unhealthy' || dbStatus === 'unhealthy'
-        ? 'unhealthy'
-        : stellarStatus === 'degraded' || apiStatus === 'degraded' || dbStatus === 'degraded'
-        ? 'degraded'
-        : 'healthy';
+function combineStatuses(statuses: HealthStatus[]): HealthStatus {
+  if (statuses.includes('unhealthy')) return 'unhealthy';
+  if (statuses.includes('degraded')) return 'degraded';
+  return 'healthy';
+}
+
+async function handleHealth(request: NextRequest) {
+  try {
+    const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
+      checkUrl(`${config.stellar.horizonUrl}/`),
+      checkUrl(`${(config.stellar as { sorobanRpcUrl?: string }).sorobanRpcUrl ?? config.stellar.horizonUrl}/health`),
+      checkUrl(`${config.api.baseUrl}/health`),
+      checkUrl(`${config.api.baseUrl}/health`),
+    ]);
+
+    const stellarStatus = combineStatuses([horizonStatus, sorobanStatus]);
+    const overallStatus = combineStatuses([stellarStatus, apiStatus, dbStatus]);
 
     // Stable fields for ETag calculation (excl. volatile timestamp)
     const stableFields = {

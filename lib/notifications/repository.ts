@@ -1,8 +1,6 @@
 import type { Notification } from './types';
-import { notificationHub } from '@/lib/streams/notification-hub';
-import { db } from '../db';
-import { notifications as notificationsTable } from '../db/schema/notifications';
-import { eq, and, desc } from 'drizzle-orm';
+import { enqueue, type NotificationsJobPayload } from '@/lib/queue';
+import { logger } from '@/lib/logger';
 
 // Seeded demo notifications used to populate new users' inboxes.
 const SEED_NOTIFICATIONS: Omit<Notification, 'userId'>[] = [
@@ -32,16 +30,10 @@ const SEED_NOTIFICATIONS: Omit<Notification, 'userId'>[] = [
   },
 ];
 
-async function seedUser(userId: string): Promise<Notification[]> {
-  const seeded = SEED_NOTIFICATIONS.map((n) => ({
-    id: `${userId}-${n.id}`,
-    userId,
-    title: n.title,
-    message: n.message,
-    read: n.read,
-    createdAt: new Date(n.createdAt),
-    type: n.type,
-  }));
+// In-process store keyed by userId.
+// Replace with a database-backed repository (e.g. Prisma, Supabase) in production.
+const store = new Map<string, Notification[]>();
+const ROUTE = 'lib/notifications/repository';
 
   for (const item of seeded) {
     await db.insert(notificationsTable).values(item).onConflictDoNothing();
@@ -179,6 +171,34 @@ export function addNotification(
   notifications.unshift(record);
   store.set(userId, notifications);
   return record;
+}
+
+/**
+ * Enqueues notification fan-out to a BullMQ worker.
+ */
+export async function enqueueNotification(
+  userId: string,
+  notification: Omit<NotificationsJobPayload, 'userId'>,
+): Promise<void> {
+  await enqueue('notifications', {
+    userId,
+    ...notification,
+  });
+}
+
+/**
+ * Fire-and-forget convenience wrapper for API handlers.
+ */
+export function enqueueNotificationInBackground(
+  userId: string,
+  notification: Omit<NotificationsJobPayload, 'userId'>,
+): void {
+  void enqueueNotification(userId, notification).catch((error) => {
+    logger.warn('Failed to enqueue notification', ROUTE, {
+      userId,
+      error: String(error),
+    });
+  });
 }
 
 /** Clears all stored notifications (used in tests). */

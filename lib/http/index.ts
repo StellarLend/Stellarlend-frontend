@@ -1,4 +1,4 @@
-export { httpGet, httpPost } from './client';
+export { httpFetch, httpGet, httpPost } from './client';
 export {
   HttpError,
   NetworkError,
