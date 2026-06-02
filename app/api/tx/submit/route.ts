@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
+import { getSession } from '@/lib/auth';
 import { httpPost } from '@/lib/http/client';
 import { metrics } from '@/lib/metrics/registry';
+import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
+import {
+  buildSorobanSimulationApiError,
+  getSorobanSimulationStatus,
+  simulateSorobanTransaction,
+  SorobanSimulationError,
+} from '@/lib/soroban/simulate';
 import {
   buildSorobanRpcError,
   buildSorobanSubmitRpcRequest,
@@ -73,8 +81,13 @@ const postHandler = async (request: NextRequest) => {
   }
 
   const payload = buildSorobanSubmitRpcRequest(body.signedEnvelopeXdr);
+  const shouldSimulate = new URL(request.url).searchParams.get('simulate') === 'true';
 
   try {
+    if (shouldSimulate) {
+      await simulateSorobanTransaction(config.stellar.sorobanRpcUrl, body.signedEnvelopeXdr);
+    }
+
     const start = Date.now();
     const rpcResponse = await httpPost<unknown>(config.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
@@ -106,6 +119,13 @@ const postHandler = async (request: NextRequest) => {
       metrics.sorobanSubmissions.inc({ result: 'failure' });
       metrics.sorobanSubmitDuration.observe(0, { result: 'failure' });
     } catch (e) {}
+
+    if (error instanceof SorobanSimulationError) {
+      return NextResponse.json(
+        { error: buildSorobanSimulationApiError(error) },
+        { status: getSorobanSimulationStatus(error) },
+      );
+    }
 
     return NextResponse.json(
       { error: buildSorobanRpcError(error) },
