@@ -222,6 +222,22 @@ describe('Config Modules', () => {
     expect(serverConfig.server.token).toBe('server-token-789');
   });
 
+  it('server config loads horizon URLs from STELLAR_HORIZON_URLS', async () => {
+    vi.resetModules();
+    process.env.STELLAR_HORIZON_URLS = 'https://primary.example.com,https://secondary.example.com/';
+
+    const serverConfigModule = await import('./server-config');
+    const serverConfig = serverConfigModule.default;
+
+    expect(serverConfig.horizon.urls).toEqual([
+      'https://primary.example.com',
+      'https://secondary.example.com',
+    ]);
+    expect(serverConfig.horizon.primaryUrl).toBe('https://primary.example.com');
+
+    delete process.env.STELLAR_HORIZON_URLS;
+  });
+
   it('server config falls back to empty strings when env vars are missing', async () => {
     const serverConfigModule = await import('./server-config');
     const serverConfig = serverConfigModule.default;

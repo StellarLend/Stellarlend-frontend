@@ -11,6 +11,7 @@ Metric catalog:
 - `soroban_submit_duration_seconds{result}` — histogram for Soroban submit duration.
 - `outbound_http_requests_total{method,host,status}` — counter for outbound HTTP calls.
 - `outbound_http_request_duration_seconds{method,host,status}` — histogram for outbound request durations.
+- `horizon_selection_total{host}` — counter for Horizon endpoint selections used for failover.
 
 Cardinality guidance:
 - Keep `route` and `host` labels limited to known values (do not use unbounded user-provided values).

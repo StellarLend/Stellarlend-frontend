@@ -79,6 +79,7 @@ class Registry {
 
   outboundRequests = new Counter('outbound_http_requests_total', 'Outbound HTTP requests');
   outboundRequestDuration = new Histogram('outbound_http_request_duration_seconds', 'Outbound HTTP request duration seconds');
+  horizonSelections = new Counter('horizon_selection_total', 'Horizon endpoint selections');
 
   collect(): string {
     // Return concatenated exposition
@@ -90,6 +91,7 @@ class Registry {
     out += this.sorobanSubmitDuration.collect();
     out += this.outboundRequests.collect();
     out += this.outboundRequestDuration.collect();
+    out += this.horizonSelections.collect();
     return out;
   }
 }
