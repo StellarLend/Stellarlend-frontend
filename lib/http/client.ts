@@ -6,6 +6,7 @@ import {
   TimeoutError,
   UpstreamHttpError,
 } from './errors';
+import { metrics } from '@/lib/metrics/registry';
 
 export interface RequestOptions extends Omit<RequestInit, 'signal'> {
   /** Override the global timeout from config.api.timeout (ms). */
@@ -17,6 +18,7 @@ export interface RequestOptions extends Omit<RequestInit, 'signal'> {
 }
 
 async function fetchOnce<T>(url: string, options: RequestOptions): Promise<T> {
+  const start = Date.now();
   const timeoutMs = options.timeoutMs ?? config.api.timeout;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -39,7 +41,15 @@ async function fetchOnce<T>(url: string, options: RequestOptions): Promise<T> {
     }
 
     try {
-      return (await response.json()) as T;
+      const json = (await response.json()) as T;
+      try {
+        const dur = (Date.now() - start) / 1000;
+        const method = (options.method ?? 'GET').toUpperCase();
+        const host = new URL(url).host;
+        metrics.outboundRequests.inc({ method, host, status: String(response.status) });
+        metrics.outboundRequestDuration.observe(dur, { method, host, status: String(response.status) });
+      } catch (e) {}
+      return json;
     } catch (err) {
       throw new HttpError('PARSE_ERROR', `Failed to parse JSON from ${url}`, undefined, err);
     }

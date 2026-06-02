@@ -1,0 +1,7 @@
+{
+  "soroban.submitEnabled": {
+    "enabled": true,
+    "rollout": 100,
+    "overrides": {}
+  }
+}

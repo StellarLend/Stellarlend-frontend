@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
+import { metrics } from '@/lib/metrics/registry';
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
@@ -20,6 +21,11 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
     const method = request?.method ?? 'UNKNOWN';
     let requestContext: any = null;
 
+    const chaosResponse = await chaosInject(request as NextRequest);
+    if (chaosResponse) {
+      return chaosResponse;
+    }
+
     try {
       requestContext = {
         method,
@@ -33,7 +39,15 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
 
       const response = await handler(...args);
       const durationMs = Date.now() - startedAt;
-      const status = typeof (response as any)?.status === 'number' ? (response as any).status : undefined;
+      const status = typeof (response as any)?.status === 'number' ? (response as any).status : 0;
+
+      // Metrics
+      try {
+        metrics.httpRequests.inc({ method, route, status: String(status) });
+        metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: String(status) });
+      } catch (e) {
+        // swallow metrics errors
+      }
 
       logger.info('request completed', route, {
         status,
@@ -44,6 +58,12 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
       return response;
     } catch (error) {
       const durationMs = Date.now() - startedAt;
+
+      try {
+        metrics.httpRequests.inc({ method, route, status: '500' });
+        metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: '500' });
+        metrics.httpErrors.inc({ route, error: (error as Error)?.name ?? 'Error' });
+      } catch (e) {}
 
       logger.error('request failed', route, {
         durationMs,
