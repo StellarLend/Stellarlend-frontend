@@ -15,7 +15,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
+import { TransactionsSkeleton } from "./Skeleton";
 import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
+import TransactionDetail from "@/components/features/dashboard/components/TransactionDetail";
+
 import {
   fetchTransactions,
   type Transaction,
@@ -45,6 +48,8 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -178,7 +183,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <div className="relative" ref={searchRef}>
+          <Dialog as="div" className="relative z-50" onClose={() => {}} id="transaction-detail-drawer">
             <div
               className="flex items-center gap-1 cursor-pointer"
               onClick={() => setShowSearch((v) => !v)}
@@ -198,7 +203,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                 />
               </div>
             )}
-          </div>
+          </Dialog>
           <div className="relative" ref={filterRef}>
             <div
               className="flex items-center gap-1 cursor-pointer"
@@ -333,7 +338,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
       <div className="">
         {loading ? (
-          <div className="text-center py-8 text-gray-400">Loading...</div>
+          <TransactionsSkeleton count={itemsPerPage} />
         ) : transactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
@@ -357,6 +362,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                     <th className="py-3 px-4 text-left font-semibold">Asset</th>
                     <th className="py-3 px-4 text-left font-semibold">Date</th>
                     <th className="py-3 px-4 text-left font-semibold">Status</th>
+                    <th className="py-3 px-4 text-left font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -395,12 +401,25 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                           label={txn.status}
                         />
                       </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => {
+                            setSelectedTxn(txn);
+                            setIsDetailOpen(true);
+                          }}
+                          className="text-blue-600 hover:underline"
+                          aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          aria-controls="transaction-detail-drawer"
+                        >
+                          Details
+                        </button>
+                      </td>
                     </tr>
                   ))}
 
                   {transactions.length === 0 && !loading && (
                     <tr>
-                      <td colSpan={5} className="text-center py-6">
+                      <td colSpan={6} className="text-center py-6">
                         No transactions found.
                       </td>
                     </tr>
@@ -474,6 +493,17 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                         {formatDateTime(txn.date, txn.time)}
                       </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        setSelectedTxn(txn);
+                        setIsDetailOpen(true);
+                      }}
+                      className="mt-2 text-blue-600 hover:underline"
+                      aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                      aria-controls="transaction-detail-drawer"
+                    >
+                      Details
+                    </button>
                   </div>
                 </div>
               ))}
@@ -499,6 +529,9 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
           )}
         </div>
       </div>
+      {isDetailOpen && (
+        <TransactionDetail transaction={selectedTxn} isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} />
+      )}
     </section>
   );
 }

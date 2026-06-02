@@ -15,9 +15,11 @@ describe("Transactions Component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders loading state initially", () => {
+  it("renders skeleton loading state initially", () => {
     render(<Transactions />);
-    expect(screen.getByText(/Loading.../i)).toBeInTheDocument();
+    // Skeleton renders the table headers and an aria-labeled container immediately
+    expect(screen.getByText("Transaction Type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading transactions")).toBeInTheDocument();
   });
 
   it("renders transaction table on desktop", async () => {

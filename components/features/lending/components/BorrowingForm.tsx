@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { LendingData } from '@/app/lending/page';
-import { Input } from '@/components/shared/ui/Input';
+import { AmountInput } from '@/components/shared/ui/AmountInput';
 import Button from '@/components/shared/ui/Button';
+import { Tooltip } from '@/components/atoms/Tooltip/Tooltip';
+import { IconButton } from '@/components/atoms/IconButton/IconButton';
 import { cn } from '@/lib/utils/cn';
 import { ASSETS } from '@/lib/assets';
 
@@ -80,6 +82,7 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
     if (validateForm()) {
       setIsSubmitting(true);
       try {
+        // Simulate validation/processing
         await new Promise(resolve => setTimeout(resolve, 800));
         setSubmitStatus('success');
         setSubmitMessage('Details validated successfully.');
@@ -123,9 +126,7 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Borrow Asset Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Asset to Borrow
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Asset to Borrow <Tooltip content="The asset you wish to borrow (must be collateralized)."><IconButton aria-label="Help" size="sm" variant="ghost" /></Tooltip></label>
           <div className="grid grid-cols-2 gap-4">
             {ASSETS.map(asset => (
               <button
@@ -141,11 +142,12 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className={cn(
-                    "font-bold text-sm",
-                    formData.asset === asset.symbol ? "text-[#2600FF]" : "text-gray-900"
-                  )}>
-                    {asset.symbol}
-                  </span>
+                  "font-bold text-sm",
+                  formData.asset === asset.symbol ? "text-[#2600FF]" : "text-gray-900"
+                )}>
+                  {asset.symbol}
+                </span>
+                <Tooltip content="Annual Percentage Yield (APR) for this asset."><IconButton aria-label="Help" size="sm" variant="ghost" /></Tooltip>
                   <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
                     {INTEREST_RATES[asset.symbol as keyof typeof INTEREST_RATES]}% APR
                   </span>
@@ -157,15 +159,11 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
         </div>
 
         {/* Borrow Amount */}
-        <Input
+        <AmountInput
           label="Amount to Borrow"
-          type="number"
-          step="0.01"
-          placeholder="0.00"
-          value={formData.amount || ''}
-          error={errors.amount}
-          onChange={(e) => {
-            setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }));
+          value={formData.amount || 0}
+          onChange={(val) => {
+            setFormData(prev => ({ ...prev, amount: val }));
             if (errors.amount) {
               setErrors(prev => {
                 const next = { ...prev };
@@ -174,6 +172,9 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
               });
             }
           }}
+          precision={selectedAsset?.precision ?? 2}
+          placeholder="0.00"
+          error={errors.amount}
         />
 
         {/* Loan Duration */}
@@ -203,7 +204,7 @@ export default function BorrowingForm({ onSubmit, initialData }: BorrowingFormPr
                     : "border-gray-100 hover:border-gray-200 bg-gray-50/30 text-gray-600"
                 )}
               >
-                <div className="font-bold text-sm">{duration.label}</div>
+                <div className="flex items-center gap-2"><Tooltip content="Loan duration in days."><IconButton aria-label="Help" size="sm" variant="ghost" /></Tooltip>{duration.label}</div>
                 <div className="text-[10px] opacity-70 font-semibold">{duration.days} days</div>
               </button>
             ))}

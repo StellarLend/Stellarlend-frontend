@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { LendingData } from '@/app/lending/page';
-import { Input } from '@/components/shared/ui/Input';
+import { AmountInput } from '@/components/shared/ui/AmountInput';
 import Button from '@/components/shared/ui/Button';
+import { Tooltip } from '@/components/atoms/Tooltip/Tooltip';
 import { cn } from '@/lib/utils/cn';
+import { IconButton } from '@/components/atoms/IconButton/IconButton';
 import { ASSETS } from '@/lib/assets';
 
 interface LendingFormProps {
@@ -161,16 +163,11 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
 
         {/* Amount Input */}
         <div className="relative">
-          <Input
+          <AmountInput
             label="Amount to Lend"
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            value={formData.amount || ''}
-            error={errors.amount}
-            helperText={selectedAsset ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}` : undefined}
-            onChange={(e) => {
-              setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }));
+            value={formData.amount || 0}
+            onChange={(val) => {
+              setFormData(prev => ({ ...prev, amount: val }));
               if (errors.amount) {
                 setErrors(prev => {
                   const next = { ...prev };
@@ -179,21 +176,22 @@ export default function LendingForm({ onSubmit, initialData }: LendingFormProps)
                 });
               }
             }}
+            precision={selectedAsset?.precision ?? 2}
+            placeholder="0.00"
+            error={errors.amount}
+            helperText={selectedAsset ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}` : undefined}
+            onMax={handleMaxAmount}
           />
-          <button
-            type="button"
-            onClick={handleMaxAmount}
-            className="absolute right-3 top-[38px] text-xs font-bold text-green-600 hover:text-green-700 bg-green-50 px-2 py-1 rounded transition-colors"
-          >
-            MAX
-          </button>
         </div>
 
         {/* Interest Rate */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700 flex items-center">
               Interest Rate (% APY)
+              <Tooltip content="Annual Percentage Yield (APR) is the annual rate of return, including compounding.">
+                <IconButton aria-label="Help" size="sm" variant="ghost" />
+              </Tooltip>
             </label>
             <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">
               {formData.interestRate.toFixed(1)}% APY

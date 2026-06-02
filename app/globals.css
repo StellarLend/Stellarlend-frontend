@@ -1,6 +1,87 @@
 @import url("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
 @import "tailwindcss";
+/* app/globals.css — Tailwind v4 theme wiring */
+@import "tailwindcss";
 
+@theme {
+  /* ── Colors ── */
+  --color-green-50:  #E6F5EE;
+  --color-green-100: #C2E5D3;
+  --color-green-200: #9DD5B7;
+  --color-green-300: #78C49B;
+  --color-green-400: #53B47F;
+  --color-green-500: #097C4C;
+  --color-green-600: #0A3D1E;
+  --color-green-700: #082F17;
+  --color-green-800: #062110;
+  --color-green-900: #031309;
+
+  --color-neutral-0:   #FFFFFF;
+  --color-neutral-50:  #F8F9FA;
+  --color-neutral-100: #F1F3F5;
+  --color-neutral-200: #E9ECEF;
+  --color-neutral-300: #DEE2E6;
+  --color-neutral-400: #CED4DA;
+  --color-neutral-500: #AAABAB;
+  --color-neutral-600: #868E96;
+  --color-neutral-700: #495057;
+  --color-neutral-800: #343A40;
+  --color-neutral-900: #212529;
+  --color-neutral-950: #0D0F10;
+
+  --color-surface-base:     #0A3D1E;
+  --color-surface-elevated: #0D4F27;
+  --color-surface-overlay:  #0F6130;
+  --color-surface-muted:    #062110;
+  --color-surface-inverse:  #FFFFFF;
+
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: #AAABAB;
+  --color-text-disabled:  #868E96;
+  --color-text-inverse:   #0A3D1E;
+  --color-text-accent:    #097C4C;
+
+  --color-border-default: #0F6130;
+  --color-border-muted:   #082F17;
+  --color-border-accent:  #097C4C;
+  --color-border-inverse: #DEE2E6;
+
+  --color-success:       #097C4C;
+  --color-success-light: #E6F5EE;
+  --color-warning:       #F59F00;
+  --color-warning-light: #FFF9DB;
+  --color-error:         #E03131;
+  --color-error-light:   #FFF5F5;
+  --color-info:          #1971C2;
+  --color-info-light:    #E7F5FF;
+
+  /* ── Border Radius ── */
+  --radius-none: 0;
+  --radius-sm:   0.125rem;
+  --radius-base: 0.25rem;
+  --radius-md:   0.375rem;
+  --radius-lg:   0.5rem;
+  --radius-xl:   0.75rem;
+  --radius-2xl:  1rem;
+  --radius-3xl:  1.5rem;
+  --radius-full: 9999px;
+
+  /* ── Shadows ── */
+  --shadow-sm:   0 1px 2px 0 rgba(0,0,0,0.4);
+  --shadow-base: 0 1px 3px 0 rgba(0,0,0,0.4), 0 1px 2px -1px rgba(0,0,0,0.4);
+  --shadow-md:   0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -2px rgba(0,0,0,0.4);
+  --shadow-lg:   0 10px 15px -3px rgba(0,0,0,0.4), 0 4px 6px -4px rgba(0,0,0,0.4);
+  --shadow-xl:   0 20px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.4);
+  --shadow-2xl:  0 25px 50px -12px rgba(0,0,0,0.6);
+  --shadow-glow: 0 0 20px rgba(9,124,76,0.4);
+
+  /* ── Spacing extras ── */
+  --spacing-4_5: 1.125rem;
+  --spacing-13:  3.25rem;
+  --spacing-15:  3.75rem;
+  --spacing-18:  4.5rem;
+  --spacing-22:  5.5rem;
+}
 :root {
   --background: #ffffff;
   --foreground: #171717;
