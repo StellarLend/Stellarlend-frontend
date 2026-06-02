@@ -85,3 +85,12 @@ export function markNotificationRead(userId: string, id: string): Notification |
 export function clearStore(): void {
   store.clear();
 }
+
+/** Removes all notifications for a specific user (used during account deletion). */
+export function removeNotificationsByUserId(userId: string): number {
+  const notifications = store.get(userId);
+  if (!notifications) return 0;
+  const count = notifications.length;
+  store.delete(userId);
+  return count;
+}

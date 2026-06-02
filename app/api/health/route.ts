@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import config from '@/lib/config';
-<<<<<<< HEAD
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
-import { withHandler } from '@/lib/api/handler';
+import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
@@ -50,14 +49,7 @@ async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   }
 }
 
-export async function GET() {
-=======
-import { withRequestLogging } from '@/lib/api/handler';
-
-export const runtime = 'nodejs';
-
 async function handleHealth() {
->>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
   try {
     const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
       checkHorizon(),
@@ -104,8 +96,5 @@ async function handleHealth() {
     );
   }
 }
-<<<<<<< HEAD
-=======
 
 export const GET = withRequestLogging('/api/health', handleHealth);
->>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
