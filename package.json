@@ -19,7 +19,8 @@
     "generate-component": "plop",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "create-pr": "node scripts/create-pr.js"
+    "create-pr": "node scripts/create-pr.js",
+    "test:contract": "bash scripts/run-contract-tests.sh"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
