@@ -111,6 +111,7 @@ export default function InterestCalculator({ data, type, onCalculate }: Interest
             </div>
           </>
         )}
+
       </div>
     </div>
   );

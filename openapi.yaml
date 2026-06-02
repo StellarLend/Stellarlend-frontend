@@ -227,6 +227,54 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/internal/cache/invalidate:
+    post:
+      operationId: invalidateCache
+      tags: [auth]
+      summary: Invalidate cache namespaces (internal only)
+      description: |
+        Internal-only endpoint used by deployment tooling to invalidate
+        specific cache namespaces (e.g. `prices`, `markets`, `idempotency`).
+        This route is protected by an internal server token and should only
+        be invoked from trusted CI/CD workflows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespaces]
+              properties:
+                namespaces:
+                  type: array
+                  items:
+                    type: string
+                  example: ["prices", "markets"]
+      responses:
+        "200":
+          description: Number of cache keys deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deletedCount:
+                    type: integer
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   # ---------------------------------------------------------------------------
   # Positions
   # ---------------------------------------------------------------------------
@@ -454,6 +502,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /api/notifications/stream:
+    get:
+      operationId: streamNotifications
+      tags: [notifications]
+      summary: Server-Sent Events stream for per-user notifications
+      description: |
+        Opens a per-session Server-Sent Events (SSE) connection that pushes
+        new notifications and unread-count updates for the authenticated user.
+
+        Event types:
+        - `notification`: contains a single `Notification` object
+        - `unreadCount`: contains `{ unreadCount: number }`
+
+        Clients SHOULD subscribe to this endpoint to receive live updates.
+        Polling the `/api/notifications` GET endpoint remains a supported
+        fallback for environments that do not support SSE.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: SSE stream (text/event-stream)
+          content:
+            text/event-stream: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
 # =============================================================================
 # Components

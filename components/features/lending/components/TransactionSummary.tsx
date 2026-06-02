@@ -189,22 +189,50 @@ export default function TransactionSummary({ data, calculation, type }: Transact
           )}
         </div>
 
-        {/* Risk Notice */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-yellow-400 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <div className="text-sm">
-              <p className="text-yellow-800 font-medium mb-1">Important Notice</p>
-              <p className="text-yellow-700">
-                {type === 'lend' 
-                  ? 'Lending involves risk. Interest rates may vary and principal is not guaranteed.'
-                  : 'Failure to repay may result in liquidation of your collateral. Ensure you can meet payment obligations.'}
-              </p>
-            </div>
-          </div>
-        </div>
+            {/* Repayment Breakdown Visualization */}
+            {type === 'borrow' && calculation && (
+              <div className="mt-6">
+                {/* Accessible fallback table */}
+                <table className="w-full text-sm border border-gray-200 mb-4" aria-label="Repayment breakdown table">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-2 py-1 text-left">Component</th>
+                      <th className="px-2 py-1 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-2 py-1">Principal</td>
+                      <td className="px-2 py-1 text-right">{formatCurrency(data.amount, data.asset)}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-1">Total Interest</td>
+                      <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalEarnings, data.asset)}</td>
+                    </tr>
+                    <tr className="font-medium border-t border-gray-200">
+                      <td className="px-2 py-1">Total Repayment</td>
+                      <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalRepayment, data.asset)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                {/* Visual bar */}
+                <div className="w-full bg-gray-200 rounded h-4 flex overflow-hidden" aria-label="Repayment breakdown bar" role="img">
+                  <div
+                    className="bg-green-600"
+                    style={{ width: `${(data.amount / (calculation.totalRepayment)) * 100}%` }}
+                  ></div>
+                  <div
+                    className="bg-red-600"
+                    style={{ width: `${(calculation.totalEarnings / (calculation.totalRepayment)) * 100}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-xs mt-1 text-gray-600">
+                  <span>Principal</span>
+                  <span>Interest</span>
+                </div>
+              </div>
+            )}
+
       </div>
     </div>
   );
