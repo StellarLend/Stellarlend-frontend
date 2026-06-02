@@ -15,6 +15,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
+import { TransactionsSkeleton } from "./Skeleton";
 import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
 import {
   fetchTransactions,
@@ -333,7 +334,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
       <div className="">
         {loading ? (
-          <div className="text-center py-8 text-gray-400">Loading...</div>
+          <TransactionsSkeleton count={itemsPerPage} />
         ) : transactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
