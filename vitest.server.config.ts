@@ -23,9 +23,9 @@ export default defineConfig({
     },
   },
   test: {
-    globals: true,
     name: 'server',
     environment: 'node',
+    globals: true,
     include: [
       'lib/**/*.test.ts',
       'app/api/**/*.test.ts',
@@ -40,6 +40,11 @@ export default defineConfig({
       NEXT_PUBLIC_STELLAR_NETWORK: 'testnet',
       NEXT_PUBLIC_STELLAR_HORIZON_URL: 'https://horizon-testnet.stellar.org',
       NEXT_PUBLIC_SOROBAN_RPC_URL: 'https://soroban-testnet.stellar.org',
+      API_RATE_LIMIT_MAX: '100',
+      API_RATE_LIMIT_WINDOW_MS: '60000',
+      TX_ACCOUNT_RATE_LIMIT_MAX: '30',
+      TX_ACCOUNT_RATE_LIMIT_WINDOW_MS: '60000',
+      TX_ACCOUNT_RATE_LIMIT_BURST: '60',
     },
   },
 });

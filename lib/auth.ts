@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
+import { jwtVerify, SignJWT } from "jose";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
 
 /**
  * Auth Configuration
@@ -12,16 +18,8 @@ const AUTH_CONFIG = {
   sessionExpiryHours: parseInt(process.env.AUTH_SESSION_EXPIRY || "24", 10),
 };
 
-export const JWT_SECRET = process.env.JWT_SECRET || AUTH_CONFIG.sessionSecret;
-
-import { SignJWT, jwtVerify } from "jose";
-
-export interface AuthUser {
-  id: string;
-  email: string;
-  name?: string;
-  walletAddress?: string;
-}
+export const JWT_SECRET =
+  process.env.JWT_SECRET || AUTH_CONFIG.sessionSecret;
 
 /**
  * Create a new session JWT
@@ -78,7 +76,7 @@ export async function getSession(): Promise<Session | null> {
     // Verify and parse session
     try {
       const { payload } = await jwtVerify(sessionCookie.value, secret);
-      
+
       return {
         user: {
           id: (payload.sub || payload.userId) as string,
@@ -125,13 +123,16 @@ export async function isAuthenticated(): Promise<boolean> {
 /**
  * Get session expiry information
  */
-export async function getSessionExpiry(): Promise<{ expiresAt: Date; expiresIn: number } | null> {
+export async function getSessionExpiry(): Promise<{
+  expiresAt: Date;
+  expiresIn: number;
+} | null> {
   const session = await getSession();
   if (!session) return null;
-  
+
   const now = new Date();
   const expiresIn = Math.max(0, session.expiresAt.getTime() - now.getTime());
-  
+
   return {
     expiresAt: session.expiresAt,
     expiresIn,
@@ -151,65 +152,6 @@ export async function getAuthenticatedUser(): Promise<User> {
     };
   }
   return user;
-}
-
-/**
- * Decodes and retrieves authenticated user from a Request object.
- * Used for legacy routes like account profile API.
- */
-export function getAuthUser(req: NextRequest): { id: string; email: string } | null {
-  try {
-    let token = "";
-    
-    // Check Authorization header
-    const authHeader = req.headers.get("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    } else {
-      // Check session cookie
-      const sessionCookie = req.cookies.get(AUTH_CONFIG.sessionCookieName);
-      if (sessionCookie?.value) {
-        token = sessionCookie.value;
-      }
-    }
-
-    if (!token) return null;
-
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
-    
-    // Check expiration
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) return null;
-    
-    const sub = payload.sub || payload.userId;
-    const email = payload.email;
-    if (!sub || !email) return null;
-
-    return { id: sub, email };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Enforces authentication on a Request object.
- * Throws a 401 NextResponse if unauthorized.
- */
-export function requireAuth(req: NextRequest): { id: string; email: string } {
-  const user = getAuthUser(req);
-  if (!user) {
-    throw NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  return user;
-}
-
-
-export function signToken(user: AuthUser, expiresIn = "1h"): string {
-  return jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
-    expiresIn,
-  });
 }
 
 /**
@@ -234,6 +176,7 @@ function extractToken(req: NextRequest): string | null {
 
 /**
  * Get authenticated user from a NextRequest (Bearer token or session cookie)
+ * Verifies JWT signature.
  */
 export function getAuthUser(req: NextRequest): AuthUser | null {
   const token = extractToken(req);
@@ -252,42 +195,22 @@ export function getAuthUser(req: NextRequest): AuthUser | null {
 }
 
 /**
- * Require authentication on a request. Returns the user or a 401 response.
+ * Enforces authentication on a Request object.
+ * Throws a 401 NextResponse if unauthorized.
  */
-export function requireAuth(
-  req: NextRequest
-): AuthUser | NextResponse {
+export function requireAuth(req: NextRequest): AuthUser {
   const user = getAuthUser(req);
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    throw NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return user;
 }
 
 /**
- * Check if the current request is authenticated (cookie-based)
+ * Create a signed JWT for testing or internal use.
  */
-export async function isAuthenticated(): Promise<boolean> {
-  const session = await getSession();
-  return session !== null;
-}
-
-/**
- * Get session expiry info
- */
-export async function getSessionExpiry(): Promise<{
-  expiresAt: Date;
-  expiresIn: number;
-} | null> {
-  try {
-    const session = await getSession();
-    if (!session) return null;
-
-    const now = new Date();
-    const expiresIn = Math.max(0, session.expiresAt.getTime() - now.getTime());
-
-    return { expiresAt: session.expiresAt, expiresIn };
-  } catch {
-    return null;
-  }
+export function signToken(user: AuthUser, expiresIn = "1h"): string {
+  return jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, {
+    expiresIn,
+  });
 }
