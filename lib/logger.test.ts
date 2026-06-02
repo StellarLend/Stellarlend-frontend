@@ -31,7 +31,7 @@ describe('logger redaction', () => {
   it('redacts Stellar public and secret keys inside strings', () => {
     const input = {
       address: `G${'A'.repeat(55)}`,
-      secret: `S${'B'.repeat(55)}`,
+      seed: `S${'B'.repeat(55)}`,
       message: 'Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9',
     };
 
@@ -39,8 +39,8 @@ describe('logger redaction', () => {
 
     expect(output.address).not.toContain(input.address);
     expect(output.address).toContain('[REDACTED_ADDRESS]');
-    expect(output.secret).not.toContain(input.secret);
-    expect(output.secret).toContain('[REDACTED_SECRET]');
+    expect(output.seed).not.toContain(input.seed);
+    expect(output.seed).toContain('[REDACTED_SECRET]');
     expect(output.message).not.toContain('Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9');
     expect(output.message).toContain('[REDACTED_TOKEN]');
   });

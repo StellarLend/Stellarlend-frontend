@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getUser, getSession, isAuthenticated, getAuthenticatedUser, getSessionExpiry } from "./auth";
 import * as nextCookies from "next/headers";
 
+import jwt from "jsonwebtoken";
+
 // Mock next/headers
 vi.mock("next/headers", () => ({
   cookies: vi.fn(),
@@ -19,23 +21,20 @@ describe("Authentication Module", () => {
 
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + 24);
+  expiresAt.setMilliseconds(0);
 
-  // Create a mock JWT token (format: header.payload.signature)
+  // Create a mock JWT token with a valid signature using jsonwebtoken
   const createMockJWT = (user = mockUser, expiry = expiresAt) => {
-    const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-    const payload = Buffer.from(
-      JSON.stringify({
-        sub: user.id,
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        walletAddress: user.walletAddress,
-        iat: Math.floor(new Date("2024-01-01").getTime() / 1000),
-        exp: Math.floor(expiry.getTime() / 1000),
-      })
-    ).toString("base64url");
-    const signature = Buffer.from("mock-signature").toString("base64url");
-    return `${header}.${payload}.${signature}`;
+    const payload = {
+      sub: user.id,
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      walletAddress: user.walletAddress,
+      iat: Math.floor(new Date("2024-01-01").getTime() / 1000),
+      exp: Math.floor(expiry.getTime() / 1000),
+    };
+    return jwt.sign(payload, "dev-secret-change-in-production");
   };
 
   beforeEach(() => {

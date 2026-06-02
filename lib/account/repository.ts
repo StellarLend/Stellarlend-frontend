@@ -1,3 +1,6 @@
+import { db } from '@/lib/db/client';
+import { profiles } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 export interface ProfileRecord {
     userId: string;
@@ -9,34 +12,65 @@ export interface ProfileRecord {
 }
 
 export interface ProfileRepository {
-    getByUserId(userId: string): Promise<ProfileRecord | null>;
+    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null>;
 
     upsert(
         userId: string,
-        data: Omit<ProfileRecord, "userId" | "updatedAt">
-    ): Promise<ProfileRecord>;
+        data: Omit<ProfileRecord, "userId" | "updatedAt">,
+        tx?: any
+    ): ProfileRecord | Promise<ProfileRecord>;
 }
 
-class InMemoryProfileRepository implements ProfileRepository {
-    private store = new Map<string, ProfileRecord>();
+class DrizzleProfileRepository implements ProfileRepository {
+    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null> {
+        const client = tx || db;
+        const query = client
+            .select()
+            .from(profiles)
+            .where(eq(profiles.userId, userId))
+            .limit(1);
 
-    async getByUserId(userId: string): Promise<ProfileRecord | null> {
-        return this.store.get(userId) ?? null;
+        if (tx) {
+            const results = query.all();
+            return results[0] ?? null;
+        } else {
+            return query.then((results: any[]) => results[0] ?? null);
+        }
     }
 
-    async upsert(
+    upsert(
         userId: string,
-        data: Omit<ProfileRecord, "userId" | "updatedAt">
-    ): Promise<ProfileRecord> {
-        const record: ProfileRecord = {
-            userId,
-            ...data,
-            updatedAt: new Date(),
-        };
-        this.store.set(userId, record);
-        return record;
+        data: Omit<ProfileRecord, "userId" | "updatedAt">,
+        tx?: any
+    ): ProfileRecord | Promise<ProfileRecord> {
+        const client = tx || db;
+        const query = client
+            .insert(profiles)
+            .values({
+                userId,
+                ...data,
+                updatedAt: new Date(),
+            })
+            .onConflictDoUpdate({
+                target: profiles.userId,
+                set: {
+                    displayName: data.displayName,
+                    bio: data.bio,
+                    website: data.website,
+                    timezone: data.timezone,
+                    updatedAt: new Date(),
+                },
+            })
+            .returning();
+
+        if (tx) {
+            const results = query.all();
+            return results[0];
+        } else {
+            return query.then((results: any[]) => results[0]);
+        }
     }
 }
 
 export const profileRepository: ProfileRepository =
-    new InMemoryProfileRepository();
+    new DrizzleProfileRepository();

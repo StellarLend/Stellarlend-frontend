@@ -18,17 +18,19 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
     const startedAt = Date.now();
     const request = args[0] as NextRequest | undefined;
     const method = request?.method ?? 'UNKNOWN';
-    const requestContext = {
-      method,
-      route,
-      query: request?.nextUrl?.searchParams.toString() ?? '',
-      headers: {
-        authorization: request?.headers.get('authorization'),
-        'x-forwarded-for': request?.headers.get('x-forwarded-for'),
-      },
-    };
+    let requestContext: any = null;
 
     try {
+      requestContext = {
+        method,
+        route,
+        query: request?.nextUrl?.searchParams.toString() ?? '',
+        headers: {
+          authorization: request?.headers?.get('authorization'),
+          'x-forwarded-for': request?.headers?.get('x-forwarded-for'),
+        },
+      };
+
       const response = await handler(...args);
       const durationMs = Date.now() - startedAt;
       const status = typeof (response as any)?.status === 'number' ? (response as any).status : undefined;

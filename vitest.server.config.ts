@@ -29,6 +29,7 @@ export default defineConfig({
       'lib/**/*.test.ts',
       'app/api/**/*.test.ts',
       'types/enums.test.ts',
+      '__tests__/**/*.test.ts',
     ],
   },
 });

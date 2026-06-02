@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+
+vi.mock('@/lib/http', () => ({
+  httpGet: vi.fn().mockResolvedValue({}),
+  UpstreamHttpError: class extends Error {},
+  TimeoutError: class extends Error {},
+}));
+
 import { GET } from './route';
 
 vi.mock('@/lib/config', () => ({

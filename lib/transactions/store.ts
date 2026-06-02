@@ -1,6 +1,6 @@
 import type { Transaction } from "@/types/Transaction";
 import type { TransactionStatus } from "@/types/enums";
-import { fetchTransactions } from "@/types/Transaction";
+import { fetchTransactions } from "@/lib/transactions/repository";
 
 /**
  * Simple in-memory transaction store.

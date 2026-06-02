@@ -41,21 +41,16 @@ const config: Config = {
     timeout: 10000,
   },
   stellar: {
-stellar: {
-  network:
-    validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
-
-  horizonUrl:
-    validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
-    'https://horizon-testnet.stellar.org',
-
-  sorobanRpcUrl:
-    validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
-    'https://soroban-testnet.stellar.org',
-
-  sorobanContractId:
-    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
-},
+    network:
+      validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
+    horizonUrl:
+      validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
+      'https://horizon-testnet.stellar.org',
+    sorobanRpcUrl:
+      validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+      'https://soroban-testnet.stellar.org',
+    sorobanContractId:
+      process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
   },
   analytics: {
     googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,

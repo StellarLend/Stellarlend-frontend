@@ -8,38 +8,6 @@ describe('Config Modules', () => {
   beforeEach(() => {
     vi.resetModules();
 
-    // Clear relevant env vars to ensure a clean state
-    Object.keys(process.env).forEach((key) => {
-      if (
-        key.startsWith('NEXT_PUBLIC_') ||
-        key.startsWith('CONFIG_')
-      ) {
-        delete process.env[key];
-      }
-    });
-  });
-
-  afterEach(() => {
-    process.env = { ...ORIGINAL_ENV };
-  });
-});
-    delete process.env.NEXT_PUBLIC_APP_NAME;
-    delete process.env.NEXT_PUBLIC_APP_VERSION;
-    delete process.env.NEXT_PUBLIC_APP_ENV;
-    delete process.env.NEXT_PUBLIC_API_BASE_URL;
-    delete process.env.NEXT_PUBLIC_STELLAR_NETWORK;
-    delete process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL;
-    delete process.env.NEXT_PUBLIC_SOROBAN_RPC_URL;
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-vi.mock('server-only', () => ({}));
-
-const ORIGINAL_ENV = { ...process.env };
-
-describe('Config Modules', () => {
-  beforeEach(() => {
-    vi.resetModules();
-
     // Clear public env vars
     delete process.env.NEXT_PUBLIC_APP_NAME;
     delete process.env.NEXT_PUBLIC_APP_VERSION;
@@ -84,7 +52,7 @@ describe('Config Modules', () => {
     expect(res1.success).toBe(false);
 
     if (!res1.success) {
-      expect(res1.error.errors[0].message).toContain(
+      expect(res1.error.issues[0].message).toContain(
         'APP_NAME is required'
       );
     }
@@ -99,7 +67,7 @@ describe('Config Modules', () => {
     expect(res2.success).toBe(false);
 
     if (!res2.success) {
-      expect(res2.error.errors[0].message).toContain(
+      expect(res2.error.issues[0].message).toContain(
         'API_BASE_URL must be a valid URL'
       );
     }
@@ -156,10 +124,12 @@ describe('Config Modules', () => {
   });
 
   it('throws an error if imported without any environment configuration', async () => {
+    process.env.NEXT_PUBLIC_APP_ENV = 'invalid-env';
     await expect(import('./configValidation')).rejects.toThrow();
   });
 
   it('public config loads defaults when no env vars are defined', async () => {
+    process.env.NEXT_PUBLIC_APP_ENV = 'development';
     const configModule = await import('./config');
     const config = configModule.default;
 

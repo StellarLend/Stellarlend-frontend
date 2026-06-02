@@ -56,6 +56,23 @@ export function markNotificationRead(userId: string, id: string): Notification |
   return notif;
 }
 
+/**
+ * Adds a new notification for a user.
+ */
+export function addNotification(
+  userId: string,
+  notification: Omit<Notification, 'userId'>
+): Notification {
+  const notifications = getNotifications(userId);
+  const record: Notification = {
+    ...notification,
+    userId,
+  };
+  notifications.unshift(record);
+  store.set(userId, notifications);
+  return record;
+}
+
 /** Clears all stored notifications (used in tests). */
 export function clearStore(): void {
   store.clear();

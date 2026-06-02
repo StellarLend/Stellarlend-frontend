@@ -1,3 +1,4 @@
+import { describe, test, expect } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, PUT } from "@/app/account/profile/route";
 import { profileRepository } from "@/lib/account/repository";

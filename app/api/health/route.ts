@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import config from '@/lib/config';
-<<<<<<< HEAD
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
-import { withHandler } from '@/lib/api/handler';
+import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
@@ -50,14 +49,9 @@ async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   }
 }
 
-export async function GET() {
-=======
-import { withRequestLogging } from '@/lib/api/handler';
+import { generateETag, isNotModified, cacheHeaders, notModifiedResponse } from '@/lib/api';
 
-export const runtime = 'nodejs';
-
-async function handleHealth() {
->>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
+async function handleHealth(req: NextRequest) {
   try {
     const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
       checkHorizon(),
@@ -79,9 +73,9 @@ async function handleHealth() {
         ? 'degraded'
         : 'healthy';
 
-    const healthData = {
+    // Stable fields for ETag calculation (excl. volatile timestamp)
+    const stableFields = {
       status: overallStatus,
-      timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
       checks: {
@@ -91,8 +85,24 @@ async function handleHealth() {
       },
     };
 
+    const etag = generateETag(stableFields);
+
+    if (isNotModified(req, etag)) {
+      return new NextResponse(null, notModifiedResponse(etag, 'public'));
+    }
+
+    const healthData = {
+      ...stableFields,
+      timestamp: new Date().toISOString(),
+    };
+
     const httpStatus = healthData.status === 'healthy' ? 200 : 503;
-    return NextResponse.json(healthData, { status: httpStatus });
+    const headers = cacheHeaders(etag, 30, 'public');
+
+    return NextResponse.json(healthData, {
+      status: httpStatus,
+      headers,
+    });
   } catch {
     return NextResponse.json(
       {
@@ -104,8 +114,5 @@ async function handleHealth() {
     );
   }
 }
-<<<<<<< HEAD
-=======
 
 export const GET = withRequestLogging('/api/health', handleHealth);
->>>>>>> 9570107 (feat: add structured server logging with redaction (Closes #190))
