@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
+import { chaosInject } from '@/lib/chaos/inject';
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
@@ -27,6 +28,11 @@ export function withRequestLogging<T extends (...args: unknown[]) => Promise<Nex
         'x-forwarded-for': request?.headers.get('x-forwarded-for'),
       },
     };
+
+    const chaosResponse = await chaosInject(request as NextRequest);
+    if (chaosResponse) {
+      return chaosResponse;
+    }
 
     try {
       const response = await handler(...args);
