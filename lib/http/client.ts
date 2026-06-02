@@ -8,8 +8,7 @@ import {
   UpstreamHttpError,
 } from './errors';
 import { metrics } from '@/lib/metrics/registry';
-import { getActiveRequestId } from '@/lib/request-context';
-import { generateRequestId, normalizeRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
+import { circuitBreaker } from '@/lib/http/circuit-breaker';
 
 const CSRF_COOKIE_NAME = process.env.CSRF_COOKIE_NAME || 'csrf-token';
 
@@ -59,7 +58,72 @@ async function fetchOnce<T>(url: string, options: RequestOptions): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  const { timeoutMs: _t, retries: _r, maxRetries: _mr, backoffMs: _b, retryOnPost: _rp, retryAfterUpperBoundMs: _rau, ...fetchOptions } = options;
+  // Extract host and path for circuit breaker decision
+  const host = new URL(url).host;
+  const path = new URL(url).pathname;
+
+  // Check circuit breaker before proceeding
+  if (!circuitBreaker.shouldAllow(host, path)) {
+    clearTimeout(timer);
+    throw new Error(`Circuit breaker open for host ${host}`);
+  }
+
+  const { timeoutMs: _t, retries: _r, backoffMs: _b, ...fetchOptions } = options;
+
+  const method = (options.method ?? 'GET').toUpperCase();
+  const headers = new Headers(fetchOptions.headers);
+  const csrfToken = getCsrfToken();
+
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && csrfToken) {
+    headers.set('x-csrf-token', csrfToken);
+  }
+
+  try {
+    let response: Response;
+    try {
+      response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
+    } catch (err) {
+      clearTimeout(timer);
+      // Record failure on network error
+      circuitBreaker.recordFailure(host);
+      if ((err as Error).name === 'AbortError') {
+        throw new TimeoutError(url, timeoutMs);
+      }
+      throw new NetworkError(url, err);
+    }
+
+    if (!response.ok) {
+      // Record failure on bad status
+      circuitBreaker.recordFailure(host);
+      throw new UpstreamHttpError(url, response.status);
+    }
+
+    try {
+      const json = (await response.json()) as T;
+      try {
+        const dur = (Date.now() - start) / 1000;
+        metrics.outboundRequests.inc({ method, host, status: String(response.status) });
+        metrics.outboundRequestDuration.observe(dur, { method, host, status: String(response.status) });
+      } catch (e) {}
+      // Record success
+      circuitBreaker.recordSuccess(host);
+      return json;
+    } catch (err) {
+      // Record failure on parse error
+      circuitBreaker.recordFailure(host);
+      throw new HttpError('PARSE_ERROR', `Failed to parse JSON from ${url}`, undefined, err);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+  const start = Date.now();
+  const timeoutMs = options.timeoutMs ?? config.api.timeout;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  const { timeoutMs: _t, retries: _r, backoffMs: _b, ...fetchOptions } = options;
+  
   const method = (options.method ?? 'GET').toUpperCase();
   const headers = withCorrelationHeaders(fetchOptions.headers, method);
 

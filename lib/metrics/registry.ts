@@ -80,6 +80,23 @@ class Histogram {
   }
 }
 
+class Gauge {
+  private values = new Map<string, number>();
+  constructor(private name: string, private help: string) {}
+  set(labels: Labels, v: number) {
+    const key = labelKey(labels);
+    this.values.set(key, v);
+  }
+  collect(): string {
+    let out = `# HELP ${this.name} ${this.help}\n# TYPE ${this.name} gauge\n`;
+    for (const [lbl, val] of this.values) {
+      const labelPart = lbl === '{}' ? '' : `{${lbl}}`;
+      out += `${this.name}${labelPart} ${val}\n`;
+    }
+    return out;
+  }
+}
+
 class Registry {
   httpRequests = new Counter('http_requests_total', 'Total HTTP requests');
   httpRequestDuration = new Histogram('http_request_duration_seconds', 'HTTP request duration in seconds');
@@ -97,8 +114,10 @@ class Registry {
     this.schedulerIsLeader.set(value);
   }
 
+  // gauge for circuit breaker state per host (0=closed,1=open,2=half_open)
+  circuitState = new Gauge('circuit_state', 'Circuit breaker state per host');
+
   collect(): string {
-    // Return concatenated exposition
     let out = '';
     out += this.httpRequests.collect();
     out += this.httpRequestDuration.collect();
@@ -108,9 +127,10 @@ class Registry {
     out += this.outboundRequests.collect();
     out += this.outboundRequestDuration.collect();
     out += this.horizonSelections.collect();
-    out += this.schedulerIsLeader.collect();
+    out += this.circuitState.collect();
     return out;
   }
+}
 }
 
 export const metrics = new Registry();
