@@ -49,3 +49,5 @@ export class RetryExhaustedError extends HttpError {
     this.name = 'RetryExhaustedError';
   }
 }
+
+export { HttpError as UpstreamError };

@@ -20,12 +20,14 @@ export function captureServerError(
     route?: string;
     method?: string;
     sessionId?: string;
+    requestId?: string;
   } = {},
 ) {
   Sentry.withScope((scope) => {
     if (context.route) scope.setTag('route', context.route);
     if (context.method) scope.setTag('method', context.method);
     if (context.sessionId) scope.setTag('session_id', context.sessionId);
+    if (context.requestId) scope.setTag('request_id', context.requestId);
 
     Sentry.captureException(error);
   });
