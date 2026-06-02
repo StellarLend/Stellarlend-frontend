@@ -1,4 +1,9 @@
 import type { Transaction, TransactionFilters } from './types';
+import type { Transaction as IndexerTransaction } from '@/types/Transaction';
+import { indexAccountTransactions } from '@/lib/indexer';
+import { logger } from '@/lib/logger';
+
+const ROUTE = 'lib/transactions/repository';
 
 const MOCK_TRANSACTIONS: Transaction[] = [
   { id: 'TXN12345', type: 'Deposit',      amount:  2000,    asset: 'XLM',  date: '2025-04-12', time: '09:32AM', status: 'Completed'  },
@@ -11,6 +16,35 @@ const MOCK_TRANSACTIONS: Transaction[] = [
 
 export async function fetchTransactions(): Promise<Transaction[]> {
   return MOCK_TRANSACTIONS;
+}
+
+/**
+ * Primary data source for the /api/transactions route.
+ *
+ * When the `STELLAR_INDEXER_ACCOUNT` environment variable is set, live
+ * on-chain operations are fetched from Horizon and normalized into the
+ * Transaction shape.  Falls back to the mock dataset when no account is
+ * configured or when Horizon is unavailable, ensuring the API remains
+ * functional in all environments.
+ */
+export async function fetchTransactionRecords(
+  accountId?: string,
+): Promise<IndexerTransaction[]> {
+  const account = accountId ?? process.env.STELLAR_INDEXER_ACCOUNT;
+
+  if (account) {
+    try {
+      return await indexAccountTransactions(account);
+    } catch (err) {
+      logger.warn(
+        'Horizon indexer failed; falling back to mock data',
+        ROUTE,
+        { error: String(err) },
+      );
+    }
+  }
+
+  return MOCK_TRANSACTIONS as unknown as IndexerTransaction[];
 }
 
 export function filterTransactions(

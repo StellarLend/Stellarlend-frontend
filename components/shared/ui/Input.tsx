@@ -1,7 +1,7 @@
 import React, { InputHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils/cn';
 
-interface BaseProps {
+export interface BaseProps {
   label?: string;
   error?: string;
   helperText?: string;
@@ -10,16 +10,16 @@ interface BaseProps {
   containerClassName?: string;
 }
 
-interface TextInputProps extends InputHTMLAttributes<HTMLInputElement>, BaseProps {
+export interface TextInputProps extends InputHTMLAttributes<HTMLInputElement>, BaseProps {
   multiline?: false;
 }
 
-interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement>, BaseProps {
+export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement>, BaseProps {
   multiline: true;
   rows?: number;
 }
 
-type InputProps = TextInputProps | TextAreaProps;
+export type InputProps = TextInputProps | TextAreaProps;
 
 export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, InputProps>(
   (props, ref) => {
