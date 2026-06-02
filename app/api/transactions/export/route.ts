@@ -6,6 +6,7 @@ import {
   serializeTransactionsToCSV,
 } from '@/lib/transactions';
 import type { TransactionFilters, TransactionStatus } from '@/lib/transactions';
+import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +22,7 @@ function parseFilters(searchParams: URLSearchParams): TransactionFilters {
   };
 }
 
-export async function GET(request: NextRequest) {
+async function handleExportTransactions(request: NextRequest) {
   const user = await getUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -43,3 +44,5 @@ export async function GET(request: NextRequest) {
     },
   });
 }
+
+export const GET = withRequestLogging('/api/transactions/export', handleExportTransactions);
