@@ -47,7 +47,28 @@ Key fields used by the API layer:
 ### lib/server-config.ts — Server-only secrets
 
 Imports `server-only` to prevent accidental client bundle inclusion.
-Reads `AUTH_SECRET`, `AUTH_ORACLE_API_KEY`, `SERVER_TOKEN` from env.
+Reads `AUTH_SECRET`, `AUTH_ORACLE_API_KEY`, `SERVER_TOKEN`, and database pool settings from env.
+
+### lib/db/pool.ts — PostgreSQL connection pool
+
+Creates a single `pg.Pool` instance for server-side routes.
+The pool is configured from:
+
+| Config | Env var | Default |
+|---|---|---|
+| `connectionString` | `DATABASE_URL` | required |
+| `max` | `DB_POOL_MAX` | `20` |
+| `idleTimeoutMillis` | `DB_POOL_IDLE_TIMEOUT_MS` | `30000` |
+| `connectionTimeoutMillis` | `DB_POOL_CONNECTION_TIMEOUT_MS` | `5000` |
+
+The health check uses a lightweight `SELECT 1` probe and exposes Prometheus metrics
+for `db_pool_total`, `db_pool_idle`, and `db_pool_waiting`.
+
+**Tuning guidance:** set `DB_POOL_MAX` to no more than the number of expected
+simultaneous requests plus the database's connection allowance. Use a moderate
+`idleTimeoutMillis` so unused connections are recycled without causing frequent
+reconnects. Keep `connectionTimeoutMillis` low enough that blocked requests fail
+fast when the pool is saturated.
 
 ### lib/auth.ts — Session management
 
