@@ -1,4 +1,5 @@
 import config from '@/lib/config';
+import { getActiveRequestId } from '@/lib/request-context';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -92,6 +93,23 @@ export function formatLog(entry: Omit<LogEntry, 'timestamp'>): string {
   return JSON.stringify(log);
 }
 
+function withActiveRequestContext(context: unknown): unknown {
+  const requestId = getActiveRequestId();
+  if (!requestId) {
+    return context;
+  }
+
+  if (context && typeof context === 'object' && !Array.isArray(context)) {
+    return { requestId, ...context };
+  }
+
+  if (context === undefined) {
+    return { requestId };
+  }
+
+  return { requestId, data: context };
+}
+
 function emit(level: LogLevel, message: string, route: string, options?: { status?: number; durationMs?: number; context?: unknown }) {
   if (!shouldLog(level)) {
     return;
@@ -103,7 +121,7 @@ function emit(level: LogLevel, message: string, route: string, options?: { statu
     message,
     status: options?.status,
     durationMs: options?.durationMs,
-    context: options?.context,
+    context: withActiveRequestContext(options?.context),
   });
 
   if (level === 'error') {

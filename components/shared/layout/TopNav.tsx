@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import Searchbar from "../common/Searchbar";
+import SearchBar from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu } from "lucide-react";
 

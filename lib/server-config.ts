@@ -1,6 +1,5 @@
 import 'server-only';
 
-// Runtime guard to prevent client-side imports
 if (typeof window !== 'undefined') {
   throw new Error('Internal Error: server-config.ts cannot be imported on the client side.');
 }
@@ -15,18 +14,23 @@ interface ServerConfig {
   server: {
     token: string;
   };
-  db: {
-    connectionString: string;
-    max: number;
-    idleTimeoutMs: number;
-    connectionTimeoutMs: number;
-  };
+  redisUrl: string;
 }
 
-const parseNumber = (value: string | undefined, fallback: number) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
+function parseHorizonUrls(rawValue?: string): string[] {
+  const rawList = rawValue?.trim() || '';
+  const urls = rawList
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(normalizeUrl);
+
+  return urls.length ? Array.from(new Set(urls)) : ['https://horizon-testnet.stellar.org'];
+}
+
+const horizonUrls = parseHorizonUrls(
+  process.env.STELLAR_HORIZON_URLS || process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL,
+);
 
 const serverConfig: ServerConfig = {
   oracle: {
@@ -38,12 +42,15 @@ const serverConfig: ServerConfig = {
   server: {
     token: process.env.SERVER_TOKEN || '',
   },
-  db: {
-    connectionString: process.env.DATABASE_URL || '',
-    max: parseNumber(process.env.DB_POOL_MAX, 20),
-    idleTimeoutMs: parseNumber(process.env.DB_POOL_IDLE_TIMEOUT_MS, 30000),
-    connectionTimeoutMs: parseNumber(process.env.DB_POOL_CONNECTION_TIMEOUT_MS, 5000),
-  },
+  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
 };
 
+export const AUDIT_RETENTION_DAYS = Number(process.env.AUDIT_RETENTION_DAYS ?? '30');
+export const SESSION_RETENTION_DAYS = Number(process.env.SESSION_RETENTION_DAYS ?? '30');
+export const SNAPSHOT_RETENTION_DAYS = Number(process.env.SNAPSHOT_RETENTION_DAYS ?? '30');
+
 export default serverConfig;
+export const CIRCUIT_FAILURE_RATE = Number(process.env.CIRCUIT_FAILURE_RATE ?? '0.5');
+export const CIRCUIT_MIN_CALLS = Number(process.env.CIRCUIT_MIN_CALLS ?? '20');
+export const CIRCUIT_COOLDOWN_MS = Number(process.env.CIRCUIT_COOLDOWN_MS ?? '60000'); // 60 seconds
+export const ENABLE_CHAOS_INJECTION = process.env.ENABLE_CHAOS_INJECTION === 'true';

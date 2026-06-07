@@ -8,6 +8,8 @@ Single source of truth for all asset symbols, transaction types, and transaction
 
 ## Supported Values
 
+
+
 ### Asset Symbols (`AssetSymbol`)
 
 | Symbol | Name            |

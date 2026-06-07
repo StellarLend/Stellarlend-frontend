@@ -64,8 +64,10 @@ Edit `.env.local` with your configuration:
 # Stellar Network Configuration
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
 NEXT_PUBLIC_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+STELLAR_HORIZON_URLS=https://horizon-testnet.stellar.org,https://horizon-backup.stellar.org
 NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 NEXT_PUBLIC_SOROBAN_CONTRACT_ID=GXXXXXXXXXXXXXXX...YOUR_CONTRACT_ID
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
 
 # API Configuration (if applicable)
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
@@ -75,7 +77,18 @@ NEXT_PUBLIC_ENABLE_ANALYTICS=false
 
 # Server Logging Configuration
 SERVER_LOG_LEVEL=info
+
+# Transaction Rate Limiting
+API_RATE_LIMIT_MAX=100
+API_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_MAX=30
+TX_ACCOUNT_RATE_LIMIT_WINDOW_MS=60000
+TX_ACCOUNT_RATE_LIMIT_BURST=60
 ```
+
+The Tx relay routes `/api/tx/build` and `/api/tx/submit` are protected by an account-scoped wallet limit. If a wallet exceeds the configured burst or window, the response returns `429` with `Retry-After` and standard `RateLimit-*` headers.
+
+Migration note: if you previously used `NEXT_PUBLIC_SOROBAN_RPC_URL`, rename it to `SOROBAN_RPC_URL` and restart the dev server or rebuild your deployment. The RPC endpoint now stays server-only so browsers cannot bypass the relay and its rate limits.
 
 Logging is emitted as structured JSON by `lib/logger.ts` and includes:
 - `timestamp`
@@ -109,7 +122,25 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-### 5. Build for Production
+### 5. Database Setup (Drizzle ORM & PostgreSQL)
+
+Stellarlend uses **Drizzle ORM** with a **PostgreSQL** database backend to persist accounts, sessions, notifications, transactions, and audit logs.
+
+1. Ensure your `.env.local` contains the database connection URL:
+   ```env
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/stellarlend
+   ```
+
+2. Run the migrations to initialize your local database:
+   ```bash
+   # Using npm
+   npm run db:migrate
+
+   # Using pnpm
+   pnpm db:migrate
+   ```
+
+### 6. Build for Production
 
 ```bash
 npm run build
@@ -283,6 +314,49 @@ We use [Conventional Commits](https://www.conventionalcommits.org/). Examples:
 
 For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## ⚙️ Background Workers & Job Queues
+
+Stellarlend uses **BullMQ** (backed by Redis) to process long-running, asynchronous tasks outside the Next.js API request lifecycle. This guarantees that user-facing API routes remain responsive and non-blocking.
+
+### Available Queues & Workers
+
+- **`indexer-queue`**: Periodically indexes on-chain transactions for Stellar accounts.
+  - Consumer worker: `src/jobs/indexer.worker.ts`
+- **`notifications-queue`**: Dispatches in-app notifications and manages user notification fan-out.
+  - Consumer worker: `src/jobs/notifications.worker.ts`
+
+### Configuration
+
+Set the `REDIS_URL` environment variable in your production or local configuration to point to your running Redis instance:
+
+```env
+REDIS_URL=redis://localhost:6379
+```
+
+### Worker Deployment
+
+In production environments, background workers should be run as persistent, standalone processes separate from the web server. You can run them using a process manager like PM2:
+
+```bash
+# Run Next.js web application
+npm start
+
+# Run background workers (using custom scripts or entrypoint)
+node dist/jobs/indexer.worker.js
+node dist/jobs/notifications.worker.js
+```
+
+Workers register graceful shutdown handlers for `SIGINT` and `SIGTERM`, so queue connections are closed cleanly during deploy rollouts or container termination.
+
+### Dead-letter queues
+
+Jobs that exhaust retries are copied into dedicated dead-letter queues for investigation and replay:
+
+- `indexer-dead-letter-queue`
+- `notifications-dead-letter-queue`
+
+Each dead-letter payload includes the original job id, input payload, error reason, and failure timestamp.
+
 ## 🚢 Deployment
 
 ### Vercel (Recommended)
@@ -305,6 +379,10 @@ npm start
 ```
 
 For more deployment options, see the [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying).
+
+### Scheduled jobs
+
+Cron registration is protected by Postgres advisory-lock leader election so only one application replica schedules retention, snapshot, and indexer health-check jobs. See [docs/scheduler-leader-election.md](docs/scheduler-leader-election.md) and [docs/infrastructure/README.md](docs/infrastructure/README.md) for failover and recovery procedures.
 
 ## 📝 Scripts Reference
 
