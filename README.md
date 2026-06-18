@@ -6,6 +6,10 @@ Stellarlend is a decentralized finance (DeFi) lending platform built on the Stel
 
 This frontend application provides a modern, responsive web interface for interacting with the Stellarlend protocol, featuring real-time transaction tracking, interest rate calculations, and comprehensive dashboard analytics.
 
+## Developer Guides
+
+- [Lending and borrowing data flow](docs/LENDING_FLOW.md)
+
 ## 🚀 Features
 
 - **Lending & Borrowing**: Earn interest by lending assets or borrow against collateral
