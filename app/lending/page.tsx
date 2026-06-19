@@ -1,13 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import LendingForm from '@/components/features/lending/components/LendingForm';
-import BorrowingForm from '@/components/features/lending/components/BorrowingForm';
-import InterestCalculator from '@/components/features/lending/components/InterestCalculator';
-import TransactionSummary from '@/components/features/lending/components/TransactionSummary';
-import ConfirmModal from '@/components/features/lending/components/ConfirmModal';
-import TabSelector from '@/components/features/lending/components/TabSelector';
 import { PageHeader } from '@/components/shared/common';
+import { Skeleton } from '@/components/shared/common/Skeleton';
+
+const BorrowingForm = dynamic(() => import('@/components/features/lending/components/BorrowingForm'), {
+  loading: () => <div className="space-y-4 animate-pulse"><Skeleton className="h-64 w-full" /></div>,
+});
+const InterestCalculator = dynamic(() => import('@/components/features/lending/components/InterestCalculator'), {
+  loading: () => <div className="space-y-4 animate-pulse"><Skeleton className="h-64 w-full" /></div>,
+});
+const TransactionSummary = dynamic(() => import('@/components/features/lending/components/TransactionSummary'), {
+  loading: () => <div className="space-y-4 animate-pulse"><Skeleton className="h-40 w-full" /></div>,
+});
+const ConfirmModal = dynamic(() => import('@/components/features/lending/components/ConfirmModal'));
+import TabSelector from '@/components/features/lending/components/TabSelector';
 
 export type { LendingData, CalculationResult } from '@/lib/lending/types';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
