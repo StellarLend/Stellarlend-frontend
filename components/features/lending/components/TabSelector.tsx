@@ -1,31 +1,36 @@
+import type { LendingActionType } from "@/lib/lending/types";
+
 interface TabSelectorProps {
-    activeTab: 'lend' | 'borrow';
-    onTabChange: (tab: 'lend' | 'borrow') => void;
-  }
-  
-  export default function TabSelector({ activeTab, onTabChange }: TabSelectorProps) {
-    return (
-      <div className="flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+  activeTab: LendingActionType;
+  onTabChange: (tab: LendingActionType) => void;
+}
+
+const TABS: Array<{ value: LendingActionType; label: string }> = [
+  { value: "lend", label: "Lend Assets" },
+  { value: "borrow", label: "Borrow Assets" },
+  { value: "repay", label: "Repay Loan" },
+];
+
+export default function TabSelector({
+  activeTab,
+  onTabChange,
+}: TabSelectorProps) {
+  return (
+    <div className="flex bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+      {TABS.map((tab) => (
         <button
-          onClick={() => onTabChange('lend')}
-          className={`flex-1 px-6 py-3 rounded-md text-sm font-medium transition-all duration-200 ${
-            activeTab === 'lend'
-              ? 'bg-green-500 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+          key={tab.value}
+          type="button"
+          onClick={() => onTabChange(tab.value)}
+          className={`flex-1 px-4 py-3 rounded-md text-sm font-medium transition-all duration-200 ${
+            activeTab === tab.value
+              ? "bg-green-500 text-white shadow-sm"
+              : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          Lend Assets
+          {tab.label}
         </button>
-        <button
-          onClick={() => onTabChange('borrow')}
-          className={`flex-1 px-6 py-3 rounded-md text-sm font-medium transition-all duration-200 ${
-            activeTab === 'borrow'
-              ? 'bg-green-500 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Borrow Assets
-        </button>
-      </div>
-    );
-  }
+      ))}
+    </div>
+  );
+}
