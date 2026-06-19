@@ -420,4 +420,105 @@ describe("lending quote properties", () => {
       { numRuns: 100, seed: 42 }
     );
   });
+
+  /**
+   * Property 11: Invalid numeric inputs are rejected without throwing
+   * Both quote modes should use the structured error branch for non-positive
+   * and non-finite amount, rate, or duration inputs.
+   */
+  it("property: invalid amount inputs return INVALID_INPUT for lend and borrow", () => {
+    const invalidNumber = fc.oneof(
+      fc.constant(0),
+      fc.double({ min: -1_000_000, max: 0, noNaN: true }),
+      fc.constant(Number.NaN),
+      fc.constant(Number.POSITIVE_INFINITY),
+      fc.constant(Number.NEGATIVE_INFINITY)
+    );
+
+    fc.assert(
+      fc.property(
+        invalidNumber,
+        fc.constantFrom("lend", "borrow"),
+        (amount, type) => {
+          const result = calculateQuote(type, {
+            asset: "XLM",
+            amount,
+            interestRate: 8,
+            duration: 30,
+          });
+
+          expect(result.ok).toBe(false);
+          if (result.ok) {
+            throw new Error("expected invalid amount to fail");
+          }
+          expect(result.error.code).toBe("INVALID_INPUT");
+        }
+      ),
+      { numRuns: 100, seed: 42 }
+    );
+  });
+
+  it("property: invalid interest rates return INVALID_INPUT for lend and borrow", () => {
+    const invalidNumber = fc.oneof(
+      fc.constant(0),
+      fc.double({ min: -1_000_000, max: 0, noNaN: true }),
+      fc.constant(Number.NaN),
+      fc.constant(Number.POSITIVE_INFINITY),
+      fc.constant(Number.NEGATIVE_INFINITY)
+    );
+
+    fc.assert(
+      fc.property(
+        invalidNumber,
+        fc.constantFrom("lend", "borrow"),
+        (interestRate, type) => {
+          const result = calculateQuote(type, {
+            asset: "XLM",
+            amount: 1_000,
+            interestRate,
+            duration: 30,
+          });
+
+          expect(result.ok).toBe(false);
+          if (result.ok) {
+            throw new Error("expected invalid interest rate to fail");
+          }
+          expect(result.error.code).toBe("INVALID_INPUT");
+        }
+      ),
+      { numRuns: 100, seed: 43 }
+    );
+  });
+
+  it("property: invalid durations return INVALID_INPUT for lend and borrow", () => {
+    const invalidNumber = fc.oneof(
+      fc.constant(0),
+      fc.double({ min: -1_000_000, max: 0, noNaN: true }),
+      fc.constant(Number.NaN),
+      fc.constant(Number.POSITIVE_INFINITY),
+      fc.constant(Number.NEGATIVE_INFINITY)
+    );
+
+    fc.assert(
+      fc.property(
+        invalidNumber,
+        fc.constantFrom("lend", "borrow"),
+        (duration, type) => {
+          const result = calculateQuote(type, {
+            asset: "XLM",
+            amount: 1_000,
+            interestRate: 8,
+            duration,
+          });
+
+          expect(result.ok).toBe(false);
+          if (result.ok) {
+            throw new Error("expected invalid duration to fail");
+          }
+          expect(result.error.code).toBe("INVALID_INPUT");
+        }
+      ),
+      { numRuns: 100, seed: 44 }
+    );
+  });
 });
