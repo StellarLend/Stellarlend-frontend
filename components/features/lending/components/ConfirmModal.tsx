@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
+import type { LendingActionType } from "@/lib/lending/types";
 import { cn } from "@/lib/utils/cn";
 
 interface ConfirmModalProps {
@@ -10,7 +11,7 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   data: LendingData;
   calculation: CalculationResult | null;
-  type: "lend" | "borrow";
+  type: LendingActionType;
 }
 
 export default function ConfirmModal({
@@ -23,33 +24,44 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasAgreed, setHasAgreed] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [submitMessage, setSubmitMessage] = useState('');
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "success" | "error"
+  >("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
 
   useEffect(() => {
     if (isOpen) {
-      setSubmitStatus('idle');
-      setSubmitMessage('');
+      setSubmitStatus("idle");
+      setSubmitMessage("");
       setHasAgreed(false);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const actionLabel =
+    type === "lend" ? "Lending" : type === "borrow" ? "Borrowing" : "Repayment";
+  const amountLabel =
+    type === "lend"
+      ? "Amount to Lend"
+      : type === "borrow"
+        ? "Amount to Borrow"
+        : "Amount to Repay";
+
   const handleConfirm = async () => {
     if (!hasAgreed) return;
 
     setIsConfirming(true);
-    setSubmitStatus('idle');
-    setSubmitMessage('');
+    setSubmitStatus("idle");
+    setSubmitMessage("");
     try {
       await onConfirm();
-      setSubmitStatus('success');
-      setSubmitMessage('Transaction confirmed successfully!');
+      setSubmitStatus("success");
+      setSubmitMessage("Transaction confirmed successfully!");
       setTimeout(onClose, 2000);
     } catch (err) {
-      setSubmitStatus('error');
-      setSubmitMessage('Transaction failed. Please try again.');
+      setSubmitStatus("error");
+      setSubmitMessage("Transaction failed. Please try again.");
     } finally {
       setIsConfirming(false);
     }
@@ -76,7 +88,7 @@ export default function ConfirmModal({
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">
-              Confirm {type === "lend" ? "Lending" : "Borrowing"} Transaction
+              Confirm {actionLabel} Transaction
             </h3>
             <button
               onClick={onClose}
@@ -103,9 +115,9 @@ export default function ConfirmModal({
             <div
               className={cn(
                 "p-3 rounded-lg mb-4 text-sm font-medium",
-                submitStatus === 'success' 
-                  ? "bg-green-50 text-green-800 border border-green-200" 
-                  : "bg-red-50 text-red-800 border border-red-200"
+                submitStatus === "success"
+                  ? "bg-green-50 text-green-800 border border-green-200"
+                  : "bg-red-50 text-red-800 border border-red-200",
               )}
               role="alert"
               aria-live="polite"
@@ -136,7 +148,7 @@ export default function ConfirmModal({
                     type === "lend" ? "text-green-600" : "text-blue-600"
                   }`}
                 >
-                  {type === "lend" ? "Amount to Lend" : "Amount to Borrow"}
+                  {amountLabel}
                 </div>
               </div>
             </div>
@@ -150,14 +162,43 @@ export default function ConfirmModal({
                 </span>
               </div>
 
-              {type === "borrow" && data.duration && (
+              {(type === "borrow" || type === "repay") && data.duration && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Loan Duration</span>
                   <span className="font-medium">{data.duration} days</span>
                 </div>
               )}
 
-              {calculation && (
+              {type === "repay" && (
+                <>
+                  {data.positionId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Position</span>
+                      <span className="font-medium">{data.positionId}</span>
+                    </div>
+                  )}
+                  {typeof data.remainingDebt === "number" && (
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="font-medium">Remaining Debt</span>
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(data.remainingDebt, data.asset)}
+                      </span>
+                    </div>
+                  )}
+                  {typeof data.healthFactorAfter === "number" && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">New Health Factor</span>
+                      <span className="font-medium text-green-600">
+                        {Number.isFinite(data.healthFactorAfter)
+                          ? data.healthFactorAfter.toFixed(2)
+                          : "Debt cleared"}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {calculation && type !== "repay" && (
                 <>
                   {type === "lend" ? (
                     <>
@@ -214,19 +255,23 @@ export default function ConfirmModal({
             </div>
 
             {/* Collateral Info for Borrowing */}
-            {type === "borrow" && data.collateral && data.collateralAmount && (
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h4 className="font-medium text-yellow-800 mb-2">
-                  Collateral Required
-                </h4>
-                <div className="flex justify-between text-sm">
-                  <span className="text-yellow-700">Asset & Amount</span>
-                  <span className="font-medium">
-                    {formatCurrency(data.collateralAmount, data.collateral)}
-                  </span>
+            {(type === "borrow" || type === "repay") &&
+              data.collateral &&
+              data.collateralAmount && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h4 className="font-medium text-yellow-800 mb-2">
+                    {type === "repay"
+                      ? "Collateral Securing Position"
+                      : "Collateral Required"}
+                  </h4>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-yellow-700">Asset & Amount</span>
+                    <span className="font-medium">
+                      {formatCurrency(data.collateralAmount, data.collateral)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
 
           {/* Terms Agreement */}
@@ -271,7 +316,9 @@ export default function ConfirmModal({
                 hasAgreed && !isConfirming
                   ? type === "lend"
                     ? "bg-green-500 hover:bg-green-600"
-                    : "bg-blue-500 hover:bg-blue-600"
+                    : type === "repay"
+                      ? "bg-green-500 hover:bg-green-600"
+                      : "bg-blue-500 hover:bg-blue-600"
                   : "bg-gray-300 cursor-not-allowed"
               }`}
             >
@@ -299,7 +346,7 @@ export default function ConfirmModal({
                   Processing...
                 </div>
               ) : (
-                `Confirm ${type === "lend" ? "Lending" : "Borrowing"}`
+                `Confirm ${actionLabel}`
               )}
             </button>
           </div>
