@@ -25,29 +25,25 @@ export function verifyWebhookSignature(
   signature: string,
   secret: string,
 ): boolean {
-  if (!signature || !secret || !payload) {
+  if (!secret || !payload) {
     return false;
   }
 
   const prefix = "sha256=";
-  if (!signature.startsWith(prefix)) {
-    return false;
-  }
-
-  const receivedHex = signature.slice(prefix.length);
   const expectedHex = createHmac("sha256", secret)
     .update(payload)
     .digest("hex");
+  const expected = Buffer.from(expectedHex, "hex");
 
-  // timingSafeEqual requires equal-length buffers
-  if (receivedHex.length !== expectedHex.length) {
-    return false;
-  }
+  const receivedHex = signature.startsWith(prefix)
+    ? signature.slice(prefix.length)
+    : "";
+  const hasValidDigestShape = /^[0-9a-fA-F]{64}$/.test(receivedHex);
+  const received = hasValidDigestShape
+    ? Buffer.from(receivedHex, "hex")
+    : Buffer.alloc(expected.length);
 
-  return timingSafeEqual(
-    Buffer.from(receivedHex, "hex"),
-    Buffer.from(expectedHex, "hex"),
-  );
+  return timingSafeEqual(received, expected) && hasValidDigestShape;
 }
 
 /**

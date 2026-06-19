@@ -26,6 +26,13 @@ HMAC-SHA256(WEBHOOK_SECRET, raw-request-body)
 
 > **Important:** The signature is computed over the **raw** request body string — not a re-serialised version. Whitespace, key order, and encoding must be preserved exactly.
 
+### Constant-Time Verification
+
+The server compares webhook signatures with Node.js `crypto.timingSafeEqual`.
+Malformed, missing, wrong-length, and wrong-value signatures all return the same
+`401` response and do not include the received signature or shared secret in the
+response body.
+
 ### Environment Variable
 
 | Variable | Required | Description |

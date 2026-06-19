@@ -53,6 +53,15 @@ describe("verifyWebhookSignature", () => {
   it("returns false when hex digest has wrong length", () => {
     expect(verifyWebhookSignature(payload, "sha256=abcd", secret)).toBe(false);
   });
+
+  it("returns false when hex digest has the right length but invalid characters", () => {
+    expect(verifyWebhookSignature(payload, `sha256=${"z".repeat(64)}`, secret)).toBe(false);
+  });
+
+  it("accepts uppercase hex digest characters", () => {
+    const sig = signPayload(payload, secret).toUpperCase().replace("SHA256=", "sha256=");
+    expect(verifyWebhookSignature(payload, sig, secret)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

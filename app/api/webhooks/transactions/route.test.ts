@@ -133,6 +133,29 @@ describe("POST /api/webhooks/transactions – signature verification", () => {
     const res = await POST(req);
     expect(res.status).toBe(401);
   });
+
+  it("returns 401 when signature digest has the wrong length", async () => {
+    const body = JSON.stringify(makePayload());
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "sha256=abcd" });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+
+    const json = await res.json();
+    expect(json.error).toMatch(/signature/i);
+    expect(json.error).not.toContain("abcd");
+  });
+
+  it("returns 401 when signature digest contains non-hex characters", async () => {
+    const body = JSON.stringify(makePayload());
+    const req = makeWebhookRequest(body, {
+      [SIGNATURE_HEADER]: `sha256=${"z".repeat(64)}`,
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+
+    const json = await res.json();
+    expect(json.error).toBe("Invalid or missing webhook signature");
+  });
 });
 
 // ---------------------------------------------------------------------------
