@@ -521,4 +521,88 @@ describe("lending quote properties", () => {
       { numRuns: 100, seed: 44 }
     );
   });
+
+  it("property: lending earnings increase monotonically with duration", () => {
+    fc.assert(
+      fc.property(
+        fc.tuple(
+          fc.integer({ min: 1, max: 3650 }),
+          fc.integer({ min: 1, max: 3650 }),
+          fc.float({ min: 1, max: 1_000_000, noNaN: true }),
+          fc.float({ min: 0.001, max: 100, noNaN: true })
+        ),
+        ([duration1, duration2, amount, interestRate]) => {
+          const d1 = Math.min(duration1, duration2);
+          const d2 = Math.max(duration1, duration2);
+
+          const result1 = calculateQuote("lend", {
+            asset: "XLM",
+            amount,
+            interestRate,
+            duration: d1,
+          });
+
+          const result2 = calculateQuote("lend", {
+            asset: "XLM",
+            amount,
+            interestRate,
+            duration: d2,
+          });
+
+          if (!result1.ok || !result2.ok) {
+            throw new Error(
+              `Unexpected failure: ${!result1.ok ? result1.error.message : result2.error.message}`
+            );
+          }
+
+          expect(result2.result.totalEarnings).toBeGreaterThanOrEqual(
+            result1.result.totalEarnings - 1e-10
+          );
+        }
+      ),
+      { numRuns: 100, seed: 45 }
+    );
+  });
+
+  it("property: borrowing repayment increases monotonically with duration", () => {
+    fc.assert(
+      fc.property(
+        fc.tuple(
+          fc.integer({ min: 1, max: 3650 }),
+          fc.integer({ min: 1, max: 3650 }),
+          fc.float({ min: 1, max: 1_000_000, noNaN: true }),
+          fc.float({ min: 0.001, max: 100, noNaN: true })
+        ),
+        ([duration1, duration2, amount, interestRate]) => {
+          const d1 = Math.min(duration1, duration2);
+          const d2 = Math.max(duration1, duration2);
+
+          const result1 = calculateQuote("borrow", {
+            asset: "XLM",
+            amount,
+            interestRate,
+            duration: d1,
+          });
+
+          const result2 = calculateQuote("borrow", {
+            asset: "XLM",
+            amount,
+            interestRate,
+            duration: d2,
+          });
+
+          if (!result1.ok || !result2.ok) {
+            throw new Error(
+              `Unexpected failure: ${!result1.ok ? result1.error.message : result2.error.message}`
+            );
+          }
+
+          expect(result2.result.totalRepayment ?? 0).toBeGreaterThanOrEqual(
+            (result1.result.totalRepayment ?? 0) - 1e-10
+          );
+        }
+      ),
+      { numRuns: 100, seed: 46 }
+    );
+  });
 });
