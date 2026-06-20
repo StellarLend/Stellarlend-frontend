@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
+import { walletAddressSchema } from '@/lib/positions/queryParams';
 import { withRequestLogging } from '@/lib/api/handler';
 import { computeLiquidations, generateMockPositions } from '@/lib/positions/liquidation';
 
@@ -12,11 +13,14 @@ async function handleLiquidations(request?: NextRequest) {
 
   const walletParam = request?.nextUrl?.searchParams.get('wallet') ?? null;
 
-  if (walletParam && walletParam.length > 56) {
-    return NextResponse.json(
-      { error: 'Invalid wallet address' },
-      { status: 400 },
-    );
+  if (walletParam !== null) {
+    const parsed = walletAddressSchema.safeParse(walletParam);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid wallet address', details: parsed.error.issues[0]?.message },
+        { status: 400 },
+      );
+    }
   }
 
   const walletAddress = walletParam || user.walletAddress || 'GA-mock-address';

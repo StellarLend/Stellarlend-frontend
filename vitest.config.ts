@@ -91,6 +91,7 @@ export default defineConfig({
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
+            "app/api/liquidations/route.test.ts",
             "__tests__/**/*.test.ts",
           ],
         },
