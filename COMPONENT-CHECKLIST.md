@@ -39,3 +39,4 @@
 - [ ] ARIA attributes
 - [ ] Keyboard navigation
 - [ ] Screen reader support
+- [ ] Tabs use role="tablist"/`role="tab"`, `aria-selected`, roving tabIndex, and arrow-key navigation
