@@ -10,6 +10,7 @@ This frontend application provides a modern, responsive web interface for intera
 
 - [Lending and borrowing data flow](docs/LENDING_FLOW.md)
 - [Borrow repayment flow](docs/REPAY_FLOW.md)
+- [Environment variables reference](docs/ENVIRONMENT.md)
 
 ## ?? Features
 
@@ -56,6 +57,8 @@ bun install
 ```
 
 ### 3. Environment Variables
+
+See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for the complete public/server-only variable reference and `.env.example` sync checks.
 
 Create a `.env.local` file in the root directory:
 
