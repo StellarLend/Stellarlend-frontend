@@ -91,6 +91,8 @@ TX_ACCOUNT_RATE_LIMIT_WINDOW_MS=60000
 TX_ACCOUNT_RATE_LIMIT_BURST=60
 ```
 
+
+See **[docs/ENVIRONMENT.md](docs/ENVIRONMENT.md)** for the complete environment-variable reference.
 The Tx relay routes `/api/tx/build` and `/api/tx/submit` are protected by an account-scoped wallet limit. If a wallet exceeds the configured burst or window, the response returns `429` with `Retry-After` and standard `RateLimit-*` headers.
 
 Migration note: if you previously used `NEXT_PUBLIC_SOROBAN_RPC_URL`, rename it to `SOROBAN_RPC_URL` and restart the dev server or rebuild your deployment. The RPC endpoint now stays server-only so browsers cannot bypass the relay and its rate limits.
