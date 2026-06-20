@@ -1,6 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useTxStatus from "@/lib/tx/useTxStatus";
+import { Toast } from "@/components/shared/common";
+import LendingForm from "@/components/features/lending/components/LendingForm";
+import BorrowingForm from "@/components/features/lending/components/BorrowingForm";
+import InterestCalculator from "@/components/features/lending/components/InterestCalculator";
+import TransactionSummary from "@/components/features/lending/components/TransactionSummary";
+import ConfirmModal from "@/components/features/lending/components/ConfirmModal";
+import TabSelector from "@/components/features/lending/components/TabSelector";
+import { PageHeader } from "@/components/shared/common";
+
 import dynamic from "next/dynamic";
 import LendingForm from "@/components/features/lending/components/LendingForm";
 import { PageHeader } from "@/components/shared/common";
@@ -56,6 +66,7 @@ export type { LendingData, CalculationResult } from "@/lib/lending/types";
 import type { LendingData, CalculationResult } from "@/lib/lending/types";
 
 export default function LendingPage() {
+  const [activeTab, setActiveTab] = useState<"lend" | "borrow">("lend");
   const [activeTab, setActiveTab] = useState<LendingActionType>("lend");
   const [lendingData, setLendingData] = useState<LendingData>({
     asset: "XLM",
@@ -86,6 +97,13 @@ export default function LendingPage() {
   const [calculationResult, setCalculationResult] =
     useState<CalculationResult | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    variant: "processing" | "success" | "error" | "info";
+    title?: string;
+    description?: string;
+  } | null>(null);
+  const txStatus = useTxStatus(txHash);
 
   // Hydrate default interest rates from the live /api/markets endpoint.
   // Falls back silently to the hardcoded values above if the fetch fails.
@@ -139,6 +157,87 @@ export default function LendingPage() {
   };
 
   const handleConfirm = async () => {
+    setShowConfirmModal(false);
+    const payload = {
+      signedEnvelopeXdr: JSON.stringify({
+        action: activeTab,
+        data: activeTab === "lend" ? lendingData : borrowingData,
+      }),
+    };
+    try {
+      const res = await fetch("/api/tx/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 429) {
+        const json = await res.json().catch(() => ({}));
+        setToast({
+          variant: "error",
+          title: "Rate limited",
+          description:
+            json?.error?.message || "Too many requests. Try again later.",
+        });
+        return;
+      }
+
+      const json = await res.json();
+      if (res.ok && json?.status === "submitted" && json?.hash) {
+        setTxHash(json.hash);
+        setToast({
+          variant: "processing",
+          title: "Transaction submitted",
+          description: "Waiting for on-chain settlement...",
+        });
+      } else {
+        setToast({
+          variant: "error",
+          title: "Submission failed",
+          description: json?.error?.message || "Unable to submit transaction",
+        });
+      }
+    } catch (err) {
+      setToast({
+        variant: "error",
+        title: "Submission error",
+        description: String(err),
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!txStatus) return;
+    if (txStatus.state === "processing") {
+      setToast({
+        variant: "processing",
+        title: "Processing",
+        description: "Transaction is being processed on-chain",
+      });
+    } else if (txStatus.state === "completed") {
+      setToast({
+        variant: "success",
+        title: "Completed",
+        description: "Transaction settled on-chain",
+      });
+      setTimeout(() => setTxHash(null), 2000);
+    } else if (txStatus.state === "failed") {
+      setToast({
+        variant: "error",
+        title: "Failed",
+        description: "Transaction failed on-chain",
+      });
+      setTimeout(() => setTxHash(null), 2000);
+    } else if (txStatus.state === "rate_limited") {
+      setToast({
+        variant: "error",
+        title: "Rate limited",
+        description: `Rate limited by relay. Retry after ${txStatus.retryAfterSeconds || "some"}s`,
+      });
+    }
+  }, [txStatus]);
+
+  const currentData = activeTab === "lend" ? lendingData : borrowingData;
     console.log("Submitting:", currentData);
     setShowConfirmModal(false);
   };
@@ -233,6 +332,13 @@ export default function LendingPage() {
           calculation={calculationResult}
           type={activeTab}
         />
+        {toast && (
+          <Toast
+            variant={toast.variant}
+            title={toast.title}
+            description={toast.description}
+          />
+        )}
       </div>
     </div>
   );
