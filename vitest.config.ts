@@ -4,14 +4,41 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
-
 const dirname =
     typeof __dirname !== "undefined"
         ? __dirname
         : path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
+export default defineConfig(async () => {
+  const storybookProjects =
+    process.env.VITEST_ENABLE_STORYBOOK === "1"
+      ? [
+          {
+            extends: true,
+
+            plugins: [
+              (await import("@storybook/addon-vitest/vitest-plugin")).storybookTest({
+                configDir: path.join(dirname, ".storybook"),
+              }),
+            ],
+
+            test: {
+              name: "storybook",
+
+              browser: {
+                enabled: true,
+                headless: true,
+                provider: "playwright",
+                instances: [{ browser: "chromium" }],
+              },
+
+              setupFiles: [".storybook/vitest.setup.ts"],
+            },
+          },
+        ]
+      : [];
+
+  return {
   plugins: [
     react(),
     tsconfigPaths(),
@@ -41,26 +68,7 @@ export default defineConfig({
     },
 
     projects: [
-      {
-        extends: true,
-
-        plugins: [
-          storybookTest({ configDir: path.join(dirname, ".storybook") }),
-        ],
-
-        test: {
-          name: "storybook",
-
-          browser: {
-            enabled: true,
-            headless: true,
-            provider: "playwright",
-            instances: [{ browser: "chromium" }],
-          },
-
-          setupFiles: [".storybook/vitest.setup.ts"],
-        },
-      },
+      ...storybookProjects,
 
       {
         extends: true,
@@ -91,7 +99,9 @@ export default defineConfig({
           include: [
             "types/enums.test.ts",
             "app/api/transactions/route.test.ts",
+            "app/api/liquidations/route.test.ts",
             "__tests__/**/*.test.ts",
+            "lib/lending/**/*.test.ts",
           ],
         },
       },
@@ -99,7 +109,7 @@ export default defineConfig({
         test: {
           name: "server",
           environment: "node",
-          include: ["test/server/**/*.test.ts"],
+          include: ["test/server/**/*.test.ts", "lib/lending/**/*.test.ts"],
           alias: {
             "@": path.resolve(dirname, "."),
           },
@@ -138,4 +148,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });
