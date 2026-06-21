@@ -35,9 +35,10 @@ jobs:
 
       - name: Bundle size analysis
         run: |
-          npm ci
-          npm run build
-          npx bundlewatch --config bundlewatch.config.json
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm exec bundlewatch --config bundlewatch.config.json
 
       - name: Comment PR with performance results
         if: github.event_name == 'pull_request'
