@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen } from "@/test/test-utils";
-import PositionSummary from "./PositionSummary";
+import PositionSummary, { arePositionSummaryPropsEqual } from "./PositionSummary";
 import { describe, it, expect } from "vitest";
 
 describe("PositionSummary Component", () => {
@@ -410,6 +410,40 @@ describe("PositionSummary Component", () => {
 
       const container = screen.getByRole("region");
       expect(container).toHaveClass("transition-colors");
+    });
+  });
+
+  describe("Performance memoisation", () => {
+    it("treats equivalent position data objects as unchanged during polling", () => {
+      expect(
+        arePositionSummaryPropsEqual(
+          { data: mockHealthyData, isLoading: false },
+          {
+            data: {
+              suppliedFunds: mockHealthyData.suppliedFunds,
+              borrowedAmount: mockHealthyData.borrowedAmount,
+              healthFactor: mockHealthyData.healthFactor,
+            },
+            isLoading: false,
+          },
+        ),
+      ).toBe(true);
+    });
+
+    it("rerenders when health inputs or loading state change", () => {
+      expect(
+        arePositionSummaryPropsEqual(
+          { data: mockHealthyData, isLoading: false },
+          { data: mockAtRiskData, isLoading: false },
+        ),
+      ).toBe(false);
+
+      expect(
+        arePositionSummaryPropsEqual(
+          { data: mockHealthyData, isLoading: false },
+          { data: mockHealthyData, isLoading: true },
+        ),
+      ).toBe(false);
     });
   });
 });

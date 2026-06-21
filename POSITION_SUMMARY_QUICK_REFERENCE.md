@@ -82,6 +82,12 @@ The component is already integrated into the dashboard:
 4. Component renders with appropriate styling
 5. Displays breakdown of supplied/borrowed amounts
 
+## Performance
+
+- `PositionSummary` memoises derived net-position and health-status display values from the specific input fields (`suppliedFunds`, `borrowedAmount`, `healthFactor`, and `isLoading`) instead of the full `data` object reference.
+- The exported component is wrapped in `React.memo` with a field-level comparator, so dashboard polling that returns a new object with unchanged values does not force the summary card to render again.
+- Before: identical polling payloads with new object references could still re-enter the component subtree. After: the comparator skips those renders until one of the displayed health inputs or loading state changes.
+
 ## 🎨 Styling
 
 - **Container**: Dark green gradient with border

@@ -1,15 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo, type FC } from "react";
 import { AlertCircle, TrendingUp } from "lucide-react";
 
-interface PositionData {
+export interface PositionData {
   suppliedFunds: string;
   borrowedAmount: string;
   healthFactor: number;
 }
 
-interface PositionSummaryProps {
+export interface PositionSummaryProps {
   data: PositionData | null;
   isLoading?: boolean;
 }
@@ -88,6 +88,29 @@ function formatCurrencyValue(value: number): string {
   }).format(value);
 }
 
+export function arePositionSummaryPropsEqual(
+  previous: PositionSummaryProps,
+  next: PositionSummaryProps,
+): boolean {
+  if (previous.isLoading !== next.isLoading) {
+    return false;
+  }
+
+  if (previous.data === next.data) {
+    return true;
+  }
+
+  if (!previous.data || !next.data) {
+    return false;
+  }
+
+  return (
+    previous.data.suppliedFunds === next.data.suppliedFunds &&
+    previous.data.borrowedAmount === next.data.borrowedAmount &&
+    previous.data.healthFactor === next.data.healthFactor
+  );
+}
+
 /**
  * PositionSummary Component
  *
@@ -100,39 +123,42 @@ function formatCurrencyValue(value: number): string {
  * - High contrast for health indicators
  * - Non-color-dependent status communication
  */
-export const PositionSummary: React.FC<PositionSummaryProps> = ({
+const PositionSummaryComponent: FC<PositionSummaryProps> = ({
   data,
   isLoading = false,
 }) => {
+  const suppliedFunds = data?.suppliedFunds ?? "";
+  const borrowedAmount = data?.borrowedAmount ?? "";
+  const healthFactor = data?.healthFactor ?? 0;
+
   const {
-    netPosition,
     formattedNetPosition,
+    formattedHealthFactor,
     healthStatus,
-    supplied,
-    borrowed,
+    isPositive,
   } = useMemo(() => {
-    if (!data || isLoading) {
+    if (!suppliedFunds || !borrowedAmount || isLoading) {
       return {
         netPosition: 0,
         formattedNetPosition: "$0.00",
+        formattedHealthFactor: "0.00",
         healthStatus: getHealthStatus(0),
-        supplied: 0,
-        borrowed: 0,
+        isPositive: true,
       };
     }
 
-    const suppliedNum = parseFormattedCurrency(data.suppliedFunds);
-    const borrowedNum = parseFormattedCurrency(data.borrowedAmount);
+    const suppliedNum = parseFormattedCurrency(suppliedFunds);
+    const borrowedNum = parseFormattedCurrency(borrowedAmount);
     const net = suppliedNum - borrowedNum;
 
     return {
       netPosition: net,
       formattedNetPosition: formatCurrencyValue(net),
-      healthStatus: getHealthStatus(data.healthFactor),
-      supplied: suppliedNum,
-      borrowed: borrowedNum,
+      formattedHealthFactor: healthFactor.toFixed(2),
+      healthStatus: getHealthStatus(healthFactor),
+      isPositive: net >= 0,
     };
-  }, [data, isLoading]);
+  }, [borrowedAmount, healthFactor, isLoading, suppliedFunds]);
 
   if (isLoading) {
     return (
@@ -160,9 +186,6 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
       </div>
     );
   }
-
-  const isPositive = netPosition >= 0;
-  const trend = data.healthFactor >= 2.0 ? "improving" : "worsening";
 
   return (
     <div
@@ -231,9 +254,9 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
             </h3>
             <span
               className={`${healthStatus.color} text-xs font-semibold px-2 py-1 rounded`}
-              aria-label={`Health factor: ${data.healthFactor.toFixed(2)}`}
+              aria-label={`Health factor: ${formattedHealthFactor}`}
             >
-              {data.healthFactor.toFixed(2)}x
+              {formattedHealthFactor}x
             </span>
           </div>
           <p className="text-[#AAABAB] text-sm font-medium">
@@ -274,5 +297,12 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
     </div>
   );
 };
+
+PositionSummaryComponent.displayName = "PositionSummary";
+
+export const PositionSummary = memo(
+  PositionSummaryComponent,
+  arePositionSummaryPropsEqual,
+);
 
 export default PositionSummary;
