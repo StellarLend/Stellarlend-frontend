@@ -14,6 +14,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
       - name: Wait for deployment
         if: github.event_name == 'pull_request'
         uses: fountainhead/action-wait-for-check@v1.1.0
@@ -35,7 +48,6 @@ jobs:
 
       - name: Bundle size analysis
         run: |
-          corepack enable
           pnpm install --frozen-lockfile
           pnpm run build
           pnpm exec bundlewatch --config bundlewatch.config.json
