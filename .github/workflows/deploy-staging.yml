@@ -3,12 +3,22 @@ name: Deploy to Staging
 on:
   push:
     branches: [develop]
-
-environment: staging
+  pull_request:
+    branches: [main]
 
 jobs:
-  deploy-staging:
+  validate-staging-workflow:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Skip staging deployment for pull requests
+        run: echo "Staging deployment only runs for pushes to develop."
+
+  deploy-staging:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
     
     steps:
       - name: Checkout code
