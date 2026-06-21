@@ -26,11 +26,19 @@ HMAC-SHA256(WEBHOOK_SECRET, raw-request-body)
 
 > **Important:** The signature is computed over the **raw** request body string — not a re-serialised version. Whitespace, key order, and encoding must be preserved exactly.
 
+### Constant-Time Verification
+
+The server verifies the digest with Node.js `crypto.timingSafeEqual`. Malformed,
+missing, wrong-length, and wrong-value signatures are normalized through the same
+fixed-length comparison path before the request is rejected with `401`. This
+avoids exposing signature validity through simple timing differences. The
+server never logs the shared secret or the full received signature on failure.
+
 ### Environment Variable
 
-| Variable | Required | Description |
-|---|---|---|
-| `WEBHOOK_SECRET` | ✅ Yes | Shared HMAC secret. **Server-only** — do NOT prefix with `NEXT_PUBLIC_`. |
+| Variable         | Required | Description                                                              |
+| ---------------- | -------- | ------------------------------------------------------------------------ |
+| `WEBHOOK_SECRET` | ✅ Yes   | Shared HMAC secret. **Server-only** — do NOT prefix with `NEXT_PUBLIC_`. |
 
 For local development, add to `.env.local`:
 
@@ -42,10 +50,10 @@ WEBHOOK_SECRET=your-secret-key-here
 
 ### Headers
 
-| Header | Required | Description |
-|---|---|---|
-| `Content-Type` | Yes | Must be `application/json` |
-| `x-webhook-signature` | Yes | `sha256=<hex-digest>` HMAC signature |
+| Header                | Required | Description                          |
+| --------------------- | -------- | ------------------------------------ |
+| `Content-Type`        | Yes      | Must be `application/json`           |
+| `x-webhook-signature` | Yes      | `sha256=<hex-digest>` HMAC signature |
 
 ### Body
 
@@ -63,13 +71,13 @@ WEBHOOK_SECRET=your-secret-key-here
 
 ### Field Reference
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `event` | `string` | ✅ | Must be `"transaction.status_updated"` |
-| `timestamp` | `number` | ✅ | Unix timestamp in **milliseconds** (e.g. `Date.now()`). Must be within ±5 minutes of server time. |
-| `nonce` | `string` | ✅ | Unique event ID (UUID v4 recommended). Prevents replay attacks. |
-| `data.transaction_id` | `string` | ✅ | Stellarlend transaction ID (e.g. `"TXN12345"`) |
-| `data.status` | `TransactionStatus` | ✅ | New status. One of: `"Completed"`, `"Processing"`, `"Failed"` |
+| Field                 | Type                | Required | Description                                                                                       |
+| --------------------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `event`               | `string`            | ✅       | Must be `"transaction.status_updated"`                                                            |
+| `timestamp`           | `number`            | ✅       | Unix timestamp in **milliseconds** (e.g. `Date.now()`). Must be within ±5 minutes of server time. |
+| `nonce`               | `string`            | ✅       | Unique event ID (UUID v4 recommended). Prevents replay attacks.                                   |
+| `data.transaction_id` | `string`            | ✅       | Stellarlend transaction ID (e.g. `"TXN12345"`)                                                    |
+| `data.status`         | `TransactionStatus` | ✅       | New status. One of: `"Completed"`, `"Processing"`, `"Failed"`                                     |
 
 ## Replay Protection
 
@@ -80,15 +88,15 @@ Two mechanisms prevent replay attacks:
 
 ## Response Codes
 
-| Code | Meaning | When |
-|---|---|---|
-| `200` | Success | Event processed, transaction status updated |
-| `400` | Bad Request | Invalid JSON, unsupported event type, missing fields, or unknown status value |
-| `401` | Unauthorized | Missing or invalid `x-webhook-signature` |
-| `403` | Forbidden | Timestamp outside ±5 minute tolerance window |
-| `404` | Not Found | `transaction_id` does not exist |
-| `409` | Conflict | Duplicate `nonce` (event already processed) |
-| `500` | Internal Server Error | `WEBHOOK_SECRET` environment variable not configured |
+| Code  | Meaning               | When                                                                          |
+| ----- | --------------------- | ----------------------------------------------------------------------------- |
+| `200` | Success               | Event processed, transaction status updated                                   |
+| `400` | Bad Request           | Invalid JSON, unsupported event type, missing fields, or unknown status value |
+| `401` | Unauthorized          | Missing or invalid `x-webhook-signature`                                      |
+| `403` | Forbidden             | Timestamp outside ±5 minute tolerance window                                  |
+| `404` | Not Found             | `transaction_id` does not exist                                               |
+| `409` | Conflict              | Duplicate `nonce` (event already processed)                                   |
+| `500` | Internal Server Error | `WEBHOOK_SECRET` environment variable not configured                          |
 
 ### Success Response
 
@@ -178,9 +186,9 @@ npx vitest run --project unit --coverage
 
 ## File Map
 
-| File | Purpose |
-|---|---|
-| `app/api/webhooks/transactions/route.ts` | Webhook route handler |
-| `lib/webhooks/verify.ts` | Signature verification, timestamp validation, nonce store |
-| `lib/webhooks/types.ts` | `WebhookPayload` interface and constants |
-| `lib/transactions/store.ts` | In-memory transaction data layer |
+| File                                     | Purpose                                                   |
+| ---------------------------------------- | --------------------------------------------------------- |
+| `app/api/webhooks/transactions/route.ts` | Webhook route handler                                     |
+| `lib/webhooks/verify.ts`                 | Signature verification, timestamp validation, nonce store |
+| `lib/webhooks/types.ts`                  | `WebhookPayload` interface and constants                  |
+| `lib/transactions/store.ts`              | In-memory transaction data layer                          |

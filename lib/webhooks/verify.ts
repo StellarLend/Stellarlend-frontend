@@ -4,6 +4,9 @@ import { createHmac, timingSafeEqual } from "crypto";
  * Default tolerance for timestamp validation (5 minutes in milliseconds).
  */
 export const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000;
+const SIGNATURE_PREFIX = "sha256=";
+const SHA256_HEX_LENGTH = 64;
+const SHA256_BYTE_LENGTH = 32;
 
 // ---------------------------------------------------------------------------
 // Signature verification
@@ -22,32 +25,34 @@ export const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000;
  */
 export function verifyWebhookSignature(
   payload: string,
-  signature: string,
+  signature: string | null | undefined,
   secret: string,
 ): boolean {
-  if (!signature || !secret || !payload) {
+  if (!secret || typeof payload !== "string") {
     return false;
   }
 
-  const prefix = "sha256=";
-  if (!signature.startsWith(prefix)) {
-    return false;
-  }
-
-  const receivedHex = signature.slice(prefix.length);
   const expectedHex = createHmac("sha256", secret)
     .update(payload)
     .digest("hex");
+  const expected = Buffer.from(expectedHex, "hex");
 
-  // timingSafeEqual requires equal-length buffers
-  if (receivedHex.length !== expectedHex.length) {
-    return false;
-  }
+  const receivedHex =
+    signature?.startsWith(SIGNATURE_PREFIX) === true
+      ? signature.slice(SIGNATURE_PREFIX.length)
+      : "";
+  const hasValidFormat = /^[0-9a-f]{64}$/i.test(receivedHex);
+  const received = hasValidFormat
+    ? Buffer.from(receivedHex, "hex")
+    : Buffer.alloc(SHA256_BYTE_LENGTH);
 
-  return timingSafeEqual(
-    Buffer.from(receivedHex, "hex"),
-    Buffer.from(expectedHex, "hex"),
-  );
+  // Always compare equal-length buffers so malformed, missing, and wrong-length
+  // signatures take the same verification path before returning false.
+  const isSameLength =
+    receivedHex.length === SHA256_HEX_LENGTH &&
+    received.length === expected.length;
+  const signaturesMatch = timingSafeEqual(received, expected);
+  return hasValidFormat && isSameLength && signaturesMatch;
 }
 
 /**

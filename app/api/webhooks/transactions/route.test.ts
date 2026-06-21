@@ -1,9 +1,55 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/webhooks/transactions/route";
-import { signPayload } from "@/lib/webhooks/verify";
+import { signPayload, verifyWebhookSignature } from "@/lib/webhooks/verify";
 import { SIGNATURE_HEADER } from "@/lib/webhooks/types";
 import { resetStore, getTransaction } from "@/lib/transactions/store";
+
+vi.mock("@/lib/notifications/repository", () => ({
+  enqueueNotificationInBackground: vi.fn(),
+}));
+
+vi.mock("@/lib/transactions/store", () => {
+  let mockStore = new Map<string, any>();
+
+  return {
+    getTransaction: vi.fn(async (id: string) => mockStore.get(id)),
+    updateTransactionStatus: vi.fn(async (id: string, status: any) => {
+      const tx = mockStore.get(id);
+      if (!tx) return null;
+      tx.status = status;
+      return tx;
+    }),
+    resetStore: vi.fn(() => {
+      mockStore = new Map([
+        [
+          "TXN12345",
+          {
+            id: "TXN12345",
+            type: "Loan Payment",
+            amount: -250,
+            asset: "BTC",
+            date: "2025-03-10",
+            time: "11:15AM",
+            status: "Completed",
+          },
+        ],
+        [
+          "TXN12346",
+          {
+            id: "TXN12346",
+            type: "Loan Payment",
+            amount: -250,
+            asset: "BTC",
+            date: "2025-03-10",
+            time: "11:15AM",
+            status: "Processing",
+          },
+        ],
+      ]);
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,6 +104,46 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+// ---------------------------------------------------------------------------
+// Signature helper
+// ---------------------------------------------------------------------------
+
+describe("verifyWebhookSignature", () => {
+  it("accepts a valid sha256 signature", () => {
+    const body = JSON.stringify(makePayload());
+    const signature = signPayload(body, TEST_SECRET);
+
+    expect(verifyWebhookSignature(body, signature, TEST_SECRET)).toBe(true);
+  });
+
+  it("rejects missing, malformed, wrong-length, and wrong-value signatures", () => {
+    const body = JSON.stringify(makePayload());
+    const validSignature = signPayload(body, TEST_SECRET);
+
+    expect(verifyWebhookSignature(body, null, TEST_SECRET)).toBe(false);
+    expect(
+      verifyWebhookSignature(body, "not-a-sha256-signature", TEST_SECRET),
+    ).toBe(false);
+    expect(verifyWebhookSignature(body, "sha256=abc123", TEST_SECRET)).toBe(
+      false,
+    );
+    const wrongValueSignature =
+      validSignature.slice(0, -1) + (validSignature.endsWith("0") ? "1" : "0");
+    expect(verifyWebhookSignature(body, wrongValueSignature, TEST_SECRET)).toBe(
+      false,
+    );
+  });
+
+  it("rejects a signature after the signed body is tampered", () => {
+    const body = JSON.stringify(makePayload());
+    const signature = signPayload(body, TEST_SECRET);
+
+    expect(verifyWebhookSignature(`${body} `, signature, TEST_SECRET)).toBe(
+      false,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -131,6 +217,36 @@ describe("POST /api/webhooks/transactions – signature verification", () => {
     const signature = signPayload(body, "wrong-secret");
     const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: signature });
     const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature has the right prefix but the wrong length", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const req = makeWebhookRequest(body, {
+      [SIGNATURE_HEADER]: "sha256=abc123",
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toMatch(/signature/i);
+  });
+
+  it("returns 401 when the body changes after signing", async () => {
+    const originalPayload = makePayload();
+    const originalBody = JSON.stringify(originalPayload);
+    const signature = signPayload(originalBody, TEST_SECRET);
+    const tamperedBody = JSON.stringify({
+      ...originalPayload,
+      data: { transaction_id: "TXN12346", status: "Failed" },
+    });
+
+    const req = makeWebhookRequest(tamperedBody, {
+      [SIGNATURE_HEADER]: signature,
+    });
+    const res = await POST(req);
+
     expect(res.status).toBe(401);
   });
 });
@@ -282,7 +398,9 @@ describe("POST /api/webhooks/transactions – body read error", () => {
     const req = new NextRequest("http://localhost/api/webhooks/transactions", {
       method: "POST",
     });
-    vi.spyOn(req, "text").mockRejectedValue(new Error("Simulated stream read error"));
+    vi.spyOn(req, "text").mockRejectedValue(
+      new Error("Simulated stream read error"),
+    );
     const res = await POST(req);
     expect(res.status).toBe(400);
 

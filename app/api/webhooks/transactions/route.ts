@@ -7,8 +7,16 @@ import {
 } from "@/lib/webhooks/verify";
 import { SIGNATURE_HEADER } from "@/lib/webhooks/types";
 import type { WebhookPayload } from "@/lib/webhooks/types";
-import { updateTransactionStatus } from "@/lib/transactions/store";
+import {
+  getTransaction,
+  updateTransactionStatus,
+} from "@/lib/transactions/store";
 import { enqueueNotificationInBackground } from "@/lib/notifications/repository";
+import {
+  isStrictModeEnabled,
+  resolveAccountByMemo,
+  validateMemo,
+} from "@/lib/stellar/memo";
 
 export const runtime = "nodejs";
 
@@ -49,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   // ── 3. Verify signature ─────────────────────────────────────────────────
   const signature = req.headers.get(SIGNATURE_HEADER);
-  if (!signature || !verifyWebhookSignature(rawBody, signature, secret)) {
+  if (!verifyWebhookSignature(rawBody, signature, secret)) {
     return NextResponse.json(
       { error: "Invalid or missing webhook signature" },
       { status: 401 },
@@ -61,10 +69,7 @@ export async function POST(req: NextRequest) {
   try {
     payload = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json(
-      { error: "Invalid JSON body" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   if (payload.event !== "transaction.status_updated") {
@@ -125,8 +130,8 @@ export async function POST(req: NextRequest) {
   const memoType = rawData.memo_type;
 
   if (memo || memoType) {
-    const type = (memoType || 'MEMO_TEXT') as any;
-    const value = memo || '';
+    const type = (memoType || "MEMO_TEXT") as any;
+    const value = memo || "";
 
     // Validate format
     if (!validateMemo(value, type)) {
@@ -140,16 +145,20 @@ export async function POST(req: NextRequest) {
     const accountId = resolveAccountByMemo(value, type);
     if (!accountId && isStrictModeEnabled()) {
       return NextResponse.json(
-        { error: `Strict Mode Rejection: Unknown or unregistered memo: "${value}"` },
+        {
+          error: `Strict Mode Rejection: Unknown or unregistered memo: "${value}"`,
+        },
         { status: 400 },
       );
     }
   } else if (isStrictModeEnabled()) {
     // If in strict mode, ensure inbound deposits always specify a memo.
     const existingTx = await getTransaction(payload.data.transaction_id);
-    if (existingTx && existingTx.type === 'Deposit') {
+    if (existingTx && existingTx.type === "Deposit") {
       return NextResponse.json(
-        { error: `Strict Mode Rejection: Inbound deposits must have a valid memo` },
+        {
+          error: `Strict Mode Rejection: Inbound deposits must have a valid memo`,
+        },
         { status: 400 },
       );
     }
@@ -169,10 +178,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Enqueue notification fan-out job (fire-and-forget)
-  enqueueNotificationInBackground('demo-user', {
-    title: 'Transaction Status Update',
+  enqueueNotificationInBackground("demo-user", {
+    title: "Transaction Status Update",
     message: `Your transaction ${payload.data.transaction_id} is now ${payload.data.status}.`,
-    type: payload.data.status === 'Completed' ? 'success' : payload.data.status === 'Failed' ? 'error' : 'info',
+    type:
+      payload.data.status === "Completed"
+        ? "success"
+        : payload.data.status === "Failed"
+          ? "error"
+          : "info",
   });
 
   return NextResponse.json({ success: true, transaction: updated });

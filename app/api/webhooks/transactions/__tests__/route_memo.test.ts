@@ -10,9 +10,14 @@ import {
   deriveAndRegisterMemo,
 } from "@/lib/stellar/memo";
 
+vi.mock("@/lib/notifications/repository", () => ({
+  enqueueNotificationInBackground: vi.fn(),
+}));
+
 // Mock store to control getTransaction in tests precisely
 vi.mock("@/lib/transactions/store", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/lib/transactions/store")>();
+  const original =
+    await importOriginal<typeof import("@/lib/transactions/store")>();
   let mockStore = new Map<string, any>();
 
   return {
@@ -65,7 +70,10 @@ function makePayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeWebhookRequest(body: string, headers: Record<string, string> = {}) {
+function makeWebhookRequest(
+  body: string,
+  headers: Record<string, string> = {},
+) {
   return new NextRequest("http://localhost/api/webhooks/transactions", {
     method: "POST",
     body,
@@ -76,7 +84,10 @@ function makeWebhookRequest(body: string, headers: Record<string, string> = {}) 
   });
 }
 
-function makeSignedRequest(payload: Record<string, unknown>, secret: string = TEST_SECRET) {
+function makeSignedRequest(
+  payload: Record<string, unknown>,
+  secret: string = TEST_SECRET,
+) {
   const body = JSON.stringify(payload);
   const signature = signPayload(body, secret);
   return makeWebhookRequest(body, { [SIGNATURE_HEADER]: signature });
@@ -114,6 +125,27 @@ describe("Webhook Route - Stellar Memo Enforcement", () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.transaction.status).toBe("Completed");
+  });
+
+  it("returns 401 for a wrong-length signature before memo validation", async () => {
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12345",
+        status: "Completed",
+        memo: "not-an-unsigned-int",
+        memo_type: "MEMO_ID",
+      },
+    });
+    const body = JSON.stringify(payload);
+    const req = makeWebhookRequest(body, {
+      [SIGNATURE_HEADER]: "sha256=abc123",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+
+    const json = await res.json();
+    expect(json.error).toMatch(/signature/i);
   });
 
   it("returns 400 when a malformed memo value is provided", async () => {
@@ -163,7 +195,9 @@ describe("Webhook Route - Stellar Memo Enforcement", () => {
     expect(res.status).toBe(400);
 
     const body = await res.json();
-    expect(body.error).toContain("Strict Mode Rejection: Unknown or unregistered memo");
+    expect(body.error).toContain(
+      "Strict Mode Rejection: Unknown or unregistered memo",
+    );
   });
 
   it("returns 400 when Deposit transaction lacks a memo in strict mode", async () => {
@@ -180,7 +214,9 @@ describe("Webhook Route - Stellar Memo Enforcement", () => {
     expect(res.status).toBe(400);
 
     const body = await res.json();
-    expect(body.error).toContain("Strict Mode Rejection: Inbound deposits must have a valid memo");
+    expect(body.error).toContain(
+      "Strict Mode Rejection: Inbound deposits must have a valid memo",
+    );
   });
 
   it("succeeds when non-Deposit transaction lacks a memo in strict mode", async () => {
