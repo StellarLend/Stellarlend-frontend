@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { AlertTriangle, Info, ShieldAlert, X } from "lucide-react";
 
 export type AlertBannerSeverity = "info" | "warning" | "critical";
@@ -35,6 +36,8 @@ export interface AlertBannerProps {
   severity?: AlertBannerSeverity;
   dismissKey?: string;
   onDismiss?: () => void;
+  actions?: ReactNode;
+  role?: "region" | "alert";
 }
 
 export const AlertBanner: React.FC<AlertBannerProps> = ({
@@ -43,6 +46,8 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
   severity = "info",
   dismissKey,
   onDismiss,
+  actions,
+  role = "region",
 }) => {
   const [isReady, setIsReady] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -76,10 +81,10 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
 
   return (
     <section
-      role="region"
+      role={role}
       aria-labelledby={titleId}
       aria-describedby={messageId}
-      aria-live={severity === "critical" ? "assertive" : "polite"}
+      aria-live={role === "alert" || severity === "critical" ? "assertive" : "polite"}
       className={`rounded-2xl border px-4 py-4 shadow-sm ${bannerStyles[severity]}`}
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -102,6 +107,11 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
             <p id={messageId} className="mt-2 text-sm leading-6 text-slate-700">
               {message}
             </p>
+            {actions ? (
+              <div className="mt-4 flex flex-wrap gap-3 text-sm font-semibold">
+                {actions}
+              </div>
+            ) : null}
           </div>
         </div>
 
