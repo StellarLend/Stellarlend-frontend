@@ -148,6 +148,9 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
           {...rest}
           id={id}
           ref={inputRef}
+          label={label}
+          error={error}
+          helperText={helperText}
           type="text"
           inputMode="decimal"
           value={displayValue}

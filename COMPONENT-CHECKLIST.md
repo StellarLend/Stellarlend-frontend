@@ -1,41 +1,42 @@
 ## Component Checklist
 
-### ✅ Structure
+### Structure
 - [ ] Proper file organization
 - [ ] Index file with barrel export
 - [ ] Type definitions in separate file
 
-### ✅ Types
+### Types
 - [ ] Comprehensive TypeScript interfaces
 - [ ] Proper prop types
 - [ ] Event handler types
 
-### ✅ Styling
+### Styling
 - [ ] Consistent Tailwind classes
 - [ ] Responsive design
 - [ ] Dark mode support (if applicable)
 
-### ✅ Functionality
+### Functionality
 - [ ] Core functionality implemented
 - [ ] Error handling
 - [ ] Loading states
 
-### ✅ Testing
+### Testing
 - [ ] Unit tests written
 - [ ] Integration tests (if needed)
 - [ ] Accessibility tests
+- [x] LendingForm covers empty, zero, negative, and over-balance amounts; rate min/max validation and boundaries; asset default-rate switching; max amount; async submit success/error states
 
-### ✅ Documentation
+### Documentation
 - [ ] JSDoc comments
 - [ ] Storybook stories
 - [ ] Usage examples
 
-### ✅ Performance
+### Performance
 - [ ] Memoization where appropriate
 - [ ] Bundle size optimized
 - [ ] No unnecessary re-renders
 
-### ✅ Accessibility
+### Accessibility
 - [ ] ARIA attributes
 - [ ] Keyboard navigation
 - [ ] Screen reader support

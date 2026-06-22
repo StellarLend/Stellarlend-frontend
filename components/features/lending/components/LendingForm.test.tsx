@@ -1,213 +1,204 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
+import { fireEvent, render, screen, waitFor } from "@/test/test-utils";
+import type { ComponentProps } from "react";
 import LendingForm from "./LendingForm";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-describe("LendingForm Component", () => {
-  const mockInitialData = {
-    asset: 'XLM',
-    amount: 0,
-    interestRate: 8.5,
-  };
-  const mockOnSubmit = vi.fn();
+const initialData = {
+  asset: "XLM",
+  amount: 0,
+  interestRate: 8.5,
+};
 
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
+function renderLendingForm(
+  onSubmit = vi.fn(),
+  props: Partial<ComponentProps<typeof LendingForm>> = {},
+) {
+  render(
+    <LendingForm
+      initialData={initialData}
+      onSubmit={onSubmit}
+      submitDelayMs={0}
+      {...props}
+    />,
+  );
+  return onSubmit;
+}
 
+function amountInput() {
+  return screen.getByLabelText(/amount to lend/i);
+}
+
+function rateSlider() {
+  return screen.getByRole("slider", { name: /interest rate/i });
+}
+
+function enterAmount(amount: string) {
+  fireEvent.change(amountInput(), { target: { value: amount } });
+}
+
+function submitValidOffer(onSubmit = vi.fn()) {
+  renderLendingForm(onSubmit);
+  enterAmount("100");
+  fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+  return onSubmit;
+}
+
+describe("LendingForm", () => {
   afterEach(() => {
-    vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
-  it("renders correctly", () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-    
-    expect(screen.getByText(/Lend Your Assets/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Amount to Lend/i)).toBeInTheDocument();
+  it("renders the core lending controls with accessible names", () => {
+    renderLendingForm();
+
+    expect(screen.getByRole("heading", { name: /lend your assets/i })).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: /select asset/i })).toBeInTheDocument();
+    expect(amountInput()).toBeInTheDocument();
+    expect(rateSlider()).toHaveAttribute("min", "5");
+    expect(rateSlider()).toHaveAttribute("max", "12");
+    expect(screen.getByRole("button", { name: /review lending offer/i })).toBeInTheDocument();
   });
 
-  it("validates amount is positive", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-    
-    const submitButton = screen.getByText(/Review Lending Offer/i);
-    fireEvent.click(submitButton);
-    
-    expect(await screen.findByText(/Please enter a valid amount/i)).toBeInTheDocument();
-    // Verify our new top-level error banner
-    expect(screen.getByText(/Please fix the errors in the form before continuing/i)).toBeInTheDocument();
+  it.each([
+    ["empty amount", ""],
+    ["zero amount", "0"],
+    ["negative amount", "-50"],
+  ])("rejects %s", async (_caseName, value) => {
+    const onSubmit = renderLendingForm();
+
+    enterAmount(value);
+    fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+    expect(screen.getByText(/please enter a valid amount/i)).toBeInTheDocument();
+    expect(screen.getByText(/please fix the errors in the form/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("validates balance", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-    
-    const amountInput = screen.getByLabelText(/Amount to Lend/i);
-    fireEvent.change(amountInput, { target: { value: "10000" } }); // Above XLM balance
-    
-    const submitButton = screen.getByText(/Review Lending Offer/i);
-    fireEvent.click(submitButton);
-    
-    expect(await screen.findByText(/Insufficient balance/i)).toBeInTheDocument();
+  it("rejects an amount above the selected asset balance", async () => {
+    const onSubmit = renderLendingForm();
+
+    enterAmount("10000");
+    fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+    expect(screen.getByText(/insufficient balance/i)).toHaveTextContent(
+      "Maximum available: 3,750 XLM",
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("handles MAX button click", () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-    
-    const maxButton = screen.getByText(/MAX/i);
-    fireEvent.click(maxButton);
-    
-    const amountInput = screen.getByLabelText(/Amount to Lend/i) as HTMLInputElement;
-    expect(amountInput.value).toBe("3,750"); // XLM balance is 3750, but it might be formatted. 
-    // Actually the code uses parseFloat so it might be 3750.
-  });
-
-  it("submits successfully with valid data", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-    
-    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "100" } });
-    
-    const submitButton = screen.getByText(/Review Lending Offer/i);
-    fireEvent.click(submitButton);
-    
-    // Fast-forward through the 800ms simulated loading delay
-    act(() => {
-      vi.advanceTimersByTime(1000);
+  it.each([
+    ["below the minimum", "4.9"],
+    ["above the maximum", "12.1"],
+  ])("rejects an interest rate %s", async (_caseName, rate) => {
+    const onSubmit = renderLendingForm(vi.fn(), {
+      initialData: { ...initialData, interestRate: Number(rate) },
     });
-    
-    await waitFor(() => {
-      // Verify our new success banner
-      expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
-      expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({
-        amount: 100,
-        asset: 'XLM'
-      }));
-    });
+
+    enterAmount("100");
+    fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+    expect(screen.getByText(/interest rate must be between 5% and 12%/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("rejects zero and negative amounts", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+  it.each([
+    ["minimum", "5"],
+    ["maximum", "12"],
+  ])("accepts the %s interest rate boundary", async (_caseName, rate) => {
+    const onSubmit = renderLendingForm();
 
-    const amountInput = screen.getByLabelText(/Amount to Lend/i);
-
-    // Zero amount
-    fireEvent.change(amountInput, { target: { value: "0" } });
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
-    expect(await screen.findByText(/Please enter a valid amount/i)).toBeInTheDocument();
-
-    // Negative amount
-    fireEvent.change(amountInput, { target: { value: "-50" } });
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
-    expect(await screen.findByText(/Please enter a valid amount/i)).toBeInTheDocument();
-  });
-
-  it("rejects interest rate below minimum", async () => {
-    render(<LendingForm initialData={{ ...mockInitialData, interestRate: 2.0 }} onSubmit={mockOnSubmit} />);
-
-    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "100" } });
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
-
-    expect(await screen.findByText(/Interest rate must be between/)).toBeInTheDocument();
-  });
-
-  it("rejects interest rate above maximum", async () => {
-    render(<LendingForm initialData={{ ...mockInitialData, interestRate: 15.0 }} onSubmit={mockOnSubmit} />);
-
-    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "100" } });
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
-
-    expect(await screen.findByText(/Interest rate must be between/)).toBeInTheDocument();
-  });
-
-  it("updates default interest rate when asset changes", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-
-    // XLM default is 8.5
-    expect(screen.getByText(/8\.5% APY/)).toBeInTheDocument();
-
-    // Switch to USDC — default should become 6.5
-    const combobox = screen.getByRole("combobox");
-    fireEvent.change(combobox, { target: { value: "USDC" } });
-
-    // After the useEffect fires, the rate should update
-    await waitFor(() => {
-      expect(screen.getByText(/6\.5% APY/)).toBeInTheDocument();
-    });
-  });
-
-  it("resets errors after editing amount", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-
-    // Submit empty form to trigger validation
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
-    expect(await screen.findByText(/Please enter a valid amount/i)).toBeInTheDocument();
-
-    // Edit the amount — error should be cleared
-    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "200" } });
+    enterAmount("100");
+    fireEvent.change(rateSlider(), { target: { value: rate } });
+    fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/Please enter a valid amount/i)).not.toBeInTheDocument();
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 100, asset: "XLM", interestRate: Number(rate) }),
+      );
     });
   });
 
-  it("shows submit error banner when validation fails on submit", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+  it("fills the selected asset balance from the MAX action and clears amount errors", async () => {
+    renderLendingForm();
 
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+    fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+    expect(screen.getByText(/please enter a valid amount/i)).toBeInTheDocument();
 
-    expect(await screen.findByText(/Please fix the errors in the form before continuing/i)).toBeInTheDocument();
-    expect(mockOnSubmit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /^max$/i }));
+
+    expect(amountInput()).toHaveValue("3,750.0000000");
+    expect(screen.queryByText(/please enter a valid amount/i)).not.toBeInTheDocument();
   });
 
-  it("disables submit button while submitting (loading state)", async () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+  it("updates the default rate when the selected asset changes", async () => {
+    renderLendingForm();
 
-    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "100" } });
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+    expect(screen.getByText("8.5% APY")).toBeInTheDocument();
 
-    // Button should show loading state
+    fireEvent.click(screen.getByRole("option", { name: /usdc/i }));
+
+    expect(screen.getByRole("option", { name: /usdc/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByText("6.5% APY")).toBeInTheDocument();
+    expect(rateSlider()).toHaveAttribute("min", "4");
+    expect(rateSlider()).toHaveAttribute("max", "10");
+  });
+
+  it("disables the submit button while validation is pending", async () => {
+    let resolveSubmit!: () => void;
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+
+    submitValidOffer(onSubmit);
+
+    const submitButton = screen.getByRole("button", { name: /review lending offer/i });
+    expect(submitButton).toBeDisabled();
+
+    resolveSubmit();
+
+    await waitFor(() => expect(submitButton).not.toBeDisabled());
+  });
+
+  it("submits valid data and shows the success state", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    submitValidOffer(onSubmit);
+
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /review lending offer/i })).toBeDisabled();
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 100, asset: "XLM", interestRate: 8.5 }),
+      );
+      expect(screen.getByRole("alert")).toHaveTextContent("Details validated successfully.");
     });
   });
 
-  it("renders lending terms section", () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+  it("shows the error state when submit handling fails", async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error("network unavailable"));
+
+    submitValidOffer(onSubmit);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "An error occurred during validation.",
+      );
+    });
+  });
+
+  it("documents the visible terms and rate markers", () => {
+    renderLendingForm();
 
     expect(screen.getByText("Lending Terms")).toBeInTheDocument();
-    expect(screen.getByText(/Minimum lending period: 7 days/)).toBeInTheDocument();
-    expect(screen.getByText(/Interest is calculated daily and compounded/)).toBeInTheDocument();
-  });
-
-  it("renders interest rate min/max/default markers", () => {
-    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
-
-    expect(screen.getByText(/MIN: 5\.0%/)).toBeInTheDocument();
-    expect(screen.getByText(/DEFAULT: 8\.5%/)).toBeInTheDocument();
-    expect(screen.getByText(/MAX: 12\.0%/)).toBeInTheDocument();
-  });
-
-  it("accepts rate at boundary values (min and max)", async () => {
-    const { rerender } = render(
-      <LendingForm initialData={{ ...mockInitialData, interestRate: 5.0 }} onSubmit={mockOnSubmit} />,
-    );
-
-    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "100" } });
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
-
-    // Rate = min (5.0) should be valid
-    act(() => { vi.advanceTimersByTime(1000); });
-    await waitFor(() => {
-      expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
-    });
-
-    // Now test with rate = max (12.0)
-    rerender(
-      <LendingForm initialData={{ ...mockInitialData, interestRate: 12.0 }} onSubmit={mockOnSubmit} />,
-    );
-
-    fireEvent.click(screen.getByText(/Review Lending Offer/i));
-    act(() => { vi.advanceTimersByTime(1000); });
-    await waitFor(() => {
-      expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
-    });
+    expect(screen.getByText(/minimum lending period: 7 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/interest is calculated daily and compounded/i)).toBeInTheDocument();
+    expect(screen.getByText("MIN: 5%")).toBeInTheDocument();
+    expect(screen.getByText("DEFAULT: 8.5%")).toBeInTheDocument();
+    expect(screen.getByText("MAX: 12%")).toBeInTheDocument();
   });
 });

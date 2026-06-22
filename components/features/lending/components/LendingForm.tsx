@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { LendingData } from "@/app/lending/page";
-import { Input } from "@/components/shared/ui/Input";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { Tooltip } from "@/components/atoms/Tooltip";
+import { IconButton } from "@/components/atoms/IconButton";
 
 interface LendingFormProps {
-  onSubmit: (data: LendingData) => void;
+  onSubmit: (data: LendingData) => void | Promise<void>;
   initialData: LendingData;
+  submitDelayMs?: number;
 }
 
 const INTEREST_RATES = {
@@ -23,6 +26,7 @@ const INTEREST_RATES = {
 export default function LendingForm({
   onSubmit,
   initialData,
+  submitDelayMs = 800,
 }: LendingFormProps) {
   const [formData, setFormData] = useState<LendingData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -34,12 +38,6 @@ export default function LendingForm({
 
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
   const rates = INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
-
-  useEffect(() => {
-    if (rates) {
-      setFormData((prev) => ({ ...prev, interestRate: rates.default }));
-    }
-  }, [formData.asset, rates]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -69,11 +67,12 @@ export default function LendingForm({
     if (validateForm()) {
       setIsSubmitting(true);
       try {
-        // Simulate validation/processing
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        if (submitDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, submitDelayMs));
+        }
+        await onSubmit(formData);
         setSubmitStatus("success");
         setSubmitMessage("Details validated successfully.");
-        onSubmit(formData);
       } catch (err) {
         setSubmitStatus("error");
         setSubmitMessage("An error occurred during validation.");
@@ -138,9 +137,12 @@ export default function LendingForm({
               value={formData.asset}
               label="Select Asset"
               onChange={(asset) => {
+                const nextRates =
+                  INTEREST_RATES[asset as keyof typeof INTEREST_RATES];
                 setFormData((prev) => ({
                   ...prev,
                   asset,
+                  interestRate: nextRates?.default ?? prev.interestRate,
                 }));
 
                 setErrors({});
@@ -156,17 +158,17 @@ export default function LendingForm({
             type="number"
             step="0.01"
             placeholder="0.00"
-            value={formData.amount || ""}
+            value={formData.amount}
             error={errors.amount}
             helperText={
               selectedAsset
                 ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`
                 : undefined
             }
-            onChange={(e) => {
+            onChange={(amount) => {
               setFormData((prev) => ({
                 ...prev,
-                amount: parseFloat(e.target.value) || 0,
+                amount,
               }));
               if (errors.amount) {
                 setErrors((prev) => {
@@ -177,9 +179,6 @@ export default function LendingForm({
               }
             }}
             precision={selectedAsset?.precision ?? 2}
-            placeholder="0.00"
-            error={errors.amount}
-            helperText={selectedAsset ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}` : undefined}
             onMax={handleMaxAmount}
           />
         </div>
@@ -190,7 +189,9 @@ export default function LendingForm({
             <label className="text-sm font-medium text-gray-700 flex items-center">
               Interest Rate (% APY)
               <Tooltip content="Annual Percentage Yield (APR) is the annual rate of return, including compounding.">
-                <IconButton aria-label="Help" size="sm" variant="ghost" />
+                <IconButton aria-label="Help" size="sm" variant="ghost">
+                  ?
+                </IconButton>
               </Tooltip>
             </label>
             <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">
@@ -200,6 +201,7 @@ export default function LendingForm({
 
           <div className="px-1">
             <input
+              aria-label="Interest Rate (% APY)"
               type="range"
               min={rates.min}
               max={rates.max}
