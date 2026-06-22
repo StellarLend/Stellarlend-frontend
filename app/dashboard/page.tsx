@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
+import PositionHistoryChart from "@/components/features/dashboard/components/PositionHistoryChart";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { DashboardLayout } from "@/components";
 import { AlertBanner, PageHeader } from "@/components/shared/common";
@@ -165,6 +166,7 @@ export default function Dashboard() {
           ) : null}
 
           <MetricsCards />
+          <PositionHistoryChart />
         </div>
 
         <div className="pt-8 ">
