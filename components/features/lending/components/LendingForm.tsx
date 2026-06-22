@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { LendingData } from "@/app/lending/page";
-import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
+import { IconButton } from "@/components/atoms/IconButton";
+import { Tooltip } from "@/components/atoms/Tooltip";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -156,17 +158,17 @@ export default function LendingForm({
             type="number"
             step="0.01"
             placeholder="0.00"
-            value={formData.amount || ""}
+            value={formData.amount || 0}
             error={errors.amount}
             helperText={
               selectedAsset
                 ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`
                 : undefined
             }
-            onChange={(e) => {
+            onChange={(amount) => {
               setFormData((prev) => ({
                 ...prev,
-                amount: parseFloat(e.target.value) || 0,
+                amount,
               }));
               if (errors.amount) {
                 setErrors((prev) => {
@@ -177,9 +179,6 @@ export default function LendingForm({
               }
             }}
             precision={selectedAsset?.precision ?? 2}
-            placeholder="0.00"
-            error={errors.amount}
-            helperText={selectedAsset ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}` : undefined}
             onMax={handleMaxAmount}
           />
         </div>
@@ -190,7 +189,9 @@ export default function LendingForm({
             <label className="text-sm font-medium text-gray-700 flex items-center">
               Interest Rate (% APY)
               <Tooltip content="Annual Percentage Yield (APR) is the annual rate of return, including compounding.">
-                <IconButton aria-label="Help" size="sm" variant="ghost" />
+                <IconButton aria-label="Help" size="sm" variant="ghost">
+                  <span aria-hidden="true">?</span>
+                </IconButton>
               </Tooltip>
             </label>
             <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded">
@@ -201,6 +202,9 @@ export default function LendingForm({
           <div className="px-1">
             <input
               type="range"
+              aria-label="Interest Rate (% APY)"
+              aria-describedby={errors.interestRate ? "lend-interest-rate-error" : undefined}
+              aria-invalid={errors.interestRate ? "true" : undefined}
               min={rates.min}
               max={rates.max}
               step="0.1"
@@ -222,6 +226,7 @@ export default function LendingForm({
 
           {errors.interestRate && (
             <p
+              id="lend-interest-rate-error"
               className="text-xs text-red-500 font-medium"
               role="alert"
               aria-live="polite"

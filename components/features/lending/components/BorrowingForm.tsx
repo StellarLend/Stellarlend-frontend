@@ -276,15 +276,20 @@ export default function BorrowingForm({
         />
 
         {/* Loan Duration */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+        <div
+          role="group"
+          aria-labelledby="loan-duration-label"
+          aria-describedby={errors.duration ? "loan-duration-error" : undefined}
+        >
+          <span id="loan-duration-label" className="block text-sm font-medium text-gray-700 mb-3">
             Loan Duration
-          </label>
+          </span>
           <div className="grid grid-cols-3 gap-3">
             {LOAN_DURATIONS.map((duration) => (
               <button
                 key={duration.days}
                 type="button"
+                aria-pressed={formData.duration === duration.days}
                 onClick={() => {
                   setFormData((prev) => ({ ...prev, duration: duration.days }));
                   if (errors.duration) {
@@ -311,6 +316,7 @@ export default function BorrowingForm({
           </div>
           {errors.duration && (
             <p
+              id="loan-duration-error"
               className="text-xs text-red-500 font-medium mt-2"
               role="alert"
               aria-live="polite"
@@ -321,15 +327,21 @@ export default function BorrowingForm({
         </div>
 
         {/* Collateral Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+        <div
+          role="group"
+          aria-labelledby="collateral-asset-label"
+          aria-describedby={errors.collateral ? "collateral-asset-error" : undefined}
+        >
+          <span id="collateral-asset-label" className="block text-sm font-medium text-gray-700 mb-3">
             Collateral Asset
-          </label>
+          </span>
           <div className="grid grid-cols-2 gap-4">
             {ASSETS.map((asset) => (
               <button
                 key={asset.symbol}
                 type="button"
+                aria-pressed={formData.collateral === asset.symbol}
+                aria-label={`${asset.symbol} collateral, balance ${asset.balance.toLocaleString()}`}
                 onClick={() => {
                   setFormData((prev) => ({
                     ...prev,
@@ -359,6 +371,7 @@ export default function BorrowingForm({
           </div>
           {errors.collateral && (
             <p
+              id="collateral-asset-error"
               className="text-xs text-red-500 font-medium mt-2"
               role="alert"
               aria-live="polite"

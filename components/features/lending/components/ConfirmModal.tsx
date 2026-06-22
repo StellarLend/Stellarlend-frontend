@@ -351,7 +351,10 @@ export default function ConfirmModal({
               />
               <span className="text-sm text-gray-700">
                 I understand and agree to the{" "}
-                <button className="text-green-600 hover:text-green-700 underline">
+                <button
+                  type="button"
+                  className="text-green-600 hover:text-green-700 underline"
+                >
                   terms and conditions
                 </button>
                 {type === "borrow" && (

@@ -49,6 +49,7 @@ export default function AssetSelector({
               type="button"
               role="option"
               aria-selected={selected}
+              aria-label={`${asset.symbol}, ${asset.name}${showBalance ? `, balance ${asset.balance.toLocaleString()}` : ""}`}
               tabIndex={0}
               onClick={() => onChange(asset.symbol)}
               onKeyDown={(e) => {
@@ -67,6 +68,7 @@ export default function AssetSelector({
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div
+                    aria-hidden="true"
                     className={cn(
                       "w-6 h-6 rounded-full",
                       TOKEN_COLORS[asset.symbol],
