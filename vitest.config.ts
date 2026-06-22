@@ -101,7 +101,10 @@ export default defineConfig({
         test: {
           name: "server",
           environment: "node",
-          include: ["test/server/**/*.test.ts"],
+          include: [
+            "test/server/**/*.test.ts",
+            "app/api/markets/route.test.ts",
+          ],
           alias: {
             "@": path.resolve(dirname, "."),
           },
