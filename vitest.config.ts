@@ -93,6 +93,7 @@ export default defineConfig({
             "app/api/markets/route.test.ts",
             "app/api/transactions/route.test.ts",
             "app/api/liquidations/route.test.ts",
+            "app/api/notifications/[id]/route.test.ts",
             "__tests__/**/*.test.ts",
           ],
         },
