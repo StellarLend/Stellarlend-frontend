@@ -90,6 +90,7 @@ export default defineConfig({
 
           include: [
             "types/enums.test.ts",
+            "app/api/markets/route.test.ts",
             "app/api/transactions/route.test.ts",
             "app/api/liquidations/route.test.ts",
             "__tests__/**/*.test.ts",
@@ -100,7 +101,10 @@ export default defineConfig({
         test: {
           name: "server",
           environment: "node",
-          include: ["test/server/**/*.test.ts"],
+          include: [
+            "test/server/**/*.test.ts",
+            "app/api/markets/route.test.ts",
+          ],
           alias: {
             "@": path.resolve(dirname, "."),
           },
