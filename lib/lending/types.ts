@@ -1,4 +1,4 @@
-export type LendingActionType = "lend" | "borrow" | "repay";
+export type LendingActionType = "lend" | "borrow" | "repay" | "withdraw";
 
 export interface LendingData {
   asset: string;
