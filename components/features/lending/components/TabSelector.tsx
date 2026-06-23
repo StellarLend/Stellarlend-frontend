@@ -10,6 +10,7 @@ const TABS: Array<{ value: LendingActionType; label: string }> = [
   { value: "lend", label: "Lend Assets" },
   { value: "borrow", label: "Borrow Assets" },
   { value: "repay", label: "Repay Loan" },
+  { value: "withdraw", label: "Withdraw" },
 ];
 
 export default function TabSelector({

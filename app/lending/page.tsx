@@ -1,21 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import useTxStatus from "@/lib/tx/useTxStatus";
 import { Toast } from "@/components/shared/common";
 import LendingForm from "@/components/features/lending/components/LendingForm";
-import BorrowingForm from "@/components/features/lending/components/BorrowingForm";
-import InterestCalculator from "@/components/features/lending/components/InterestCalculator";
-import TransactionSummary from "@/components/features/lending/components/TransactionSummary";
-import ConfirmModal from "@/components/features/lending/components/ConfirmModal";
 import TabSelector from "@/components/features/lending/components/TabSelector";
-import { PageHeader } from "@/components/shared/common";
-
-import dynamic from "next/dynamic";
-import LendingForm from "@/components/features/lending/components/LendingForm";
 import { PageHeader } from "@/components/shared/common";
 import { Skeleton } from "@/components/shared/common/Skeleton";
 import type { LendingActionType } from "@/lib/lending/types";
+
+export type { LendingData, CalculationResult } from "@/lib/lending/types";
+import type { LendingData, CalculationResult } from "@/lib/lending/types";
 
 const BorrowingForm = dynamic(
   () => import("@/components/features/lending/components/BorrowingForm"),
@@ -29,6 +25,16 @@ const BorrowingForm = dynamic(
 );
 const RepayForm = dynamic(
   () => import("@/components/features/lending/components/RepayForm"),
+  {
+    loading: () => (
+      <div className="space-y-4 animate-pulse">
+        <Skeleton className="h-64 w-full" />
+      </div>
+    ),
+  },
+);
+const WithdrawForm = dynamic(
+  () => import("@/components/features/lending/components/WithdrawForm"),
   {
     loading: () => (
       <div className="space-y-4 animate-pulse">
@@ -60,13 +66,8 @@ const TransactionSummary = dynamic(
 const ConfirmModal = dynamic(
   () => import("@/components/features/lending/components/ConfirmModal"),
 );
-import TabSelector from "@/components/features/lending/components/TabSelector";
-
-export type { LendingData, CalculationResult } from "@/lib/lending/types";
-import type { LendingData, CalculationResult } from "@/lib/lending/types";
 
 export default function LendingPage() {
-  const [activeTab, setActiveTab] = useState<"lend" | "borrow">("lend");
   const [activeTab, setActiveTab] = useState<LendingActionType>("lend");
   const [lendingData, setLendingData] = useState<LendingData>({
     asset: "XLM",
@@ -93,6 +94,17 @@ export default function LendingPage() {
     remainingDebt: 1500,
     healthFactorBefore: 1.5,
     healthFactorAfter: 1.5,
+  });
+  const [withdrawData, setWithdrawData] = useState<LendingData>({
+    asset: "XLM",
+    amount: 0,
+    interestRate: 0,
+    positionId: "xlm-supply-001",
+    outstandingDebt: 1500,
+    remainingDebt: 5000,
+    collateralAmount: 2250,
+    healthFactorBefore: 1.85,
+    healthFactorAfter: 1.85,
   });
   const [calculationResult, setCalculationResult] =
     useState<CalculationResult | null>(null);
@@ -156,12 +168,27 @@ export default function LendingPage() {
     setShowConfirmModal(true);
   };
 
+  const handleWithdrawSubmit = (data: LendingData) => {
+    setWithdrawData(data);
+    setShowConfirmModal(true);
+  };
+
   const handleConfirm = async () => {
     setShowConfirmModal(false);
+
+    const actionData =
+      activeTab === "lend"
+        ? lendingData
+        : activeTab === "borrow"
+          ? borrowingData
+          : activeTab === "repay"
+            ? repayData
+            : withdrawData;
+
     const payload = {
       signedEnvelopeXdr: JSON.stringify({
         action: activeTab,
-        data: activeTab === "lend" ? lendingData : borrowingData,
+        data: actionData,
       }),
     };
     try {
@@ -237,17 +264,14 @@ export default function LendingPage() {
     }
   }, [txStatus]);
 
-  const currentData = activeTab === "lend" ? lendingData : borrowingData;
-    console.log("Submitting:", currentData);
-    setShowConfirmModal(false);
-  };
-
   const currentData =
     activeTab === "lend"
       ? lendingData
       : activeTab === "borrow"
         ? borrowingData
-        : repayData;
+        : activeTab === "repay"
+          ? repayData
+          : withdrawData;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
@@ -267,7 +291,7 @@ export default function LendingPage() {
             <PageHeader
               tone="light"
               title="Lending & Borrowing"
-              description="Earn interest, borrow against collateral, or repay open debt positions."
+              description="Earn interest, borrow against collateral, repay open debt positions, or withdraw supplied liquidity."
               className="mb-0"
             />
           </div>
@@ -289,20 +313,25 @@ export default function LendingPage() {
                 onSubmit={handleBorrowingSubmit}
                 initialData={borrowingData}
               />
-            ) : (
+            ) : activeTab === "repay" ? (
               <RepayForm onSubmit={handleRepaySubmit} />
+            ) : (
+              <WithdrawForm onSubmit={handleWithdrawSubmit} />
             )}
           </div>
 
           <div className="space-y-6">
-            {activeTab === "repay" ? (
+            {activeTab === "repay" || activeTab === "withdraw" ? (
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="mb-2 text-lg font-semibold text-gray-900">
-                  Repayment Status
+                  {activeTab === "repay"
+                    ? "Repayment Status"
+                    : "Withdrawal Status"}
                 </h2>
                 <p className="text-sm text-gray-600">
-                  Submit a repayment preview to open the confirmation step and
-                  review quote details before signing.
+                  {activeTab === "repay"
+                    ? "Submit a repayment preview to open the confirmation step and review quote details before signing."
+                    : "Submit a withdrawal preview to open the confirmation step before signing."}
                 </p>
               </div>
             ) : (
