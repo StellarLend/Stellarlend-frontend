@@ -96,13 +96,21 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   const actionLabel =
-    type === "lend" ? "Lending" : type === "borrow" ? "Borrowing" : "Repayment";
+    type === "lend"
+      ? "Lending"
+      : type === "borrow"
+        ? "Borrowing"
+        : type === "withdraw"
+          ? "Withdrawal"
+          : "Repayment";
   const amountLabel =
     type === "lend"
       ? "Amount to Lend"
       : type === "borrow"
         ? "Amount to Borrow"
-        : "Amount to Repay";
+        : type === "withdraw"
+          ? "Amount to Withdraw"
+          : "Amount to Repay";
 
   const handleConfirm = async () => {
     if (!hasAgreed) return;
@@ -196,7 +204,7 @@ export default function ConfirmModal({
           <div className="mb-6">
             <div
               className={`rounded-lg p-4 mb-4 ${
-                type === "lend"
+                type === "lend" || type === "withdraw"
                   ? "bg-green-50 border border-green-200"
                   : "bg-blue-50 border border-blue-200"
               }`}
@@ -204,14 +212,18 @@ export default function ConfirmModal({
               <div className="text-center">
                 <div
                   className={`text-2xl font-bold mb-1 ${
-                    type === "lend" ? "text-green-700" : "text-blue-700"
+                    type === "lend" || type === "withdraw"
+                      ? "text-green-700"
+                      : "text-blue-700"
                   }`}
                 >
                   {formatCurrency(data.amount, data.asset)}
                 </div>
                 <div
                   className={`text-sm ${
-                    type === "lend" ? "text-green-600" : "text-blue-600"
+                    type === "lend" || type === "withdraw"
+                      ? "text-green-600"
+                      : "text-blue-600"
                   }`}
                 >
                   {amountLabel}
@@ -220,13 +232,15 @@ export default function ConfirmModal({
             </div>
 
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Interest Rate</span>
-                <span className="font-medium">
-                  {data.interestRate.toFixed(1)}%{" "}
-                  {type === "lend" ? "APY" : "APR"}
-                </span>
-              </div>
+              {type !== "withdraw" && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Interest Rate</span>
+                  <span className="font-medium">
+                    {data.interestRate.toFixed(1)}%{" "}
+                    {type === "lend" ? "APY" : "APR"}
+                  </span>
+                </div>
+              )}
 
               {(type === "borrow" || type === "repay") && data.duration && (
                 <div className="flex justify-between">
@@ -235,7 +249,7 @@ export default function ConfirmModal({
                 </div>
               )}
 
-              {type === "repay" && (
+              {(type === "repay" || type === "withdraw") && (
                 <>
                   {data.positionId && (
                     <div className="flex justify-between">
@@ -245,22 +259,27 @@ export default function ConfirmModal({
                   )}
                   {typeof data.remainingDebt === "number" && (
                     <div className="flex justify-between border-t pt-2">
-                      <span className="font-medium">Remaining Debt</span>
+                      <span className="font-medium">
+                        {type === "withdraw" ? "Remaining Supplied" : "Remaining Debt"}
+                      </span>
                       <span className="font-semibold text-gray-900">
                         {formatCurrency(data.remainingDebt, data.asset)}
                       </span>
                     </div>
                   )}
-                  {typeof data.healthFactorAfter === "number" && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">New Health Factor</span>
-                      <span className="font-medium text-green-600">
-                        {Number.isFinite(data.healthFactorAfter)
-                          ? data.healthFactorAfter.toFixed(2)
-                          : "Debt cleared"}
-                      </span>
-                    </div>
-                  )}
+                  {typeof data.healthFactorAfter === "number" &&
+                    (data.outstandingDebt ?? 0) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">New Health Factor</span>
+                        <span className="font-medium text-green-600">
+                          {Number.isFinite(data.healthFactorAfter)
+                            ? data.healthFactorAfter.toFixed(2)
+                            : type === "withdraw"
+                              ? "N/A"
+                              : "Debt cleared"}
+                        </span>
+                      </div>
+                    )}
                 </>
               )}
 
@@ -320,7 +339,7 @@ export default function ConfirmModal({
               )}
             </div>
 
-            {/* Collateral Info for Borrowing */}
+            {/* Collateral Info for Borrowing / Repay */}
             {(type === "borrow" || type === "repay") &&
               data.collateral &&
               data.collateralAmount && (
@@ -380,11 +399,9 @@ export default function ConfirmModal({
               disabled={!hasAgreed || isConfirming}
               className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition-all duration-200 ${
                 hasAgreed && !isConfirming
-                  ? type === "lend"
+                  ? type === "lend" || type === "repay" || type === "withdraw"
                     ? "bg-green-500 hover:bg-green-600"
-                    : type === "repay"
-                      ? "bg-green-500 hover:bg-green-600"
-                      : "bg-blue-500 hover:bg-blue-600"
+                    : "bg-blue-500 hover:bg-blue-600"
                   : "bg-gray-300 cursor-not-allowed"
               }`}
             >
