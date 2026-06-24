@@ -2,6 +2,11 @@
   "ci": {
     "collect": {
       "numberOfRuns": 3,
+      "url": [
+        "https://stellarlend-staging.vercel.app",
+        "https://stellarlend-staging.vercel.app/lending",
+        "https://stellarlend-staging.vercel.app/dashboard"
+      ],
       "settings": {
         "chromeFlags": "--no-sandbox --disable-dev-shm-usage"
       }
@@ -15,7 +20,10 @@
         "first-contentful-paint": ["warn", {"maxNumericValue": 2000}],
         "largest-contentful-paint": ["warn", {"maxNumericValue": 3000}],
         "cumulative-layout-shift": ["warn", {"maxNumericValue": 0.1}],
-        "total-blocking-time": ["warn", {"maxNumericValue": 300}]
+        "total-blocking-time": ["warn", {"maxNumericValue": 300}],
+        "resource-summary:document:size": ["warn", {"maxNumericValue": 1500}],
+        "resource-summary:script:size": ["warn", {"maxNumericValue": 500}],
+        "resource-summary:image:size": ["warn", {"maxNumericValue": 300}]
       }
     },
     "upload": {
