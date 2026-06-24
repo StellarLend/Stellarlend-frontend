@@ -161,17 +161,19 @@ npm start
 
 ## ?? Testing
 
-### Run Tests
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing guide — covers all four test runners, coverage gates, and how to run a single suite or file.
+
+### Quick Test Commands
 
 ```bash
-# Run all tests
+# Run all unit + component tests
 npm test
 
-# Run tests in watch mode
-npm test -- --watch
+# Run server-side tests only
+npm run test:server
 
-# Run tests with coverage
-npm test -- --coverage
+# Run E2E tests (requires built app on localhost:3000)
+npm run test:e2e
 ```
 
 ### Component Testing with Storybook

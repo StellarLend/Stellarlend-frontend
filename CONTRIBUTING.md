@@ -59,23 +59,78 @@ export default function Component({ ... }: ComponentProps) {
 
 ## 🧪 Testing
 
-- Write tests for new features and bug fixes
-- Use Vitest for unit tests
-- Use React Testing Library for component tests
-- Aim for meaningful test coverage
-- Test user interactions, not implementation details
+This project uses **four test runners** — each targets a different layer. Always run the right runner for your change; running all suites is rarely needed during local development.
+
+### Test Runner Overview
+
+| Runner | Config | Command | Scope | Environment |
+|--------|--------|---------|-------|-------------|
+| **Unit / Component** | `vitest.config.ts` | `npm test` | `lib/`, `components/`, `hooks/`, `app/` (non-API) | jsdom (via `@vitejs/plugin-react`) |
+| **Server** | `vitest.server.config.ts` | `npm run test:server` | `lib/config.test.ts`, `app/api/**` | node |
+| **Server + Coverage Gate** | `vitest.server.config.ts` | `npm run test:server:coverage` | Same as server | node |
+| **E2E** | `playwright.config.ts` | `npm run test:e2e` | `test/e2e/` | Chromium / Firefox / WebKit |
+| **Storybook** | `vitest.config.ts` (addon) | `npm test` (includes Storybook tests) | `*.stories.tsx` | jsdom |
+
+### Running a Single Test File
+
+```bash
+# Unit / component — single file
+npx vitest run components/features/lending/components/BorrowingForm.test.tsx
+
+# Server — single file
+npx vitest run --config vitest.server.config.ts lib/config.test.ts
+
+# E2E — single spec
+npx playwright test test/e2e/lending.spec.ts
+```
+
+### Coverage Gates (enforced in CI)
+
+The **server-coverage** workflow (`server-coverage.yml`) runs on every push/PR touching `app/api/**` or `lib/**`. The build **fails** if any threshold defined in `vitest.config.ts` is not met:
+
+- **Lines:** ≥ 95%
+- **Functions:** ≥ 95%
+- **Branches:** ≥ 90%
+- **Statements:** ≥ 95%
+
+The main `ci.yml` workflow runs `npm run test:coverage` (all unit + component tests) but does **not** block the PR on threshold failure (`continue-on-error: true`). Aim for ≥ 95% on new/changed lines regardless.
+
+### Test Utilities
+
+- `test/test-utils.tsx` — custom render wrapper with providers (used by all component tests)
+- `vitest.setup.ts` — global setup (mocks for `next/navigation`, `IntersectionObserver`, etc.)
+- `vitest.shims.d.ts` — type declarations for Vite-specific imports
+
+### Writing New Tests
+
+- **Component tests:** place alongside the component as `ComponentName.test.tsx`
+- **Server/API tests:** place in `app/api/**` or `lib/` as `*.test.ts`
+- **E2E tests:** place in `test/e2e/` as `*.spec.ts`
+- **Storybook tests:** co-located as `*.stories.tsx` (picked up by the Vitest addon)
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all unit + component tests (excludes server project)
 npm test
 
-# Run tests in watch mode
+# Run in watch mode
 npm test -- --watch
 
-# Run tests with coverage
-npm test -- --coverage
+# Run with coverage (local preview of CI gate)
+npm run test:coverage
+
+# Run server-side tests only
+npm run test:server
+
+# Run server tests with coverage gate (same as CI)
+npm run test:server:coverage
+
+# Run E2E tests (requires built app on localhost:3000)
+npm run test:e2e
+
+# Run E2E with UI mode for debugging
+npm run test:e2e:ui
 ```
 
 ## 📦 Component Development
