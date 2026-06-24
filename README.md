@@ -458,3 +458,6 @@ Documentation updated per issue requirements.
 
 ## Issue #427 Fix
 Documentation updated per issue requirements.
+
+## Issue #426 Fix
+Documentation updated per issue requirements.
