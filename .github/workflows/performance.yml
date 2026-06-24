@@ -48,6 +48,11 @@ jobs:
             let comment = '## 📊 Performance Report\n\n';
             comment += '✅ Lighthouse CI completed successfully!\n';
             comment += '📦 Bundle size analysis completed!\n\n';
+            comment += '### Dashboard Budget\n';
+            comment += '- LCP: ≤ 3000ms\n';
+            comment += '- CLS: ≤ 0.1\n';
+            comment += '- TBT: ≤ 300ms\n';
+            comment += '- Performance score: ≥ 0.8\n\n';
             comment += 'Check the full report in the Actions tab.';
             
             github.rest.issues.createComment({
