@@ -513,4 +513,90 @@ describe("WithdrawForm", () => {
       expect(select.value).toBe("supply-2");
     });
   });
+
+  describe("edge cases — partial vs full withdraw", () => {
+    it("allows a partial withdraw that leaves collateral intact", () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+      // Withdraw 1000 of 5000 supplied, 2250 locked
+      fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
+        target: { value: "1000" },
+      });
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: 1000,
+          asset: "XLM",
+        }),
+      );
+    });
+
+    it("allows a full withdraw (entire withdrawable balance) when no debt", () => {
+      const noDebtPositions: SupplyPosition[] = [
+        {
+          id: "full-avail",
+          asset: "USDC",
+          suppliedAmount: 2000,
+          lockedCollateral: 0,
+          outstandingDebt: 0,
+          healthFactor: 99,
+        },
+      ];
+      render(<WithdrawForm positions={noDebtPositions} onSubmit={onSubmit} />);
+      fireEvent.click(screen.getByText("MAX"));
+
+      const input = screen.getByLabelText(
+        /Withdrawal amount/i,
+      ) as HTMLInputElement;
+      expect(Number(input.value)).toBe(2000);
+
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 2000, asset: "USDC" }),
+      );
+    });
+
+    it("rejects withdraw that would breach active borrow health guard", async () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+      // Trying to withdraw 2750 (full withdrawable) would drop health to 0.8325 → critical
+      fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
+        target: { value: "2750" },
+      });
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      expect(
+        await screen.findByText(/push your health factor into the critical zone/i),
+      ).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("rejects zero amount withdraw", async () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+      fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
+        target: { value: "0" },
+      });
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      expect(
+        await screen.findByText(
+          /Enter a withdrawal amount greater than zero/i,
+        ),
+      ).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("rejects withdraw exceeding supplied balance", async () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+      // suppliedAmount=5000, trying 5001
+      fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
+        target: { value: "5001" },
+      });
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      expect(
+        await screen.findByText(/Amount exceeds withdrawable balance/i),
+      ).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+  });
 });
