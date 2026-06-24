@@ -2,6 +2,7 @@
 
 import { AssetInfo } from "@/lib/assets";
 import { cn } from "@/lib/utils/cn";
+import { TokenIcon } from "./icons/TokenIcon";
 
 interface AssetSelectorProps {
   assets: AssetInfo[];
@@ -66,13 +67,7 @@ export default function AssetSelector({
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      "w-6 h-6 rounded-full",
-                      TOKEN_COLORS[asset.symbol],
-                    )}
-                  />
-
+                  <TokenIcon symbol={asset.symbol} className="w-6 h-6" />
                   <span className="font-bold">{asset.symbol}</span>
                 </div>
 

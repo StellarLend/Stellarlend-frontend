@@ -1,3 +1,12 @@
+# Performance Budget: Token Icons
+
+Token icons are lazy-loaded via `React.lazy` + dynamic import in `components/shared/ui/icons/TokenIcon.tsx`. Only the icons actually rendered in the current view are loaded — the rest stay in their own chunks.
+
+**Before:** All token icons were bundled into the lending route chunk.
+**After:** Each icon is a separate chunk loaded on-demand. The initial bundle ships only the placeholder (a 200-byte div), and the icon SVG loads asynchronously.
+
+---
+
 # Performance Budget: Lending Route
 
 To maintain fast initial load times for the lending page, we have implemented code splitting using `next/dynamic`.
