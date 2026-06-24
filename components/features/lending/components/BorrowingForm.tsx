@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { LendingData } from "@/app/lending/page";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
@@ -13,6 +13,7 @@ import {
   getHealthBand,
   type PriceMap,
 } from "@/lib/lending/health";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 interface BorrowingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -82,19 +83,37 @@ export default function BorrowingForm({
   // Calculate required collateral (150% of loan amount)
   const requiredCollateral = formData.amount * 1.5;
   const collateralAmount = formData.collateralAmount ?? 0;
-  const projectedHealth = calculateProjectedBorrowHealth({
-    loanAmount: formData.amount,
-    borrowAsset: formData.asset,
-    collateralAmount: collateralAmount || requiredCollateral,
-    collateralAsset: formData.collateral ?? "",
-    prices: priceMap,
-  });
-  const projectedBand = projectedHealth
-    ? getHealthBand(projectedHealth.healthFactor)
-    : null;
-  const projectedBandStyle = projectedBand
-    ? HEALTH_BAND_STYLES[projectedBand]
-    : null;
+
+  // Debounce the loan amount so rapid keystrokes don't thrash health math
+  const debouncedAmount = useDebouncedValue(formData.amount, 300);
+
+  // Memoised health/liquidation recomputation — only re-runs when inputs change,
+  // not on every keystroke-driven re-render.
+  const memoizedHealthInput = useMemo(
+    () => ({
+      loanAmount: debouncedAmount,
+      borrowAsset: formData.asset,
+      collateralAmount: collateralAmount || requiredCollateral,
+      collateralAsset: formData.collateral ?? "",
+      prices: priceMap,
+    }),
+    [debouncedAmount, formData.asset, formData.collateral, collateralAmount, requiredCollateral, priceMap],
+  );
+
+  const projectedHealth = useMemo(
+    () => calculateProjectedBorrowHealth(memoizedHealthInput),
+    [memoizedHealthInput],
+  );
+
+  const projectedBand = useMemo(
+    () => (projectedHealth ? getHealthBand(projectedHealth.healthFactor) : null),
+    [projectedHealth],
+  );
+
+  const projectedBandStyle = useMemo(
+    () => (projectedBand ? HEALTH_BAND_STYLES[projectedBand] : null),
+    [projectedBand],
+  );
 
   useEffect(() => {
     setFormData((prev) => ({

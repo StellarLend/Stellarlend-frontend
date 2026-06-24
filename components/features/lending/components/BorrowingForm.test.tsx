@@ -114,6 +114,33 @@ describe("BorrowingForm Component", () => {
     expect(screen.getByText(/Please fix the errors in the form before continuing/i)).toBeInTheDocument();
   });
 
+  it("debounces health recomputation on rapid keystrokes", () => {
+    const { rerender } = render(
+      <BorrowingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />,
+    );
+
+    const amountInput = screen.getByLabelText(/Amount to Borrow/i);
+
+    // Simulate rapid typing: 5 keystrokes in quick succession
+    fireEvent.change(amountInput, { target: { value: "1" } });
+    fireEvent.change(amountInput, { target: { value: "10" } });
+    fireEvent.change(amountInput, { target: { value: "100" } });
+    fireEvent.change(amountInput, { target: { value: "1000" } });
+    fireEvent.change(amountInput, { target: { value: "10000" } });
+
+    // Before debounce timer fires (300ms), health preview should not show
+    expect(screen.queryByText(/Projected Health Preview/i)).not.toBeInTheDocument();
+
+    // After debounce fires, health preview appears with the final value
+    act(() => {
+      vi.advanceTimersByTime(350);
+    });
+
+    expect(screen.getByText(/Projected Health Preview/i)).toBeInTheDocument();
+    // 150% of 10000 = 15000
+    expect(screen.getByText("15000 XLM")).toBeInTheDocument();
+  });
+
   it("submits successfully with valid data", async () => {
     render(<BorrowingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
     
