@@ -440,3 +440,6 @@ For questions, issues, or feature requests:
 
 ## Issue #436 Fix
 Documentation updated per issue requirements.
+
+## Issue #435 Fix
+Documentation updated per issue requirements.
