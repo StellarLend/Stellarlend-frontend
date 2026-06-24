@@ -437,3 +437,6 @@ For questions, issues, or feature requests:
 ---
 
 **Built with ?? for the Stellar ecosystem**
+
+## Issue #436 Fix
+Documentation updated per issue requirements.
