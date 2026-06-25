@@ -57,6 +57,8 @@ export default function Component({ ... }: ComponentProps) {
 // 4. Exports (if needed)
 ```
 
+For placement and dependency rules, follow the living [component architecture guide](docs/component-architecture.md). In short, feature components may import shared primitives, but shared layers must not import feature-specific code.
+
 ## 🧪 Testing
 
 - Write tests for new features and bug fixes
@@ -123,6 +125,7 @@ Follow the established structure:
   - `features/`: Feature-specific components
   - `marketing/`: Marketing page components
   - `shared/`: Shared components (ui, layout, common)
+  - See [Component Architecture](docs/component-architecture.md) for dependency direction and known migration debt
 - **`lib/`**: Utility libraries and helpers
 - **`types/`**: TypeScript type definitions
 - **`constants/`**: Application constants

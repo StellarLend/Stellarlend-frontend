@@ -4,6 +4,7 @@
 - [ ] Proper file organization
 - [ ] Index file with barrel export
 - [ ] Type definitions in separate file
+- [ ] Component layer and imports follow the [component architecture guide](docs/component-architecture.md)
 
 ### ✅ Types
 - [ ] Comprehensive TypeScript interfaces
@@ -29,6 +30,7 @@
 - [ ] JSDoc comments
 - [ ] Storybook stories
 - [ ] Usage examples
+- [ ] New shared or reusable components document their intended layer and example usage
 
 ### ✅ Performance
 - [ ] Memoization where appropriate
