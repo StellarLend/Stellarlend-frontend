@@ -1,5 +1,5 @@
 "use client"
-import ProfileForm from "@/components/features/account/components/ProfileForm";
+import { DataExportButton, ProfileForm } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
 import { PageHeader } from "@/components/shared/common";
 import { usePathname } from "next/navigation";
@@ -18,7 +18,12 @@ export default function Account() {
             title="Profile"
             description="Manage your personal details, security settings, and notification preferences."
           />
-          {pathname === "/account/profile" && <ProfileForm />}
+          {pathname === "/account/profile" && (
+            <div className="space-y-6">
+              <ProfileForm />
+              <DataExportButton />
+            </div>
+          )}
         </div>
       </div>
     </div>
