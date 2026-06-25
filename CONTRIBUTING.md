@@ -28,6 +28,10 @@ Thank you for your interest in contributing to Stellarlend! This document provid
 - Keep components focused and single-purpose
 - Use TypeScript for all component props
 
+### Client Data Fetching
+
+When wiring client components to `app/api/*` routes or adding route-backed hooks, follow the [client data-fetching and hook conventions](docs/data-fetching.md). Hooks should own request state and cleanup; components should render loading, empty, error, and success states explicitly.
+
 ### File Naming
 
 - Components: `PascalCase.tsx` (e.g., `LendingForm.tsx`)
