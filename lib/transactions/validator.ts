@@ -3,9 +3,14 @@ import { TransactionStatus } from "../../types/Transaction";
 const VALID_STATUSES = new Set(["Completed", "Processing", "Failed"]);
 const VALID_ASSETS = new Set(["XLM", "BTC", "STRK"]);
 
+function parseIntegerParam(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export function parseTransactionParams(searchParams: URLSearchParams) {
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-  const rawPageSize = parseInt(searchParams.get("pageSize") || "10", 10);
+  const page = Math.max(1, parseIntegerParam(searchParams.get("page"), 1));
+  const rawPageSize = parseIntegerParam(searchParams.get("pageSize"), 10);
   const pageSize = Math.min(100, Math.max(1, rawPageSize)); // Clamped to 100 max
   const sort = searchParams.get("sort") || "date-desc";
   const status = searchParams.get("status") as TransactionStatus | null;
