@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock('server-only', () => ({}));
 import { NextRequest } from "next/server";
 import { GET, POST } from "@/app/api/transactions/route";
 import { globalCache } from "@/lib/cache";

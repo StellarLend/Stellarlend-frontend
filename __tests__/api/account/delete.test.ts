@@ -1,12 +1,57 @@
+import { vi } from 'vitest';
+vi.mock('server-only', () => ({}));
+
+const notificationsStore = new Map<string, any[]>();
+vi.mock('@/lib/notifications/repository', () => {
+  const seedUser = (userId: string) => {
+    notificationsStore.set(userId, [
+      { id: 'notif-3', userId, title: 'Interest Earned', message: '...', read: true, createdAt: new Date().toISOString(), type: 'info' },
+      { id: 'notif-2', userId, title: 'Loan Payment Due', message: '...', read: false, createdAt: new Date().toISOString(), type: 'warning' },
+      { id: 'notif-1', userId, title: 'Deposit Confirmed', message: '...', read: false, createdAt: new Date().toISOString(), type: 'success' }
+    ]);
+  };
+  return {
+    getNotifications: vi.fn((userId: string) => {
+      if (!notificationsStore.has(userId)) {
+        seedUser(userId);
+      }
+      return notificationsStore.get(userId) || [];
+    }),
+    addNotification: vi.fn((userId: string, n: any) => {
+      if (!notificationsStore.has(userId)) {
+        seedUser(userId);
+      }
+      const list = notificationsStore.get(userId) || [];
+      const newNotif = {
+        ...n,
+        userId,
+        createdAt: new Date().toISOString()
+      };
+      list.unshift(newNotif);
+      notificationsStore.set(userId, list);
+      return newNotif;
+    }),
+    removeNotificationsByUserId: vi.fn((userId: string) => {
+      const list = notificationsStore.get(userId) || [];
+      notificationsStore.set(userId, []);
+      return list.length;
+    }),
+    clearStore: vi.fn(() => {
+      notificationsStore.clear();
+    }),
+  };
+});
+
 import { NextRequest } from 'next/server';
 import { GET as ChallengeGET } from '@/app/api/account/delete/challenge/route';
 import { DELETE as DeleteDELETE } from '@/app/api/account/delete/route';
 import { signToken } from '@/lib/auth';
 import { profileRepository } from '@/lib/account/repository';
 import { getNotifications, removeNotificationsByUserId, clearStore } from '@/lib/notifications/repository';
-import { getAuditEvents, clearAuditLog } from '@/lib/audit/events';
-import { getJobsByUserId, clearJobQueue } from '@/lib/queue/cleanup-queue';
+import { getAuditEvents, clearAuditLog, emitAuditEvent } from '@/lib/audit/events';
+import { getJobsByUserId, clearJobQueue, enqueueCleanupJob, processJob, getQueueStats } from '@/lib/queue/cleanup-queue';
 import { clearChallengeStore, getChallengeCount } from '@/lib/account/challenge-store';
+import { deleteAccount } from '@/lib/account/delete';
 
 const USER = { id: 'user-delete-test-1', email: 'delete@example.com', name: 'Delete Test' };
 
@@ -490,7 +535,6 @@ describe('lib/notifications/repository - removeNotificationsByUserId', () => {
 
 describe('lib/audit/events', () => {
   test('emitAuditEvent creates and stores an event', () => {
-    const { emitAuditEvent, getAuditEvents } = require('@/lib/audit/events');
     const event = emitAuditEvent('account.deleted', 'audit-user', { reason: 'test' });
     expect(event.id).toBeDefined();
     expect(event.type).toBe('account.deleted');
@@ -503,7 +547,6 @@ describe('lib/audit/events', () => {
   });
 
   test('getAuditEvents filters by type', () => {
-    const { emitAuditEvent, getAuditEvents, clearAuditLog } = require('@/lib/audit/events');
     clearAuditLog();
     emitAuditEvent('account.deleted', 'filter-user');
     emitAuditEvent('sessions.revoked', 'filter-user');
@@ -514,7 +557,6 @@ describe('lib/audit/events', () => {
   });
 
   test('getAuditEvents filters by since timestamp', () => {
-    const { emitAuditEvent, getAuditEvents, clearAuditLog } = require('@/lib/audit/events');
     clearAuditLog();
 
     const past = new Date(Date.now() - 10000).toISOString();
@@ -529,7 +571,6 @@ describe('lib/audit/events', () => {
   });
 
   test('clearAuditLog removes all events', () => {
-    const { emitAuditEvent, getAuditEvents, clearAuditLog } = require('@/lib/audit/events');
     clearAuditLog();
     emitAuditEvent('account.deleted', 'clear-user');
     expect(getAuditEvents({ userId: 'clear-user' }).length).toBeGreaterThan(0);
@@ -541,7 +582,6 @@ describe('lib/audit/events', () => {
 
 describe('lib/queue/cleanup-queue', () => {
   test('enqueueCleanupJob creates a pending job', () => {
-    const { enqueueCleanupJob, getJobsByUserId, clearJobQueue } = require('@/lib/queue/cleanup-queue');
     clearJobQueue();
     const job = enqueueCleanupJob('remove-derived-data', 'queue-user');
     expect(job.id).toBeDefined();
@@ -554,7 +594,6 @@ describe('lib/queue/cleanup-queue', () => {
   });
 
   test('different job types have different retention periods', () => {
-    const { enqueueCleanupJob, clearJobQueue } = require('@/lib/queue/cleanup-queue');
     clearJobQueue();
 
     const cacheJob = enqueueCleanupJob('clear-cache-entries', 'retention-user');
@@ -566,7 +605,6 @@ describe('lib/queue/cleanup-queue', () => {
   });
 
   test('processJob marks job as completed', () => {
-    const { enqueueCleanupJob, processJob, clearJobQueue } = require('@/lib/queue/cleanup-queue');
     clearJobQueue();
     const job = enqueueCleanupJob('clear-cache-entries', 'process-user');
 
@@ -577,7 +615,6 @@ describe('lib/queue/cleanup-queue', () => {
   });
 
   test('processJob marks job as failed with error', () => {
-    const { enqueueCleanupJob, processJob, clearJobQueue } = require('@/lib/queue/cleanup-queue');
     clearJobQueue();
     const job = enqueueCleanupJob('clear-cache-entries', 'fail-user');
 
@@ -587,12 +624,10 @@ describe('lib/queue/cleanup-queue', () => {
   });
 
   test('processJob returns null for nonexistent job', () => {
-    const { processJob } = require('@/lib/queue/cleanup-queue');
     expect(processJob('nonexistent')).toBeNull();
   });
 
   test('getQueueStats returns correct counts', () => {
-    const { enqueueCleanupJob, processJob, getQueueStats, clearJobQueue } = require('@/lib/queue/cleanup-queue');
     clearJobQueue();
 
     const job1 = enqueueCleanupJob('clear-cache-entries', 'stats-user');
@@ -608,7 +643,6 @@ describe('lib/queue/cleanup-queue', () => {
   });
 
   test('clearJobQueue removes all jobs', () => {
-    const { enqueueCleanupJob, getQueueStats, clearJobQueue } = require('@/lib/queue/cleanup-queue');
     clearJobQueue();
     enqueueCleanupJob('clear-cache-entries', 'clear-queue-user');
     expect(getQueueStats().total).toBeGreaterThan(0);
@@ -620,12 +654,10 @@ describe('lib/queue/cleanup-queue', () => {
 
 describe('lib/account/delete - deleteAccount', () => {
   test('throws when no profile exists', async () => {
-    const { deleteAccount } = await import('@/lib/account/delete');
     await expect(deleteAccount('nonexistent-delete-user')).rejects.toThrow('No profile found');
   });
 
   test('returns successful deletion result', async () => {
-    const { deleteAccount } = await import('@/lib/account/delete');
     await profileRepository.upsert('success-user', {
       displayName: 'Success',
       bio: '',

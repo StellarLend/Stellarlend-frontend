@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
@@ -95,6 +96,8 @@ describe('config modules', () => {
     process.env.NEXT_PUBLIC_APP_ENV = 'development';
 
     const configModule = await import('./config');
+    expect((configModule.default as any).serverToken).toBeUndefined();
+  });
 
   it('throws an error if imported without any environment configuration', async () => {
     process.env.NEXT_PUBLIC_APP_ENV = 'invalid-env';

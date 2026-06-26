@@ -359,7 +359,7 @@ export default function LendingPage() {
           onConfirm={handleConfirm}
           data={currentData}
           calculation={calculationResult}
-          type={activeTab}
+          type={activeTab === 'repay' ? 'borrow' : activeTab}
         />
         {toast && (
           <Toast
