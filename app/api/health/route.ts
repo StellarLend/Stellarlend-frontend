@@ -8,50 +8,13 @@ export const runtime = 'nodejs';
 
 type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 
-async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
-  try {
-    await httpGet(${config.stellar.sorobanRpcUrl}/health, { timeoutMs: 5000, retries: 1 });
-    return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
-  }
-}
-
-async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
-  try {
-    await httpGet(${config.api.baseUrl}/health, { timeoutMs: 5000, retries: 1 });
-    return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
-  }
-}
-
-async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
-  try {
-    await httpGet(${config.api.baseUrl}/health, { timeoutMs: 5000, retries: 1 });
-    return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
-  }
-}
-
-import { generateETag, isNotModified, cacheHeaders, notModifiedResponse } from '@/lib/api';
-
-async function handleHealth(req: NextRequest) {
+async function checkUrl(url: string): Promise<HealthStatus> {
   try {
     await httpGet(url, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
-  } catch (error) {
-    if (error instanceof TimeoutError || error instanceof UpstreamHttpError) {
-      return 'degraded';
-    }
-
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
     return 'unhealthy';
   }
 }
@@ -66,7 +29,7 @@ async function handleHealth(request: NextRequest) {
   try {
     const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
       checkUrl(`${config.stellar.horizonUrl}/`),
-      checkUrl(`${(config.stellar as { sorobanRpcUrl?: string }).sorobanRpcUrl ?? config.stellar.horizonUrl}/health`),
+      checkUrl(`${config.stellar.sorobanRpcUrl ?? config.stellar.horizonUrl}/health`),
       checkUrl(`${config.api.baseUrl}/health`),
       checkUrl(`${config.api.baseUrl}/health`),
     ]);
@@ -88,7 +51,7 @@ async function handleHealth(request: NextRequest) {
 
     const etag = generateETag(stableFields);
 
-    if (isNotModified(req, etag)) {
+    if (isNotModified(request, etag)) {
       return new NextResponse(null, notModifiedResponse(etag, 'public'));
     }
 
@@ -97,7 +60,7 @@ async function handleHealth(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    const httpStatus = healthData.status === 'healthy' ? 200 : 503;
+    const httpStatus = healthData.status === 'unhealthy' ? 503 : 200;
     const headers = cacheHeaders(etag, 30, 'public');
 
     return NextResponse.json(healthData, {

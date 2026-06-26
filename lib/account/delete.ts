@@ -65,7 +65,7 @@ export async function deleteAccount(userId: string): Promise<AccountDeletionResu
     userId,
     anonymizedAt: new Date().toISOString(),
     notificationsRemoved,
-    cleanupJobs,
+    cleanupJobsEnqueued: cleanupJobs,
     auditEventId: auditEvent.id,
   };
 }
