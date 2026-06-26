@@ -4,6 +4,7 @@ import { middleware } from '@/middleware';
 import { withRequestLogging } from '@/lib/api/handler';
 import { httpGet } from '@/lib/http/client';
 import { normalizeRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
+import { captureServerError } from '@/lib/telemetry/sentry';
 
 vi.mock('server-only', () => ({}));
 
@@ -29,6 +30,7 @@ function apiRequest(headers?: HeadersInit) {
 }
 
 afterEach(() => {
+  vi.clearAllMocks();
   vi.restoreAllMocks();
 });
 
@@ -99,5 +101,23 @@ describe('x-request-id propagation', () => {
     expect(sanitizedHandlerId).not.toBe('not-a-ulid');
     expect(normalizeRequestId(sanitizedHandlerId)).toBe(sanitizedHandlerId);
     expect(upstreamHeaders.get(REQUEST_ID_HEADER)).toBe(sanitizedHandlerId);
+  });
+
+  it('passes the active request id to Sentry on handler errors', async () => {
+    const handler = withRequestLogging('/api/test', async () => {
+      throw new Error('boom');
+    });
+
+    const response = await handler(apiRequest({ [REQUEST_ID_HEADER]: VALID_REQUEST_ID }));
+
+    expect(response.status).toBe(500);
+    expect(captureServerError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        method: 'GET',
+        requestId: VALID_REQUEST_ID,
+        route: '/api/test',
+      }),
+    );
   });
 });

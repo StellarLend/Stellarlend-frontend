@@ -31,6 +31,8 @@ All `/api/*` requests participate in `x-request-id` correlation:
 - `withRequestLogging` stores the value in request-scoped logger context so structured logs include `context.requestId`.
 - `lib/http/client.ts` forwards the active value to upstream services on outbound HTTP calls.
 
+For the full flow, examples, Sentry tagging, and edge cases, see [`docs/request-tracing.md`](./request-tracing.md).
+
 Example:
 
 ```bash

@@ -125,6 +125,7 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
           captureServerError(error, {
             route,
             method,
+            requestId,
             query: request?.nextUrl?.searchParams.toString() ?? '',
             headers: {
               authorization: request?.headers?.get('authorization') ?? undefined,
