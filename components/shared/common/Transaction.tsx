@@ -18,6 +18,8 @@ import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
 import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
 import TransactionDetail from "@/components/features/dashboard/components/TransactionDetail";
+import { Dialog } from "@headlessui/react";
+
 
 import {
   fetchTransactions,

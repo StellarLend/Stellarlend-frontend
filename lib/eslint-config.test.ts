@@ -1,7 +1,7 @@
 import { Linter } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line
 const eslintConfig = require('../.eslintrc.js');
 
 function verify(code: string) {

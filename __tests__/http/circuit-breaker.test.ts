@@ -1,18 +1,19 @@
-// __tests__/http/circuit-breaker.test.ts
+import { vi, describe, test, expect, beforeEach } from 'vitest';
+vi.mock('server-only', () => ({}));
 
 import { CircuitBreaker, CircuitState } from '@/lib/http/circuit-breaker';
 
 // Mock metrics to avoid side effects
-jest.mock('@/lib/metrics/registry', () => ({
+vi.mock('@/lib/metrics/registry', () => ({
   metrics: {
     circuitState: {
-      set: jest.fn()
+      set: vi.fn()
     }
   }
 }));
 
 // Use fake timers for deterministic clock
-jest.useFakeTimers('modern');
+vi.useFakeTimers();
 
 describe('CircuitBreaker', () => {
   const host = 'example.com';
@@ -21,7 +22,7 @@ describe('CircuitBreaker', () => {
   let breaker: CircuitBreaker;
 
   beforeEach(() => {
-    jest.setSystemTime(0);
+    vi.setSystemTime(0);
     breaker = new CircuitBreaker();
   });
 
@@ -49,7 +50,7 @@ describe('CircuitBreaker', () => {
     // Circuit should be open now
     expect(breaker.shouldAllow(host, path)).toBe(false);
     // Advance time past cooldown
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     // Should transition to half‑open and allow request
     expect(breaker.shouldAllow(host, path)).toBe(true);
   });

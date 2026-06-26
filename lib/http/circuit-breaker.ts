@@ -76,14 +76,17 @@ export class CircuitBreaker {
 
   private transitionIfNeeded(stats: HostStats) {
     const total = stats.successes + stats.failures;
-    if (total < CIRCUIT_MIN_CALLS) return;
+    const minCalls = Number(process.env.CIRCUIT_MIN_CALLS ?? CIRCUIT_MIN_CALLS);
+    if (total < minCalls) return;
     const failureRate = stats.failures / total;
-    if (stats.state === CircuitState.CLOSED && failureRate >= CIRCUIT_FAILURE_RATE) {
+    const targetFailureRate = Number(process.env.CIRCUIT_FAILURE_RATE ?? CIRCUIT_FAILURE_RATE);
+    if (stats.state === CircuitState.CLOSED && failureRate >= targetFailureRate) {
       this.setState(stats, CircuitState.OPEN);
       return;
     }
     if (stats.state === CircuitState.OPEN && stats.openedAt !== undefined) {
-      if (this.now() - stats.openedAt >= CIRCUIT_COOLDOWN_MS) {
+      const cooldownMs = Number(process.env.CIRCUIT_COOLDOWN_MS ?? CIRCUIT_COOLDOWN_MS);
+      if (this.now() - stats.openedAt >= cooldownMs) {
         this.setState(stats, CircuitState.HALF_OPEN);
       }
     }

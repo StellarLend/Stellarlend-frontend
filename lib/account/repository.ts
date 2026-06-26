@@ -21,6 +21,8 @@ export interface ProfileRepository {
     ): ProfileRecord | Promise<ProfileRecord>;
 }
 
+const ANONYMIZED_MARKER = '[deleted]';
+
 class DrizzleProfileRepository implements ProfileRepository {
     getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null> {
         const client = tx || db;
@@ -72,18 +74,19 @@ class DrizzleProfileRepository implements ProfileRepository {
     }
 
     async anonymizeByUserId(userId: string): Promise<boolean> {
-        const existing = this.store.get(userId);
+        const existing = await this.getByUserId(userId);
         if (!existing) return false;
 
-        const anonymized: ProfileRecord = {
-            userId: existing.userId,
-            displayName: ANONYMIZED_MARKER,
-            bio: "",
-            website: "",
-            timezone: "UTC",
-            updatedAt: new Date(),
-        };
-        this.store.set(userId, anonymized);
+        await db
+            .update(profiles)
+            .set({
+                displayName: ANONYMIZED_MARKER,
+                bio: "",
+                website: "",
+                timezone: "UTC",
+                updatedAt: new Date(),
+            })
+            .where(eq(profiles.userId, userId));
         return true;
     }
 }

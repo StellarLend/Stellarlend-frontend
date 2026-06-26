@@ -120,6 +120,7 @@ export default defineConfig({
         "app/api/**",
         "lib/**",
         "components/atoms/IconButton/IconButton.tsx",
+        "components/shared/ui/AmountInput.tsx",
         "components/shared/layout/TopNav.tsx",
         "components/shared/layout/NavLink.tsx",
         "components/shared/layout/NavigationMenu.tsx",

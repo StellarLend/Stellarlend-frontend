@@ -27,13 +27,28 @@ class Counter {
 }
 
 class Gauge {
-  private value = 0;
+  private values = new Map<string, number>();
   constructor(private name: string, private help: string) {}
-  set(value: number) {
-    this.value = value;
+
+  set(labels: Labels, v: number): void;
+  set(v: number): void;
+  set(labelsOrValue: Labels | number, v?: number) {
+    if (typeof labelsOrValue === 'number') {
+      const key = labelKey(undefined);
+      this.values.set(key, labelsOrValue);
+    } else {
+      const key = labelKey(labelsOrValue);
+      this.values.set(key, v ?? 0);
+    }
   }
+
   collect(): string {
-    return `# HELP ${this.name} ${this.help}\n# TYPE ${this.name} gauge\n${this.name} ${this.value}\n`;
+    let out = `# HELP ${this.name} ${this.help}\n# TYPE ${this.name} gauge\n`;
+    for (const [lbl, val] of this.values) {
+      const labelPart = lbl === '{}' ? '' : `{${lbl}}`;
+      out += `${this.name}${labelPart} ${val}\n`;
+    }
+    return out;
   }
 }
 
@@ -80,22 +95,7 @@ class Histogram {
   }
 }
 
-class Gauge {
-  private values = new Map<string, number>();
-  constructor(private name: string, private help: string) {}
-  set(labels: Labels, v: number) {
-    const key = labelKey(labels);
-    this.values.set(key, v);
-  }
-  collect(): string {
-    let out = `# HELP ${this.name} ${this.help}\n# TYPE ${this.name} gauge\n`;
-    for (const [lbl, val] of this.values) {
-      const labelPart = lbl === '{}' ? '' : `{${lbl}}`;
-      out += `${this.name}${labelPart} ${val}\n`;
-    }
-    return out;
-  }
-}
+
 
 class Registry {
   httpRequests = new Counter('http_requests_total', 'Total HTTP requests');
@@ -130,7 +130,6 @@ class Registry {
     out += this.circuitState.collect();
     return out;
   }
-}
 }
 
 export const metrics = new Registry();
