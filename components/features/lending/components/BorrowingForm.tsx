@@ -10,6 +10,7 @@ import AssetSelector from "@/components/shared/ui/AssetSelector";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
+import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
 
 interface BorrowingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -39,9 +40,7 @@ export default function BorrowingForm({
   const [formData, setFormData] = useState<LendingData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "success" | "error"
-  >("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
 
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
@@ -89,23 +88,23 @@ export default function BorrowingForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitStatus("idle");
+    setStatus("idle");
     setSubmitMessage("");
     if (validateForm()) {
       setIsSubmitting(true);
       try {
         await new Promise((resolve) => setTimeout(resolve, 800));
-        setSubmitStatus("success");
+        setStatus("success");
         setSubmitMessage("Details validated successfully.");
         onSubmit(formData);
       } catch (err) {
-        setSubmitStatus("error");
+        setStatus("error");
         setSubmitMessage("An error occurred during validation.");
       } finally {
         setIsSubmitting(false);
       }
     } else {
-      setSubmitStatus("error");
+      setStatus("error");
       setSubmitMessage("Please fix the errors in the form before continuing.");
     }
   };
@@ -122,20 +121,7 @@ export default function BorrowingForm({
         </p>
       </div>
 
-      {submitMessage && (
-        <div
-          className={cn(
-            "p-4 rounded-xl mb-6 text-sm font-medium",
-            submitStatus === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200",
-          )}
-          role="alert"
-          aria-live="polite"
-        >
-          {submitMessage}
-        </div>
-      )}
+      <StatusAnnouncer status={status} type="borrow" message={submitMessage} />
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Borrow Asset Selection */}
