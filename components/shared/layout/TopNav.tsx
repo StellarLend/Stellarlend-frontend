@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import SearchBar from "@/components/molecules/SearchBar";
+import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu } from "lucide-react";
 import NotificationBell from "@/components/shared/layout/NotificationBell";
