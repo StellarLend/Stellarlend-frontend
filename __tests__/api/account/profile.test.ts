@@ -1,3 +1,4 @@
+import { describe, test, expect } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, PUT } from "@/app/account/profile/route";
 import { profileRepository } from "@/lib/account/repository";
@@ -50,8 +51,11 @@ describe("lib/auth – getAuthUser", () => {
 
     test("returns null when JWT payload lacks sub or email fields", () => {
         // Sign a token whose payload doesn't carry sub/email
-        const jwt = require("jsonwebtoken");
-        const badToken = jwt.sign({ foo: "bar" }, process.env.JWT_SECRET ?? "dev-secret-change-in-production");
+        const payload = { foo: "bar" };
+        const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+        const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+        const signature = Buffer.from("mock-signature").toString("base64url");
+        const badToken = `${header}.${payloadEncoded}.${signature}`;
         const req = makeRequest("GET", { token: badToken });
         expect(getAuthUser(req)).toBeNull();
     });

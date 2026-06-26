@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
+import type { LendingActionType } from "@/lib/lending/types";
 import { cn } from "@/lib/utils/cn";
 
 interface ConfirmModalProps {
@@ -10,7 +11,7 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   data: LendingData;
   calculation: CalculationResult | null;
-  type: "lend" | "borrow";
+  type: LendingActionType;
 }
 
 export default function ConfirmModal({
@@ -23,33 +24,108 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasAgreed, setHasAgreed] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [submitMessage, setSubmitMessage] = useState('');
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "success" | "error"
+  >("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setSubmitStatus('idle');
-      setSubmitMessage('');
+      setSubmitStatus("idle");
+      setSubmitMessage("");
       setHasAgreed(false);
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    previouslyFocusedElementRef.current = document.activeElement as HTMLElement;
+    closeButtonRef.current?.focus();
+
+    const focusableSelector = [
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "a[href]",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(", ");
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusableElements = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+      ).filter((element) => !element.hasAttribute("disabled"));
+
+      if (!focusableElements.length) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedElementRef.current?.focus();
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+
+  const actionLabel =
+    type === "lend"
+      ? "Lending"
+      : type === "borrow"
+        ? "Borrowing"
+        : type === "withdraw"
+          ? "Withdrawal"
+          : "Repayment";
+  const amountLabel =
+    type === "lend"
+      ? "Amount to Lend"
+      : type === "borrow"
+        ? "Amount to Borrow"
+        : type === "withdraw"
+          ? "Amount to Withdraw"
+          : "Amount to Repay";
 
   const handleConfirm = async () => {
     if (!hasAgreed) return;
 
     setIsConfirming(true);
-    setSubmitStatus('idle');
-    setSubmitMessage('');
+    setSubmitStatus("idle");
+    setSubmitMessage("");
     try {
       await onConfirm();
-      setSubmitStatus('success');
-      setSubmitMessage('Transaction confirmed successfully!');
+      setSubmitStatus("success");
+      setSubmitMessage("Transaction confirmed successfully!");
       setTimeout(onClose, 2000);
     } catch (err) {
-      setSubmitStatus('error');
-      setSubmitMessage('Transaction failed. Please try again.');
+      setSubmitStatus("error");
+      setSubmitMessage("Transaction failed. Please try again.");
     } finally {
       setIsConfirming(false);
     }
@@ -72,13 +148,23 @@ export default function ConfirmModal({
         />
 
         {/* Modal */}
-        <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+        <div
+          ref={dialogRef}
+          className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-transaction-title"
+        >
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Confirm {type === "lend" ? "Lending" : "Borrowing"} Transaction
+            <h3
+              id="confirm-transaction-title"
+              className="text-lg font-semibold text-gray-900"
+            >
+              Confirm {actionLabel} Transaction
             </h3>
             <button
+              ref={closeButtonRef}
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
               aria-label="Close modal"
@@ -103,9 +189,9 @@ export default function ConfirmModal({
             <div
               className={cn(
                 "p-3 rounded-lg mb-4 text-sm font-medium",
-                submitStatus === 'success' 
-                  ? "bg-green-50 text-green-800 border border-green-200" 
-                  : "bg-red-50 text-red-800 border border-red-200"
+                submitStatus === "success"
+                  ? "bg-green-50 text-green-800 border border-green-200"
+                  : "bg-red-50 text-red-800 border border-red-200",
               )}
               role="alert"
               aria-live="polite"
@@ -118,7 +204,7 @@ export default function ConfirmModal({
           <div className="mb-6">
             <div
               className={`rounded-lg p-4 mb-4 ${
-                type === "lend"
+                type === "lend" || type === "withdraw"
                   ? "bg-green-50 border border-green-200"
                   : "bg-blue-50 border border-blue-200"
               }`}
@@ -126,38 +212,78 @@ export default function ConfirmModal({
               <div className="text-center">
                 <div
                   className={`text-2xl font-bold mb-1 ${
-                    type === "lend" ? "text-green-700" : "text-blue-700"
+                    type === "lend" || type === "withdraw"
+                      ? "text-green-700"
+                      : "text-blue-700"
                   }`}
                 >
                   {formatCurrency(data.amount, data.asset)}
                 </div>
                 <div
                   className={`text-sm ${
-                    type === "lend" ? "text-green-600" : "text-blue-600"
+                    type === "lend" || type === "withdraw"
+                      ? "text-green-600"
+                      : "text-blue-600"
                   }`}
                 >
-                  {type === "lend" ? "Amount to Lend" : "Amount to Borrow"}
+                  {amountLabel}
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Interest Rate</span>
-                <span className="font-medium">
-                  {data.interestRate.toFixed(1)}%{" "}
-                  {type === "lend" ? "APY" : "APR"}
-                </span>
-              </div>
+              {type !== "withdraw" && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Interest Rate</span>
+                  <span className="font-medium">
+                    {data.interestRate.toFixed(1)}%{" "}
+                    {type === "lend" ? "APY" : "APR"}
+                  </span>
+                </div>
+              )}
 
-              {type === "borrow" && data.duration && (
+              {(type === "borrow" || type === "repay") && data.duration && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Loan Duration</span>
                   <span className="font-medium">{data.duration} days</span>
                 </div>
               )}
 
-              {calculation && (
+              {(type === "repay" || type === "withdraw") && (
+                <>
+                  {data.positionId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Position</span>
+                      <span className="font-medium">{data.positionId}</span>
+                    </div>
+                  )}
+                  {typeof data.remainingDebt === "number" && (
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="font-medium">
+                        {type === "withdraw" ? "Remaining Supplied" : "Remaining Debt"}
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(data.remainingDebt, data.asset)}
+                      </span>
+                    </div>
+                  )}
+                  {typeof data.healthFactorAfter === "number" &&
+                    (data.outstandingDebt ?? 0) > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">New Health Factor</span>
+                        <span className="font-medium text-green-600">
+                          {Number.isFinite(data.healthFactorAfter)
+                            ? data.healthFactorAfter.toFixed(2)
+                            : type === "withdraw"
+                              ? "N/A"
+                              : "Debt cleared"}
+                        </span>
+                      </div>
+                    )}
+                </>
+              )}
+
+              {calculation && type !== "repay" && (
                 <>
                   {type === "lend" ? (
                     <>
@@ -213,20 +339,24 @@ export default function ConfirmModal({
               )}
             </div>
 
-            {/* Collateral Info for Borrowing */}
-            {type === "borrow" && data.collateral && data.collateralAmount && (
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h4 className="font-medium text-yellow-800 mb-2">
-                  Collateral Required
-                </h4>
-                <div className="flex justify-between text-sm">
-                  <span className="text-yellow-700">Asset & Amount</span>
-                  <span className="font-medium">
-                    {formatCurrency(data.collateralAmount, data.collateral)}
-                  </span>
+            {/* Collateral Info for Borrowing / Repay */}
+            {(type === "borrow" || type === "repay") &&
+              data.collateral &&
+              data.collateralAmount && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <h4 className="font-medium text-yellow-800 mb-2">
+                    {type === "repay"
+                      ? "Collateral Securing Position"
+                      : "Collateral Required"}
+                  </h4>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-yellow-700">Asset & Amount</span>
+                    <span className="font-medium">
+                      {formatCurrency(data.collateralAmount, data.collateral)}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
 
           {/* Terms Agreement */}
@@ -269,7 +399,7 @@ export default function ConfirmModal({
               disabled={!hasAgreed || isConfirming}
               className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition-all duration-200 ${
                 hasAgreed && !isConfirming
-                  ? type === "lend"
+                  ? type === "lend" || type === "repay" || type === "withdraw"
                     ? "bg-green-500 hover:bg-green-600"
                     : "bg-blue-500 hover:bg-blue-600"
                   : "bg-gray-300 cursor-not-allowed"
@@ -299,7 +429,7 @@ export default function ConfirmModal({
                   Processing...
                 </div>
               ) : (
-                `Confirm ${type === "lend" ? "Lending" : "Borrowing"}`
+                `Confirm ${actionLabel}`
               )}
             </button>
           </div>

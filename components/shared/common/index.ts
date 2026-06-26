@@ -7,3 +7,5 @@ export { PageHeader } from './PageHeader';
 export { AlertBanner } from './AlertBanner';
 export type { PageHeaderProps, PageHeaderTone } from './PageHeader';
 export type { AlertBannerSeverity, AlertBannerProps } from './AlertBanner';
+export { default as Toast } from './Toast';
+export type { ToastVariant } from './Toast';

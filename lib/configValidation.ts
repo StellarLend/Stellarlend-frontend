@@ -8,23 +8,23 @@ const isProd = appEnv === 'production';
 export const envSchema = z.object({
   NEXT_PUBLIC_APP_NAME: isProd
     ? z.string().min(1, { message: 'APP_NAME is required' })
-    : z.string().min(1).default('Stellarlend'),
+    : z.string().min(1, { message: 'APP_NAME is required' }).default('Stellarlend'),
   NEXT_PUBLIC_APP_VERSION: isProd
     ? z.string().min(1, { message: 'APP_VERSION is required' })
-    : z.string().min(1).default('1.0.0'),
-  NEXT_PUBLIC_APP_ENV: z.enum(['development', 'staging', 'production'], { required_error: 'APP_ENV is required' }),
+    : z.string().min(1, { message: 'APP_VERSION is required' }).default('1.0.0'),
+  NEXT_PUBLIC_APP_ENV: z.enum(['development', 'staging', 'production']).default('development'),
   NEXT_PUBLIC_API_BASE_URL: isProd
     ? z.string().url({ message: 'API_BASE_URL must be a valid URL' })
-    : z.string().url().default('http://localhost:3001'),
+    : z.string().url({ message: 'API_BASE_URL must be a valid URL' }).default('http://localhost:3001'),
   NEXT_PUBLIC_STELLAR_NETWORK: isProd
     ? z.string().min(1, { message: 'STELLAR_NETWORK is required' })
-    : z.string().min(1).default('testnet'),
+    : z.string().min(1, { message: 'STELLAR_NETWORK is required' }).default('testnet'),
   NEXT_PUBLIC_STELLAR_HORIZON_URL: isProd
     ? z.string().url({ message: 'STELLAR_HORIZON_URL must be a valid URL' })
-    : z.string().url().default('https://horizon-testnet.stellar.org'),
+    : z.string().url({ message: 'STELLAR_HORIZON_URL must be a valid URL' }).default('https://horizon-testnet.stellar.org'),
   NEXT_PUBLIC_SOROBAN_RPC_URL: isProd
     ? z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' })
-    : z.string().url().default('https://soroban-testnet.stellar.org'),
+    : z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' }).default('https://soroban-testnet.stellar.org'),
   // Optional analytics ids
   NEXT_PUBLIC_GA_TRACKING_ID: z.string().optional(),
   NEXT_PUBLIC_MIXPANEL_TOKEN: z.string().optional(),
