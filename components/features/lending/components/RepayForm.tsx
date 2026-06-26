@@ -1,365 +1,391 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { usePositions, BorrowPosition } from "@/hooks/usePositions";
-import { EmptyState } from "@/components/shared/common/EmptyState";
-import { Skeleton } from "@/components/shared/common/Skeleton";
+import { useMemo, useState } from "react";
+import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
+import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
-import { Info, AlertTriangle, CheckCircle, X } from "lucide-react";
 
-export interface RepayFormProps {
-  positions?: BorrowPosition[];
-  onSubmit: (data: {
-    asset: string;
-    amount: number;
-    interestRate: number;
-  }) => void;
-}
-
-interface ToastMessage {
+export interface BorrowPosition {
   id: string;
-  text: string;
-  type: "success" | "error" | "info";
+  asset: string;
+  outstandingDebt: number;
+  interestRate: number;
+  collateralAsset: string;
+  collateralAmount: number;
+  healthFactor: number;
+  duration?: number;
 }
 
-export default function RepayForm({ positions: propsPositions, onSubmit }: RepayFormProps) {
-  // Toast notifications state
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+interface RepayFormProps {
+  onSubmit: (data: LendingData, quote: CalculationResult | null) => void;
+  positions?: BorrowPosition[];
+  initialPositionId?: string;
+}
 
-  const addToast = (text: string, type: "success" | "error" | "info" = "error") => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, text, type }]);
-    setTimeout(() => {
-      removeToast(id);
-    }, 5000);
-  };
+const DEFAULT_POSITIONS: BorrowPosition[] = [
+  {
+    id: "xlm-borrow-001",
+    asset: "XLM",
+    outstandingDebt: 1500,
+    interestRate: 12,
+    collateralAsset: "XLM",
+    collateralAmount: 5000,
+    healthFactor: 1.5,
+    duration: 30,
+  },
+  {
+    id: "usdc-borrow-002",
+    asset: "USDC",
+    outstandingDebt: 2200,
+    interestRate: 10.5,
+    collateralAsset: "ETH",
+    collateralAmount: 6200,
+    healthFactor: 1.18,
+    duration: 60,
+  },
+];
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+const formatAmount = (amount: number, asset: string) =>
+  `${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })} ${asset}`;
 
-  // Fetch live positions if no prop override is provided
-  const hasOverride = propsPositions !== undefined;
-  
-  const {
-    positions: fetchedPositions,
-    isLoading: isFetchLoading,
-    error: fetchError,
-  } = usePositions();
+const getHealthLabel = (healthFactor: number) => {
+  if (!Number.isFinite(healthFactor)) return "Debt cleared";
+  if (healthFactor >= 2) return "Healthy";
+  if (healthFactor >= 1) return "At Risk";
+  return "Critical";
+};
 
-  // Surface errors that might occur on initial render or hook run
-  useEffect(() => {
-    if (fetchError && !hasOverride) {
-      addToast(`Failed to load borrow positions: ${fetchError.message}`, "error");
-    }
-  }, [fetchError, hasOverride]);
+const computeHealthAfterRepayment = (
+  currentHealthFactor: number,
+  outstandingDebt: number,
+  repaymentAmount: number,
+) => {
+  const remainingDebt = Math.max(outstandingDebt - repaymentAmount, 0);
 
-  const activePositions = hasOverride ? propsPositions : fetchedPositions;
-  const isLoading = hasOverride ? false : isFetchLoading;
+  if (remainingDebt === 0) return Infinity;
 
-  // Form states
-  const [selectedPositionId, setSelectedPositionId] = useState<string>("");
-  const [amount, setAmount] = useState<string>("");
+  return (currentHealthFactor * outstandingDebt) / remainingDebt;
+};
+
+export default function RepayForm({
+  onSubmit,
+  positions = DEFAULT_POSITIONS,
+  initialPositionId,
+}: RepayFormProps) {
+  const [selectedPositionId, setSelectedPositionId] = useState(
+    initialPositionId ?? positions[0]?.id ?? "",
+  );
+  const [amount, setAmount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
 
-  const selectedPosition = activePositions?.find((p) => p.id === selectedPositionId);
+  const selectedPosition = positions.find(
+    (position) => position.id === selectedPositionId,
+  );
 
-  // Auto-select first position if available
-  useEffect(() => {
-    if (activePositions && activePositions.length > 0 && !selectedPositionId) {
-      setSelectedPositionId(activePositions[0].id);
-    }
-  }, [activePositions, selectedPositionId]);
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!selectedPositionId) {
-      newErrors.position = "Please select a borrow position to repay";
+  const preview = useMemo(() => {
+    if (!selectedPosition) {
+      return {
+        remainingDebt: 0,
+        healthFactorAfter: 0,
+        label: "Unavailable",
+      };
     }
 
-    const numAmount = parseFloat(amount);
-    if (!amount || isNaN(numAmount) || numAmount <= 0) {
-      newErrors.amount = "Please enter a valid positive amount";
-    } else if (selectedPosition && numAmount > selectedPosition.amount) {
-      newErrors.amount = `Repayment amount exceeds outstanding borrow amount of ${selectedPosition.amount} ${selectedPosition.asset}`;
+    const remainingDebt = Math.max(
+      selectedPosition.outstandingDebt - amount,
+      0,
+    );
+    const healthFactorAfter = computeHealthAfterRepayment(
+      selectedPosition.healthFactor,
+      selectedPosition.outstandingDebt,
+      amount,
+    );
+
+    return {
+      remainingDebt,
+      healthFactorAfter,
+      label: getHealthLabel(healthFactorAfter),
+    };
+  }, [amount, selectedPosition]);
+
+  const positionSummaryData = selectedPosition
+    ? {
+        suppliedFunds: `$${selectedPosition.collateralAmount.toLocaleString()} ${selectedPosition.collateralAsset}`,
+        borrowedAmount: `$${preview.remainingDebt.toLocaleString()} ${selectedPosition.asset}`,
+        healthFactor: Number.isFinite(preview.healthFactorAfter)
+          ? preview.healthFactorAfter
+          : 99,
+      }
+    : null;
+
+  const validate = () => {
+    const nextErrors: Record<string, string> = {};
+
+    if (!selectedPosition) {
+      nextErrors.position = "Please select an open borrow position";
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!amount || amount <= 0) {
+      nextErrors.amount = "Enter a repayment amount greater than zero";
+    } else if (selectedPosition && amount > selectedPosition.outstandingDebt) {
+      nextErrors.amount = `Repayment cannot exceed ${formatAmount(
+        selectedPosition.outstandingDebt,
+        selectedPosition.asset,
+      )}`;
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleMaxAmount = () => {
-    if (selectedPosition) {
-      setAmount(selectedPosition.amount.toString());
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.amount;
-        return next;
-      });
-    }
+  const handlePositionChange = (positionId: string) => {
+    const nextPosition = positions.find(
+      (position) => position.id === positionId,
+    );
+    setSelectedPositionId(positionId);
+    setAmount(0);
+    setErrors({});
+    setSubmitStatus("idle");
+    setSubmitMessage(
+      nextPosition ? `Selected ${nextPosition.asset} borrow position.` : "",
+    );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMaxRepayment = () => {
+    if (!selectedPosition) return;
+    setAmount(selectedPosition.outstandingDebt);
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.amount;
+      return next;
+    });
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setSubmitStatus("idle");
     setSubmitMessage("");
 
-    if (validateForm() && selectedPosition) {
-      setIsSubmitting(true);
-      try {
-        // Simulate processing delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        setSubmitStatus("success");
-        setSubmitMessage("Repayment transaction details validated successfully.");
-        
-        onSubmit({
-          asset: selectedPosition.asset,
-          amount: parseFloat(amount),
-          interestRate: 0, // Repayment submit contract does not need interest calculation rate
-        });
-      } catch (err) {
-        setSubmitStatus("error");
-        setSubmitMessage("An error occurred during transaction processing.");
-      } finally {
-        setIsSubmitting(false);
-      }
-    } else {
+    if (!validate() || !selectedPosition) {
       setSubmitStatus("error");
       setSubmitMessage("Please fix the errors in the form before continuing.");
+      return;
+    }
+
+    setSubmitStatus("loading");
+    setSubmitMessage("Preparing repayment preview...");
+
+    try {
+      const response = await fetch("/api/quote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "borrow",
+          data: {
+            asset: selectedPosition.asset,
+            amount,
+            interestRate: selectedPosition.interestRate,
+            duration: selectedPosition.duration ?? 30,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Quote preview failed");
+      }
+
+      const payload = (await response.json()) as {
+        result?: CalculationResult;
+      };
+
+      const data: LendingData = {
+        asset: selectedPosition.asset,
+        amount,
+        interestRate: selectedPosition.interestRate,
+        duration: selectedPosition.duration,
+        collateral: selectedPosition.collateralAsset,
+        collateralAmount: selectedPosition.collateralAmount,
+        positionId: selectedPosition.id,
+        outstandingDebt: selectedPosition.outstandingDebt,
+        remainingDebt: preview.remainingDebt,
+        healthFactorBefore: selectedPosition.healthFactor,
+        healthFactorAfter: preview.healthFactorAfter,
+      };
+
+      setSubmitStatus("success");
+      setSubmitMessage("Repayment preview ready.");
+      onSubmit(data, payload.result ?? null);
+    } catch {
+      setSubmitStatus("error");
+      setSubmitMessage(
+        "Unable to prepare repayment preview. Please try again.",
+      );
     }
   };
 
-  // Render skeletons while loading
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6" aria-label="Loading repayment details" aria-busy="true">
-        <div>
-          <Skeleton className="h-6 w-48 mb-2" />
-          <Skeleton className="h-4 w-80" />
-        </div>
-        <div className="space-y-4">
-          <div>
-            <Skeleton className="h-4 w-32 mb-2" />
-            <div className="grid grid-cols-2 gap-4">
-              <Skeleton className="h-20 rounded-xl" />
-              <Skeleton className="h-20 rounded-xl" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-10 rounded-lg" />
-          </div>
-          <Skeleton className="h-10 w-full rounded-lg" />
-        </div>
-      </div>
-    );
-  }
-
-  // Render EmptyState if no active borrows
-  if (!activePositions || activePositions.length === 0) {
-    return (
-      <div>
-        <EmptyState
-          title="No Outstanding Borrows"
-          description="You do not have any active borrow positions to repay at the moment."
-          icon={<Info className="h-8 w-8 text-[#097C4C]" aria-hidden="true" />}
-        />
-        {/* Render toast portal/container for any fetch failure errors */}
-        {toasts.length > 0 && (
-          <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-auto" role="alert" aria-label="Notifications">
-            {toasts.map((toast) => (
-              <div
-                key={toast.id}
-                className={cn(
-                  "p-4 rounded-xl shadow-lg border text-sm font-semibold transition-all duration-300 flex items-center gap-2",
-                  toast.type === "error" && "bg-red-50 text-red-800 border-red-200",
-                  toast.type === "success" && "bg-green-50 text-green-800 border-green-200",
-                  toast.type === "info" && "bg-blue-50 text-blue-800 border-blue-200"
-                )}
-              >
-                <span>{toast.text}</span>
-                <button
-                  type="button"
-                  onClick={() => removeToast(toast.id)}
-                  className="ml-auto text-current opacity-70 hover:opacity-100 focus:outline-none"
-                  aria-label="Close notification"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-2">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
           Repay Borrowed Assets
         </h2>
-        <p className="text-gray-600 text-sm font-medium">
-          Select an active borrow position and enter the amount you wish to repay.
+        <p className="text-gray-600 text-sm">
+          Choose an open borrow position and preview how repayment changes debt
+          and account health.
         </p>
       </div>
 
       {submitMessage && (
         <div
           className={cn(
-            "p-4 rounded-xl mb-6 text-sm font-semibold flex items-center gap-2",
+            "p-4 rounded-xl mb-6 text-sm font-medium",
             submitStatus === "success"
               ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200",
+              : submitStatus === "loading"
+                ? "bg-blue-50 text-blue-800 border border-blue-200"
+                : "bg-red-50 text-red-800 border border-red-200",
           )}
           role="alert"
           aria-live="polite"
         >
-          {submitStatus === "success" ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
           {submitMessage}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Select Borrow Position */}
+      <form onSubmit={handleSubmit} className="space-y-8">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-3">
-            Select Active Borrow Position
+          <label
+            htmlFor="repay-position"
+            className="block text-sm font-medium text-gray-700 mb-3"
+          >
+            Borrow position
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activePositions.map((pos) => {
-              const isSelected = pos.id === selectedPositionId;
-              return (
-                <button
-                  key={pos.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPositionId(pos.id);
-                    setAmount("");
-                    setErrors({});
-                  }}
-                  className={cn(
-                    "flex flex-col text-left p-4 rounded-xl border-2 transition-all duration-200 hover:border-[#097C4C]/50 focus:outline-none focus:ring-2 focus:ring-[#097C4C] focus:ring-offset-2",
-                    isSelected
-                      ? "border-[#097C4C] bg-[#E6F5EE]/20"
-                      : "border-gray-200 bg-white"
-                  )}
-                  aria-pressed={isSelected}
-                >
-                  <div className="flex justify-between items-center w-full mb-1">
-                    <span className="font-bold text-gray-900">{pos.asset}</span>
-                    {isSelected && (
-                      <span className="h-2 w-2 rounded-full bg-[#097C4C]" />
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600 font-medium">
-                    Outstanding: {pos.amount.toLocaleString()} {pos.asset}
-                  </div>
-                  {pos.healthFactor !== undefined && (
-                    <div className="text-xs text-gray-500 mt-1 font-medium">
-                      Health Factor: <span className={cn(
-                        pos.healthFactor >= 2.0 ? "text-green-600" :
-                        pos.healthFactor >= 1.2 ? "text-amber-600" : "text-red-600"
-                      )}>{pos.healthFactor.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {pos.nextDue && (
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      Next Due: {pos.nextDue}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <select
+            id="repay-position"
+            value={selectedPositionId}
+            onChange={(event) => handlePositionChange(event.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all focus:border-[#2600FF] focus:ring-1 focus:ring-[#2600FF]"
+            aria-invalid={Boolean(errors.position)}
+            aria-describedby={
+              errors.position ? "repay-position-error" : undefined
+            }
+          >
+            {positions.map((position) => (
+              <option key={position.id} value={position.id}>
+                {position.asset} debt -{" "}
+                {formatAmount(position.outstandingDebt, position.asset)}
+              </option>
+            ))}
+          </select>
           {errors.position && (
-            <p className="text-xs text-red-500 mt-1.5">{errors.position}</p>
+            <p
+              id="repay-position-error"
+              className="text-xs text-red-500 font-medium mt-2"
+              role="alert"
+            >
+              {errors.position}
+            </p>
           )}
         </div>
 
-        {/* Repayment Amount */}
+        <div className="relative">
+          <Input
+            id="repay-amount"
+            label="Repayment amount"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            value={amount || ""}
+            error={errors.amount}
+            helperText={
+              selectedPosition
+                ? `Outstanding: ${formatAmount(
+                    selectedPosition.outstandingDebt,
+                    selectedPosition.asset,
+                  )}`
+                : undefined
+            }
+            onChange={(event) => {
+              setAmount(Number.parseFloat(event.target.value) || 0);
+              if (errors.amount) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.amount;
+                  return next;
+                });
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleMaxRepayment}
+            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700"
+          >
+            MAX
+          </button>
+        </div>
+
         {selectedPosition && (
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label htmlFor="repay-amount" className="text-sm font-semibold text-gray-700">
-                Amount to Repay
-              </label>
-              <button
-                type="button"
-                onClick={handleMaxAmount}
-                className="text-xs font-semibold text-[#097C4C] hover:underline"
-              >
-                Max ({selectedPosition.amount.toLocaleString()} {selectedPosition.asset})
-              </button>
+          <div className="space-y-5">
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-5">
+              <h3 className="text-xs font-bold text-blue-900 mb-3 uppercase tracking-wider">
+                Repayment Preview
+              </h3>
+              <div className="space-y-2.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-blue-700">Remaining debt</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatAmount(
+                      preview.remainingDebt,
+                      selectedPosition.asset,
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-700">Health factor</span>
+                  <span className="font-semibold text-gray-900">
+                    {Number.isFinite(preview.healthFactorAfter)
+                      ? preview.healthFactorAfter.toFixed(2)
+                      : "Debt cleared"}{" "}
+                    ({preview.label})
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-blue-200 pt-2.5">
+                  <span className="text-blue-700">Collateral</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatAmount(
+                      selectedPosition.collateralAmount,
+                      selectedPosition.collateralAsset,
+                    )}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="relative">
-              <Input
-                id="repay-amount"
-                type="number"
-                step="any"
-                placeholder={`0.00 ${selectedPosition.asset}`}
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  if (errors.amount) {
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.amount;
-                      return next;
-                    });
-                  }
-                }}
-                error={errors.amount}
-              />
-            </div>
+
+            <PositionSummary data={positionSummaryData} />
           </div>
         )}
 
-        {/* Submit Button */}
         <Button
           type="submit"
           variant="primary"
-          isLoading={isSubmitting}
+          size="lg"
           fullWidth
-          className="bg-[#097C4C] hover:bg-[#0A3D1E] focus:ring-[#097C4C]"
+          isLoading={submitStatus === "loading"}
         >
-          Submit Repayment
+          Review Repayment
         </Button>
       </form>
-
-      {/* Floating Toast Notification Container */}
-      {toasts.length > 0 && (
-        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-auto" role="alert" aria-label="Notifications">
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={cn(
-                "p-4 rounded-xl shadow-lg border text-sm font-semibold transition-all duration-300 flex items-center gap-2 animate-slide-in",
-                toast.type === "error" && "bg-red-50 text-red-800 border-red-200",
-                toast.type === "success" && "bg-green-50 text-green-800 border-green-200",
-                toast.type === "info" && "bg-blue-50 text-blue-800 border-blue-200"
-              )}
-            >
-              <span>{toast.text}</span>
-              <button
-                type="button"
-                onClick={() => removeToast(toast.id)}
-                className="ml-auto text-current opacity-70 hover:opacity-100 focus:outline-none"
-                aria-label="Close notification"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,53 +1,81 @@
-# Repay Flow and Live Positions Data Source
+# Repay Flow
 
-This document outlines how the repayment flow interacts with the live backend positions API in StellarLend.
+This guide documents the borrower repayment path added to the lending page.
 
-## Data Flow Architecture
+## Primary Surfaces
 
-The repayment flow is designed to fetch outstanding debt directly from the user's active positions.
+The repayment flow is centered on these files:
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant RepayForm
-    participant usePositions Hook
-    participant Positions API (/api/positions)
+- `app/lending/page.tsx`
+- `components/features/lending/components/TabSelector.tsx`
+- `components/features/lending/components/RepayForm.tsx`
+- `components/features/lending/components/ConfirmModal.tsx`
+- `components/features/dashboard/components/PositionSummary.tsx`
 
-    User->>RepayForm: Open Repay Tab
-    RepayForm->>usePositions Hook: usePositions()
-    usePositions Hook->>Positions API (/api/positions): GET /api/positions
-    Positions API (/api/positions)-->>usePositions Hook: JSON Response (aggregate metrics)
-    Note over usePositions Hook: Map borrowedAmount to BorrowPosition[]
-    usePositions Hook-->>RepayForm: BorrowPosition[] (state)
-    RepayForm-->>User: Display active borrow positions list
+`TabSelector` exposes the `repay` tab alongside `lend` and `borrow`. `RepayForm` owns repayment-specific field state, validation, preview calculation, and `/api/quote` preview loading. `app/lending/page.tsx` stores the validated repayment draft and opens `ConfirmModal` for final review.
+
+## User Flow
+
+1. The user opens `/lending` and selects the Repay Loan tab.
+2. The user selects an open borrow position.
+3. The user enters a repayment amount.
+4. The form validates that `0 < amount <= outstandingDebt`.
+5. The form previews remaining debt and the post-repayment health factor.
+6. The form requests `/api/quote` using the existing borrow quote path for repayment cost preview context.
+7. The page opens `ConfirmModal` with the repayment amount, remaining debt, collateral, and updated health factor.
+8. The user confirms before the transaction build/submit layer is invoked.
+
+## Validation Rules
+
+Repayment validation happens in `RepayForm` before any quote request:
+
+- A borrow position must be selected.
+- The repayment amount must be greater than zero.
+- The repayment amount must not exceed the selected position's outstanding debt.
+- Field-level errors and a summary alert are rendered with accessible labels and live regions.
+
+## Health Factor Preview
+
+The repayment preview reuses the same threshold model as `PositionSummary`:
+
+| Health Factor        | Status   |
+| -------------------- | -------- |
+| `>= 2.0`             | Healthy  |
+| `>= 1.0` and `< 2.0` | At Risk  |
+| `< 1.0`              | Critical |
+
+For partial repayments, `RepayForm` keeps collateral fixed and recalculates the post-repayment health factor by reducing the debt denominator. Full repayment is displayed as debt cleared.
+
+## Worked Example
+
+A borrower has an XLM loan with:
+
+- Outstanding debt: `1,500 XLM`
+- Collateral: `5,000 XLM`
+- Current health factor: `1.50`
+
+If the borrower repays `500 XLM`, the live preview shows:
+
+- Remaining debt: `1,000 XLM`
+- New health factor: `2.25`
+- Status: `Healthy`
+
+If the borrower repays the full `1,500 XLM`, the preview shows `0 XLM` remaining debt and `Debt cleared` for the health factor state.
+
+## Tests
+
+`components/features/lending/components/RepayForm.test.tsx` covers:
+
+- Required repayment amount validation.
+- No open positions.
+- Overpayment validation.
+- Partial repayment preview.
+- Full repayment preview.
+- Quote submission and callback payload.
+- Loading and error states when quote preview fails.
+
+Run the focused suite with:
+
+```bash
+npm test -- components/features/lending/components/RepayForm.test.tsx
 ```
-
-## Data Source API
-
-The live positions endpoint is located at `/api/positions`.
-
-### Response Schema
-When authenticated, the GET request returns an object containing:
-- `borrowedAmount`: A string representing the total borrowed funds formatted with asset (e.g. `"$1,500.00 XLM"`).
-- `healthFactor`: Number representing the collateralization ratio health.
-- `nextDue`: A string showing the next payment due date (e.g. `"$250.00 in 4 days"`).
-
-## Custom Hook: `usePositions`
-
-File: [hooks/usePositions.ts](file:///c:/Users/HP/Stellarlend-frontend/hooks/usePositions.ts)
-
-The `usePositions` custom hook manages fetching and parsing positions:
-- **Mapping:** Parses the `borrowedAmount` string to extract the numeric value and the asset symbol.
-- **Robustness:** Supports both the current flat object format and potential array-based formats.
-- **States:** Exposes `positions: BorrowPosition[]`, `isLoading: boolean`, `error: Error | null`, and a `refetch: () => Promise<void>` callback.
-
-## Component: `RepayForm`
-
-File: [components/features/lending/components/RepayForm.tsx](file:///c:/Users/HP/Stellarlend-frontend/components/features/lending/components/RepayForm.tsx)
-
-The `RepayForm` component displays active borrows and handles user validation:
-- **Override Prop:** Accepts `positions` directly as a prop for testing and storybook fixtures. Falls back to `usePositions` only when the prop is omitted.
-- **Loading:** Renders pulse layout skeletons during active fetch.
-- **Empty State:** Reuses the common `EmptyState` component when no borrow positions are active.
-- **Toast Notifications:** Surfaces fetch errors to the user using a floating toast message overlay.
-- **Validation:** Enforces that repayment amount is positive and does not exceed the outstanding position limit.

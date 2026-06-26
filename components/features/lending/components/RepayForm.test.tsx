@@ -1,146 +1,180 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
-import RepayForm from "./RepayForm";
-import { usePositions, BorrowPosition } from "@/hooks/usePositions";
+import { render, screen, fireEvent, waitFor } from "@/test/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import RepayForm, { BorrowPosition } from "./RepayForm";
 
-// Mock the usePositions hook
-vi.mock("@/hooks/usePositions", () => {
-  return {
-    usePositions: vi.fn(),
-  };
-});
+const positions: BorrowPosition[] = [
+  {
+    id: "loan-1",
+    asset: "XLM",
+    outstandingDebt: 1500,
+    interestRate: 12,
+    collateralAsset: "XLM",
+    collateralAmount: 5000,
+    healthFactor: 1.5,
+    duration: 30,
+  },
+  {
+    id: "loan-2",
+    asset: "USDC",
+    outstandingDebt: 900,
+    interestRate: 9,
+    collateralAsset: "ETH",
+    collateralAmount: 3000,
+    healthFactor: 2.1,
+    duration: 60,
+  },
+];
+
+const quoteResult = {
+  totalEarnings: 5,
+  dailyEarnings: 0.16,
+  totalRepayment: 505,
+  monthlyPayment: 505,
+};
 
 describe("RepayForm Component", () => {
-  const mockOnSubmit = vi.fn();
-
-  const mockPositions: BorrowPosition[] = [
-    { id: "borrow-XLM", asset: "XLM", amount: 1500, healthFactor: 1.5, nextDue: "in 4 days" },
-    { id: "borrow-USDC", asset: "USDC", amount: 500, healthFactor: 2.1 },
-  ];
+  const onSubmit = vi.fn();
 
   beforeEach(() => {
-    vi.mocked(usePositions).mockReturnValue({
-      positions: [],
-      isLoading: false,
-      error: null,
-      refetch: async () => {},
-    });
-    vi.useFakeTimers();
+    onSubmit.mockReset();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ result: quoteResult }),
+      }),
+    );
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it("renders with positions override prop (Storybook fixture path)", () => {
-    render(<RepayForm positions={mockPositions} onSubmit={mockOnSubmit} />);
+  it("renders the repayment workflow", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
 
     expect(screen.getByText(/Repay Borrowed Assets/i)).toBeInTheDocument();
-    expect(screen.getByText(/Select Active Borrow Position/i)).toBeInTheDocument();
-    expect(screen.getByText(/Outstanding: 1,500 XLM/i)).toBeInTheDocument();
-    expect(screen.getByText(/Outstanding: 500 USDC/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Borrow position/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Repayment amount/i)).toBeInTheDocument();
   });
 
-  it("renders skeletons during loading state", () => {
-    vi.mocked(usePositions).mockReturnValue({
-      positions: [],
-      isLoading: true,
-      error: null,
-      refetch: async () => {},
+  it("validates repayment amount is greater than zero", async () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByText(/Review Repayment/i));
+
+    expect(
+      await screen.findByText(/Enter a repayment amount greater than zero/i),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a clear error when there are no open positions", async () => {
+    render(<RepayForm positions={[]} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "100" },
+    });
+    fireEvent.click(screen.getByText(/Review Repayment/i));
+
+    expect(
+      await screen.findByText(/Please select an open borrow position/i),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("validates repayment does not exceed outstanding debt", async () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "1500.01" },
+    });
+    fireEvent.click(screen.getByText(/Review Repayment/i));
+
+    expect(
+      await screen.findByText(/Repayment cannot exceed 1,500.00 XLM/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows partial repayment preview with updated debt and health factor", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "500" },
     });
 
-    render(<RepayForm onSubmit={mockOnSubmit} />);
-
-    expect(screen.getByLabelText(/Loading repayment details/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Repay Borrowed Assets/i)).not.toBeInTheDocument();
+    expect(screen.getByText("1,000.00 XLM")).toBeInTheDocument();
+    expect(screen.getByText(/2.25 \(Healthy\)/i)).toBeInTheDocument();
   });
 
-  it("renders EmptyState when user has no borrows", () => {
-    vi.mocked(usePositions).mockReturnValue({
-      positions: [],
-      isLoading: false,
-      error: null,
-      refetch: async () => {},
+  it("shows full repayment preview as debt cleared", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByText("MAX"));
+
+    expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
+    expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it("submits quote preview and repayment data", async () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "500" },
     });
+    fireEvent.click(screen.getByText(/Review Repayment/i));
 
-    render(<RepayForm onSubmit={mockOnSubmit} />);
-
-    expect(screen.getByText(/No Outstanding Borrows/i)).toBeInTheDocument();
-    expect(screen.getByText(/You do not have any active borrow positions to repay at the moment./i)).toBeInTheDocument();
-  });
-
-  it("surfaces fetch errors via toast system", () => {
-    const mockError = new Error("API route not found");
-    let errorCallback: ((err: Error) => void) | undefined = undefined;
-
-    vi.mocked(usePositions).mockImplementation((onError) => {
-      errorCallback = onError;
-      return {
-        positions: [],
-        isLoading: false,
-        error: mockError,
-        refetch: async () => {},
-      };
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/quote",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: 500,
+          asset: "XLM",
+          positionId: "loan-1",
+          remainingDebt: 1000,
+          healthFactorAfter: 2.25,
+        }),
+        quoteResult,
+      );
     });
-
-    render(<RepayForm onSubmit={mockOnSubmit} />);
-
-    // Trigger error callback manually if mock hook didn't invoke it automatically
-    if (errorCallback) {
-      act(() => {
-        errorCallback!(mockError);
-      });
-    }
-
-    expect(screen.getByText(/Failed to load borrow positions: API route not found/i)).toBeInTheDocument();
+    expect(screen.getByText(/Repayment preview ready/i)).toBeInTheDocument();
   });
 
-  it("validates amount is positive and within limit", () => {
-    render(<RepayForm positions={mockPositions} onSubmit={mockOnSubmit} />);
+  it("shows loading and error states when quote preview fails", async () => {
+    let rejectPreview: () => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectPreview = () => reject(new Error("network"));
+          }),
+      ),
+    );
 
-    // Auto-selected first position (XLM, 1500)
-    const amountInput = screen.getByLabelText(/Amount to Repay/i);
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
 
-    // Test negative/zero value
-    fireEvent.change(amountInput, { target: { value: "-50" } });
-    fireEvent.click(screen.getByText(/Submit Repayment/i));
-    expect(screen.getByText(/Please enter a valid positive amount/i)).toBeInTheDocument();
-
-    // Test value exceeding limit
-    fireEvent.change(amountInput, { target: { value: "2000" } });
-    fireEvent.click(screen.getByText(/Submit Repayment/i));
-    expect(screen.getByText(/Repayment amount exceeds outstanding borrow amount/i)).toBeInTheDocument();
-  });
-
-  it("sets outstanding balance value on MAX button click", () => {
-    render(<RepayForm positions={mockPositions} onSubmit={mockOnSubmit} />);
-
-    // Click MAX button
-    fireEvent.click(screen.getByText(/Max/i));
-
-    const amountInput = screen.getByLabelText(/Amount to Repay/i) as HTMLInputElement;
-    expect(amountInput.value).toBe("1500");
-  });
-
-  it("submits successfully with valid data", async () => {
-    render(<RepayForm positions={mockPositions} onSubmit={mockOnSubmit} />);
-
-    const amountInput = screen.getByLabelText(/Amount to Repay/i);
-    fireEvent.change(amountInput, { target: { value: "350" } });
-
-    fireEvent.click(screen.getByText(/Submit Repayment/i));
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "250" },
     });
+    fireEvent.click(screen.getByText(/Review Repayment/i));
 
-    expect(screen.getByText(/Repayment transaction details validated successfully/i)).toBeInTheDocument();
-    expect(mockOnSubmit).toHaveBeenCalledWith({
-      asset: "XLM",
-      amount: 350,
-      interestRate: 0,
-    });
+    expect(
+      await screen.findByText(/Preparing repayment preview/i),
+    ).toBeInTheDocument();
+
+    rejectPreview();
+
+    expect(
+      await screen.findByText(/Unable to prepare repayment preview/i),
+    ).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

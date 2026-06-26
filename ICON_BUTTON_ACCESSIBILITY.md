@@ -51,6 +51,13 @@ This document outlines the accessibility improvements made to icon-only buttons 
   - `aria-label="Close modal"`
   - Enhanced focus styling with visible focus ring
 
+##### ConfirmModal Focus Contract
+- The modal container uses `role="dialog"`, `aria-modal="true"`, and a labelled title.
+- Focus moves to the close button when the modal opens.
+- Tab and Shift+Tab remain inside the dialog while it is open.
+- Escape, the close button, the cancel button, and the backdrop all close the modal.
+- Focus returns to the trigger that opened the modal after close.
+
 #### Pagination Component (`/components/shared/common/Pagination.tsx`)
 - **Before**: Had basic `aria-label` but inconsistent focus styling
 - **After**: Enhanced with:
