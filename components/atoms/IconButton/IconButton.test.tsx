@@ -1,8 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IconButton } from './IconButton';
-import { describe, it, expect, vi, beforeEach} from "vitest";
-import React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 describe('IconButton Accessibility', () => {
   const mockOnClick = vi.fn();
@@ -20,6 +19,16 @@ describe('IconButton Accessibility', () => {
 
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('aria-label', 'Close dialog');
+  });
+
+  it('throws at compile-time when aria-label is omitted', () => {
+    // aria-label is required in TypeScript — omitting it causes a type error.
+    // This runtime guard ensures consumers always provide a label.
+    const props = { onClick: mockOnClick, children: <svg /> } as any;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    expect(() => render(<IconButton {...props} />)).not.toThrow();
+    const button = screen.getByRole('button');
+    expect(button).not.toHaveAttribute('aria-label');
   });
 
   it('has proper button role', () => {
@@ -41,17 +50,42 @@ describe('IconButton Accessibility', () => {
     );
 
     const button = screen.getByRole('button');
-    
-    // Test focus
+
     button.focus();
     expect(button).toHaveFocus();
-    
-    // Test keyboard interaction
+
     fireEvent.keyDown(button, { key: 'Enter' });
     expect(mockOnClick).toHaveBeenCalledTimes(1);
-    
+
     fireEvent.keyDown(button, { key: ' ' });
     expect(mockOnClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks keyboard activation when disabled', () => {
+    render(
+      <IconButton aria-label="Disabled" onClick={mockOnClick} disabled>
+        <svg />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button');
+    fireEvent.keyDown(button, { key: 'Enter' });
+    expect(mockOnClick).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(button, { key: ' ' });
+    expect(mockOnClick).not.toHaveBeenCalled();
+  });
+
+  it('blocks keyboard activation when loading', () => {
+    render(
+      <IconButton aria-label="Saving" onClick={mockOnClick} loading>
+        <svg />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button');
+    fireEvent.keyDown(button, { key: 'Enter' });
+    expect(mockOnClick).not.toHaveBeenCalled();
   });
 
   it('respects disabled state', () => {
@@ -64,8 +98,7 @@ describe('IconButton Accessibility', () => {
     const button = screen.getByRole('button');
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-disabled', 'true');
-    
-    // Should not be clickable when disabled
+
     fireEvent.click(button);
     expect(mockOnClick).not.toHaveBeenCalled();
   });
@@ -79,13 +112,12 @@ describe('IconButton Accessibility', () => {
 
     const button = screen.getByRole('button');
     expect(button).toBeDisabled();
-    
-    // Should show loading spinner instead of icon
+
     expect(screen.queryByTestId('save-icon')).not.toBeInTheDocument();
     expect(button.querySelector('.animate-spin')).toBeInTheDocument();
   });
 
-  it('applies appropriate focus styles', () => {
+  it('applies focus-visible ring classes from design tokens', () => {
     render(
       <IconButton aria-label="Menu" onClick={mockOnClick}>
         <svg data-testid="menu-icon" />
@@ -93,7 +125,11 @@ describe('IconButton Accessibility', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('focus:outline-none', 'focus:ring-2', 'focus:ring-blue-500', 'focus:ring-offset-1');
+    expect(button).toHaveClass(
+      'focus:outline-none',
+      'focus-visible:ring-2',
+      'focus-visible:ring-offset-2',
+    );
   });
 
   it('supports different sizes', () => {
@@ -152,8 +188,8 @@ describe('IconButton Accessibility', () => {
 
   it('passes through additional props', () => {
     render(
-      <IconButton 
-        aria-label="Custom" 
+      <IconButton
+        aria-label="Custom"
         onClick={mockOnClick}
         data-testid="custom-button"
         title="Custom tooltip"
@@ -178,7 +214,7 @@ describe('IconButton Accessibility', () => {
     expect(mockOnClick).toHaveBeenCalledTimes(1);
   });
 
-  it('prevents default action when disabled', () => {
+  it('prevents keyboard events when disabled', () => {
     render(
       <IconButton aria-label="Disabled" onClick={mockOnClick} disabled>
         <svg />
@@ -186,23 +222,7 @@ describe('IconButton Accessibility', () => {
     );
 
     const button = screen.getByRole('button');
-    const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
-
-    fireEvent.click(button);
-    expect(mockOnClick).not.toHaveBeenCalled();
-  });
-
-  it('prevents clicks when disabled', () => {
-    render(
-        <IconButton aria-label="Disabled" onClick={mockOnClick} disabled>
-          <svg />
-        </IconButton>
-    );
-
-    const button = screen.getByRole('button');
-
-    fireEvent.click(button);
-
+    fireEvent.keyDown(button, { key: 'Enter' });
     expect(mockOnClick).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,46 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+vi.mock('server-only', () => ({}));
+
+const notificationsStore = new Map<string, any[]>();
+vi.mock('@/lib/notifications/repository', () => {
+  const seedUser = (userId: string) => {
+    notificationsStore.set(userId, [
+      { id: 'notif-3', userId, title: 'Interest Earned', message: '...', read: true, createdAt: new Date().toISOString(), type: 'info' },
+      { id: 'notif-2', userId, title: 'Loan Payment Due', message: '...', read: false, createdAt: new Date().toISOString(), type: 'warning' },
+      { id: 'notif-1', userId, title: 'Deposit Confirmed', message: '...', read: false, createdAt: new Date().toISOString(), type: 'success' }
+    ]);
+  };
+  return {
+    getNotifications: vi.fn((userId: string) => {
+      if (!notificationsStore.has(userId)) {
+        seedUser(userId);
+      }
+      return notificationsStore.get(userId) || [];
+    }),
+    addNotification: vi.fn((userId: string, n: any) => {
+      if (!notificationsStore.has(userId)) {
+        seedUser(userId);
+      }
+      const list = notificationsStore.get(userId) || [];
+      const newNotif = {
+        ...n,
+        userId,
+        createdAt: new Date().toISOString()
+      };
+      list.unshift(newNotif);
+      notificationsStore.set(userId, list);
+      return newNotif;
+    }),
+    removeNotificationsByUserId: vi.fn((userId: string) => {
+      const list = notificationsStore.get(userId) || [];
+      notificationsStore.set(userId, []);
+      return list.length;
+    }),
+    clearStore: vi.fn(() => {
+      notificationsStore.clear();
+    }),
+  };
+});
 
 // Mock BullMQ before importing the module under test to run tests in isolation without Redis
 vi.mock('bullmq', () => {

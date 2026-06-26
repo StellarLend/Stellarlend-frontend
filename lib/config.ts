@@ -36,6 +36,10 @@ interface Config {
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
   };
+  rateLimit: {
+    max: number;
+    window: number;
+  };
 }
 
 const config: Config = {
@@ -63,6 +67,10 @@ const config: Config = {
   },
   logging: {
     level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
+  },
+  rateLimit: {
+    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    window: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
   },
 };
 

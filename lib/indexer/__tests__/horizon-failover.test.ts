@@ -17,9 +17,9 @@ let fetchAccountOperations: typeof import('../horizon').fetchAccountOperations;
 let HorizonError: typeof import('../horizon').HorizonError;
 
 beforeAll(async () => {
-  const module = await import('../horizon');
-  fetchAccountOperations = module.fetchAccountOperations;
-  HorizonError = module.HorizonError;
+  const horizonModule = await import('../horizon');
+  fetchAccountOperations = horizonModule.fetchAccountOperations;
+  HorizonError = horizonModule.HorizonError;
 });
 
 const ACCOUNT = 'GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890ABCDEFGH';

@@ -147,6 +147,129 @@ describe("RepayForm Component", () => {
     expect(screen.getByText(/Repayment preview ready/i)).toBeInTheDocument();
   });
 
+  it("switching selected position updates the preview", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    expect(screen.getByText(/XLM debt/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Borrow position/i), {
+      target: { value: "loan-2" },
+    });
+
+    expect(screen.getByText(/USDC debt/)).toBeInTheDocument();
+    expect(screen.getByText(/Outstanding: 900.00 USDC/i)).toBeInTheDocument();
+  });
+
+  it("shows error for zero amount", async () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "0" },
+    });
+    fireEvent.click(screen.getByText(/Review Repayment/i));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Enter a repayment amount greater than zero/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows error for negative amount", async () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "-50" },
+    });
+    fireEvent.click(screen.getByText(/Review Repayment/i));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Enter a repayment amount greater than zero/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("exact full repayment shows Debt cleared", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "1500" },
+    });
+
+    expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
+    expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it("shows Healthy label for health factor >= 2", () => {
+    const highHealthPositions: BorrowPosition[] = [
+      {
+        id: "loan-healthy",
+        asset: "XLM",
+        outstandingDebt: 1000,
+        interestRate: 10,
+        collateralAsset: "XLM",
+        collateralAmount: 10000,
+        healthFactor: 3.0,
+        duration: 30,
+      },
+    ];
+
+    render(<RepayForm positions={highHealthPositions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "100" },
+    });
+
+    expect(screen.getAllByText(/Healthy/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows At Risk label for health factor between 1 and 2", () => {
+    const atRiskPositions: BorrowPosition[] = [
+      {
+        id: "loan-at-risk",
+        asset: "XLM",
+        outstandingDebt: 1000,
+        interestRate: 12,
+        collateralAsset: "XLM",
+        collateralAmount: 5000,
+        healthFactor: 1.2,
+        duration: 30,
+      },
+    ];
+
+    render(<RepayForm positions={atRiskPositions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "100" },
+    });
+
+    expect(screen.getAllByText(/At Risk/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows Critical label for health factor below 1", () => {
+    const criticalPositions: BorrowPosition[] = [
+      {
+        id: "loan-critical",
+        asset: "XLM",
+        outstandingDebt: 1000,
+        interestRate: 15,
+        collateralAsset: "XLM",
+        collateralAmount: 2000,
+        healthFactor: 0.8,
+        duration: 30,
+      },
+    ];
+
+    render(<RepayForm positions={criticalPositions} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Repayment amount/i), {
+      target: { value: "100" },
+    });
+
+    expect(screen.getAllByText(/Critical/i).length).toBeGreaterThanOrEqual(1);
+  });
+
   it("shows loading and error states when quote preview fails", async () => {
     let rejectPreview: () => void = () => {};
     vi.stubGlobal(

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
+vi.mock('server-only', () => ({}));
+
 vi.mock('@/lib/http', () => ({
   httpGet: vi.fn().mockResolvedValue({}),
   UpstreamHttpError: class extends Error {},

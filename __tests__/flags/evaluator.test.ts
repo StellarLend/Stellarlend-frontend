@@ -1,18 +1,24 @@
-// __tests__/flags/evaluator.test.ts
-import { describe, it, expect } from 'vitest';
-import { evaluateFlag, evaluateAllFlags } from '@/lib/flags/evaluator';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+
+let evaluateFlag: typeof import('@/lib/flags/evaluator').evaluateFlag;
+let evaluateAllFlags: typeof import('@/lib/flags/evaluator').evaluateAllFlags;
 
 // Helper to reset the config between tests
 function loadConfig(json: any) {
   const configPath = path.resolve(process.cwd(), 'config', 'feature-flags.json');
   fs.writeFileSync(configPath, JSON.stringify(json, null, 2));
   // Clear module cache so evaluator reloads the file
-  jest.resetModules?.();
+  vi.resetModules();
 }
 
 describe('Feature flag evaluator', () => {
+  beforeEach(async () => {
+    const mod = await import('@/lib/flags/evaluator');
+    evaluateFlag = mod.evaluateFlag;
+    evaluateAllFlags = mod.evaluateAllFlags;
+  });
   it('returns false for unknown flag', () => {
     const result = evaluateFlag('nonexistent', 'user1');
     expect(result).toBe(false);

@@ -15,15 +15,19 @@ export type FlagConfig = {
 
 export type Flags = Record<string, FlagConfig>;
 
-// Load the config once at module initialization.
 const CONFIG_PATH = path.resolve(process.cwd(), 'config', 'feature-flags.json');
 let flags: Flags = {};
-try {
-  const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
-  flags = JSON.parse(raw) as Flags;
-} catch (e) {
-  // If the file does not exist we keep an empty config – the evaluator will simply return false.
-  console.warn('Feature flag config not found at', CONFIG_PATH);
+
+export function getFlags(): Flags {
+  if (process.env.NODE_ENV === 'test' || Object.keys(flags).length === 0) {
+    try {
+      const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
+      flags = JSON.parse(raw) as Flags;
+    } catch (e) {
+      flags = {};
+    }
+  }
+  return flags;
 }
 
 /** Simple deterministic hash – djb2 algorithm. */
@@ -43,7 +47,8 @@ function hashString(str: string): number {
  * @returns boolean – true if the flag is active for this user
  */
 export function evaluateFlag(flagKey: string, userId: string): boolean {
-  const flag = flags[flagKey];
+  const currentFlags = getFlags();
+  const flag = currentFlags[flagKey];
   if (!flag) return false;
 
   // Per‑user override takes precedence.
@@ -66,8 +71,9 @@ export function evaluateFlag(flagKey: string, userId: string): boolean {
  * Evaluate **all** flags for a user and return a map of flagKey → boolean.
  */
 export function evaluateAllFlags(userId: string): Record<string, boolean> {
+  const currentFlags = getFlags();
   const result: Record<string, boolean> = {};
-  for (const key of Object.keys(flags)) {
+  for (const key of Object.keys(currentFlags)) {
     result[key] = evaluateFlag(key, userId);
   }
   return result;

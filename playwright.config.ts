@@ -14,11 +14,14 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
+  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html'],
-    ['json', { outputFile: 'playwright-report/results.json' }],
-    ['junit', { outputFile: 'playwright-report/results.xml' }]
+    ['html', { outputFolder: '.next/playwright-report' }],
+    ['json', { outputFile: '.next/playwright-report/results.json' }],
+    ['junit', { outputFile: '.next/playwright-report/results.xml' }]
   ],
+  /* Folder for test artifacts such as screenshots, videos, traces, etc. */
+  outputDir: '.next/test-results',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -31,14 +34,14 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     
     /* Record video on failure */
-    video: 'retain-on-failure',
+    video: 'off',
   },
 
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
 
     {
