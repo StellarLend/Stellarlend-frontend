@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "@/context/SidebarContext";
+import { WalletProvider } from "@/context/WalletContext";
 import NextTopLoader from "nextjs-toploader";
 
 const inter = Inter({
@@ -42,7 +43,9 @@ export default function RootLayout({
           shadow="0 0 10px #15a350, 0 0 5px #15a350"
           zIndex={9999}
         />
-        <SidebarProvider>{children}</SidebarProvider>
+        <WalletProvider>
+          <SidebarProvider>{children}</SidebarProvider>
+        </WalletProvider>
       </body>
     </html>
   );
