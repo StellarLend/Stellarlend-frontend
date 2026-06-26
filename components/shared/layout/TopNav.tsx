@@ -5,6 +5,7 @@ import Image from "next/image";
 import SearchBar from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu } from "lucide-react";
+import NotificationBell from "@/components/shared/layout/NotificationBell";
 
 declare global {
   interface Window {
@@ -212,14 +213,7 @@ const TopNav = () => {
           <div className="h-8 border-l" style={{ borderColor: "#71B48D" }} aria-hidden="true" />
 
           <div className="flex gap-4 items-center">
-            {/* Notification */}
-            <button
-              type="button"
-              className={`p-2 rounded-md hover:bg-white/30 transition-colors ${focusClasses}`}
-              aria-label="View notifications"
-            >
-              <Image src="/icons/notification.png" alt="" width={24} height={24} />
-            </button>
+<NotificationBell />
 
             {/* Profile Avatar */}
             <button
@@ -241,14 +235,7 @@ const TopNav = () => {
         </div>
 
         <div className="flex gap-4 items-center">
-          {/* Notification */}
-          <button
-            type="button"
-            className={`p-2 rounded-md hover:bg-white/30 transition-colors ${focusClasses}`}
-            aria-label="View notifications"
-          >
-            <Image src="/icons/notification.png" alt="" width={24} height={24} />
-          </button>
+<NotificationBell />
 
           {/* Profile Avatar */}
           <button
