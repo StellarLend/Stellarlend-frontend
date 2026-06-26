@@ -1,8 +1,10 @@
 import { Pool } from 'pg';
 
+import { resolveDbSslConfig } from './pool-config';
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: resolveDbSslConfig(),
 });
 
 export default pool;
