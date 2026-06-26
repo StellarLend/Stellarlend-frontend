@@ -116,7 +116,7 @@ npm run generate-component
 Follow the established structure:
 
 - **`app/`**: Next.js App Router pages
-- **`components/`**: React components organized by:
+- **`components/`**: React components (see the [Component Architecture Guide](docs/component-architecture.md) for layering rules), organized by:
   - `atoms/`: Smallest reusable components
   - `molecules/`: Composite components
   - `organisms/`: Complex components
