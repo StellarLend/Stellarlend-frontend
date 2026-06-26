@@ -15,6 +15,8 @@ export interface Transaction {
 export type FetchTransactionsOptions = {
   page?: number;
   pageSize?: number;
+  cursor?: string;
+  limit?: number;
   search?: string;
   status?: TransactionStatus;
   dateFrom?: string;
@@ -26,6 +28,8 @@ export type FetchTransactionsOptions = {
 export type FetchTransactionsResponse = {
   transactions: Transaction[];
   total: number;
+  nextCursor?: string | null;
+  prevCursor?: string | null;
 };
 
 export const fetchTransactions = async (

@@ -383,6 +383,41 @@ AUTH_SESSION_EXPIRY=48
 echo $AUTH_SECRET # Should be identical everywhere
 ```
 
+## End-to-End Testing & Mocking
+
+The codebase includes comprehensive Playwright E2E tests for the wallet connection journey (connect → connected → disconnect). Because browser extensions (like Freighter) cannot run in headless CI environments, we mock the injected wallet provider (`window.stellar`).
+
+### How Mocking Works
+
+In our Playwright specs (e.g., `test/e2e/wallet-connect.spec.ts`), we stub the wallet API using Playwright’s initialization hook `page.addInitScript`.
+
+1. **Expose Node.js Signer:**
+   We expose a secure cryptographic signing helper `mockSignTransaction` from the Node test environment to the browser context using `page.exposeFunction()`. This helper parses the challenge transaction XDR and signs it using a mock client Keypair:
+   ```typescript
+   await page.exposeFunction('mockSignTransaction', async (xdr: string) => {
+     const tx = TransactionBuilder.fromXDR(xdr, Networks.TESTNET);
+     tx.sign(mockClientKeypair);
+     return tx.toXDR();
+   });
+   ```
+
+2. **Inject `window.stellar`:**
+   We stub `window.stellar` on page load:
+   ```typescript
+   await page.addInitScript(({ publicKey }) => {
+     window.stellar = {
+       getPublicKey: async () => publicKey,
+       signTransaction: async (xdr) => window.mockSignTransaction(xdr)
+     };
+   }, { publicKey: mockClientPublicKey });
+   ```
+
+3. **Running the E2E Suite:**
+   Run the E2E tests locally or in CI using:
+   ```bash
+   npm run test:e2e
+   ```
+
 ## Further Reading
 
 - [JWT Best Practices](https://tools.ietf.org/html/rfc8725)

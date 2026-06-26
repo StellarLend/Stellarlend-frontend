@@ -1,31 +1,36 @@
 import type { Transaction } from "@/types/Transaction";
 import type { TransactionStatus } from "@/types/enums";
-import { fetchTransactions } from "@/types/Transaction";
+import { fetchTransactions } from "@/lib/transactions/repository";
 
-/**
- * Simple in-memory transaction store.
- *
- * Seeded from the existing `fetchTransactions()` mock data on first access.
- * When a real database is introduced, swap out this module.
- */
-
-let store: Map<string, Transaction> | null = null;
-
-/** Lazily initialise the store from the mock data source. */
-async function getStore(): Promise<Map<string, Transaction>> {
-  if (!store) {
-    const transactions = await fetchTransactions();
-    store = new Map(transactions.map((t) => [t.id, t]));
+async function ensureSeeded() {
+  const rows = await db.select().from(transactionsTable);
+  if (rows.length === 0) {
+    await fetchMockTransactions(); // Seeds the database
   }
-  return store;
 }
 
 /** Retrieve a single transaction by ID. */
 export async function getTransaction(
   id: string,
 ): Promise<Transaction | undefined> {
-  const s = await getStore();
-  return s.get(id);
+  await ensureSeeded();
+  const [row] = await db
+    .select()
+    .from(transactionsTable)
+    .where(eq(transactionsTable.id, id))
+    .limit(1);
+
+  if (!row) return undefined;
+
+  return {
+    id: row.id,
+    type: row.type,
+    amount: row.amount,
+    asset: row.asset as any,
+    date: row.date,
+    time: row.time,
+    status: row.status as any,
+  };
 }
 
 /**
@@ -37,18 +42,29 @@ export async function updateTransactionStatus(
   id: string,
   status: TransactionStatus,
 ): Promise<Transaction | null> {
-  const s = await getStore();
-  const tx = s.get(id);
-  if (!tx) return null;
+  await ensureSeeded();
+  const [row] = await db
+    .update(transactionsTable)
+    .set({ status })
+    .where(eq(transactionsTable.id, id))
+    .returning();
 
-  const updated: Transaction = { ...tx, status };
-  s.set(id, updated);
-  return updated;
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    type: row.type,
+    amount: row.amount,
+    asset: row.asset as any,
+    date: row.date,
+    time: row.time,
+    status: row.status as any,
+  };
 }
 
 /**
  * Reset the store (useful for tests).
  */
-export function resetStore(): void {
-  store = null;
+export async function resetStore(): Promise<void> {
+  await db.delete(transactionsTable);
 }

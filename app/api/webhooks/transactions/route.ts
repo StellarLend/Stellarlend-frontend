@@ -8,6 +8,7 @@ import {
 import { SIGNATURE_HEADER } from "@/lib/webhooks/types";
 import type { WebhookPayload } from "@/lib/webhooks/types";
 import { updateTransactionStatus } from "@/lib/transactions/store";
+import { enqueueNotificationInBackground } from "@/lib/notifications/repository";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,8 @@ const nonceStore = new NonceStore();
  * Signed webhook receiver for transaction status updates.
  * Verifies HMAC-SHA256 signature, validates timestamp + nonce to prevent
  * replays, and updates the transaction status in the data layer.
+ *
+ * Now enforces and validates Stellar memos for inbound deposits.
  *
  * @see WEBHOOKS.md for the full contract documentation.
  */
@@ -116,6 +119,42 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ── 7.5. Validate & Enforce Stellar Memo ────────────────────────────────
+  const rawData = payload.data as any;
+  const memo = rawData.memo;
+  const memoType = rawData.memo_type;
+
+  if (memo || memoType) {
+    const type = (memoType || 'MEMO_TEXT') as any;
+    const value = memo || '';
+
+    // Validate format
+    if (!validateMemo(value, type)) {
+      return NextResponse.json(
+        { error: `Invalid memo format: "${value}" for type "${type}"` },
+        { status: 400 },
+      );
+    }
+
+    // Resolve account
+    const accountId = resolveAccountByMemo(value, type);
+    if (!accountId && isStrictModeEnabled()) {
+      return NextResponse.json(
+        { error: `Strict Mode Rejection: Unknown or unregistered memo: "${value}"` },
+        { status: 400 },
+      );
+    }
+  } else if (isStrictModeEnabled()) {
+    // If in strict mode, ensure inbound deposits always specify a memo.
+    const existingTx = await getTransaction(payload.data.transaction_id);
+    if (existingTx && existingTx.type === 'Deposit') {
+      return NextResponse.json(
+        { error: `Strict Mode Rejection: Inbound deposits must have a valid memo` },
+        { status: 400 },
+      );
+    }
+  }
+
   // ── 8. Update transaction ───────────────────────────────────────────────
   const updated = await updateTransactionStatus(
     payload.data.transaction_id,
@@ -128,6 +167,13 @@ export async function POST(req: NextRequest) {
       { status: 404 },
     );
   }
+
+  // Enqueue notification fan-out job (fire-and-forget)
+  enqueueNotificationInBackground('demo-user', {
+    title: 'Transaction Status Update',
+    message: `Your transaction ${payload.data.transaction_id} is now ${payload.data.status}.`,
+    type: payload.data.status === 'Completed' ? 'success' : payload.data.status === 'Failed' ? 'error' : 'info',
+  });
 
   return NextResponse.json({ success: true, transaction: updated });
 }

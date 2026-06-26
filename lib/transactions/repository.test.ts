@@ -1,5 +1,50 @@
-import { describe, it, expect } from 'vitest';
-import { fetchTransactions, filterTransactions } from './repository';
+import { describe, it, expect, vi } from 'vitest';
+import { fetchTransactions, filterTransactions, getTransactionDetail } from './repository';
+
+vi.mock('@/lib/db', () => {
+  const mockSelect = vi.fn(() => ({
+    from: vi.fn(async () => [
+      { id: 'TXN12345', type: 'Deposit',      amount:  2000,    asset: 'XLM',  date: '2025-04-12', time: '09:32AM', status: 'Completed'  },
+      { id: 'TXN12346', type: 'Loan Payment', amount:  -250,    asset: 'BTC',  date: '2025-03-10', time: '11:15AM', status: 'Processing' },
+      { id: 'TXN12347', type: 'Withdrawal',   amount:  -7500,   asset: 'STRK', date: '2025-02-28', time: '04:45PM', status: 'Completed'  },
+      { id: 'TXN12348', type: 'Lend Funds',   amount:  -1500,   asset: 'XLM',  date: '2025-01-05', time: '08:00AM', status: 'Completed'  },
+      { id: 'TXN12349', type: 'Lend Funds',   amount:  -607.87, asset: 'BTC',  date: '2024-12-20', time: '10:20PM', status: 'Failed'     },
+      { id: 'TXN12350', type: 'Deposit',      amount:  20000,   asset: 'STRK', date: '2024-11-15', time: '01:05PM', status: 'Completed'  },
+    ]),
+  }));
+
+  const mockInsert = vi.fn(() => ({
+    values: vi.fn(() => ({
+      onConflictDoNothing: vi.fn(async () => ({})),
+    })),
+  }));
+
+  return {
+    db: {
+      select: mockSelect,
+      insert: mockInsert,
+    },
+  };
+});
+
+vi.mock('./store', () => {
+  return {
+    getTransaction: vi.fn(async (id: string) => {
+      if (id === 'TXN12345') {
+        return {
+          id: 'TXN12345',
+          type: 'Deposit',
+          amount: 2000,
+          asset: 'XLM' as const,
+          date: '2025-04-12',
+          time: '09:32AM',
+          status: 'Completed' as const,
+        };
+      }
+      return undefined;
+    }),
+  };
+});
 
 describe('fetchTransactions', () => {
   it('returns a non-empty array of transactions', async () => {
@@ -95,3 +140,20 @@ describe('filterTransactions', () => {
     expect(result).toHaveLength(0);
   });
 });
+
+describe('getTransactionDetail', () => {
+  it('returns null if transaction does not exist', async () => {
+    const detail = await getTransactionDetail('TXN99999');
+    expect(detail).toBeNull();
+  });
+
+  it('returns detailed transaction with fee, explorerUrl, and operations if it exists', async () => {
+    const detail = await getTransactionDetail('TXN12345');
+    expect(detail).not.toBeNull();
+    expect(detail?.id).toBe('TXN12345');
+    expect(detail?.fee).toBeDefined();
+    expect(detail?.explorerUrl).toContain('stellar.expert');
+    expect(detail?.operations).toHaveLength(1);
+  });
+});
+

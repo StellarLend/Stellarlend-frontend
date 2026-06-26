@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": "simulate_transaction",
+  "result": {
+    "restorePreamble": {
+      "minResourceFee": "9876",
+      "transactionData": "AAAAAgAAAAI=",
+      "transaction": "AAAAAwAAAAE="
+    }
+  }
+}

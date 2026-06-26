@@ -7,12 +7,32 @@ import {
   TimeoutError,
   UpstreamHttpError,
 } from './errors';
+import { metrics } from '@/lib/metrics/registry';
+import { circuitBreaker } from '@/lib/http/circuit-breaker';
+import { normalizeRequestId, generateRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
+import { getActiveRequestId } from '@/lib/request-context';
+
+const CSRF_COOKIE_NAME = process.env.CSRF_COOKIE_NAME || 'csrf-token';
+
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === CSRF_COOKIE_NAME) {
+      return decodeURIComponent(value);
+    }
+  }
+  return null;
+}
 
 export interface RequestOptions extends Omit<RequestInit, 'signal'> {
   /** Override the global timeout from config.api.timeout (ms). */
   timeoutMs?: number;
   /** Number of retry attempts for idempotent GET/HEAD requests (default: 3). */
   retries?: number;
+  /** Compatibility alias: number of retries after the first attempt. */
+  maxRetries?: number;
   /** Base backoff delay in ms; doubles on each attempt (default: 200). */
   backoffMs?: number;
   /** Allow retries on POST requests when true (default: false). */

@@ -35,6 +35,35 @@ export class InMemoryCache {
   }
 
   /**
+   * Invalidates all keys that belong to the provided namespaces.
+   * A namespace matches a key when the key is exactly the namespace
+   * or when it starts with `${namespace}:` (covers nested keys like `markets:assets:XLM`).
+   * Returns the number of deleted keys.
+   */
+  public invalidateNamespaces(namespaces: string[]): number {
+    if (!namespaces || namespaces.length === 0) return 0;
+
+    const toDelete: string[] = [];
+
+    for (const key of this.cache.keys()) {
+      for (const ns of namespaces) {
+        if (!ns || typeof ns !== 'string') continue;
+        if (key === ns || key.startsWith(`${ns}:`)) {
+          toDelete.push(key);
+          break;
+        }
+      }
+    }
+
+    for (const k of toDelete) {
+      this.cache.delete(k);
+      this.revalidatingKeys.delete(k);
+    }
+
+    return toDelete.length;
+  }
+
+  /**
    * Retrieves the full cache entry including metadata if not fully expired.
    */
   public getEntry<T>(key: string): CacheEntry<T> | null {

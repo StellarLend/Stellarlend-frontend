@@ -1,17 +1,21 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { GET } from '@/app/api/health/route';
-import { NextRequest } from 'next/server';
+
+vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/http', () => ({
-  httpFetch: vi.fn().mockResolvedValue({}),
-  isUpstreamError: (e: unknown) => e instanceof Error && 'code' in e,
+  httpGet: vi.fn().mockResolvedValue({}),
+  UpstreamHttpError: class extends Error {},
+  TimeoutError: class extends Error {},
 }));
+
+import { GET } from '@/app/api/health/route';
+import { NextRequest } from 'next/server';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('GET /api/health', () => {
   it('returns 200 with healthy status', async () => {
-    const response = await GET();
+    const response = await GET(new NextRequest('http://localhost/api/health'));
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe('healthy');
@@ -19,10 +23,10 @@ describe('GET /api/health', () => {
   });
 
   it('returns degraded status when stellar is unreachable', async () => {
-    const { httpFetch } = await import('@/lib/http');
-    (httpFetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('timeout'));
+    const { httpGet, TimeoutError } = await import('@/lib/http');
+    (httpGet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TimeoutError('timeout'));
 
-    const response = await GET();
+    const response = await GET(new NextRequest('http://localhost/api/health'));
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe('degraded');

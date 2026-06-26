@@ -87,8 +87,8 @@ export function isValidUpstreamResponse(data: unknown): data is UpstreamPriceSou
 
   const source = data as Record<string, unknown>;
 
-  // Check prices object
-  if (typeof source.prices !== 'object' || source.prices === null) {
+  // Check prices object (ensure it is a non-array object)
+  if (typeof source.prices !== 'object' || source.prices === null || Array.isArray(source.prices)) {
     return false;
   }
 
@@ -104,9 +104,8 @@ export function isValidUpstreamResponse(data: unknown): data is UpstreamPriceSou
     return false;
   }
 
-  try {
-    new Date(source.timestamp);
-  } catch {
+  const date = new Date(source.timestamp);
+  if (Number.isNaN(date.getTime())) {
     return false;
   }
 

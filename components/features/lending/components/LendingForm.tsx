@@ -1,4 +1,7 @@
 "use client";
+import AmountInput from '@/components/shared/ui/AmountInput';
+import Tooltip from '@/components/shared/ui/Tooltip';
+import IconButton from '@/components/shared/ui/IconButton';
 
 import { useState, useEffect } from "react";
 import { LendingData } from "@/app/lending/page";
@@ -177,9 +180,6 @@ export default function LendingForm({
               }
             }}
             precision={selectedAsset?.precision ?? 2}
-            placeholder="0.00"
-            error={errors.amount}
-            helperText={selectedAsset ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}` : undefined}
             onMax={handleMaxAmount}
           />
         </div>

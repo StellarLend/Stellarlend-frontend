@@ -15,6 +15,7 @@ access cookies, perform crypto operations, and use Node-only packages.
 app/api/
 ├── auth/session/route.ts      POST | GET | DELETE  – session lifecycle
 ├── health/route.ts            GET                  – platform health check
+├── admin/migrate-status/route.ts GET               – admin migration drift status
 ├── markets/route.ts           GET                  – per-asset APR & utilization  ← #193
 ├── notifications/
 │   ├── route.ts               GET                  – list user notifications       ← #195
@@ -40,14 +41,14 @@ Key fields used by the API layer:
 
 | Path | Env var | Default |
 |---|---|---|
-| `stellar.sorobanRpcUrl` | `NEXT_PUBLIC_SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` |
 | `stellar.horizonUrl` | `NEXT_PUBLIC_STELLAR_HORIZON_URL` | `https://horizon-testnet.stellar.org` |
 | `api.timeout` | — | 10 000 ms |
 
 ### lib/server-config.ts — Server-only secrets
 
 Imports `server-only` to prevent accidental client bundle inclusion.
-Reads `AUTH_SECRET`, `AUTH_ORACLE_API_KEY`, `SERVER_TOKEN` from env.
+Reads `AUTH_SECRET`, `AUTH_ORACLE_API_KEY`, `SERVER_TOKEN`, and Horizon endpoint configuration from env.
+Horizon failover uses `STELLAR_HORIZON_URLS` with health-weighted selection.
 
 ### lib/auth.ts — Session management
 
@@ -146,6 +147,18 @@ CSV export, filtering helpers, and validation used by `/api/transactions/export`
 `generateETag(data)` — deterministic ETag for conditional GET (`If-None-Match`).
 Used by read routes to return `304 Not Modified` and save bandwidth.
 
+### lib/api/handler.ts — Request logging and response compression
+
+`withRequestLogging(route, handler)` records structured request metrics and applies response compression negotiation for large read responses. If the client sends `Accept-Encoding: br` or `Accept-Encoding: gzip`, compressible responses at or above 1 KiB are returned with `Content-Encoding` and `Vary: Accept-Encoding`. Brotli is preferred when both encodings are acceptable.
+
+Compression is intentionally skipped for responses that are already encoded, empty/conditional responses (`HEAD`, `204`, `304`), and content types that are already compressed or should remain stream-native, including `text/csv` exports and `text/event-stream`. Content-length-delimited streams are piped through gzip/brotli transforms so large payloads do not need to be buffered before sending.
+
+Performance-sensitive callers can opt out per request by sending:
+
+```http
+X-Stellarlend-Compression: off
+```
+
 ---
 
 ## Type Definitions
@@ -171,6 +184,9 @@ The `Transaction` interface lives in `types/Transaction.ts`.
 
 * **Secrets isolation:** `lib/server-config.ts` imports `server-only`; any
   accidental client import fails at build time.
+* **Admin endpoint protection:** internal maintenance routes such as
+  `/api/admin/migrate-status` require a server token in the `x-server-token`
+  header, rejecting unauthorized callers with a structured error envelope.
 * **Session tokens:** HttpOnly + SameSite=strict cookie prevents XSS and CSRF.
 * **Cache bypass:** Authenticated requests always skip the shared cache to
   prevent cross-user data leakage.

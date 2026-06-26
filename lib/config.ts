@@ -18,8 +18,16 @@ interface Config {
   stellar: {
     network: string;
     horizonUrl: string;
-    sorobanRpcUrl: string;
     sorobanContractId: string;
+  };
+  rateLimit: {
+    max: number;
+    window: number;
+    account: {
+      limit: number;
+      windowMs: number;
+      burst: number;
+    };
   };
   analytics: {
     googleAnalyticsId?: string;
@@ -27,6 +35,10 @@ interface Config {
   };
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
+  };
+  rateLimit: {
+    max: number;
+    window: number;
   };
 }
 
@@ -41,21 +53,13 @@ const config: Config = {
     timeout: 10000,
   },
   stellar: {
-stellar: {
-  network:
-    validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
-
-  horizonUrl:
-    validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
-    'https://horizon-testnet.stellar.org',
-
-  sorobanRpcUrl:
-    validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
-    'https://soroban-testnet.stellar.org',
-
-  sorobanContractId:
-    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
-},
+    network:
+      validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
+    horizonUrl:
+      validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
+      'https://horizon-testnet.stellar.org',
+    sorobanContractId:
+      process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
   },
   analytics: {
     googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,
@@ -64,9 +68,13 @@ stellar: {
   logging: {
     level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
   },
+  rateLimit: {
+    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    window: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
+  },
 };
 
-// Export the full server config (includes everything). For client side we only expose public values.
+// Shared config that is safe to import from both the server and the client.
 export default config;
 
 /**
@@ -85,7 +93,6 @@ export const publicConfig = {
   stellar: {
     network: config.stellar.network,
     horizonUrl: config.stellar.horizonUrl,
-    sorobanRpcUrl: config.stellar.sorobanRpcUrl,
   },
   analytics: {
     googleAnalyticsId: config.analytics.googleAnalyticsId,

@@ -7,9 +7,19 @@ import {
   isTransactionType,
   isTransactionStatus,
 } from '@/types/enums';
-import { fetchTransactions } from '@/types/Transaction';
+import {
+  fetchTransactionRecords,
+  filterTransactions,
+} from '@/lib/transactions/repository';
 import type { Transaction } from '@/types/Transaction';
+import {
+  fetchTransactionRecords,
+  filterTransactions,
+  paginateTransactionsByCursor,
+} from '@/lib/transactions/repository';
 import { withRequestLogging } from '@/lib/api/handler';
+import { parseCursorParams } from '@/lib/api/cursor';
+import { withIdempotency } from '@/lib/api';
 
 export const runtime = 'nodejs';
 
@@ -37,9 +47,9 @@ function parseSortDir(value: string | null): "asc" | "desc" {
 }
 
 /** GET /api/transactions
- *  Optional query params: page, pageSize, asset, type, status, search, dateFrom, dateTo,
+ *  Optional query params: page, pageSize, cursor, limit, asset, type, status, search, dateFrom, dateTo,
  *  sortBy, sortDir
- *  Returns typed transaction pages with total count.
+ *  Returns typed transaction pages with total count and cursor links when cursor pagination is used.
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -47,6 +57,15 @@ async function handleGetTransactions(req: NextRequest) {
   const asset = searchParams.get('asset');
   const type = searchParams.get('type');
   const status = searchParams.get('status');
+
+  const page = parsePageParam(searchParams.get('page'), DEFAULT_PAGE);
+  const pageSize = parsePageSizeParam(searchParams.get('pageSize'), DEFAULT_PAGE_SIZE);
+  const useCursorPagination = searchParams.has('cursor') || searchParams.has('limit');
+  const search = searchParams.get('search');
+  const dateFrom = searchParams.get('dateFrom');
+  const dateTo = searchParams.get('dateTo');
+  const sortBy = parseSortBy(searchParams.get('sortBy'));
+  const sortDir = parseSortDir(searchParams.get('sortDir'));
 
   if (asset !== null && !isAssetSymbol(asset)) {
     return NextResponse.json(
@@ -92,8 +111,37 @@ async function handleGetTransactions(req: NextRequest) {
       : new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
+  if (useCursorPagination) {
+    if (sortBy !== 'date') {
+      return NextResponse.json(
+        { error: 'Cursor pagination only supports sortBy=date because it uses (date, id) as the stable keyset.' },
+        { status: 400 },
+      );
+    }
+
+    try {
+      const cursorParams = parseCursorParams(searchParams);
+      const pageByCursor = paginateTransactionsByCursor(transactions, {
+        ...cursorParams,
+        sortDir,
+      });
+
+      return NextResponse.json({
+        transactions: pageByCursor.transactions,
+        total,
+        nextCursor: pageByCursor.nextCursor,
+        prevCursor: pageByCursor.prevCursor,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Invalid cursor pagination parameters' },
+        { status: 400 },
+      );
+    }
+  }
+
   const paginated = transactions.slice((page - 1) * pageSize, page * pageSize);
-  return NextResponse.json({ transactions: paginated, total });
+  return NextResponse.json({ transactions: paginated, total, nextCursor: null, prevCursor: null });
 }
 
 /** POST /api/transactions
@@ -101,6 +149,10 @@ async function handleGetTransactions(req: NextRequest) {
  *  Validates asset, type, and status against canonical enums.
  */
 async function handlePostTransactions(req: NextRequest) {
+  return withIdempotency(req, async (request) => createTransaction(request));
+}
+
+async function createTransaction(req: NextRequest) {
   let body: Partial<Transaction>;
 
   try {
@@ -109,7 +161,7 @@ async function handlePostTransactions(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-    const { asset, type, status, amount, date, time } = body;
+  const { asset, type, status, amount, date, time } = body;
 
   if (!isAssetSymbol(asset)) {
     return NextResponse.json(
@@ -140,19 +192,20 @@ async function handlePostTransactions(req: NextRequest) {
     return NextResponse.json({ error: 'date and time are required' }, { status: 400 });
   }
 
-    const transaction: Transaction = {
-      id: `TXN${Date.now()}`,
-      asset,
-      type,
-      status,
-      amount,
-      date,
-      time,
-    };
+  const transaction: Transaction = {
+    id: `TXN${Date.now()}`,
+    asset,
+    type,
+    status,
+    amount,
+    date,
+    time,
+  };
 
-    return NextResponse.json({ transaction }, { status: 201 });
-  });
+  return NextResponse.json({ transaction }, { status: 201 });
 }
 
 export const GET = withRequestLogging('/api/transactions', handleGetTransactions);
-export const POST = withRequestLogging('/api/transactions', handlePostTransactions);
+export const POST = withRequestLogging('/api/transactions', (req: NextRequest) =>
+  withIdempotency(req, handlePostTransactions)
+);
