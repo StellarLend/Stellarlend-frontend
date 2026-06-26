@@ -99,6 +99,7 @@ export default defineConfig({
             "app/api/notifications/[id]/route.test.ts",
             "__tests__/**/*.test.ts",
             "lib/streams/**/*.test.ts",
+            "lib/account/export-bundle.test.ts",
           ],
         },
       },
