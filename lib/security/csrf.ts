@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
 const CSRF_COOKIE_NAME = process.env.CSRF_COOKIE_NAME || 'csrf-token';
@@ -21,6 +22,17 @@ export function setCsrfCookie(response: NextResponse, token: string) {
   response.cookies.set(CSRF_COOKIE_NAME, token, cookieOptions);
 }
 
+function constantTimeTokenEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left, 'utf8');
+  const rightBuffer = Buffer.from(right, 'utf8');
+
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
 export function verifyCsrfToken(request: NextRequest): boolean {
   const authorizationHeader = request.headers.get('authorization');
   if (authorizationHeader?.startsWith('Bearer ')) {
@@ -34,5 +46,5 @@ export function verifyCsrfToken(request: NextRequest): boolean {
     return false;
   }
 
-  return csrfCookie.value === csrfHeader;
+  return constantTimeTokenEqual(csrfCookie.value, csrfHeader);
 }

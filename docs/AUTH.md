@@ -270,6 +270,7 @@ openssl rand -base64 32
 ### 3. CSRF Protection
 
 httpOnly cookies with SameSite=Strict provide built-in CSRF protection.
+State-changing API helpers additionally compare CSRF cookie/header tokens with a length-guarded constant-time comparison to avoid token timing side channels.
 
 ### 4. Session Validation
 
