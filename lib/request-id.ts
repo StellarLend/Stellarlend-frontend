@@ -55,7 +55,7 @@ export function normalizeRequestId(value: string | null | undefined): string | u
     return undefined;
   }
 
-  const trimmed = value.trim().toUpperCase();
+  const trimmed = value.trim();
   if (trimmed.length !== ULID_LENGTH || !ULID_PATTERN.test(trimmed)) {
     return undefined;
   }
