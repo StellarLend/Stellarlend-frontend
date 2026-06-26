@@ -4,3 +4,4 @@ export { default as InterestCalculator } from './InterestCalculator';
 export { default as TransactionSummary } from './TransactionSummary';
 export { default as ConfirmModal } from './ConfirmModal';
 export { default as TabSelector } from './TabSelector'; 
+export { default as RepayForm } from './RepayForm';

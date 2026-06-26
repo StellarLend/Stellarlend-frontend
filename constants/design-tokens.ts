@@ -81,6 +81,7 @@ export const colorBorder = {
 
 // Flatten everything the Tailwind theme needs into one map
 export const colors = {
+  primary: colorGreen,
   "green-50":  colorGreen[50],
   "green-100": colorGreen[100],
   "green-200": colorGreen[200],

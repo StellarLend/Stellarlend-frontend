@@ -60,6 +60,8 @@ export default defineConfig({
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
             "components/shared/common/**/*.test.tsx",
+            "hooks/**/*.test.ts",
+            "components/features/lending/components/RepayForm.test.tsx",
           ],
         },
       },
