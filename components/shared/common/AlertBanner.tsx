@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, Info, ShieldAlert, X } from "lucide-react";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 export type AlertBannerSeverity = "info" | "warning" | "critical";
+
 
 const bannerStyles: Record<AlertBannerSeverity, string> = {
   info: "bg-slate-100 border-slate-200 text-slate-900",
@@ -46,6 +48,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
 }) => {
   const [isReady, setIsReady] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (!dismissKey) {
@@ -108,7 +111,9 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
         <button
           type="button"
           onClick={handleDismiss}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-current/15 bg-white/80 text-slate-700 transition hover:bg-white hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500"
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-current/15 bg-white/80 text-slate-700 hover:bg-white hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 ${
+            shouldReduceMotion ? "" : "transition"
+          }`}
           aria-label="Dismiss alert"
         >
           <X size={18} />
