@@ -1,7 +1,7 @@
 ## Component Checklist
 
 ### ✅ Structure
-- [ ] Proper file organization (adhering to the [Component Architecture Guide](docs/component-architecture.md))
+- [ ] Proper file organization
 - [ ] Index file with barrel export
 - [ ] Type definitions in separate file
 
