@@ -12,7 +12,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
@@ -35,18 +35,23 @@ const statusOptions: (TransactionStatus | "All")[] = [
 
 interface TransactionsProps {
   showPagination?: boolean;
+  hideToolbar?: boolean;
+  onDataLoad?: (totalCount: number) => void;
 }
 
-export const Transactions = ({ showPagination = true }: TransactionsProps) => {
+export const Transactions = ({ showPagination = true, hideToolbar = false, onDataLoad }: TransactionsProps) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"All" | TransactionStatus>("All");
-  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [localSearch, setLocalSearch] = useState("");
+  const [localStatus, setLocalStatus] = useState<"All" | TransactionStatus>("All");
+  const [localSortBy, setLocalSortBy] = useState<"date" | "amount">("date");
+  const [localSortDir, setLocalSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [localDateFrom, setLocalDateFrom] = useState("");
+  const [localDateTo, setLocalDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -59,11 +64,19 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
-  const router = useRouter();
+  
+  const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
+  const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
+  const sortBy = hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy;
+  const sortDir = hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir;
+  const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
+  const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
+  const asset = hideToolbar ? searchParams.get("asset") || "" : "";
+  const type = hideToolbar ? searchParams.get("type") || "" : "";
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
+  }, [search, status, sortBy, sortDir, dateFrom, dateTo, asset, type]);
 
   useEffect(() => {
     const loadTransactions = async () => {
@@ -77,23 +90,29 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
           status: status === "All" ? undefined : status,
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
+          asset: asset || undefined,
+          type: type as any || undefined,
           sortBy,
           sortDir,
         });
 
         setTransactions(payload.transactions);
         setTotalCount(payload.total);
+        if (onDataLoad) {
+          onDataLoad(payload.total);
+        }
       } catch (err) {
         console.error(err);
         setTransactions([]);
         setTotalCount(0);
+        if (onDataLoad) onDataLoad(0);
       } finally {
         setLoading(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, asset, type, onDataLoad]);
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -181,6 +200,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
+      {!hideToolbar && (
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
           <Dialog as="div" className="relative z-50" onClose={() => {}} id="transaction-detail-drawer">
@@ -197,8 +217,8 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                   type="text"
                   placeholder="Search by type, amount, asset, id"
                   className=" rounded p-1  text-sm w-48 focus:outline-none"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
                   autoFocus
                 />
               </div>
@@ -220,10 +240,10 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                   <button
                     key={opt}
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                      status === opt ? "font-bold text-primary-700" : ""
+                      localStatus === opt ? "font-bold text-primary-700" : ""
                     }`}
                     onClick={() => {
-                      setStatus(opt);
+                      setLocalStatus(opt);
                       setShowFilter(false);
                     }}
                     type="button"
@@ -248,33 +268,33 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
               <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 <button
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    sortBy === "date" ? "font-bold text-primary-700" : ""
+                    localSortBy === "date" ? "font-bold text-primary-700" : ""
                   }`}
                   onClick={() => {
-                    setSortBy("date");
+                    setLocalSortBy("date");
                     setShowSort(false);
                   }}
                   type="button"
                 >
-                  Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
+                  Date {localSortBy === "date" && (localSortDir === "asc" ? "↑" : "↓")}
                 </button>
                 <button
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    sortBy === "amount" ? "font-bold text-primary-700" : ""
+                    localSortBy === "amount" ? "font-bold text-primary-700" : ""
                   }`}
                   onClick={() => {
-                    setSortBy("amount");
+                    setLocalSortBy("amount");
                     setShowSort(false);
                   }}
                   type="button"
                 >
                   Amount{" "}
-                  {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
+                  {localSortBy === "amount" && (localSortDir === "asc" ? "↑" : "↓")}
                 </button>
                 <button
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
                   onClick={() => {
-                    setSortDir(sortDir === "asc" ? "desc" : "asc");
+                    setLocalSortDir(localSortDir === "asc" ? "desc" : "asc");
                   }}
                   type="button"
                 >
@@ -290,7 +310,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
             selected={dateFromObj}
             onChange={(date: Date | null) => {
               setDateFromObj(date);
-              setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
+              setLocalDateFrom(date ? format(date, "yyyy-MM-dd") : "");
             }}
             customInput={
               <CustomDateInput
@@ -311,7 +331,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
             selected={dateToObj}
             onChange={(date: Date | null) => {
               setDateToObj(date);
-              setDateTo(date ? format(date, "yyyy-MM-dd") : "");
+              setLocalDateTo(date ? format(date, "yyyy-MM-dd") : "");
             }}
             customInput={
               <CustomDateInput
@@ -335,6 +355,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
           />
         </div>
       </div>
+      )}
 
       <div className="">
         {loading ? (
