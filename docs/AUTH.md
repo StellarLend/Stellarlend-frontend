@@ -194,6 +194,8 @@ export async function ProtectedContent() {
 
 ### Example 2: Authorization Check
 
+For API-route role checks, use the RBAC helpers documented in [`docs/rbac.md`](./rbac.md).
+
 ```typescript
 // app/admin/layout.tsx
 import { getAuthenticatedUser } from "@/lib/auth";

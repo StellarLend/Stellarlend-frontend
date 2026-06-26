@@ -2,6 +2,8 @@
 
 This document explains how to grant admin access, how the RBAC system works, and how to use the `/api/admin/users` endpoint.
 
+For the reusable role model, guard APIs, and route-protection examples, see [`docs/rbac.md`](./rbac.md).
+
 ---
 
 ## Overview
