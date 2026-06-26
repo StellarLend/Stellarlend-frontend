@@ -27,6 +27,7 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
+import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -37,9 +38,10 @@ const statusOptions: (TransactionStatus | "All")[] = [
 
 interface TransactionsProps {
   showPagination?: boolean;
+  infiniteScroll?: boolean;
 }
 
-export const Transactions = ({ showPagination = true }: TransactionsProps) => {
+export const Transactions = ({ showPagination = true, infiniteScroll = false }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState("");
@@ -62,12 +64,25 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
   const router = useRouter();
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const liveRef = useRef<HTMLParagraphElement>(null);
+
+  const infinite = useInfiniteTransactions({
+    limit: itemsPerPage,
+    search: search || undefined,
+    status: status === "All" ? undefined : status,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    sortBy,
+    sortDir,
+  });
 
   useEffect(() => {
     setCurrentPage(1);
   }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   useEffect(() => {
+    if (infiniteScroll) return;
     const loadTransactions = async () => {
       setLoading(true);
 
@@ -95,7 +110,33 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
     };
 
     loadTransactions();
-  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, infiniteScroll]);
+
+  useEffect(() => {
+    if (!infiniteScroll) return;
+    if (infinite.hasMore && !infinite.isLoadingMore && sentinelRef.current) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting && infinite.hasMore && !infinite.isLoadingMore) {
+            infinite.loadMore();
+          }
+        },
+        { rootMargin: "200px" },
+      );
+      observer.observe(sentinelRef.current);
+      return () => observer.disconnect();
+    }
+  }, [infiniteScroll, infinite.hasMore, infinite.isLoadingMore, infinite.loadMore]);
+
+  useEffect(() => {
+    if (!infiniteScroll) return;
+    if (liveRef.current && infinite.transactions.length > 0) {
+      liveRef.current.textContent = `${infinite.transactions.length} transactions loaded`;
+    }
+  }, [infiniteScroll, infinite.transactions.length]);
+
+  const displayTransactions = infiniteScroll ? infinite.transactions : transactions;
+  const displayLoading = infiniteScroll ? infinite.isLoading : loading;
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -339,9 +380,9 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       </div>
 
       <div className="">
-        {loading ? (
+        {displayLoading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : transactions.length === 0 ? (
+        ) : displayTransactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -368,7 +409,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((txn, idx) => (
+                  {displayTransactions.map((txn, idx) => (
                     <tr
                       key={idx}
                       className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
@@ -419,7 +460,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                     </tr>
                   ))}
 
-                  {transactions.length === 0 && !loading && (
+                  {displayTransactions.length === 0 && !displayLoading && (
                     <tr>
                       <td colSpan={6} className="text-center py-6">
                         No transactions found.
@@ -432,7 +473,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {transactions.map((txn, idx) => (
+              {displayTransactions.map((txn, idx) => (
                 <div
                   key={idx}
                   className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
@@ -510,7 +551,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                 </div>
               ))}
 
-              {transactions.length === 0 && !loading && (
+              {displayTransactions.length === 0 && !displayLoading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
@@ -521,7 +562,58 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
 
         <div className="">
-          {showPagination && totalCount > 0 && (
+          {infiniteScroll && !displayLoading && (
+            <div className="px-6 pb-4">
+              {infinite.isLoadingMore && (
+                <div className="flex justify-center py-4" role="status">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="sr-only">Loading more transactions...</span>
+                </div>
+              )}
+              {infinite.isError && (
+                <div className="text-center py-4">
+                  <p className="text-sm text-red-600 mb-2">
+                    Failed to load more transactions.
+                  </p>
+                  <button
+                    onClick={infinite.loadMore}
+                    className="text-sm font-medium text-blue-600 hover:underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!infinite.hasMore && displayTransactions.length > 0 && (
+                <p className="text-center text-sm text-gray-400 py-4">
+                  All transactions loaded
+                </p>
+              )}
+              <div
+                ref={sentinelRef}
+                className="h-4"
+                aria-hidden="true"
+                data-testid="infinite-scroll-sentinel"
+              />
+              {infinite.hasMore && !infinite.isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <button
+                    onClick={infinite.loadMore}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    Load more
+                  </button>
+                </div>
+              )}
+              <p
+                ref={liveRef}
+                className="sr-only"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              />
+            </div>
+          )}
+          {!infiniteScroll && showPagination && totalCount > 0 && (
             <Pagination
               totalItems={totalCount}
               itemsPerPage={itemsPerPage}

@@ -20,7 +20,7 @@ export default function TransactionsPage() {
           }
         />
       </div>
-      <Transactions />
+      <Transactions infiniteScroll />
     </DashboardLayout>
   );
 }
