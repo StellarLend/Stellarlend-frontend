@@ -1,7 +1,4 @@
 "use client";
-import AmountInput from '@/components/shared/ui/AmountInput';
-import Tooltip from '@/components/shared/ui/Tooltip';
-import IconButton from '@/components/shared/ui/IconButton';
 
 import { useState, useEffect } from "react";
 import { LendingData } from "@/app/lending/page";
@@ -10,6 +7,9 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
+import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
+import { IconButton } from "@/components/atoms/IconButton/IconButton";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;

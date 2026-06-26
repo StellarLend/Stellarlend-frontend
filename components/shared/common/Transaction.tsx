@@ -12,7 +12,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
@@ -20,14 +20,12 @@ import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/
 import TransactionDetail from "@/components/features/dashboard/components/TransactionDetail";
 import { Dialog } from "@headlessui/react";
 
-
 import {
   fetchTransactions,
   type Transaction,
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
-import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -38,29 +36,18 @@ const statusOptions: (TransactionStatus | "All")[] = [
 
 interface TransactionsProps {
   showPagination?: boolean;
-  infiniteScroll?: boolean;
-  hideToolbar?: boolean;
-  onDataLoad?: (totalCount: number) => void;
 }
 
-export const Transactions = ({
-  showPagination = true,
-  infiniteScroll = false,
-  hideToolbar = false,
-  onDataLoad,
-}: TransactionsProps) => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
+export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [localSearch, setLocalSearch] = useState("");
-  const [localStatus, setLocalStatus] = useState<"All" | TransactionStatus>("All");
-  const [localSortBy, setLocalSortBy] = useState<"date" | "amount">("date");
-  const [localSortDir, setLocalSortDir] = useState<"asc" | "desc">("desc");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<"All" | TransactionStatus>("All");
+  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
-  const [localDateFrom, setLocalDateFrom] = useState("");
-  const [localDateTo, setLocalDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -73,34 +60,13 @@ export const Transactions = ({
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const liveRef = useRef<HTMLParagraphElement>(null);
-
-  const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
-  const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
-  const sortBy = hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy;
-  const sortDir = hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir;
-  const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
-  const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
-  const asset = hideToolbar ? searchParams.get("asset") || "" : "";
-  const type = hideToolbar ? searchParams.get("type") || "" : "";
-
-  const infinite = useInfiniteTransactions({
-    limit: itemsPerPage,
-    search: search || undefined,
-    status: status === "All" ? undefined : status,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    sortBy,
-    sortDir,
-  });
+  const router = useRouter();
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, status, sortBy, sortDir, dateFrom, dateTo, asset, type]);
+  }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   useEffect(() => {
-    if (infiniteScroll) return;
     const loadTransactions = async () => {
       setLoading(true);
 
@@ -112,58 +78,23 @@ export const Transactions = ({
           status: status === "All" ? undefined : status,
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
-          asset: asset || undefined,
-          type: type as any || undefined,
           sortBy,
           sortDir,
         });
 
         setTransactions(payload.transactions);
         setTotalCount(payload.total);
-        if (onDataLoad) {
-          onDataLoad(payload.total);
-        }
       } catch (err) {
         console.error(err);
         setTransactions([]);
         setTotalCount(0);
-        if (onDataLoad) onDataLoad(0);
       } finally {
         setLoading(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, asset, type, onDataLoad, infiniteScroll]);
-
-  useEffect(() => {
-    if (!infiniteScroll) return;
-    if (infinite.hasMore && !infinite.isLoadingMore && sentinelRef.current) {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0]?.isIntersecting && infinite.hasMore && !infinite.isLoadingMore) {
-            infinite.loadMore();
-          }
-        },
-        { rootMargin: "200px" },
-      );
-      observer.observe(sentinelRef.current);
-      return () => observer.disconnect();
-    }
-  }, [infiniteScroll, infinite.hasMore, infinite.isLoadingMore, infinite.loadMore]);
-
-  useEffect(() => {
-    if (!infiniteScroll) return;
-    if (liveRef.current && infinite.transactions.length > 0) {
-      liveRef.current.textContent = `${infinite.transactions.length} transactions loaded`;
-    }
-    if (onDataLoad) {
-      onDataLoad(infinite.transactions.length);
-    }
-  }, [infiniteScroll, infinite.transactions.length, onDataLoad]);
-
-  const displayTransactions = infiniteScroll ? infinite.transactions : transactions;
-  const displayLoading = infiniteScroll ? infinite.isLoading : loading;
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -251,7 +182,6 @@ export const Transactions = ({
 
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
-      {!hideToolbar && (
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
           <Dialog as="div" className="relative z-50" onClose={() => {}} id="transaction-detail-drawer">
@@ -268,8 +198,8 @@ export const Transactions = ({
                   type="text"
                   placeholder="Search by type, amount, asset, id"
                   className=" rounded p-1  text-sm w-48 focus:outline-none"
-                  value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                   autoFocus
                 />
               </div>
@@ -291,10 +221,10 @@ export const Transactions = ({
                   <button
                     key={opt}
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                      localStatus === opt ? "font-bold text-primary-700" : ""
+                      status === opt ? "font-bold text-primary-700" : ""
                     }`}
                     onClick={() => {
-                      setLocalStatus(opt);
+                      setStatus(opt);
                       setShowFilter(false);
                     }}
                     type="button"
@@ -319,33 +249,33 @@ export const Transactions = ({
               <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 <button
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    localSortBy === "date" ? "font-bold text-primary-700" : ""
+                    sortBy === "date" ? "font-bold text-primary-700" : ""
                   }`}
                   onClick={() => {
-                    setLocalSortBy("date");
+                    setSortBy("date");
                     setShowSort(false);
                   }}
                   type="button"
                 >
-                  Date {localSortBy === "date" && (localSortDir === "asc" ? "↑" : "↓")}
+                  Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
                 </button>
                 <button
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    localSortBy === "amount" ? "font-bold text-primary-700" : ""
+                    sortBy === "amount" ? "font-bold text-primary-700" : ""
                   }`}
                   onClick={() => {
-                    setLocalSortBy("amount");
+                    setSortBy("amount");
                     setShowSort(false);
                   }}
                   type="button"
                 >
                   Amount{" "}
-                  {localSortBy === "amount" && (localSortDir === "asc" ? "↑" : "↓")}
+                  {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
                 </button>
                 <button
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
                   onClick={() => {
-                    setLocalSortDir(localSortDir === "asc" ? "desc" : "asc");
+                    setSortDir(sortDir === "asc" ? "desc" : "asc");
                   }}
                   type="button"
                 >
@@ -361,7 +291,7 @@ export const Transactions = ({
             selected={dateFromObj}
             onChange={(date: Date | null) => {
               setDateFromObj(date);
-              setLocalDateFrom(date ? format(date, "yyyy-MM-dd") : "");
+              setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
             }}
             customInput={
               <CustomDateInput
@@ -382,7 +312,7 @@ export const Transactions = ({
             selected={dateToObj}
             onChange={(date: Date | null) => {
               setDateToObj(date);
-              setLocalDateTo(date ? format(date, "yyyy-MM-dd") : "");
+              setDateTo(date ? format(date, "yyyy-MM-dd") : "");
             }}
             customInput={
               <CustomDateInput
@@ -406,12 +336,11 @@ export const Transactions = ({
           />
         </div>
       </div>
-      )}
 
       <div className="">
-        {displayLoading ? (
+        {loading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : displayTransactions.length === 0 ? (
+        ) : transactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -438,7 +367,7 @@ export const Transactions = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {displayTransactions.map((txn, idx) => (
+                  {transactions.map((txn, idx) => (
                     <tr
                       key={idx}
                       className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
@@ -489,7 +418,7 @@ export const Transactions = ({
                     </tr>
                   ))}
 
-                  {displayTransactions.length === 0 && !displayLoading && (
+                  {transactions.length === 0 && !loading && (
                     <tr>
                       <td colSpan={6} className="text-center py-6">
                         No transactions found.
@@ -502,7 +431,7 @@ export const Transactions = ({
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {displayTransactions.map((txn, idx) => (
+              {transactions.map((txn, idx) => (
                 <div
                   key={idx}
                   className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
@@ -580,7 +509,7 @@ export const Transactions = ({
                 </div>
               ))}
 
-              {displayTransactions.length === 0 && !displayLoading && (
+              {transactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
@@ -591,58 +520,7 @@ export const Transactions = ({
 
 
         <div className="">
-          {infiniteScroll && !displayLoading && (
-            <div className="px-6 pb-4">
-              {infinite.isLoadingMore && (
-                <div className="flex justify-center py-4" role="status">
-                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                  <span className="sr-only">Loading more transactions...</span>
-                </div>
-              )}
-              {infinite.isError && (
-                <div className="text-center py-4">
-                  <p className="text-sm text-red-600 mb-2">
-                    Failed to load more transactions.
-                  </p>
-                  <button
-                    onClick={infinite.loadMore}
-                    className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              {!infinite.hasMore && displayTransactions.length > 0 && (
-                <p className="text-center text-sm text-gray-400 py-4">
-                  All transactions loaded
-                </p>
-              )}
-              <div
-                ref={sentinelRef}
-                className="h-4"
-                aria-hidden="true"
-                data-testid="infinite-scroll-sentinel"
-              />
-              {infinite.hasMore && !infinite.isLoadingMore && (
-                <div className="flex justify-center py-4">
-                  <button
-                    onClick={infinite.loadMore}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-                  >
-                    Load more
-                  </button>
-                </div>
-              )}
-              <p
-                ref={liveRef}
-                className="sr-only"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              />
-            </div>
-          )}
-          {!infiniteScroll && showPagination && totalCount > 0 && (
+          {showPagination && totalCount > 0 && (
             <Pagination
               totalItems={totalCount}
               itemsPerPage={itemsPerPage}
