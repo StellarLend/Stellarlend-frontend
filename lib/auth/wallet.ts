@@ -3,19 +3,24 @@ import config from "@/lib/config";
 
 // The server's signing keypair. In production, this should be a secure secret.
 // For development, we fallback to a random keypair if not provided.
-const SERVER_SIGNING_SECRET = process.env.STELLAR_SIGNING_SECRET;
-let serverKeypair: Keypair;
+let serverKeypair: Keypair | null = null;
 
-try {
-  if (SERVER_SIGNING_SECRET) {
-    serverKeypair = Keypair.fromSecret(SERVER_SIGNING_SECRET);
-  } else {
-    console.warn("STELLAR_SIGNING_SECRET not found in environment, using a random keypair for development");
+function getServerKeypair(): Keypair {
+  if (serverKeypair) return serverKeypair;
+
+  const secret = process.env.STELLAR_SIGNING_SECRET;
+  try {
+    if (secret) {
+      serverKeypair = Keypair.fromSecret(secret);
+    } else {
+      console.warn("STELLAR_SIGNING_SECRET not found in environment, using a random keypair for development");
+      serverKeypair = Keypair.random();
+    }
+  } catch (error) {
+    console.warn("Invalid STELLAR_SIGNING_SECRET, using a random keypair for development", error);
     serverKeypair = Keypair.random();
   }
-} catch (error) {
-  console.warn("Invalid STELLAR_SIGNING_SECRET, using a random keypair for development", error);
-  serverKeypair = Keypair.random();
+  return serverKeypair;
 }
 
 const NETWORK_PASSPHRASE =
@@ -42,8 +47,9 @@ export async function generateWalletChallenge(clientPublicKey: string): Promise<
   // Set expiration to 5 minutes
   const timeout = 300; 
 
+  const activeKeypair = getServerKeypair();
   const challengeTx = WebAuth.buildChallengeTx(
-    serverKeypair,
+    activeKeypair,
     clientPublicKey,
     HOME_DOMAIN,
     timeout,
@@ -60,11 +66,12 @@ export async function generateWalletChallenge(clientPublicKey: string): Promise<
  * @returns The validated client public key (wallet address)
  */
 export async function verifyWalletSignature(transactionXdr: string): Promise<string> {
+  const activeKeypair = getServerKeypair();
   try {
     // Read the transaction to extract the client's public key
     const { clientAccountID } = WebAuth.readChallengeTx(
       transactionXdr,
-      serverKeypair.publicKey(),
+      activeKeypair.publicKey(),
       NETWORK_PASSPHRASE,
       HOME_DOMAIN,
       HOME_DOMAIN
@@ -72,7 +79,7 @@ export async function verifyWalletSignature(transactionXdr: string): Promise<str
 
     const signersFound = WebAuth.verifyChallengeTxSigners(
       transactionXdr,
-      serverKeypair.publicKey(),
+      activeKeypair.publicKey(),
       NETWORK_PASSPHRASE,
       [clientAccountID],
       HOME_DOMAIN,

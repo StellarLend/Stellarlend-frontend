@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { withIdempotency } from "@/lib/api/idempotency";
+import { getSession } from "@/lib/auth";
 
 /**
  * Example payload structure for session creation
@@ -113,24 +114,22 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    // This is a simple example - in production, import and use getSession()
-    // import { getSession } from "@/lib/auth";
-    // const session = await getSession();
+    const session = await getSession();
 
-    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
-    const sessionCookie = request.cookies.get(cookieName);
-
-    if (!sessionCookie?.value) {
+    if (!session) {
       return NextResponse.json(
         { error: "No active session" },
         { status: 401 }
       );
     }
 
+    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
+
     return NextResponse.json({
       session: {
         active: true,
         cookie: cookieName,
+        user: session.user,
       },
     });
   } catch (error) {

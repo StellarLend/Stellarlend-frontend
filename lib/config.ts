@@ -28,6 +28,10 @@ interface Config {
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
   };
+  rateLimit: {
+    max: number;
+    window: number;
+  };
 }
 
 const config: Config = {
@@ -41,21 +45,19 @@ const config: Config = {
     timeout: 10000,
   },
   stellar: {
-stellar: {
-  network:
-    validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
+    network:
+      validatedEnv.NEXT_PUBLIC_STELLAR_NETWORK || 'testnet',
 
-  horizonUrl:
-    validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
-    'https://horizon-testnet.stellar.org',
+    horizonUrl:
+      validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
+      'https://horizon-testnet.stellar.org',
 
-  sorobanRpcUrl:
-    validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
-    'https://soroban-testnet.stellar.org',
+    sorobanRpcUrl:
+      validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+      'https://soroban-testnet.stellar.org',
 
-  sorobanContractId:
-    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
-},
+    sorobanContractId:
+      process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
   },
   analytics: {
     googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,
@@ -63,6 +65,10 @@ stellar: {
   },
   logging: {
     level: (process.env.SERVER_LOG_LEVEL as Config['logging']['level']) || 'info',
+  },
+  rateLimit: {
+    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+    window: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
   },
 };
 
