@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Copy } from "lucide-react";
+import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -23,6 +25,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
   isPrimary = false,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   const handleCopy = () => {
     if (copyValue) {
@@ -41,9 +44,8 @@ const MetricCard: React.FC<MetricCardProps> = ({
   return (
     <div
       className={`
-        ${cardBg} rounded-xl overflow-hidden p-4 transform transition-transform
-        hover:scale-[1.02] active:scale-[1.03] min-w-[345px] w-full border-[#71B48D33] my-6
-        cursor-pointer
+        ${cardBg} rounded-xl overflow-hidden p-4 w-full border-[#71B48D33] my-6
+        cursor-pointer ${shouldReduceMotion ? "" : "transform transition-transform hover:scale-[1.02] active:scale-[1.03]"}
       `}
     >
       <div>
@@ -120,8 +122,8 @@ export default function MetricsCards() {
   if (!data) return <div className="text-white p-4 text-sm font-medium">Loading metrics...</div>;
 
   return (
-    <div className="overflow-x-auto w-full">
-      <div className="flex gap-3 w-full grid-cols-3">
+    <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
           isPrimary
           icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
@@ -144,6 +146,6 @@ export default function MetricsCards() {
           subValue={data.earnings}
         />
       </div>
-    </div>
+    </ScrollCues>
   );
 }

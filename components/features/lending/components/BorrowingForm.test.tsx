@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
 import BorrowingForm from "./BorrowingForm";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -14,10 +15,26 @@ describe("BorrowingForm Component", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    mockOnSubmit.mockClear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          prices: {
+            XLM: 0.12,
+            USDC: 1,
+            BTC: 65000,
+            ETH: 3500,
+          },
+        }),
+      }),
+    );
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("renders correctly", () => {
@@ -34,6 +51,53 @@ describe("BorrowingForm Component", () => {
     
     // Required collateral should be 150 (150% of 100)
     expect(screen.getByText("150 XLM")).toBeInTheDocument();
+  });
+
+  it("shows projected health preview from collateral and price data", async () => {
+    render(<BorrowingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Amount to Borrow/i), {
+      target: { value: "100" },
+    });
+
+    expect(screen.getByText(/Projected Health Preview/i)).toBeInTheDocument();
+    expect(screen.getByText(/Health factor/i)).toBeInTheDocument();
+    expect(screen.getByText(/Critical/i)).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/prices?assets=USDC,XLM",
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        }),
+      );
+    });
+  });
+
+  it("updates the projected band when collateral amount changes", () => {
+    render(
+      <BorrowingForm
+        initialData={{
+          ...mockInitialData,
+          amount: 100,
+          collateral: "USDC",
+          collateralAmount: 300,
+        }}
+        onSubmit={mockOnSubmit}
+      />,
+    );
+
+    expect(screen.getByText(/Healthy/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Collateral Amount/i), {
+      target: { value: "120" },
+    });
+
+    expect(screen.getByText(/At Risk/i)).toBeInTheDocument();
   });
 
   it("validates insufficient collateral balance", async () => {

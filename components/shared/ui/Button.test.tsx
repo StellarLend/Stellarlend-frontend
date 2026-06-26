@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, fireEvent } from "@/test/test-utils";
 import Button from "./Button";
 import { describe, it, expect, vi } from "vitest";
@@ -25,8 +26,7 @@ describe("Button Component", () => {
     render(<Button isLoading>Processing</Button>);
     
     expect(screen.getByRole("button")).toBeDisabled();
-    // Check for SVG (spinner)
-    expect(document.querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   it("is disabled when disabled prop is true", () => {
@@ -36,12 +36,12 @@ describe("Button Component", () => {
     expect(screen.getByRole("button")).toHaveClass("disabled:opacity-50");
   });
 
-  it("applies variant styles correctly", () => {
-    const { rerender } = render(<Button variant="danger">Delete</Button>);
-    expect(screen.getByRole("button")).toHaveClass("bg-red-500");
+  it("applies destructive variant styles correctly", () => {
+    const { rerender } = render(<Button variant="destructive">Delete</Button>);
+    expect(screen.getByRole("button")).toHaveClass("bg-red-600");
     
     rerender(<Button variant="success">Save</Button>);
-    expect(screen.getByRole("button")).toHaveClass("bg-green-500");
+    expect(screen.getByRole("button")).toHaveClass("bg-green-600");
   });
 
   it("applies fullWidth style when prop is true", () => {

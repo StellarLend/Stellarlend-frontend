@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": "simulate_transaction",
+  "error": {
+    "code": -32000,
+    "message": "HostError: Error(Auth, InvalidAction)",
+    "data": {
+      "kind": "auth"
+    }
+  }
+}
