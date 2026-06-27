@@ -6,6 +6,7 @@ import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
+import ConfirmModal from "./ConfirmModal";
 
 export interface SupplyPosition {
   id: string;
@@ -84,6 +85,8 @@ export default function WithdrawForm({
     "idle" | "success" | "error"
   >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingData, setPendingData] = useState<LendingData | null>(null);
 
   const selectedPosition = positions.find((p) => p.id === selectedPositionId);
   const withdrawableBalance = selectedPosition
@@ -174,6 +177,20 @@ export default function WithdrawForm({
     });
   };
 
+  const handleConfirm = () => {
+    if (!pendingData) return;
+    setSubmitStatus("success");
+    setSubmitMessage("Withdrawal confirmed.");
+    onSubmit(pendingData);
+    setShowConfirmModal(false);
+    setPendingData(null);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowConfirmModal(false);
+    setPendingData(null);
+  };
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitStatus("idle");
@@ -197,9 +214,8 @@ export default function WithdrawForm({
       healthFactorAfter: preview.healthFactorAfter,
     };
 
-    setSubmitStatus("success");
-    setSubmitMessage("Withdrawal preview ready.");
-    onSubmit(data);
+    setPendingData(data);
+    setShowConfirmModal(true);
   };
 
   return (
@@ -409,6 +425,17 @@ export default function WithdrawForm({
           Review Withdrawal
         </Button>
       </form>
+
+      {pendingData && (
+        <ConfirmModal
+          isOpen={showConfirmModal}
+          onClose={handleCancelConfirm}
+          onConfirm={handleConfirm}
+          data={pendingData}
+          calculation={null}
+          type="withdraw"
+        />
+      )}
     </div>
   );
 }
