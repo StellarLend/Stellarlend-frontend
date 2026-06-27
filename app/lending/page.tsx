@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import useTxStatus from "@/lib/tx/useTxStatus";
 import { Toast } from "@/components/shared/common";
@@ -67,8 +68,36 @@ const ConfirmModal = dynamic(
   () => import("@/components/features/lending/components/ConfirmModal"),
 );
 
+const VALID_TABS: LendingActionType[] = ["lend", "borrow", "repay", "withdraw"];
+
+function parseTab(value: string | null): LendingActionType {
+  return VALID_TABS.includes(value as LendingActionType)
+    ? (value as LendingActionType)
+    : "lend";
+}
+
 export default function LendingPage() {
-  const [activeTab, setActiveTab] = useState<LendingActionType>("lend");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<LendingActionType>(() =>
+    parseTab(searchParams.get("tab")),
+  );
+
+  const handleTabChange = useCallback(
+    (tab: LendingActionType) => {
+      setActiveTab(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tab);
+      router.replace(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  // Sync tab when the user navigates back/forward
+  useEffect(() => {
+    const tab = parseTab(searchParams.get("tab"));
+    setActiveTab(tab);
+  }, [searchParams]);
   const [lendingData, setLendingData] = useState<LendingData>({
     asset: "XLM",
     amount: 0,
@@ -298,7 +327,7 @@ export default function LendingPage() {
         </section>
 
         <section className="rounded-[28px] border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur">
-          <TabSelector activeTab={activeTab} onTabChange={setActiveTab} />
+          <TabSelector activeTab={activeTab} onTabChange={handleTabChange} />
         </section>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
