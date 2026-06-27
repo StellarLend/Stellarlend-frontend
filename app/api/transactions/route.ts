@@ -7,10 +7,6 @@ import {
   isTransactionType,
   isTransactionStatus,
 } from '@/types/enums';
-import {
-  fetchTransactionRecords,
-  filterTransactions,
-} from '@/lib/transactions/repository';
 import type { Transaction } from '@/types/Transaction';
 import {
   fetchTransactionRecords,
