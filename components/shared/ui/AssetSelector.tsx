@@ -1,5 +1,8 @@
 "use client";
 
+"use client";
+
+import React, { type KeyboardEvent } from "react";
 import { AssetInfo } from "@/lib/assets";
 import { cn } from "@/lib/utils/cn";
 
@@ -10,6 +13,8 @@ interface AssetSelectorProps {
   showBalance?: boolean;
   interestRates?: Record<string, number>;
   label?: string;
+  id?: string;
+  onClose?: () => void;
 }
 
 const TOKEN_COLORS: Record<string, string> = {
@@ -26,7 +31,46 @@ export default function AssetSelector({
   showBalance = true,
   interestRates,
   label,
+  id,
+  onClose,
 }: AssetSelectorProps) {
+  const optionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+
+  const focusOption = (index: number) => {
+    const option = optionRefs.current[index];
+    option?.focus();
+  };
+
+  const handleOptionKeyDown = (
+    e: KeyboardEvent<HTMLButtonElement>,
+    assetSymbol: string,
+    index: number,
+  ) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onChange(assetSymbol);
+      return;
+    }
+
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      e.preventDefault();
+      focusOption((index + 1) % assets.length);
+      return;
+    }
+
+    if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      focusOption((index - 1 + assets.length) % assets.length);
+      return;
+    }
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose?.();
+      e.currentTarget.blur();
+    }
+  };
+
   return (
     <div>
       {label && (
@@ -36,27 +80,26 @@ export default function AssetSelector({
       )}
 
       <div
+        id={id}
         role="listbox"
         aria-label={label || "Asset selector"}
         className="grid grid-cols-2 gap-4"
       >
-        {assets.map((asset) => {
+        {assets.map((asset, index) => {
           const selected = value === asset.symbol;
 
           return (
             <button
+              ref={(el) => {
+                optionRefs.current[index] = el;
+              }}
               key={asset.symbol}
               type="button"
               role="option"
               aria-selected={selected}
               tabIndex={0}
               onClick={() => onChange(asset.symbol)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onChange(asset.symbol);
-                }
-              }}
+              onKeyDown={(e) => handleOptionKeyDown(e, asset.symbol, index)}
               className={cn(
                 "p-4 rounded-xl border-2 transition-all text-left focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
                 selected

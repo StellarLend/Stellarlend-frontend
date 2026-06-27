@@ -19,6 +19,8 @@ export type FetchTransactionsOptions = {
   limit?: number;
   search?: string;
   status?: TransactionStatus;
+  type?: string;
+  asset?: string;
   dateFrom?: string;
   dateTo?: string;
   sortBy?: "date" | "amount";
