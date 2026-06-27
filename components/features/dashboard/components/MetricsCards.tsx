@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Copy } from "lucide-react";
+import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { Toast } from "@/components/shared/common";
+import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -23,13 +27,40 @@ const MetricCard: React.FC<MetricCardProps> = ({
   isPrimary = false,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
+  const [toast, setToast] = useState<{
+    variant: "error" | "info";
+    title: string;
+    description: string;
+  } | null>(null);
 
-  const handleCopy = () => {
-    if (copyValue) {
-      navigator.clipboard.writeText(copyValue);
+  const handleCopy = async () => {
+    if (!copyValue) return;
+
+    const result = await copyToClipboard(copyValue, true);
+
+    if (result.success) {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
+      return;
     }
+
+    const messages: Record<CopyFailureReason, { title: string; description: string }> = {
+      invalid_address: {
+        title: "Invalid Address",
+        description: "The wallet address could not be validated before copying.",
+      },
+      clipboard_error: {
+        title: "Copy Failed",
+        description: "Clipboard access is unavailable. Try copying the address manually.",
+      },
+    };
+
+    setToast({
+      variant: "error",
+      ...messages[result.reason!],
+    });
+    setTimeout(() => setToast(null), 4000);
   };
 
   const cardBg = isPrimary ? "bg-[#0A3D1E]" : "bg-[#097C4C]";
@@ -41,9 +72,8 @@ const MetricCard: React.FC<MetricCardProps> = ({
   return (
     <div
       className={`
-        ${cardBg} rounded-xl overflow-hidden p-4 transform transition-transform
-        hover:scale-[1.02] active:scale-[1.03] min-w-[345px] w-full border-[#71B48D33] my-6
-        cursor-pointer
+        ${cardBg} rounded-xl overflow-hidden p-4 w-full border-[#71B48D33] my-6
+        cursor-pointer ${shouldReduceMotion ? "" : "transform transition-transform hover:scale-[1.02] active:scale-[1.03]"}
       `}
     >
       <div>
@@ -87,7 +117,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
               </div>
               <button
                 onClick={(e) => {
-                  e.stopPropagation(); // Prevent bubbling to parent
+                  e.stopPropagation();
                   handleCopy();
                 }}
                 className={`${iconBgColor} hover:bg-opacity-80 rounded-md w-9 h-9 flex items-center justify-center transition-all ml-2 shrink-0`}
@@ -103,50 +133,54 @@ const MetricCard: React.FC<MetricCardProps> = ({
           ) : null}
         </div>
       )}
+      {toast && (
+        <Toast
+          variant={toast.variant}
+          title={toast.title}
+          description={toast.description}
+        />
+      )}
     </div>
   );
 };
 
 export default function MetricsCards() {
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/positions")
+      .then(res => res.json())
+      .then(setData)
+      .catch(console.error);
+  }, []);
+
+  if (!data) return <div className="text-white p-4 text-sm font-medium">Loading metrics...</div>;
+
   return (
-    <div className="overflow-x-auto w-full">
-      <div className="flex gap-3 w-full grid-cols-3">
+    <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
           isPrimary
-          icon={
-            <img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />
-          }
+          icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
           label="Available Balance"
-          value="$3,750.00 XLM"
-          copyValue="BaDE1b2U45...670UzZ"
+          value={data.availableBalance}
+          copyValue={data.copyAddress}
         />
         <MetricCard
-          icon={
-            <img
-              src="/icons/Icon-11.svg"
-              alt="Dollar Icon"
-              className="w-6 h-6"
-            />
-          }
+          icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
           label="Total Borrowed Amount"
-          value="$1,500.00 XLM"
+          value={data.borrowedAmount}
           subLabel="Next Due Payment"
-          subValue="$250.00 in 4 days"
+          subValue={data.nextDue}
         />
         <MetricCard
-          icon={
-            <img
-              src="/icons/Icon-11.svg"
-              alt="Dollar Icon"
-              className="w-6 h-6"
-            />
-          }
-          label="Total Supplied Funds"
-          value="$5,000.00 XLM"
+          icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
+          label={`Total Supplied (Health Factor: ${data.healthFactor})`}
+          value={data.suppliedFunds}
           subLabel="Earnings from Lending"
-          subValue="$95.00 XLM"
+          subValue={data.earnings}
         />
       </div>
-    </div>
+    </ScrollCues>
   );
 }

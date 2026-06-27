@@ -12,84 +12,33 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
+import { EmptyState } from "./EmptyState";
+import { TransactionsSkeleton } from "./Skeleton";
+import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
+import dynamic from "next/dynamic";
 
-export type TransactionStatus = "Completed" | "Processing" | "Failed";
-export type Transaction = {
-  id: string;
-  type: string;
-  amount: number;
-  asset: "XLM" | "BTC" | "STRK";
-  date: string;
-  time: string;
-  status: TransactionStatus;
-};
+const TransactionDetail = dynamic(
+  () => import("@/components/features/dashboard/components/TransactionDetail"),
+  {
+    loading: () => (
+      <div className="fixed inset-0 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center text-sm text-gray-400">
+          Loading…
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
-export const fetchTransactions = async (): Promise<Transaction[]> => {
-  await new Promise((res) => setTimeout(res, 300));
-  return [
-    {
-      id: "TXN12345",
-      type: "Deposit",
-      amount: 2000,
-      asset: "XLM",
-      date: "2025-04-12",
-      time: "09:32AM",
-      status: "Completed",
-    },
-    {
-      id: "TXN12346",
-      type: "Loan Payment",
-      amount: -250,
-      asset: "BTC",
-      date: "2025-03-10",
-      time: "11:15AM",
-      status: "Processing",
-    },
-    {
-      id: "TXN12347",
-      type: "Withdrawal",
-      amount: -7500,
-      asset: "STRK",
-      date: "2025-02-28",
-      time: "04:45PM",
-      status: "Completed",
-    },
-    {
-      id: "TXN12348",
-      type: "Lend Funds",
-      amount: -1500,
-      asset: "XLM",
-      date: "2025-01-05",
-      time: "08:00AM",
-      status: "Completed",
-    },
-    {
-      id: "TXN12349",
-      type: "Lend Funds",
-      amount: -607.87,
-      asset: "BTC",
-      date: "2024-12-20",
-      time: "10:20PM",
-      status: "Failed",
-    },
-    {
-      id: "TXN12350",
-      type: "Deposit",
-      amount: 20000,
-      asset: "STRK",
-      date: "2024-11-15",
-      time: "01:05PM",
-      status: "Completed",
-    },
-  ];
-};
-
-const statusColors: Record<TransactionStatus, string> = {
-  Completed: "bg-green-100 text-green-700",
-  Processing: "bg-yellow-100 text-yellow-700",
-  Failed: "bg-red-100 text-red-700",
-};
+import {
+  fetchTransactions,
+  type Transaction,
+  type TransactionStatus,
+  type FetchTransactionsResponse,
+} from "@/types/Transaction";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -104,14 +53,17 @@ interface TransactionsProps {
 
 export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"All" | TransactionStatus>("All");
-  const [sortBy, setSortBy] = useState("date");
-  const [sortDir, setSortDir] = useState("desc");
+  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -119,39 +71,43 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const sortRef = useRef<HTMLDivElement>(null);
   const [dateFromObj, setDateFromObj] = useState<Date | null>(null);
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+  const router = useRouter();
 
   useEffect(() => {
-    setLoading(true);
-    fetchTransactions().then((data) => {
-      setTransactions(data);
-      setLoading(false);
-    });
-  }, []);
+    setCurrentPage(1);
+  }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
-  let filtered = transactions.filter((txn) => {
-    const matchesSearch =
-      txn.type.toLowerCase().includes(search.toLowerCase()) ||
-      txn.id.toLowerCase().includes(search.toLowerCase()) ||
-      txn.asset.toLowerCase().includes(search.toLowerCase()) ||
-      txn.amount.toString().includes(search);
-    const matchesStatus = status === "All" || txn.status === status;
-    const matchesDateFrom =
-      !dateFrom || new Date(txn.date) >= new Date(dateFrom);
-    const matchesDateTo = !dateTo || new Date(txn.date) <= new Date(dateTo);
-    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo;
-  });
+  useEffect(() => {
+    const loadTransactions = async () => {
+      setLoading(true);
 
-  filtered = filtered.sort((a, b) => {
-    if (sortBy === "date") {
-      const aDate = new Date(a.date);
-      const bDate = new Date(b.date);
-      return sortDir === "asc"
-        ? aDate.getTime() - bDate.getTime()
-        : bDate.getTime() - aDate.getTime();
-    } else {
-      return sortDir === "asc" ? a.amount - b.amount : b.amount - a.amount;
-    }
-  });
+      try {
+        const payload: FetchTransactionsResponse = await fetchTransactions({
+          page: currentPage,
+          pageSize: itemsPerPage,
+          search: search || undefined,
+          status: status === "All" ? undefined : status,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          sortBy,
+          sortDir,
+        });
+
+        setTransactions(payload.transactions);
+        setTotalCount(payload.total);
+      } catch (err) {
+        console.error(err);
+        setTransactions([]);
+        setTotalCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTransactions();
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -235,22 +191,13 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       </div>
     );
   });
+  CustomDateInput.displayName = "CustomDateInput";
 
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // Or whatever number you prefer
-
-
-  // Calculate paginated data
-  const paginatedTransactions = transactions.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <div className="relative" ref={searchRef}>
+          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
             <div
               className="flex items-center gap-1 cursor-pointer"
               onClick={() => setShowSearch((v) => !v)}
@@ -403,86 +350,202 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="">
         {loading ? (
-          <div className="text-center py-8 text-gray-400">Loading...</div>
+          <TransactionsSkeleton count={itemsPerPage} />
+        ) : transactions.length === 0 ? (
+          <div className="px-6 py-16">
+            <EmptyState
+              title="No transactions yet"
+              description="Your transaction history will appear here once you lend, borrow, or make payments on Stellarlend."
+              actionLabel="Explore lending"
+              onAction={() => router.push("/lending")}
+            />
+          </div>
         ) : (
-          <table className="min-w-full text-sm border">
-            <thead>
-              <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
-                <th className="py-3 px-4 text-left font-semibold">
-                  Transaction Type
-                </th>
-                <th className="py-3 px-4 text-left font-semibold">Amount</th>
-                <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                <th className="py-3 px-4 text-left font-semibold">Date</th>
-                <th className="py-3 px-4 text-left font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((txn, idx) => (
-                <tr
-                  key={idx}
-                  className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
-                >
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-black">{txn.type}</div>
-                    <div className="text-sm font-normal text-[#667185]">
-                      #{txn.id}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 font-mono">
-                    {txn.amount > 0
-                      ? `+$${txn.amount}`
-                      : `-$${Math.abs(txn.amount)}`}
-                  </td>
-                  <td className="py-6 px-4 flex items-center gap-2">
-                    <Image
-                      src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                      alt={txn.asset}
-                      width={24}
-                      height={24}
-                      className="inline-block"
-                    />
-                    <span className="ml-1 font-medium ">{txn.asset}</span>
-                  </td>
-                  <td className="py-3 px-4 ">
-                    {formatDateTime(txn.date, txn.time)}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
-                        statusColors[txn.status]
-                      }`}
+          <>
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-sm border">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
+                    <th className="py-3 px-4 text-left font-semibold">
+                      Transaction Type
+                    </th>
+                    <th className="py-3 px-4 text-left font-semibold">Amount</th>
+                    <th className="py-3 px-4 text-left font-semibold">Asset</th>
+                    <th className="py-3 px-4 text-left font-semibold">Date</th>
+                    <th className="py-3 px-4 text-left font-semibold">Status</th>
+                    <th className="py-3 px-4 text-left font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((txn, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
                     >
-                      {txn.status}
-                    </span>
-                  </td>
-                </tr>
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-black">{txn.type}</div>
+                        <div className="text-sm font-normal text-[#667185]">
+                          #{txn.id}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-mono">
+                        {txn.amount > 0
+                          ? `+$${txn.amount}`
+                          : `-$${Math.abs(txn.amount)}`}
+                      </td>
+                      <td className="py-6 px-4 flex items-center gap-2">
+                        <Image
+                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                          alt={txn.asset}
+                          width={24}
+                          height={24}
+                          className="inline-block"
+                        />
+                        <span className="ml-1 font-medium ">{txn.asset}</span>
+                      </td>
+                      <td className="py-3 px-4 ">
+                        {formatDateTime(txn.date, txn.time)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <StatusBadge
+                          variant={transactionStatusToVariant(txn.status)}
+                          label={txn.status}
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => {
+                            setSelectedTxn(txn);
+                            setIsDetailOpen(true);
+                          }}
+                          className="text-blue-600 hover:underline"
+                          aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          aria-controls="transaction-detail-drawer"
+                        >
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {transactions.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-6">
+                        No transactions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
+              {transactions.map((txn, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Type
+                      </span>
+                      <div className="font-bold text-gray-900">{txn.type}</div>
+                      <div className="text-xs text-gray-500 font-mono">
+                        #{txn.id}
+                      </div>
+                    </div>
+                    <StatusBadge
+                      variant={transactionStatusToVariant(txn.status)}
+                      label={txn.status}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Asset
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                          alt={txn.asset}
+                          width={20}
+                          height={20}
+                        />
+                        <span className="font-bold text-gray-900">
+                          {txn.asset}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Amount
+                      </span>
+                      <div
+                        className={`font-mono font-bold text-base ${
+                          txn.amount > 0 ? "text-green-600" : "text-gray-900"
+                        }`}
+                      >
+                        {txn.amount > 0
+                          ? `+$${txn.amount}`
+                          : `-$${Math.abs(txn.amount)}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Date & Time
+                      </span>
+                      <div className="text-sm text-gray-700">
+                        {formatDateTime(txn.date, txn.time)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedTxn(txn);
+                        setIsDetailOpen(true);
+                      }}
+                      className="mt-2 text-blue-600 hover:underline"
+                      aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                      aria-controls="transaction-detail-drawer"
+                    >
+                      Details
+                    </button>
+                  </div>
+                </div>
               ))}
 
-              {filtered.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={5} className="text-center py-6">
-                    No transactions found.
-                  </td>
-                </tr>
+              {transactions.length === 0 && !loading && (
+                <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                  <p className="text-gray-500">No transactions found.</p>
+                </div>
               )}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
 
+
         <div className="">
-          {showPagination && (
+          {showPagination && totalCount > 0 && (
             <Pagination
-              totalItems={18}
-              itemsPerPage={6}
-              currentPage={1}
+              totalItems={totalCount}
+              itemsPerPage={itemsPerPage}
+              currentPage={currentPage}
               setCurrentPage={setCurrentPage}
             />
           )}
         </div>
       </div>
+      {isDetailOpen && (
+        <TransactionDetail transaction={selectedTxn} isOpen={isDetailOpen} onClose={() => setIsDetailOpen(false)} />
+      )}
     </section>
   );
 }

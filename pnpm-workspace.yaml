@@ -1,0 +1,10 @@
+allowBuilds:
+  '@sentry/cli': false
+  '@tailwindcss/oxide': true
+  better-sqlite3: true
+  esbuild: false
+  msgpackr-extract: true
+  sharp: false
+  unrs-resolver: false
+minimumReleaseAgeExclude:
+  - bullmq@5.78.0

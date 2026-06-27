@@ -1,2 +1,13 @@
-export { default as Searchbar } from './Searchbar';
-export { default as RecentTransactions } from './RecentTransactions'; 
+// SearchBar has been consolidated and moved to components/molecules/SearchBar
+// For backward compatibility, re-export from the new location
+export { default as Searchbar, type SearchBarProps as SearchbarProps } from '@/components/molecules/SearchBar';
+
+export { RecentTransactions } from './RecentTransactions';
+export { PageHeader } from './PageHeader';
+export { AlertBanner } from './AlertBanner';
+export type { PageHeaderProps, PageHeaderTone } from './PageHeader';
+export type { AlertBannerSeverity, AlertBannerProps } from './AlertBanner';
+export { default as Toast } from './Toast';
+export type { ToastVariant } from './Toast';
+export { FeatureGate } from './FeatureGate';
+export type { FeatureGateProps } from './FeatureGate';

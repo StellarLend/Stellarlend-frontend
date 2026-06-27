@@ -1,41 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { DashboardLayout } from "@/components";
+import { Transactions } from "@/components/shared/common/Transaction";
+import { IconPlaceholder } from "@/components/shared/ui/icons/IconPlaceholder";
+import { PageHeader } from "@/components/shared/common";
+import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
 
-// Import both the fetch function and the type
-import { fetchTransactions, Transactions, type Transaction } from "@/components/shared/common/Transaction";
-import { Bank } from "@/components/shared/ui/icons/Bank";
+// Lazy load Bank icon to reduce initial bundle size
+const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod => ({ default: mod.Bank })), {
+  loading: () => <IconPlaceholder />,
+  ssr: true,
+});
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-
-  useEffect(() => {
-    const getData = async () => {
-      const data = await fetchTransactions();
-      setTransactions(data);
-    };
-
-    getData();
-  }, []);
+  const [totalCount, setTotalCount] = useState(0);
 
   return (
     <DashboardLayout>
       <div className="pt-10 border-t px-6 md:px-12 ">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-          <h1 className="text-white md:text-[24px] text-xl font-bold mb-6 md:mb-0">
-            Transactions
-          </h1>
-
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        <PageHeader
+          title="Transactions"
+          description="Review every lend, borrow, repay, and withdrawal tied to your account."
+          actions={
             <button className="bg-[#15A350] hover:bg-[#0A3D1E] text-white border border-[#71B48D] rounded-lg flex items-center justify-center gap-2 py-3 px-6 font-semibold transition-colors">
               <Bank />
               <span>Export CSV</span>
             </button>
-          </div>
-        </div>
+          }
+        />
       </div>
-      <Transactions  />
+      <div className="px-6 md:px-12 mt-4">
+        <TransactionFilters totalCount={totalCount} />
+      </div>
+      <Transactions infiniteScroll hideToolbar onDataLoad={setTotalCount} />
     </DashboardLayout>
   );
 }

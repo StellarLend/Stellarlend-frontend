@@ -1,0 +1,59 @@
+name: Server Coverage Gate
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'app/api/**'
+      - 'lib/**'
+      - 'vitest.config.ts'
+      - '.github/workflows/server-coverage.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'app/api/**'
+      - 'lib/**'
+      - 'vitest.config.ts'
+      - '.github/workflows/server-coverage.yml'
+
+jobs:
+  server-tests:
+    name: Server-side tests with coverage gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run server tests with coverage
+        # Runs only the "server" Vitest project (Node environment).
+        # The build fails if any threshold defined in vitest.config.ts is not met:
+        #   lines ≥ 95 %, functions ≥ 95 %, branches ≥ 90 %, statements ≥ 95 %
+        run: npm run test:server:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-coverage-report
+          path: coverage/
+          retention-days: 14
+
+      - name: Upload LCOV to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: server
+          name: server-coverage
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -1,0 +1,65 @@
+cat > src/stories/ComponentChecklist.mdx << 'EOF'
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Design System/Component Checklist" />
+
+# Design System Component Checklist
+
+This document defines the required states and variants that every UI component must document in Storybook.
+
+## Required States
+
+Every interactive component **must** have stories for the following states:
+
+| State | Description | Visual Indicator |
+|-------|-------------|------------------|
+| **Default** | Resting state, no interaction | Standard styling |
+| **Hover** | Mouse pointer over element | Elevated / tinted background |
+| **Focus** | Keyboard navigation focus | Ring outline (accessible) |
+| **Disabled** | Non-interactive | Reduced opacity, no pointer events |
+| **Error** | Invalid or failed state | Red border / text |
+| **Loading** | Async operation in progress | Spinner, disabled interactions |
+
+## Required Variants
+
+Components with multiple visual styles must show all variants:
+
+- **Button**: primary, secondary, ghost, danger
+- **Input**: text, email, password, number
+- **Modal**: sm, md, lg, xl
+- **Pagination**: compact, full
+- **NavLink**: default, active, with icon
+
+## Story Structure Convention
+
+```tsx
+// 1. Import Meta and StoryObj types
+import type { Meta, StoryObj } from '@storybook/react';
+
+// 2. Define meta with autodocs, argTypes, and parameters
+const meta: Meta<typeof Component> = {
+  title: 'Design System/ComponentName',
+  component: Component,
+  tags: ['autodocs'],
+  argTypes: { /* explicit controls */ },
+};
+
+// 3. Export individual state stories
+export const Default: Story = { args: {} };
+export const Hover: Story = { args: {}, parameters: { pseudo: { hover: true } } };
+export const Focus: Story = { args: {}, parameters: { pseudo: { focus: true } } };
+export const Disabled: Story = { args: { disabled: true } };
+export const Error: Story = { args: { error: true } };
+export const Loading: Story = { args: { loading: true } };
+
+// 4. Export a StateMatrix for quick visual regression
+export const StateMatrix: Story = {
+  render: () => (
+    <div>
+      <Component state="default" />
+      <Component state="hover" />
+      <Component state="disabled" />
+      {/* ... */}
+    </div>
+  ),
+};

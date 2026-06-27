@@ -1,6 +1,8 @@
 "use client"
 import ProfileForm from "@/components/features/account/components/ProfileForm";
+import { DataExportButton, PreferencesForm } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
+import { PageHeader } from "@/components/shared/common";
 import { usePathname } from "next/navigation";
 
 export default function Account() {
@@ -12,7 +14,27 @@ export default function Account() {
         <Sidebar />
 
         <div className="flex-1 bg-white rounded-lg shadow-sm p-4 md:p-6">
-          {pathname === "/account/profile" && <ProfileForm />}
+          <PageHeader
+            tone="light"
+            title="Profile"
+            description="Manage your personal details, security settings, and notification preferences."
+          />
+          {pathname === "/account/profile" && (
+            <>
+              <ProfileForm />
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <PreferencesForm />
+              </div>
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <h3 className="text-lg font-semibold mb-4">Data Export</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download a copy of your personal data including profile information, 
+                  preferences, and transaction history. This feature is subject to a 24-hour rate limit.
+                </p>
+                <DataExportButton />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
