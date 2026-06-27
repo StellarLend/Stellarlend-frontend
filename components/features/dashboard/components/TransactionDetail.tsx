@@ -8,6 +8,8 @@ import type { Transaction } from "../../../../types/Transaction";
 import { sanitiseString } from "@/lib/security/input-sanitizer";
 import { isValidTxHash } from "@/lib/validation/stellar";
 import config from "@/lib/config";
+import { copyToClipboard } from "@/lib/utils/clipboard";
+import Toast from "@/components/shared/common/Toast";
 
 interface TransactionDetailProps {
   transaction: Transaction | null;
@@ -18,6 +20,7 @@ interface TransactionDetailProps {
 export default function TransactionDetail({ transaction, isOpen, onClose }: TransactionDetailProps) {
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ title?: string; description?: string; variant?: "success" | "error" } | null>(null);
 
   const id = transaction?.id || "";
 
@@ -50,8 +53,13 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
   const signedAmount = amount > 0 ? `+$${amount}` : `-$${Math.abs(amount)}`;
 
   const copyId = async () => {
-    await navigator.clipboard.writeText(id);
-    // could show a toast later
+    const result = await copyToClipboard(id);
+    if (result.success) {
+      setToast({ title: "Copied", description: "Transaction ID copied to clipboard", variant: "success" });
+    } else {
+      setToast({ title: "Copy failed", description: "Failed to copy transaction ID", variant: "error" });
+    }
+    setTimeout(() => setToast(null), 3000);
   };
 
   const formatDateTime = (dateStr: string, timeStr: string) => {
@@ -87,19 +95,27 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
   };
 
   return (
-    <Transition show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-        </Transition.Child>
+    <>
+      {toast && (
+        <Toast
+          title={toast.title}
+          description={toast.description}
+          variant={toast.variant}
+        />
+      )}
+      <Transition show={isOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={onClose}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+          </Transition.Child>
 
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Transition.Child
@@ -191,9 +207,10 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
               </div>
             </Dialog.Panel>
           </Transition.Child>
-        </div>
-      </Dialog>
-    </Transition>
+          </div>
+        </Dialog>
+      </Transition>
+    </>
   );
 }
 
