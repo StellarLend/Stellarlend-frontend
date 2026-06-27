@@ -27,7 +27,7 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
-import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
+import { useInfiniteTransactions, type UseInfiniteTransactionsReturn } from "@/hooks/useInfiniteTransactions";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -48,7 +48,8 @@ export const Transactions = ({
   infiniteScroll = false,
   hideToolbar = false,
   onDataLoad,
-}: TransactionsProps) => {
+  infiniteHook,
+}: TransactionsProps & { infiniteHook?: UseInfiniteTransactionsReturn }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -85,7 +86,7 @@ export const Transactions = ({
   const asset = hideToolbar ? searchParams.get("asset") || "" : "";
   const type = hideToolbar ? searchParams.get("type") || "" : "";
 
-  const infinite = useInfiniteTransactions({
+  const internalInfinite = useInfiniteTransactions({
     limit: itemsPerPage,
     search: search || undefined,
     status: status === "All" ? undefined : status,
@@ -93,7 +94,10 @@ export const Transactions = ({
     dateTo: dateTo || undefined,
     sortBy,
     sortDir,
+    enabled: !infiniteHook,
   });
+
+  const infinite = infiniteHook || internalInfinite;
 
   useEffect(() => {
     setCurrentPage(1);
