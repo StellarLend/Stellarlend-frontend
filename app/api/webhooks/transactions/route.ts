@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 3. Verify signature ─────────────────────────────────────────────────
-  const signature = req.headers.get(SIGNATURE_HEADER);
-  if (!signature || !verifyWebhookSignature(rawBody, signature, secret)) {
+  const signature = req.headers.get(SIGNATURE_HEADER) || "";
+  if (!verifyWebhookSignature(rawBody, signature, secret)) {
     return NextResponse.json(
       { error: "Invalid or missing webhook signature" },
       { status: 401 },

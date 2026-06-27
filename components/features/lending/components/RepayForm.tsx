@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
+import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
+import StatusAnnouncer from '@/components/shared/common/StatusAnnouncer';
 
 export interface BorrowPosition {
   id: string;
@@ -53,19 +55,16 @@ const formatAmount = (amount: number, asset: string) =>
     maximumFractionDigits: 4,
   })} ${asset}`;
 
-const getHealthLabel = (healthFactor: number) => {
-  if (!Number.isFinite(healthFactor)) return "Debt cleared";
-  if (healthFactor >= 2) return "Healthy";
-  if (healthFactor >= 1) return "At Risk";
-  return "Critical";
-};
-
-const computeHealthAfterRepayment = (
+export const computeHealthAfterRepayment = (
   currentHealthFactor: number,
   outstandingDebt: number,
   repaymentAmount: number,
 ) => {
-  const remainingDebt = Math.max(outstandingDebt - repaymentAmount, 0);
+  const appliedRepayment = Math.min(
+    Math.max(repaymentAmount, 0),
+    outstandingDebt,
+  );
+  const remainingDebt = Math.max(outstandingDebt - appliedRepayment, 0);
 
   if (remainingDebt === 0) return Infinity;
 
@@ -83,7 +82,7 @@ export default function RepayForm({
   const [amount, setAmount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "loading" | "success" | "error"
+    "idle" | "submitting" | "success" | "error"
   >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
 
@@ -96,7 +95,6 @@ export default function RepayForm({
       return {
         remainingDebt: 0,
         healthFactorAfter: 0,
-        label: "Unavailable",
       };
     }
 
@@ -113,7 +111,6 @@ export default function RepayForm({
     return {
       remainingDebt,
       healthFactorAfter,
-      label: getHealthLabel(healthFactorAfter),
     };
   }, [amount, selectedPosition]);
 
@@ -181,7 +178,7 @@ export default function RepayForm({
       return;
     }
 
-    setSubmitStatus("loading");
+    setSubmitStatus("submitting");
     setSubmitMessage("Preparing repayment preview...");
 
     try {
@@ -244,22 +241,7 @@ export default function RepayForm({
         </p>
       </div>
 
-      {submitMessage && (
-        <div
-          className={cn(
-            "p-4 rounded-xl mb-6 text-sm font-medium",
-            submitStatus === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : submitStatus === "loading"
-                ? "bg-blue-50 text-blue-800 border border-blue-200"
-                : "bg-red-50 text-red-800 border border-red-200",
-          )}
-          role="alert"
-          aria-live="polite"
-        >
-          {submitMessage}
-        </div>
-      )}
+      <StatusAnnouncer status={submitStatus} message={submitMessage} type="repay" />
 
       <form onSubmit={handleSubmit} noValidate className="space-y-8">
         <div>
@@ -353,12 +335,14 @@ export default function RepayForm({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Health factor</span>
-                  <span className="font-semibold text-gray-900">
-                    {Number.isFinite(preview.healthFactorAfter)
-                      ? preview.healthFactorAfter.toFixed(2)
-                      : "Debt cleared"}{" "}
-                    ({preview.label})
-                  </span>
+                  <div className="flex items-center gap-2 text-right">
+                    <span className="font-semibold text-gray-900">
+                      {Number.isFinite(preview.healthFactorAfter)
+                        ? preview.healthFactorAfter.toFixed(2)
+                        : "Debt cleared"}
+                    </span>
+                    <HealthFactorBadge healthFactor={preview.healthFactorAfter} />
+                  </div>
                 </div>
                 <div className="flex justify-between border-t border-blue-200 pt-2.5">
                   <span className="text-blue-700">Collateral</span>
@@ -381,7 +365,7 @@ export default function RepayForm({
           variant="primary"
           size="lg"
           fullWidth
-          isLoading={submitStatus === "loading"}
+          isLoading={submitStatus === "submitting"}
         >
           Review Repayment
         </Button>

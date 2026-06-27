@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import type { LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
+import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
+import {
+  CRITICAL_HEALTH_FACTOR_THRESHOLD,
+  HEALTHY_HEALTH_FACTOR_THRESHOLD,
+} from "@/lib/lending/health";
 import { cn } from "@/lib/utils/cn";
 import ConfirmModal from "./ConfirmModal";
 
@@ -42,21 +47,11 @@ const DEFAULT_POSITIONS: SupplyPosition[] = [
   },
 ];
 
-const AT_RISK_THRESHOLD = 2.0;
-const CRITICAL_THRESHOLD = 1.0;
-
 const formatAmount = (amount: number, asset: string) =>
   `${amount.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   })} ${asset}`;
-
-const getHealthLabel = (healthFactor: number, hasDebt: boolean) => {
-  if (!hasDebt) return "N/A";
-  if (healthFactor >= AT_RISK_THRESHOLD) return "Healthy";
-  if (healthFactor >= CRITICAL_THRESHOLD) return "At Risk";
-  return "Critical";
-};
 
 export function computeWithdrawHealthFactor(
   currentHealthFactor: number,
@@ -90,12 +85,15 @@ export default function WithdrawForm({
 
   const selectedPosition = positions.find((p) => p.id === selectedPositionId);
   const withdrawableBalance = selectedPosition
-    ? Math.max(0, selectedPosition.suppliedAmount - selectedPosition.lockedCollateral)
+    ? Math.max(
+        0,
+        selectedPosition.suppliedAmount - selectedPosition.lockedCollateral,
+      )
     : 0;
 
   const preview = useMemo(() => {
     if (!selectedPosition) {
-      return { remainingSupplied: 0, healthFactorAfter: 0, label: "Unavailable" };
+      return { remainingSupplied: 0, healthFactorAfter: 0 };
     }
 
     const remainingSupplied = Math.max(
@@ -108,23 +106,22 @@ export default function WithdrawForm({
       amount,
       selectedPosition.outstandingDebt,
     );
-    const hasDebt = selectedPosition.outstandingDebt > 0;
-
     return {
       remainingSupplied,
       healthFactorAfter,
-      label: getHealthLabel(healthFactorAfter, hasDebt),
     };
   }, [amount, selectedPosition]);
 
   const hasDebt = (selectedPosition?.outstandingDebt ?? 0) > 0;
   const isHealthCritical =
-    hasDebt && amount > 0 && preview.healthFactorAfter < CRITICAL_THRESHOLD;
+    hasDebt &&
+    amount > 0 &&
+    preview.healthFactorAfter < CRITICAL_HEALTH_FACTOR_THRESHOLD;
   const isHealthAtRisk =
     hasDebt &&
     amount > 0 &&
-    preview.healthFactorAfter >= CRITICAL_THRESHOLD &&
-    preview.healthFactorAfter < AT_RISK_THRESHOLD;
+    preview.healthFactorAfter >= CRITICAL_HEALTH_FACTOR_THRESHOLD &&
+    preview.healthFactorAfter < HEALTHY_HEALTH_FACTOR_THRESHOLD;
 
   const positionSummaryData = selectedPosition
     ? {
@@ -394,9 +391,12 @@ export default function WithdrawForm({
                 {hasDebt && (
                   <div className="flex justify-between">
                     <span className="text-green-700">Health factor</span>
-                    <span className="font-semibold text-gray-900">
-                      {preview.healthFactorAfter.toFixed(2)} ({preview.label})
-                    </span>
+                    <div className="flex items-center gap-2 text-right">
+                      <span className="font-semibold text-gray-900">
+                        {preview.healthFactorAfter.toFixed(2)}
+                      </span>
+                      <HealthFactorBadge healthFactor={preview.healthFactorAfter} />
+                    </div>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-green-200 pt-2.5">

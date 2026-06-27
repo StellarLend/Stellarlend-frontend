@@ -31,3 +31,13 @@ export function isContractId(address: string): boolean {
   const contractRegex = /^C[A-Z2-7]{55}$/;
   return contractRegex.test(address);
 }
+
+/**
+ * Validate if a string is a valid Stellar transaction hash or mock ID.
+ * Standard Stellar transaction hashes are 64-character hex strings.
+ * Mock transaction IDs match TXN followed by digits.
+ */
+export function isValidTxHash(hash: string): boolean {
+  return /^(TXN\d+|[0-9a-fA-F]{64})$/.test(hash);
+}
+

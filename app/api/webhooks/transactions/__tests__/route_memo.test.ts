@@ -95,6 +95,44 @@ describe("Webhook Route - Stellar Memo Enforcement", () => {
     vi.unstubAllEnvs();
   });
 
+  describe("Signature verification (timing-safe)", () => {
+    it("returns 401 when signature header is missing", async () => {
+      const body = JSON.stringify(makePayload());
+      const req = makeWebhookRequest(body);
+      const res = await POST(req);
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 401 when signature header is empty string", async () => {
+      const body = JSON.stringify(makePayload());
+      const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "" });
+      const res = await POST(req);
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 401 when signature has wrong length (too short)", async () => {
+      const body = JSON.stringify(makePayload());
+      const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "sha256=abc123" });
+      const res = await POST(req);
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 401 when signature has wrong length (too long)", async () => {
+      const body = JSON.stringify(makePayload());
+      const longHex = "a".repeat(128);
+      const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: `sha256=${longHex}` });
+      const res = await POST(req);
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 401 when signature is malformed (invalid hex)", async () => {
+      const body = JSON.stringify(makePayload());
+      const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "sha256=not-valid-hex!!!" });
+      const res = await POST(req);
+      expect(res.status).toBe(401);
+    });
+  });
+
   it("succeeds when valid memo is provided and resolved (Processing -> Completed)", async () => {
     const accountId = "G-USER-ACCOUNT";
     const memo = deriveAndRegisterMemo(accountId, "MEMO_ID");

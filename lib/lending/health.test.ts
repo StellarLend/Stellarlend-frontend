@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateProjectedBorrowHealth,
+  CRITICAL_HEALTH_FACTOR_THRESHOLD,
+  getHealthLabel,
   getHealthBand,
+  HEALTHY_HEALTH_FACTOR_THRESHOLD,
 } from "@/lib/lending/health";
 
 const prices = {
@@ -53,8 +56,17 @@ describe("lending health preview", () => {
   });
 
   it("maps health bands to the PositionSummary thresholds", () => {
-    expect(getHealthBand(2)).toBe("healthy");
+    expect(getHealthBand(HEALTHY_HEALTH_FACTOR_THRESHOLD)).toBe("healthy");
     expect(getHealthBand(1.5)).toBe("at-risk");
+    expect(getHealthBand(CRITICAL_HEALTH_FACTOR_THRESHOLD)).toBe("at-risk");
     expect(getHealthBand(0.99)).toBe("critical");
+    expect(getHealthBand(Infinity)).toBe("cleared");
+  });
+
+  it("returns human-friendly health labels", () => {
+    expect(getHealthLabel(2.5)).toBe("Healthy");
+    expect(getHealthLabel(1.2)).toBe("At Risk");
+    expect(getHealthLabel(0.8)).toBe("Critical");
+    expect(getHealthLabel(Infinity)).toBe("Debt cleared");
   });
 });
