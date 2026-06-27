@@ -4,3 +4,5 @@ export { default as PositionSummary } from './PositionSummary';
 export { default as NextPaymentDue } from './NextPaymentDue';
 export { default as TransactionDetail } from './TransactionDetail';
 export { default as TransactionReceipt } from './TransactionReceipt';
+export { default as PositionSummary } from './PositionSummary';
+export { default as SearchResults } from './SearchResults';
