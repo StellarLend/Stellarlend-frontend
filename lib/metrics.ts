@@ -68,3 +68,12 @@ export function getHttpRetryMetrics(): Record<HttpRetryKey, number> {
   return { ...httpRetryCounters };
 }
 
+export function resetHttpRetryMetrics(): void {
+  // Clear both colon and pipe separated counters
+  for (const key of Object.keys(httpRetryCounts)) {
+    delete httpRetryCounts[key as any];
+  }
+  for (const key of Object.keys(httpRetryCounters)) {
+    delete httpRetryCounters[key as any];
+  }
+}

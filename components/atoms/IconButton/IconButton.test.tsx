@@ -25,7 +25,7 @@ describe('IconButton Accessibility', () => {
     // aria-label is required in TypeScript — omitting it causes a type error.
     // This runtime guard ensures consumers always provide a label.
     const props = { onClick: mockOnClick, children: <svg /> } as any;
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    // eslint-disable-next-line no-unused-expressions
     expect(() => render(<IconButton {...props} />)).not.toThrow();
     const button = screen.getByRole('button');
     expect(button).not.toHaveAttribute('aria-label');

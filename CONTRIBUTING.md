@@ -78,6 +78,32 @@ npm test -- --watch
 npm test -- --coverage
 ```
 
+## 🧪 Testing Overview
+
+### Test runners
+
+| Runner | Config file | Command | Scope | Coverage |
+| ------ | ----------- | ------- | ----- | -------- |
+| Vitest (unit) | `vitest.config.unit.mts` | `npm test` or `vitest` | Unit tests in `components/**` and `lib/**` | `npm run test:coverage` (`vitest --coverage`) |
+| Vitest (server) | `vitest.server.config.ts` | `npm run test:server` | Server‑side tests (API, backend) | `npm run test:server:coverage` |
+| Jest | `jest.config.ts` | `npm test` (uses Vitest for unit) but also runs Jest tests | Jest specific tests (`**/*.test.{ts,tsx}`) | Coverage via `npm test -- --coverage` |
+| Playwright (e2e) | `playwright.config.ts` | `npm run test:e2e` | End‑to‑end tests in `test/` | No coverage; reports in `playwright-report/` |
+| Storybook (component) | Storybook config (via `storybook` scripts) | `npm run storybook` / `npm run build-storybook` | Interactive component playground | No coverage; use Storybook a11y addon |
+
+### Running a single test
+
+- **Vitest unit test**: `vitest path/to/file.test.ts`
+- **Vitest server test**: `vitest run --project server path/to/server.test.ts`
+- **Jest test**: `jest path/to/file.test.ts`
+- **Playwright test**: `playwright test path/to/spec.spec.ts`
+- **Storybook**: `npm run storybook` then navigate to the component.
+
+### Coverage thresholds
+
+Coverage thresholds are defined in `jest.config.ts` (global) and enforced in CI via `.github/workflows/ci.yml` and `server-coverage.yml`. The thresholds require at least 90% branches and 95% for functions, lines, and statements.
+
+For Vitest coverage, the `vitest` command respects the same thresholds via the Vite config.
+
 ## 📦 Component Development
 
 ### Using Storybook
@@ -127,6 +153,7 @@ Follow the established structure:
 - **`types/`**: TypeScript type definitions
 - **`constants/`**: Application constants
 - **`context/`**: React context providers
+- **`docs/`**: Developer guides, including [Client-side data-fetching conventions](docs/data-fetching.md)
 
 ## 🔄 Git Workflow
 

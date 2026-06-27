@@ -1,11 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { DashboardLayout } from "@/components";
 import { Transactions } from "@/components/shared/common/Transaction";
-import { Bank } from "@/components/shared/ui/icons/Bank";
+import { IconPlaceholder } from "@/components/shared/ui/icons/IconPlaceholder";
 import { PageHeader } from "@/components/shared/common";
 import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
+
+// Lazy load Bank icon to reduce initial bundle size
+const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod => ({ default: mod.Bank })), {
+  loading: () => <IconPlaceholder />,
+  ssr: true,
+});
 
 export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState(0);

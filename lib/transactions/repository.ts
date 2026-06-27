@@ -14,6 +14,7 @@ const ROUTE = 'lib/transactions/repository';
 export interface DetailedTransaction extends Transaction {
   fee: string;
   explorerUrl: string;
+  memo?: string;
   operations: Array<{
     id: string;
     type: string;
@@ -163,10 +164,13 @@ export async function getTransactionDetail(id: string): Promise<DetailedTransact
     }
   ];
 
+  const memo = (tx as any).memo || (tx.type === 'Deposit' ? 'Welcome to Stellarlend' : undefined);
+
   return {
     ...tx,
     fee,
     explorerUrl,
+    memo,
     operations,
   };
 }
