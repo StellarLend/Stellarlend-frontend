@@ -99,6 +99,7 @@ export default defineConfig({
             "app/api/liquidations/route.test.ts",
             "app/api/notifications/[id]/route.test.ts",
             "__tests__/**/*.test.ts",
+            "lib/flags/**/*.test.ts",
             "lib/streams/**/*.test.ts",
           ],
         },
