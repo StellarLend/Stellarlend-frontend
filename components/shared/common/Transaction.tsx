@@ -40,6 +40,7 @@ interface TransactionsProps {
   showPagination?: boolean;
   infiniteScroll?: boolean;
   hideToolbar?: boolean;
+  typeFilter?: string;
   onDataLoad?: (totalCount: number) => void;
 }
 
@@ -47,6 +48,7 @@ export const Transactions = ({
   showPagination = true,
   infiniteScroll = false,
   hideToolbar = false,
+  typeFilter,
   onDataLoad,
 }: TransactionsProps) => {
   const router = useRouter();
@@ -83,12 +85,14 @@ export const Transactions = ({
   const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
   const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
   const asset = hideToolbar ? searchParams.get("asset") || "" : "";
-  const type = hideToolbar ? searchParams.get("type") || "" : "";
+  const type = typeFilter ?? (hideToolbar ? searchParams.get("type") || "" : "");
 
   const infinite = useInfiniteTransactions({
     limit: itemsPerPage,
     search: search || undefined,
     status: status === "All" ? undefined : status,
+    type: type || undefined,
+    asset: asset || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     sortBy,
@@ -113,7 +117,7 @@ export const Transactions = ({
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
           asset: asset || undefined,
-          type: type as any || undefined,
+          type: type || undefined,
           sortBy,
           sortDir,
         });
