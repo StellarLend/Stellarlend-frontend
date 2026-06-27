@@ -1,6 +1,6 @@
 "use client"
 import ProfileForm from "@/components/features/account/components/ProfileForm";
-import { DataExportButton } from "@/components/features/account/components";
+import { DataExportButton, PreferencesForm } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
 import { PageHeader } from "@/components/shared/common";
 import { usePathname } from "next/navigation";
@@ -22,6 +22,9 @@ export default function Account() {
           {pathname === "/account/profile" && (
             <>
               <ProfileForm />
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <PreferencesForm />
+              </div>
               <div className="mt-8 pt-6 border-t border-gray-200">
                 <h3 className="text-lg font-semibold mb-4">Data Export</h3>
                 <p className="text-sm text-gray-600 mb-4">
