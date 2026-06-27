@@ -1,7 +1,12 @@
 "use client";
+import { AmountInput } from '@/components/shared/ui/AmountInput';
+import { Tooltip } from '@/components/atoms/Tooltip';
+import { IconButton } from '@/components/atoms/IconButton';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LendingData } from "@/app/lending/page";
+import type { CalculationResult } from "@/lib/lending/types";
+import { calculateQuote } from "@/lib/lending/quote";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
@@ -33,6 +38,15 @@ export default function LendingForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
+  const [preview, setPreview] = useState<{
+    result: CalculationResult | null;
+    source: "local" | "server" | null;
+    loading: boolean;
+  }>({ result: null, source: null, loading: false });
+
+  // Track in-flight requests so earlier fetches cannot overwrite the latest
+  // preview once a newer input is in flight.
+  const requestSeqRef = useRef(0);
 
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
   const rates = INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
@@ -42,6 +56,59 @@ export default function LendingForm({
       setFormData((prev) => ({ ...prev, interestRate: rates.default }));
     }
   }, [formData.asset, rates]);
+
+  // Debounced authoritative quote preview from /api/quote with a local
+  // fallback computed via calculateQuote(). Aborts in-flight requests so
+  // stale responses can never overwrite a fresher preview.
+  useEffect(() => {
+    if (!formData.amount || formData.amount <= 0) {
+      setPreview({ result: null, source: null, loading: false });
+      return;
+    }
+
+    // Show the local fallback immediately for snappy UX.
+    const local = calculateQuote("lend", formData);
+    if (!local.ok) {
+      setPreview({ result: null, source: null, loading: false });
+      return;
+    }
+    setPreview({ result: local.result, source: "local", loading: true });
+
+    const controller = new AbortController();
+    const seq = ++requestSeqRef.current;
+    const handle = setTimeout(async () => {
+      try {
+        const response = await fetch("/api/quote", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ type: "lend", data: formData }),
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { result?: CalculationResult };
+        if (controller.signal.aborted) return;
+        // Only apply if this is still the latest in-flight request.
+        if (seq !== requestSeqRef.current) return;
+        if (payload.result) {
+          setPreview({
+            result: payload.result,
+            source: "server",
+            loading: false,
+          });
+        }
+      } catch {
+        if (controller.signal.aborted) return;
+        if (seq !== requestSeqRef.current) return;
+        // Local fallback already in place; just clear the loading flag.
+        setPreview((prev) => ({ ...prev, loading: false }));
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(handle);
+      controller.abort();
+    };
+  }, [formData.amount, formData.interestRate, formData.asset]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -242,6 +309,55 @@ export default function LendingForm({
             </li>
           </ul>
         </div>
+
+        {/* Quote Preview */}
+        {preview.result && (
+          <div
+            className="bg-blue-50 border border-blue-200 rounded-xl p-5"
+            data-testid="lending-quote-preview"
+            aria-live="polite"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                Lending Quote Preview
+              </h3>
+              <span
+                className={cn(
+                  "text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded",
+                  preview.source === "server"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-amber-100 text-amber-700",
+                )}
+                data-testid="lending-quote-source"
+              >
+                {preview.source === "server" ? "Live API" : "Local estimate"}
+                {preview.loading ? " · updating" : ""}
+              </span>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-blue-700">Daily earnings</span>
+                <span
+                  className="font-semibold text-gray-900"
+                  data-testid="lending-quote-daily"
+                >
+                  ${preview.result.dailyEarnings.toFixed(4)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-blue-700">
+                  Total earnings (30 days)
+                </span>
+                <span
+                  className="font-semibold text-gray-900"
+                  data-testid="lending-quote-total"
+                >
+                  ${preview.result.totalEarnings.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Submit Button */}
         <Button
