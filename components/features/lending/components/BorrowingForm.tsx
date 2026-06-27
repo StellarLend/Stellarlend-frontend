@@ -273,6 +273,7 @@ export default function BorrowingForm({
             }
           }}
           precision={selectedAsset?.precision ?? 2}
+          max={selectedAsset?.balance ?? 0}
         />
 
         {/* Loan Duration */}
@@ -391,6 +392,7 @@ export default function BorrowingForm({
             }
           }}
           precision={collateralAsset?.precision ?? 2}
+          max={collateralAsset?.balance ?? 0}
         />
 
         {/* Collateral Requirements */}

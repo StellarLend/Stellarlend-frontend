@@ -1,5 +1,5 @@
 "use client";
-import AmountInput from '@/components/shared/ui/AmountInput';
+import { AmountInput } from '@/components/shared/ui/AmountInput';
 import Tooltip from '@/components/shared/ui/Tooltip';
 import IconButton from '@/components/shared/ui/IconButton';
 
@@ -159,17 +159,17 @@ export default function LendingForm({
             type="number"
             step="0.01"
             placeholder="0.00"
-            value={formData.amount || ""}
+            value={formData.amount || 0}
             error={errors.amount}
             helperText={
               selectedAsset
                 ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`
                 : undefined
             }
-            onChange={(e) => {
+            onChange={(amount) => {
               setFormData((prev) => ({
                 ...prev,
-                amount: parseFloat(e.target.value) || 0,
+                amount,
               }));
               if (errors.amount) {
                 setErrors((prev) => {
@@ -181,6 +181,7 @@ export default function LendingForm({
             }}
             precision={selectedAsset?.precision ?? 2}
             onMax={handleMaxAmount}
+            max={selectedAsset?.balance ?? 0}
           />
         </div>
 
