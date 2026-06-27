@@ -52,12 +52,11 @@ describe("LendingForm Component", () => {
   it("handles MAX button click", () => {
     render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
     
-    const maxButton = screen.getByText(/MAX/i);
+    const maxButton = screen.getByRole("button", { name: /^MAX$/i });
     fireEvent.click(maxButton);
     
     const amountInput = screen.getByLabelText(/Amount to Lend/i) as HTMLInputElement;
-    expect(amountInput.value).toBe("3,750"); // XLM balance is 3750, but it might be formatted. 
-    // Actually the code uses parseFloat so it might be 3750.
+    expect(amountInput.value).toBe("3,750.0000000"); // XLM balance is 3750, formatted to precision 7
   });
 
   it("submits successfully with valid data", async () => {
@@ -124,13 +123,14 @@ describe("LendingForm Component", () => {
     expect(screen.getByText(/8\.5% APY/)).toBeInTheDocument();
 
     // Switch to USDC — default should become 6.5
-    const combobox = screen.getByRole("combobox");
-    fireEvent.change(combobox, { target: { value: "USDC" } });
+    const optionUSDC = screen.getByRole("option", { name: /USDC/i });
+    fireEvent.click(optionUSDC);
 
     // After the useEffect fires, the rate should update
-    await waitFor(() => {
-      expect(screen.getByText(/6\.5% APY/)).toBeInTheDocument();
+    act(() => {
+      vi.runAllTimers();
     });
+    expect(screen.getByText(/6\.5% APY/)).toBeInTheDocument();
   });
 
   it("resets errors after editing amount", async () => {

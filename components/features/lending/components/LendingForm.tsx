@@ -1,7 +1,4 @@
 "use client";
-import AmountInput from '@/components/shared/ui/AmountInput';
-import Tooltip from '@/components/shared/ui/Tooltip';
-import IconButton from '@/components/shared/ui/IconButton';
 
 import { useState, useEffect } from "react";
 import { LendingData } from "@/app/lending/page";
@@ -10,6 +7,9 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
+import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
+import { IconButton } from "@/components/atoms/IconButton/IconButton";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -166,10 +166,11 @@ export default function LendingForm({
                 ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`
                 : undefined
             }
-            onChange={(e) => {
+            onChange={(eOrValue) => {
+              const value = typeof eOrValue === 'object' && eOrValue !== null && 'target' in eOrValue && eOrValue.target?.value !== undefined ? eOrValue.target.value : eOrValue;
               setFormData((prev) => ({
                 ...prev,
-                amount: parseFloat(e.target.value) || 0,
+                amount: parseFloat(value as string) || 0,
               }));
               if (errors.amount) {
                 setErrors((prev) => {
@@ -214,9 +215,9 @@ export default function LendingForm({
               className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
             />
             <div className="flex justify-between text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">
-              <span>MIN: {rates.min}%</span>
-              <span>DEFAULT: {rates.default}%</span>
-              <span>MAX: {rates.max}%</span>
+              <span>MIN: {rates.min.toFixed(1)}%</span>
+              <span>DEFAULT: {rates.default.toFixed(1)}%</span>
+              <span>MAX: {rates.max.toFixed(1)}%</span>
             </div>
           </div>
 
