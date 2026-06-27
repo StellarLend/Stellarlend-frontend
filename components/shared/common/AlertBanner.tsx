@@ -87,7 +87,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
       role={severity === "critical" || severity === "error" ? "alert" : "status"}
       aria-labelledby={titleId}
       aria-describedby={messageId}
-      aria-live={severity === "critical" ? "assertive" : "polite"}
+      aria-live={severity === "critical" || severity === "error" ? "assertive" : "polite"}
       className={`rounded-2xl border px-4 py-4 shadow-sm ${bannerStyles[severity]}`}
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
