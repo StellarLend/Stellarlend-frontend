@@ -1,11 +1,15 @@
 "use client";
 
+import React, { useState } from "react";
 import { DashboardLayout } from "@/components";
 import { Transactions } from "@/components/shared/common/Transaction";
 import { Bank } from "@/components/shared/ui/icons/Bank";
 import { PageHeader } from "@/components/shared/common";
+import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
 
 export default function TransactionsPage() {
+  const [totalCount, setTotalCount] = useState(0);
+
   return (
     <DashboardLayout>
       <div className="pt-10 border-t px-6 md:px-12 ">
@@ -20,7 +24,10 @@ export default function TransactionsPage() {
           }
         />
       </div>
-      <Transactions />
+      <div className="px-6 md:px-12 mt-4">
+        <TransactionFilters totalCount={totalCount} />
+      </div>
+      <Transactions infiniteScroll hideToolbar onDataLoad={setTotalCount} />
     </DashboardLayout>
   );
 }

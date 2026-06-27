@@ -34,5 +34,6 @@ module.exports = {
           "Do not expose RPC endpoints via NEXT_PUBLIC_* env vars. Move them to lib/server-config.ts.",
       },
     ],
+    "@typescript-eslint/no-var-requires": "off",
   },
 };

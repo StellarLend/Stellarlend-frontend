@@ -73,6 +73,11 @@ If the borrower repays the full `1,500 XLM`, the preview shows `0 XLM` remaining
 - Full repayment preview.
 - Quote submission and callback payload.
 - Loading and error states when quote preview fails.
+- Switching selected position updates preview.
+- Zero and negative amount validation.
+- Exact full repayment shows "Debt cleared".
+- Health label thresholds: Healthy, At Risk, Critical.
+- Repaying more than outstanding triggers validation error.
 
 Run the focused suite with:
 

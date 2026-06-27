@@ -11,6 +11,18 @@ export interface AmountInputProps extends Omit<InputProps, 'value' | 'onChange'>
   onMax?: () => void;
 }
 
+/**
+ * AmountInput component handles formatting and validation for monetary inputs.
+ * 
+ * Behaviours handled:
+ * - Thousands grouping (e.g. 1,000) on input and display.
+ * - Maximum decimal clamping based on `precision` prop.
+ * - Paste of formatted text (stripping commas, sanitising values).
+ * - Leading-zero normalisation (e.g. '00012.34' becomes '12.34').
+ * - Rejection of non-numeric characters (letters/symbols).
+ * - Empty value handling (emits 0 and clears the field).
+ * - Maximum value clamping if `max` prop is provided.
+ */
 export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
   (props, ref) => {
     const {
@@ -42,35 +54,38 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
     }, [ref]);
 
     // Format number to string with commas
-    const formatWithCommas = useCallback((val: number, prec: number): string => {
-      if (isNaN(val)) return '';
-      const parts = val.toFixed(prec).split('.');
+    const formatWithCommas = useCallback((val: number, decimalPlaces?: number) => {
+      const parts = val.toString().split('.');
       parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      if (decimalPlaces !== undefined) {
+        return decimalPlaces === 0 ? parts[0] : `${parts[0]}.${parts[1] || ''.padEnd(decimalPlaces, '0')}`;
+      }
       return parts.join('.');
     }, []);
 
-    // Convert string with commas to number
-    const parseWithCommas = (val: string): number => {
-      const clean = val.replace(/,/g, '');
-      return parseFloat(clean);
-    };
-
     // Update display value when external value changes
     useEffect(() => {
-      const formatted = formatWithCommas(value, precision);
-      // Only update if the difference is not just a decimal point being typed
-      if (formatted !== displayValue && !displayValue.endsWith('.')) {
-        setDisplayValue(formatted);
-      }
-    }, [value, precision, formatWithCommas]);
+      setDisplayValue(value === 0 ? '' : formatWithCommas(value));
+    }, [value, formatWithCommas]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const input = e.target;
       const originalCursorPosition = input.selectionStart;
       const originalValue = input.value;
 
+      if (originalValue === '') {
+        onChange(0);
+        setDisplayValue('');
+        return;
+      }
+
       // Remove commas to get the raw numeric input
-      let rawValue = originalValue.replace(/,/g, '');
+      let rawValue = originalValue.replace(/[^0-9.]/g, '');
+
+      // Remove leading zeros
+      if (rawValue.length > 1 && rawValue.startsWith('0') && rawValue[1] !== '.') {
+        rawValue = rawValue.replace(/^0+/, '');
+      }
 
       // Allow only digits and one decimal point
       const parts = rawValue.split('.');
@@ -83,12 +98,18 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
         rawValue = parts[0] + '.' + parts[1].slice(0, precision);
       }
 
-      // If user typed something that's not a number (e.g. just a dot or nothing)
-      const numericValue = parseFloat(rawValue);
-      const isInvalid = isNaN(numericValue) && rawValue !== '';
+      let numericValue = parseFloat(rawValue);
+
+      // Clamp to max
+      if (max !== undefined && numericValue > max) {
+        numericValue = max;
+        rawValue = max.toString();
+      }
+
+      const isInvalid = isNaN(numericValue);
 
       if (!isInvalid) {
-        onChange(isNaN(numericValue) ? 0 : numericValue);
+        onChange(numericValue);
       }
 
       // Now, how to update displayValue while keeping the cursor position?
@@ -101,21 +122,11 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
       setDisplayValue(finalDisplayValue);
 
       // Restore cursor position
-      // This is still a bit tricky. We need to find the position in the formatted string.
-      // A simple way: the number of characters before the cursor in the raw value.
-      // We find the same number of non-comma characters in the new display value.
       setTimeout(() => {
         if (inputRef.current) {
-          let count = 0;
-          let newPos = 0;
-          // We want to find the position in finalDisplayValue that corresponds to originalCursorPosition in rawValue
-          // originalCursorPosition is the position in originalValue (which has commas)
-          // Wait, the user's cursor position is relative to the input they are seeing.
-          
-          // Let's try a simpler approach for the cursor:
-          // Calculate how many non-comma characters were before the cursor.
           let nonCommaCount = 0;
-          for (let i = 0; i < originalCursorPosition; i++) {
+          let newPos = 0;
+          for (let i = 0; i < (originalCursorPosition ?? 0); i++) {
             if (originalValue[i] !== ',') {
               nonCommaCount++;
             }
@@ -147,6 +158,9 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
         <Input
           {...rest}
           id={id}
+          label={label}
+          error={error}
+          helperText={helperText}
           ref={inputRef}
           type="text"
           inputMode="decimal"

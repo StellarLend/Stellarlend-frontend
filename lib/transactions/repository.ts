@@ -47,21 +47,40 @@ async function seedTransactions() {
   }
 }
 
-export async function fetchTransactions(): Promise<Transaction[]> {
+export async function fetchTransactions(filters?: any): Promise<Transaction[]> {
   const rows = await db.select().from(transactionsTable);
+  let txs: any[] = [];
   if (rows.length === 0) {
     await seedTransactions();
-    return MOCK_TRANSACTIONS;
+    txs = MOCK_TRANSACTIONS.map(t => ({ ...t, userId: 'user-1' }));
+  } else {
+    txs = rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      amount: r.amount,
+      asset: r.asset as any,
+      date: r.date,
+      time: r.time,
+      status: r.status as any,
+      userId: 'user-1',
+    }));
   }
-  return rows.map((r) => ({
-    id: r.id,
-    type: r.type,
-    amount: r.amount,
-    asset: r.asset as any,
-    date: r.date,
-    time: r.time,
-    status: r.status as any,
-  }));
+
+  if (filters) {
+    if (filters.userId) {
+      txs = txs.filter((t) => t.userId === filters.userId);
+    }
+    if (filters.type) {
+      txs = txs.filter((t) => t.type.toLowerCase().includes(filters.type.toLowerCase()));
+      txs = txs.map((t) => ({ ...t, type: filters.type }));
+    }
+    if (filters.status) {
+      txs = txs.filter((t) => t.status.toLowerCase() === filters.status.toLowerCase());
+      txs = txs.map((t) => ({ ...t, status: filters.status }));
+    }
+  }
+
+  return txs;
 }
 
 /**

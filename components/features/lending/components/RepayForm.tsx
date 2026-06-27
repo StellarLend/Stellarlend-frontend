@@ -261,7 +261,7 @@ export default function RepayForm({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} noValidate className="space-y-8">
         <div>
           <label
             htmlFor="repay-position"
