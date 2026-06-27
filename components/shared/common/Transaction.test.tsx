@@ -10,6 +10,48 @@ vi.mock("next/image", () => ({
   ),
 }));
 
+// Mock Next.js navigation hooks
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+  }),
+  useSearchParams: () => ({
+    get: vi.fn().mockReturnValue(""),
+  }),
+}));
+
+// Mock fetchTransactions API call
+vi.mock("@/types/Transaction", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/types/Transaction")>();
+  return {
+    ...actual,
+    fetchTransactions: vi.fn().mockResolvedValue({
+      transactions: [
+        {
+          id: "TXN12345",
+          type: "Deposit",
+          amount: 100,
+          asset: "XLM",
+          date: "2026-06-25",
+          time: "10:00AM",
+          status: "Completed",
+        },
+        {
+          id: "TXN54321",
+          type: "Withdrawal",
+          amount: 50,
+          asset: "USDC",
+          date: "2026-06-25",
+          time: "10:30AM",
+          status: "Completed",
+        },
+      ],
+      total: 2,
+    }),
+  };
+});
+
 describe("Transactions Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,24 +68,22 @@ describe("Transactions Component", () => {
     // We simulate desktop by checking for table elements which are hidden on mobile
     render(<Transactions />);
     
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading.../i)).not.toBeInTheDocument();
-    });
+    // Wait for the desktop table headers to render
+    await screen.findByRole("columnheader", { name: "Amount" });
 
     // Check for table headers
-    expect(screen.getByText("Transaction Type")).toBeInTheDocument();
-    expect(screen.getByText("Amount")).toBeInTheDocument();
-    expect(screen.getByText("Asset")).toBeInTheDocument();
-    expect(screen.getByText("Date")).toBeInTheDocument();
-    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Transaction Type" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Asset" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
   });
 
   it("renders transaction cards on mobile", async () => {
     render(<Transactions />);
     
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading.../i)).not.toBeInTheDocument();
-    });
+    // Wait for mock cards to load
+    await screen.findAllByText("Type");
 
     // On mobile, labels like "Type", "Asset", "Amount" are shown in cards
     const typeLabels = screen.getAllByText("Type");
@@ -56,20 +96,20 @@ describe("Transactions Component", () => {
   it("filters transactions by search term", async () => {
     render(<Transactions />);
     
-    await waitFor(() => {
-      expect(screen.queryByText(/Loading.../i)).not.toBeInTheDocument();
-    });
+    // Wait for mock transactions to load
+    await screen.findAllByText("Deposit");
 
     // Initial check - should have multiple transactions
-    expect(screen.getByText("Deposit")).toBeInTheDocument();
-    expect(screen.getByText("Withdrawal")).toBeInTheDocument();
+    expect(screen.getAllByText("Deposit")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Withdrawal")[0]).toBeInTheDocument();
 
     // Trigger search
     // Since search input is hidden behind a toggle, we need to click it first
     const searchToggle = screen.getByText("Search");
     searchToggle.click();
 
-    const searchInput = screen.getByPlaceholderText(/Search by type/i);
+    const searchInput = await screen.findByPlaceholderText(/Search by type/i);
+    expect(searchInput).toBeInTheDocument();
     // Note: In a real test environment with full DOM support, we would use fireEvent.change
     // For now, we are just verifying the structure is testable
   });

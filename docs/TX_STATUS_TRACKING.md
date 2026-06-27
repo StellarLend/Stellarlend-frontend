@@ -10,6 +10,14 @@ This document describes the client-side polling lifecycle for transaction settle
 - If the status endpoint returns `429`, polling stops and the hook surfaces a `rate_limited` state containing `Retry-After` when present.
 - The hook cleans up on unmount and when the hash is cleared or changed.
 
+## Optimistic Pending Row
+
+To bridge the UX gap between transaction submission and settlement, the `RecentTransactions` component accepts an optional `pendingTx` prop (containing `hash`, `type`, `amount`, and `asset`).
+- **Rendering**: If `pendingTx` is provided and the real transaction has not yet landed in the refetched list (`!displayTransactions.some(txn => txn.id === pendingTx.hash)`), a distinct pending row is rendered at the top.
+- **Styling**: It is styled with a subtle `pulse` animation and a distinctive color scheme (amber/orange theme).
+- **Status Driving**: Its status badge is driven directly by the `useTxStatus` hook, transitioning in place from `Processing` (while polling) to `Completed` or `Failed` when polling completes.
+- **Reconciliation**: Once the transaction settlement succeeds or fails, a refetch of the transactions is automatically triggered to sync the list. Once the real transaction lands in the list, the pending row is hidden to prevent duplicates.
+
 ## Polling lifecycle (tested)
 
 | Scenario | Expected behavior |

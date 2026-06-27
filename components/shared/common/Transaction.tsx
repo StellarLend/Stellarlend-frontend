@@ -19,13 +19,16 @@ import { TransactionsSkeleton } from "./Skeleton";
 import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
 import TransactionDetail from "@/components/features/dashboard/components/TransactionDetail";
 import { Dialog } from "@headlessui/react";
-
+import useTxStatus from "@/lib/tx/useTxStatus";
+import { type PendingTx } from "./RecentTransactions";
 
 import {
   fetchTransactions,
   type Transaction,
   type TransactionStatus,
   type FetchTransactionsResponse,
+  type AssetSymbol,
+  type TransactionType,
 } from "@/types/Transaction";
 import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
 
@@ -41,6 +44,7 @@ interface TransactionsProps {
   infiniteScroll?: boolean;
   hideToolbar?: boolean;
   onDataLoad?: (totalCount: number) => void;
+  pendingTx?: PendingTx | null;
 }
 
 export const Transactions = ({
@@ -48,6 +52,7 @@ export const Transactions = ({
   infiniteScroll = false,
   hideToolbar = false,
   onDataLoad,
+  pendingTx,
 }: TransactionsProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,6 +80,10 @@ export const Transactions = ({
   const itemsPerPage = 6;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const liveRef = useRef<HTMLParagraphElement>(null);
+
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const [resolvedHash, setResolvedHash] = useState<string | null>(null);
+  const txStatus = useTxStatus(pendingTx?.hash || null);
 
   const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
   const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
@@ -134,7 +143,22 @@ export const Transactions = ({
     };
 
     loadTransactions();
-  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, asset, type, onDataLoad, infiniteScroll]);
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, asset, type, onDataLoad, infiniteScroll, refetchTrigger]);
+
+  useEffect(() => {
+    if (
+      pendingTx?.hash &&
+      pendingTx.hash !== resolvedHash &&
+      (txStatus?.state === "completed" || txStatus?.state === "failed")
+    ) {
+      setResolvedHash(pendingTx.hash);
+      if (infiniteScroll) {
+        infinite.reset();
+      } else {
+        setRefetchTrigger((prev) => prev + 1);
+      }
+    }
+  }, [txStatus?.state, pendingTx?.hash, resolvedHash, infiniteScroll, infinite]);
 
   useEffect(() => {
     if (!infiniteScroll) return;
@@ -164,6 +188,42 @@ export const Transactions = ({
 
   const displayTransactions = infiniteScroll ? infinite.transactions : transactions;
   const displayLoading = infiniteScroll ? infinite.isLoading : loading;
+
+  const hasPendingRow = !!(pendingTx && !displayTransactions.some((txn) => txn.id === pendingTx.hash));
+
+  let pendingStatus: TransactionStatus = "Processing";
+  if (txStatus) {
+    if (txStatus.state === "completed") {
+      pendingStatus = "Completed";
+    } else if (txStatus.state === "failed") {
+      pendingStatus = "Failed";
+    }
+  }
+
+  const [pendingFormattedDateTime, setPendingFormattedDateTime] = useState<React.ReactNode>(null);
+  useEffect(() => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    });
+    let [h, m] = [now.getHours(), now.getMinutes()];
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12;
+    h = h ? h : 12;
+    const timeStr = `${h.toString().padStart(2, "0")}:${m
+      .toString()
+      .padStart(2, "0")}${ampm}`;
+
+    setPendingFormattedDateTime(
+      <span className="flex items-center gap-2">
+        <span>{dateStr}</span>
+        <span className="w-px h-4 bg-gray-300 mx-1 inline-block" />
+        <span>{timeStr}</span>
+      </span>
+    );
+  }, [pendingTx?.hash]);
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -254,7 +314,7 @@ export const Transactions = ({
       {!hideToolbar && (
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <Dialog as="div" className="relative z-50" onClose={() => {}} id="transaction-detail-drawer">
+          <div className="relative z-50" id="transaction-detail-drawer">
             <div
               className="flex items-center gap-1 cursor-pointer"
               onClick={() => setShowSearch((v) => !v)}
@@ -274,7 +334,7 @@ export const Transactions = ({
                 />
               </div>
             )}
-          </Dialog>
+          </div>
           <div className="relative" ref={filterRef}>
             <div
               className="flex items-center gap-1 cursor-pointer"
@@ -411,7 +471,7 @@ export const Transactions = ({
       <div className="">
         {displayLoading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : displayTransactions.length === 0 ? (
+        ) : (displayTransactions.length === 0 && !hasPendingRow) ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -438,6 +498,48 @@ export const Transactions = ({
                   </tr>
                 </thead>
                 <tbody>
+                  {hasPendingRow && (
+                    <tr
+                      className="border-b border-amber-100 bg-amber-50/40 whitespace-nowrap hover:bg-amber-50/60 transition text-black animate-pulse"
+                      data-testid="pending-tx-row"
+                    >
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-black">{pendingTx.type}</div>
+                        <div className="text-sm font-normal text-[#667185]">
+                          #{pendingTx.hash.slice(0, 8)}...
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-mono">
+                        {pendingTx.amount > 0
+                          ? `+$${pendingTx.amount}`
+                          : `-$${Math.abs(pendingTx.amount)}`}
+                      </td>
+                      <td className="py-6 px-4 flex items-center gap-2">
+                        <Image
+                          src={`/icons/${pendingTx.asset.toLowerCase()}.svg`}
+                          alt={pendingTx.asset}
+                          width={24}
+                          height={24}
+                          className="inline-block"
+                        />
+                        <span className="ml-1 font-medium ">{pendingTx.asset}</span>
+                      </td>
+                      <td className="py-3 px-4 ">
+                        {pendingFormattedDateTime}
+                      </td>
+                      <td className="py-3 px-4">
+                        <StatusBadge
+                          variant={transactionStatusToVariant(pendingStatus)}
+                          label={pendingStatus}
+                        />
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="text-gray-400 text-sm cursor-not-allowed">
+                          Pending
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                   {displayTransactions.map((txn, idx) => (
                     <tr
                       key={idx}
@@ -489,7 +591,7 @@ export const Transactions = ({
                     </tr>
                   ))}
 
-                  {displayTransactions.length === 0 && !displayLoading && (
+                  {displayTransactions.length === 0 && !displayLoading && !hasPendingRow && (
                     <tr>
                       <td colSpan={6} className="text-center py-6">
                         No transactions found.
@@ -502,6 +604,75 @@ export const Transactions = ({
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
+              {hasPendingRow && (
+                <div
+                  className="p-4 border border-amber-200 rounded-xl bg-amber-50/20 shadow-sm animate-pulse"
+                  data-testid="pending-tx-card"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Type
+                      </span>
+                      <div className="font-bold text-gray-900">{pendingTx.type}</div>
+                      <div className="text-xs text-gray-500 font-mono">
+                        #{pendingTx.hash.slice(0, 8)}...
+                      </div>
+                    </div>
+                    <StatusBadge
+                      variant={transactionStatusToVariant(pendingStatus)}
+                      label={pendingStatus}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Asset
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src={`/icons/${pendingTx.asset.toLowerCase()}.svg`}
+                          alt={pendingTx.asset}
+                          width={20}
+                          height={20}
+                        />
+                        <span className="font-bold text-gray-900">
+                          {pendingTx.asset}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Amount
+                      </span>
+                      <div
+                        className={`font-mono font-bold text-base ${
+                          pendingTx.amount > 0 ? "text-green-600" : "text-gray-900"
+                        }`}
+                      >
+                        {pendingTx.amount > 0
+                          ? `+$${pendingTx.amount}`
+                          : `-$${Math.abs(pendingTx.amount)}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Date & Time
+                      </span>
+                      <div className="text-sm text-gray-700">
+                        {pendingFormattedDateTime}
+                      </div>
+                    </div>
+                    <span className="text-gray-400 text-sm cursor-not-allowed">
+                      Pending
+                    </span>
+                  </div>
+                </div>
+              )}
               {displayTransactions.map((txn, idx) => (
                 <div
                   key={idx}
@@ -580,7 +751,7 @@ export const Transactions = ({
                 </div>
               ))}
 
-              {displayTransactions.length === 0 && !displayLoading && (
+              {displayTransactions.length === 0 && !displayLoading && !hasPendingRow && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
