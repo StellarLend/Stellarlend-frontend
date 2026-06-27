@@ -1,7 +1,10 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@/test/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import RepayForm, { BorrowPosition } from "./RepayForm";
+import RepayForm, {
+  BorrowPosition,
+  computeHealthAfterRepayment,
+} from "./RepayForm";
 
 const positions: BorrowPosition[] = [
   {
@@ -105,7 +108,10 @@ describe("RepayForm Component", () => {
     });
 
     expect(screen.getByText("1,000.00 XLM")).toBeInTheDocument();
-    expect(screen.getByText(/2.25 \(Healthy\)/i)).toBeInTheDocument();
+    expect(screen.getByText("2.25")).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: /Projected health: Healthy/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows full repayment preview as debt cleared", () => {
@@ -199,6 +205,10 @@ describe("RepayForm Component", () => {
 
     expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
     expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it("caps projected health at debt cleared when the input exceeds outstanding debt", () => {
+    expect(computeHealthAfterRepayment(1.5, 1500, 2000)).toBe(Infinity);
   });
 
   it("shows Healthy label for health factor >= 2", () => {
