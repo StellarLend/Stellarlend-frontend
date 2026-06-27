@@ -310,4 +310,68 @@ describe("RepayForm Component", () => {
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it("syncs slider changes to repayment amount", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(slider, { target: { value: "50" } });
+    expect(amountInput).toHaveValue(750);
+  });
+
+  it("syncs amount changes to slider percentage", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(amountInput, { target: { value: "375" } });
+    expect(slider).toHaveValue("25");
+  });
+
+  it("handles 0% slider value", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(slider, { target: { value: "0" } });
+    expect(amountInput).toHaveValue(0);
+  });
+
+  it("handles 100% full repay slider value", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(slider, { target: { value: "100" } });
+    expect(amountInput).toHaveValue(1500);
+    expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it("slider stays at 0 when outstanding debt is zero", () => {
+    const zeroDebtPositions: BorrowPosition[] = [
+      {
+        id: "loan-zero",
+        asset: "XLM",
+        outstandingDebt: 0,
+        interestRate: 10,
+        collateralAsset: "XLM",
+        collateralAmount: 5000,
+        healthFactor: Infinity,
+      },
+    ];
+
+    render(<RepayForm positions={zeroDebtPositions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    expect(slider).toHaveValue("0");
+
+    fireEvent.change(slider, { target: { value: "50" } });
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+    expect(amountInput).toHaveValue(0);
+  });
 });

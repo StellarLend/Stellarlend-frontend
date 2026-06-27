@@ -318,6 +318,68 @@ export default function RepayForm({
         </div>
 
         {selectedPosition && (
+          <div className="px-1 pt-2">
+            <label htmlFor="repay-percentage" className="sr-only">
+              Repayment percentage
+            </label>
+            <input
+              id="repay-percentage"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={
+                selectedPosition.outstandingDebt > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        Math.round(
+                          (amount / selectedPosition.outstandingDebt) * 100
+                        )
+                      )
+                    )
+                  : 0
+              }
+              onChange={(e) => {
+                const percentage = Number(e.target.value);
+                const calculatedAmount =
+                  (percentage / 100) * selectedPosition.outstandingDebt;
+                setAmount(calculatedAmount);
+                if (errors.amount) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.amount;
+                    return next;
+                  });
+                }
+              }}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2600FF]"
+              aria-valuetext={`${
+                selectedPosition.outstandingDebt > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        Math.round(
+                          (amount / selectedPosition.outstandingDebt) * 100
+                        )
+                      )
+                    )
+                  : 0
+              }%`}
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-2">
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        )}
+
+        {selectedPosition && (
           <div className="space-y-5">
             <div className="rounded-xl border border-blue-100 bg-blue-50 p-5">
               <h3 className="text-xs font-bold text-blue-900 mb-3 uppercase tracking-wider">
