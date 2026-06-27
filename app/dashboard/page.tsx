@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
 import LiquidationsPanel from "@/components/features/dashboard/components/LiquidationsPanel";
+import NextPaymentDue from "@/components/features/dashboard/components/NextPaymentDue";
 import { DashboardLayout } from "@/components";
 import { AlertBanner, PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
@@ -164,6 +165,7 @@ export default function Dashboard() {
           ) : null}
 
           <MetricsCards />
+          <NextPaymentDue />
           <div className="mt-6">
             <LiquidationsPanel />
           </div>

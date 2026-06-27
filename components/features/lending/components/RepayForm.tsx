@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
@@ -95,6 +96,7 @@ export default function RepayForm({
       return {
         remainingDebt: 0,
         healthFactorAfter: 0,
+        isFullRepay: false,
       };
     }
 
@@ -111,6 +113,7 @@ export default function RepayForm({
     return {
       remainingDebt,
       healthFactorAfter,
+      isFullRepay: remainingDebt === 0 && amount > 0,
     };
   }, [amount, selectedPosition]);
 
@@ -280,14 +283,13 @@ export default function RepayForm({
         </div>
 
         <div className="relative">
-          <Input
+          <AmountInput
             id="repay-amount"
             label="Repayment amount"
             type="number"
-            min="0"
             step="0.01"
             placeholder="0.00"
-            value={amount || ""}
+            value={amount || 0}
             error={errors.amount}
             helperText={
               selectedPosition
@@ -297,8 +299,8 @@ export default function RepayForm({
                   )}`
                 : undefined
             }
-            onChange={(event) => {
-              setAmount(Number.parseFloat(event.target.value) || 0);
+            onChange={(val) => {
+              setAmount(val);
               if (errors.amount) {
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -307,15 +309,81 @@ export default function RepayForm({
                 });
               }
             }}
+            max={selectedPosition?.outstandingDebt}
+            onMax={handleMaxRepayment}
           />
           <button
             type="button"
             onClick={handleMaxRepayment}
-            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700"
+            disabled={!selectedPosition || selectedPosition.outstandingDebt <= 0}
+            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Repay full debt"
           >
-            MAX
+            Repay full debt
           </button>
         </div>
+
+        {selectedPosition && (
+          <div className="px-1 pt-2">
+            <label htmlFor="repay-percentage" className="sr-only">
+              Repayment percentage
+            </label>
+            <input
+              id="repay-percentage"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={
+                selectedPosition.outstandingDebt > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        Math.round(
+                          (amount / selectedPosition.outstandingDebt) * 100
+                        )
+                      )
+                    )
+                  : 0
+              }
+              onChange={(e) => {
+                const percentage = Number(e.target.value);
+                const calculatedAmount =
+                  (percentage / 100) * selectedPosition.outstandingDebt;
+                setAmount(calculatedAmount);
+                if (errors.amount) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.amount;
+                    return next;
+                  });
+                }
+              }}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2600FF]"
+              aria-valuetext={`${
+                selectedPosition.outstandingDebt > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        Math.round(
+                          (amount / selectedPosition.outstandingDebt) * 100
+                        )
+                      )
+                    )
+                  : 0
+              }%`}
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-2">
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        )}
 
         {selectedPosition && (
           <div className="space-y-5">
@@ -323,6 +391,11 @@ export default function RepayForm({
               <h3 className="text-xs font-bold text-blue-900 mb-3 uppercase tracking-wider">
                 Repayment Preview
               </h3>
+              {preview.isFullRepay && (
+                <span className="mb-3 inline-block rounded-full bg-green-100 px-3 py-0.5 text-xs font-semibold text-green-700">
+                  Full repayment
+                </span>
+              )}
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-blue-700">Remaining debt</span>

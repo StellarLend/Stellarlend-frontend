@@ -165,6 +165,7 @@ export default function BorrowingForm({
             }
           }}
           precision={selectedAsset?.precision ?? 2}
+          max={selectedAsset?.balance ?? 0}
         />
 
         {/* Loan Duration */}
@@ -259,6 +260,32 @@ export default function BorrowingForm({
             </p>
           )}
         </div>
+
+        {/* Collateral Amount */}
+        <AmountInput
+          label="Collateral Amount"
+          type="number"
+          step="0.01"
+          placeholder="0.00"
+          value={formData.collateralAmount || 0}
+          error={errors.collateralAmount}
+          helperText={`Minimum required: ${requiredCollateral.toLocaleString()} ${formData.collateral}`}
+          onChange={(collateralAmount) => {
+            setFormData((prev) => ({
+              ...prev,
+              collateralAmount,
+            }));
+            if (errors.collateralAmount) {
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.collateralAmount;
+                return next;
+              });
+            }
+          }}
+          precision={collateralAsset?.precision ?? 2}
+          max={collateralAsset?.balance ?? 0}
+        />
 
         {/* Collateral Requirements */}
         {formData.amount > 0 && (
