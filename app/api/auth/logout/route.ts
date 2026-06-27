@@ -14,6 +14,7 @@ import { getSession } from '@/lib/auth';
 import { revokeSession } from '@/lib/auth/session-store';
 import { logger } from '@/lib/logger';
 import { cookies } from 'next/headers';
+import { safeRedirectPath } from '@/lib/security/safe-redirect';
 
 const AUTH_CONFIG = {
   sessionCookieName: process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session',
@@ -23,6 +24,7 @@ export interface LogoutResponse {
   success: boolean;
   message: string;
   walletAddress?: string; // included for navbar UI state management
+  redirectTo?: string; // validated safe redirect target, set when returnUrl was provided
 }
 
 export interface LogoutErrorResponse {
@@ -57,6 +59,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<LogoutRes
     const walletAddress = session.user.walletAddress;
     const userId = session.user.id;
 
+    // Validate optional returnUrl query parameter for safe redirect after logout
+    const rawReturnUrl = request.nextUrl.searchParams.get('returnUrl');
+    const redirectTo = rawReturnUrl ? safeRedirectPath(rawReturnUrl) : undefined;
+    if (rawReturnUrl && redirectTo === '/') {
+      // The value was rejected — only safe default remains. Don't echo it back as
+      // a redirect hint since there was nothing actionable.
+    }
+
     // Get the session token from cookies for revocation
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get(AUTH_CONFIG.sessionCookieName);
@@ -80,6 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<LogoutRes
         success: true,
         message: 'Logged out successfully',
         walletAddress, // useful for UI state management in navbar
+        ...(redirectTo && redirectTo !== '/' ? { redirectTo } : {}),
       },
       { status: 200 }
     );
