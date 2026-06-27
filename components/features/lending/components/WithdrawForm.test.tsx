@@ -337,6 +337,9 @@ describe("WithdrawForm", () => {
       // newHF = 1.85 * (5000 - 100) / 5000 = 1.85 * 0.98 = 1.813
       // Use exact string to avoid matching "Health Factor Warning" banner text
       expect(screen.getByText("Health factor")).toBeInTheDocument();
+      expect(
+        screen.getByRole("status", { name: /Projected health: At Risk/i }),
+      ).toBeInTheDocument();
     });
 
     it("hides health factor in the preview for debt-free positions", () => {

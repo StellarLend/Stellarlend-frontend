@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
+import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
 import StatusAnnouncer from '@/components/shared/common/StatusAnnouncer';
@@ -54,19 +55,16 @@ const formatAmount = (amount: number, asset: string) =>
     maximumFractionDigits: 4,
   })} ${asset}`;
 
-const getHealthLabel = (healthFactor: number) => {
-  if (!Number.isFinite(healthFactor)) return "Debt cleared";
-  if (healthFactor >= 2) return "Healthy";
-  if (healthFactor >= 1) return "At Risk";
-  return "Critical";
-};
-
-const computeHealthAfterRepayment = (
+export const computeHealthAfterRepayment = (
   currentHealthFactor: number,
   outstandingDebt: number,
   repaymentAmount: number,
 ) => {
-  const remainingDebt = Math.max(outstandingDebt - repaymentAmount, 0);
+  const appliedRepayment = Math.min(
+    Math.max(repaymentAmount, 0),
+    outstandingDebt,
+  );
+  const remainingDebt = Math.max(outstandingDebt - appliedRepayment, 0);
 
   if (remainingDebt === 0) return Infinity;
 
@@ -97,7 +95,6 @@ export default function RepayForm({
       return {
         remainingDebt: 0,
         healthFactorAfter: 0,
-        label: "Unavailable",
       };
     }
 
@@ -114,7 +111,6 @@ export default function RepayForm({
     return {
       remainingDebt,
       healthFactorAfter,
-      label: getHealthLabel(healthFactorAfter),
     };
   }, [amount, selectedPosition]);
 
@@ -339,12 +335,14 @@ export default function RepayForm({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Health factor</span>
-                  <span className="font-semibold text-gray-900">
-                    {Number.isFinite(preview.healthFactorAfter)
-                      ? preview.healthFactorAfter.toFixed(2)
-                      : "Debt cleared"}{" "}
-                    ({preview.label})
-                  </span>
+                  <div className="flex items-center gap-2 text-right">
+                    <span className="font-semibold text-gray-900">
+                      {Number.isFinite(preview.healthFactorAfter)
+                        ? preview.healthFactorAfter.toFixed(2)
+                        : "Debt cleared"}
+                    </span>
+                    <HealthFactorBadge healthFactor={preview.healthFactorAfter} />
+                  </div>
                 </div>
                 <div className="flex justify-between border-t border-blue-200 pt-2.5">
                   <span className="text-blue-700">Collateral</span>
