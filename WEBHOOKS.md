@@ -173,7 +173,7 @@ npx vitest run --project unit --coverage
 
 - **No new dependencies** — uses Node.js built-in `crypto` module.
 - **Signing secret is server-only** — never exposed to the browser (no `NEXT_PUBLIC_` prefix).
-- **Timing-safe comparison** — uses `crypto.timingSafeEqual` to prevent timing side-channel attacks on signature verification.
+- **Constant-time verification** — signature comparison uses `crypto.timingSafeEqual` with buffer padding to prevent timing side-channel attacks. All signature verification paths (missing, wrong-length, wrong-value) return 401 with indistinguishable timing.
 - **In-memory nonce store** — nonces are stored in a `Set` with automatic pruning. For multi-instance deployments, consider using a shared store (e.g. Redis).
 
 ## File Map
