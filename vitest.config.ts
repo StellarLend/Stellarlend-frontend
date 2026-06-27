@@ -79,7 +79,7 @@ export default defineConfig({
             "components/shared/ui/**/*.test.tsx",
             "lib/utils/clipboard.test.ts",
             "components/features/lending/**/*.test.tsx",
-            "hooks/**/*.test.ts",
+            "hooks/**/*.test.{ts,tsx}",
           ],
         },
       },
