@@ -4,10 +4,17 @@ import {
   screen,
   fireEvent,
   waitFor,
+  act,
 } from "@/test/test-utils";
 import TransactionDetail from "./TransactionDetail";
 import type { Transaction } from "@/types/Transaction";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+vi.mock("@/lib/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(),
+}));
+
+import { copyToClipboard } from "@/lib/utils/clipboard";
 
 // Mock next/image so JSDOM does not need the Next.js runtime/config.
 vi.mock("next/image", () => ({
@@ -29,18 +36,8 @@ const buildTransaction = (overrides: Partial<Transaction> = {}): Transaction => 
 });
 
 describe("TransactionDetail Modal", () => {
-  let writeText: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
-    writeText = vi.fn().mockResolvedValue(undefined);
-    // Patch only the clipboard slice of navigator instead of replacing the
-    // entire object so other navigator APIs (userAgent, language, ...) are
-    // preserved in JSDOM. Direct property assignment is safer than
-    // defineProperty across jsdom versions that may declare `clipboard`
-    // as a non-configurable accessor.
-    (window.navigator as unknown as { clipboard: { writeText: typeof writeText } }).clipboard = {
-      writeText,
-    };
+    vi.clearAllMocks();
     // Headless UI's Transition relies on requestAnimationFrame; flush it
     // synchronously so the modal content is in the DOM immediately.
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -51,14 +48,7 @@ describe("TransactionDetail Modal", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    // Restore jsdom's original clipboard (which is undefined in the test env).
-    try {
-      delete (window.navigator as unknown as { clipboard?: unknown }).clipboard;
-    } catch {
-      // Some jsdom builds treat navigator.clipboard as non-configurable
-      // and refuse the delete; in that case the per-test overwrite above
-      // re-asserts a consistent stub on the next test run.
-    }
+    vi.useRealTimers();
   });
 
   it("renders nothing when transaction is null", () => {
@@ -110,7 +100,11 @@ describe("TransactionDetail Modal", () => {
     });
   });
 
-  it("writes the transaction id to the clipboard when copy is clicked", async () => {
+  it("calls copyToClipboard with the transaction id when copy is clicked", async () => {
+    const mockCopy = vi.mocked(copyToClipboard).mockResolvedValue({
+      success: true,
+    });
+
     render(
       <TransactionDetail
         transaction={buildTransaction({ id: "TXN-COPY-42" })}
@@ -122,8 +116,68 @@ describe("TransactionDetail Modal", () => {
     fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith("TXN-COPY-42");
+      expect(mockCopy).toHaveBeenCalledWith("TXN-COPY-42");
     });
+  });
+
+  it("shows success toast when copy succeeds", async () => {
+    vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+
+    render(
+      <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Copied!")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("Transaction ID copied to clipboard."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows error toast when clipboard fails", async () => {
+    vi.mocked(copyToClipboard).mockResolvedValue({
+      success: false,
+      reason: "clipboard_error",
+    });
+
+    render(
+      <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Copy Failed")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(
+        "Clipboard access is unavailable. Try copying the ID manually.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("auto-dismisses the toast after 4 seconds", async () => {
+    vi.useFakeTimers();
+    vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+
+    render(
+      <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
+    });
+
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(4000));
+
+    expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
   });
 
   it("calls onClose when the close button is clicked", async () => {
@@ -149,9 +203,6 @@ describe("TransactionDetail Modal", () => {
       />,
     );
 
-    // The component's date formatting is locale and timezone dependent, so
-    // we only assert that the labelled Date & Time row contains *something*
-    // rendered (i.e. the value slot is non-empty).
     await waitFor(() => {
       expect(screen.getByText("Date & Time:")).toBeInTheDocument();
     });

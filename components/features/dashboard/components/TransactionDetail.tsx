@@ -8,6 +8,8 @@ import type { Transaction } from "../../../../types/Transaction";
 import { sanitiseString } from "@/lib/security/input-sanitizer";
 import { isValidTxHash } from "@/lib/validation/stellar";
 import config from "@/lib/config";
+import { Toast } from "@/components/shared/common";
+import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
 
 interface TransactionDetailProps {
   transaction: Transaction | null;
@@ -18,6 +20,11 @@ interface TransactionDetailProps {
 export default function TransactionDetail({ transaction, isOpen, onClose }: TransactionDetailProps) {
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{
+    variant: "success" | "error";
+    title: string;
+    description: string;
+  } | null>(null);
 
   const id = transaction?.id || "";
 
@@ -50,8 +57,33 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
   const signedAmount = amount > 0 ? `+$${amount}` : `-$${Math.abs(amount)}`;
 
   const copyId = async () => {
-    await navigator.clipboard.writeText(id);
-    // could show a toast later
+    const result = await copyToClipboard(id);
+
+    if (result.success) {
+      setToast({
+        variant: "success",
+        title: "Copied!",
+        description: "Transaction ID copied to clipboard.",
+      });
+    } else {
+      const messages: Record<CopyFailureReason, { title: string; description: string }> = {
+        clipboard_error: {
+          title: "Copy Failed",
+          description: "Clipboard access is unavailable. Try copying the ID manually.",
+        },
+        invalid_address: {
+          title: "Copy Failed",
+          description: "Could not copy the transaction ID.",
+        },
+      };
+
+      setToast({
+        variant: "error",
+        ...messages[result.reason!],
+      });
+    }
+
+    setTimeout(() => setToast(null), 4000);
   };
 
   const formatDateTime = (dateStr: string, timeStr: string) => {
@@ -189,6 +221,13 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
                   </>
                 )}
               </div>
+              {toast && (
+                <Toast
+                  variant={toast.variant}
+                  title={toast.title}
+                  description={toast.description}
+                />
+              )}
             </Dialog.Panel>
           </Transition.Child>
         </div>
