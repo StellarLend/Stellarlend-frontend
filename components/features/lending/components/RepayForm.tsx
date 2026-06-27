@@ -6,6 +6,7 @@ import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
+import StatusAnnouncer from '@/components/shared/common/StatusAnnouncer';
 
 export interface BorrowPosition {
   id: string;
@@ -83,7 +84,7 @@ export default function RepayForm({
   const [amount, setAmount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "loading" | "success" | "error"
+    "idle" | "submitting" | "success" | "error"
   >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
 
@@ -181,7 +182,7 @@ export default function RepayForm({
       return;
     }
 
-    setSubmitStatus("loading");
+    setSubmitStatus("submitting");
     setSubmitMessage("Preparing repayment preview...");
 
     try {
@@ -244,22 +245,7 @@ export default function RepayForm({
         </p>
       </div>
 
-      {submitMessage && (
-        <div
-          className={cn(
-            "p-4 rounded-xl mb-6 text-sm font-medium",
-            submitStatus === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : submitStatus === "loading"
-                ? "bg-blue-50 text-blue-800 border border-blue-200"
-                : "bg-red-50 text-red-800 border border-red-200",
-          )}
-          role="alert"
-          aria-live="polite"
-        >
-          {submitMessage}
-        </div>
-      )}
+      <StatusAnnouncer status={submitStatus} message={submitMessage} type="repay" />
 
       <form onSubmit={handleSubmit} noValidate className="space-y-8">
         <div>
@@ -381,7 +367,7 @@ export default function RepayForm({
           variant="primary"
           size="lg"
           fullWidth
-          isLoading={submitStatus === "loading"}
+          isLoading={submitStatus === "submitting"}
         >
           Review Repayment
         </Button>
