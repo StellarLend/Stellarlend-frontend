@@ -212,18 +212,17 @@ export default function LendingForm({
             type="number"
             step="0.01"
             placeholder="0.00"
-            value={formData.amount || ""}
+            value={formData.amount || 0}
             error={errors.amount}
             helperText={
               selectedAsset
                 ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`
                 : undefined
             }
-            onChange={(eOrValue) => {
-              const value = typeof eOrValue === 'object' && eOrValue !== null && 'target' in eOrValue && eOrValue.target?.value !== undefined ? eOrValue.target.value : eOrValue;
+            onChange={(amount) => {
               setFormData((prev) => ({
                 ...prev,
-                amount: parseFloat(value as string) || 0,
+                amount,
               }));
               if (errors.amount) {
                 setErrors((prev) => {
@@ -235,6 +234,7 @@ export default function LendingForm({
             }}
             precision={selectedAsset?.precision ?? 2}
             onMax={handleMaxAmount}
+            max={selectedAsset?.balance ?? 0}
           />
         </div>
 

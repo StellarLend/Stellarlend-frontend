@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
@@ -280,14 +281,13 @@ export default function RepayForm({
         </div>
 
         <div className="relative">
-          <Input
+          <AmountInput
             id="repay-amount"
             label="Repayment amount"
             type="number"
-            min="0"
             step="0.01"
             placeholder="0.00"
-            value={amount || ""}
+            value={amount || 0}
             error={errors.amount}
             helperText={
               selectedPosition
@@ -297,8 +297,8 @@ export default function RepayForm({
                   )}`
                 : undefined
             }
-            onChange={(event) => {
-              setAmount(Number.parseFloat(event.target.value) || 0);
+            onChange={(val) => {
+              setAmount(val);
               if (errors.amount) {
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -307,14 +307,9 @@ export default function RepayForm({
                 });
               }
             }}
+            max={selectedPosition?.outstandingDebt}
+            onMax={handleMaxRepayment}
           />
-          <button
-            type="button"
-            onClick={handleMaxRepayment}
-            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700"
-          >
-            MAX
-          </button>
         </div>
 
         {selectedPosition && (
