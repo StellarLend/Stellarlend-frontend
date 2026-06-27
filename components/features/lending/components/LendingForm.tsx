@@ -12,6 +12,10 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
+import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
+import { IconButton } from "@/components/atoms/IconButton/IconButton";
+import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -32,9 +36,7 @@ export default function LendingForm({
   const [formData, setFormData] = useState<LendingData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "success" | "error"
-  >("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
   const [preview, setPreview] = useState<{
     result: CalculationResult | null;
@@ -131,18 +133,18 @@ export default function LendingForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitStatus("idle");
+    setStatus("idle");
     setSubmitMessage("");
     if (validateForm()) {
       setIsSubmitting(true);
       try {
         // Simulate validation/processing
         await new Promise((resolve) => setTimeout(resolve, 800));
-        setSubmitStatus("success");
+        setStatus("success");
         setSubmitMessage("Details validated successfully.");
         onSubmit(formData);
       } catch (err) {
-        setSubmitStatus("error");
+        setStatus("error");
         setSubmitMessage("An error occurred during validation.");
       } finally {
         setIsSubmitting(false);
@@ -178,20 +180,7 @@ export default function LendingForm({
         </p>
       </div>
 
-      {submitMessage && (
-        <div
-          className={cn(
-            "p-4 rounded-xl mb-6 text-sm font-medium",
-            submitStatus === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200",
-          )}
-          role="alert"
-          aria-live="polite"
-        >
-          {submitMessage}
-        </div>
-      )}
+      <StatusAnnouncer status={status} type="lend" message={submitMessage} />
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Asset Selection */}
@@ -230,10 +219,11 @@ export default function LendingForm({
                 ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`
                 : undefined
             }
-            onChange={(e) => {
+            onChange={(eOrValue) => {
+              const value = typeof eOrValue === 'object' && eOrValue !== null && 'target' in eOrValue && eOrValue.target?.value !== undefined ? eOrValue.target.value : eOrValue;
               setFormData((prev) => ({
                 ...prev,
-                amount: parseFloat(e.target.value) || 0,
+                amount: parseFloat(value as string) || 0,
               }));
               if (errors.amount) {
                 setErrors((prev) => {
@@ -278,9 +268,9 @@ export default function LendingForm({
               className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
             />
             <div className="flex justify-between text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">
-              <span>MIN: {rates.min}%</span>
-              <span>DEFAULT: {rates.default}%</span>
-              <span>MAX: {rates.max}%</span>
+              <span>MIN: {rates.min.toFixed(1)}%</span>
+              <span>DEFAULT: {rates.default.toFixed(1)}%</span>
+              <span>MAX: {rates.max.toFixed(1)}%</span>
             </div>
           </div>
 

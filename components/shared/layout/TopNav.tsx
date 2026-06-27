@@ -16,6 +16,8 @@ declare global {
   }
 }
 
+import { useWallet } from "@/hooks/useWallet";
+
 /** Shared focus-visible classes for TopNav interactive elements */
 const focusClasses = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-green-600";
 
@@ -35,106 +37,14 @@ export const SidebarToggle = () => {
 };
 
 const TopNav = () => {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { address: walletAddress, status, error, connect: handleConnect, disconnect } = useWallet();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Check session on mount
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const response = await fetch("/api/auth/session");
-        if (response.ok) {
-          const data = await response.json();
-          if (data?.session?.user?.walletAddress) {
-            setWalletAddress(data.session.user.walletAddress);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch session:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkSession();
-  }, []);
-
-  const handleConnect = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const stellar = window.stellar;
-      if (!stellar) {
-        throw new Error("Stellar wallet provider (Freighter) not detected");
-      }
-
-      // 1. Get client public key
-      const pubKey = await stellar.getPublicKey();
-      if (!pubKey) {
-        throw new Error("No public key returned from wallet");
-      }
-
-      // 2. Fetch SEP-10 challenge transaction
-      const challengeResponse = await fetch("/api/auth/challenge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: pubKey }),
-      });
-
-      if (!challengeResponse.ok) {
-        const errData = await challengeResponse.json();
-        throw new Error(errData.error || "Failed to generate challenge");
-      }
-
-      const { transaction } = await challengeResponse.json();
-
-      // 3. Sign transaction
-      const signedTransaction = await stellar.signTransaction(transaction, {
-        network: "TESTNET",
-      });
-
-      // 4. Verify transaction signature and establish session
-      const verifyResponse = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transaction: signedTransaction }),
-      });
-
-      if (!verifyResponse.ok) {
-        const errData = await verifyResponse.json();
-        throw new Error(errData.error || "Verification failed");
-      }
-
-      const { walletAddress: verifiedAddress } = await verifyResponse.json();
-      setWalletAddress(verifiedAddress);
-    } catch (err: any) {
-      console.error("Wallet connection failed:", err);
-      setError(err.message || "Wallet connection failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = status === "connecting";
 
   const handleDisconnect = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/auth/session", {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        setWalletAddress(null);
-        setIsDropdownOpen(false);
-      } else {
-        throw new Error("Failed to clear session");
-      }
-    } catch (err: any) {
-      console.error("Logout failed:", err);
-      setError(err.message || "Failed to disconnect");
-    } finally {
-      setLoading(false);
-    }
+    await disconnect();
+    setIsDropdownOpen(false);
   };
 
   const getShortAddress = (addr: string) => {

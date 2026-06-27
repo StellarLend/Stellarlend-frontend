@@ -1,10 +1,13 @@
 "use client";
 
 import { Dialog, Transition } from "@headlessui/react";
-import { Fragment } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { Copy, X } from "lucide-react";
 import Image from "next/image";
 import type { Transaction } from "../../../../types/Transaction";
+import { sanitiseString } from "@/lib/security/input-sanitizer";
+import { isValidTxHash } from "@/lib/validation/stellar";
+import config from "@/lib/config";
 
 interface TransactionDetailProps {
   transaction: Transaction | null;
@@ -13,9 +16,36 @@ interface TransactionDetailProps {
 }
 
 export default function TransactionDetail({ transaction, isOpen, onClose }: TransactionDetailProps) {
+  const [details, setDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const id = transaction?.id || "";
+
+  useEffect(() => {
+    if (isOpen && id) {
+      setLoading(true);
+      fetch(`/api/transactions/${id}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch details");
+          return res.json();
+        })
+        .then((data) => {
+          setDetails(data.transaction);
+        })
+        .catch((err) => {
+          console.error("Error loading transaction details:", err);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else {
+      setDetails(null);
+    }
+  }, [isOpen, id]);
+
   if (!transaction) return null;
 
-  const { id, type, amount, asset, date, time, status } = transaction;
+  const { type, amount, asset, date, time, status } = transaction;
 
   const signedAmount = amount > 0 ? `+$${amount}` : `-$${Math.abs(amount)}`;
 
@@ -39,6 +69,21 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
     h = h ? h : 12;
     const timePart = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
     return `${datePart} ${timePart}`;
+  };
+
+  const getExplorerLink = () => {
+    if (!id || !isValidTxHash(id)) {
+      return null;
+    }
+    const net = config.stellar.network.toLowerCase() === 'public' || config.stellar.network.toLowerCase() === 'mainnet' ? 'public' : 'testnet';
+    const baseUrl = `https://stellar.expert/explorer/${net}/tx/`;
+    
+    // Ensure base URL starts with a safe https protocol and allowlisted domain
+    if (!baseUrl.startsWith("https://stellar.expert/")) {
+      return null;
+    }
+    
+    return `${baseUrl}${id}`;
   };
 
   return (
@@ -114,6 +159,35 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
                   <span className="font-medium">Status:</span>
                   <span>{status}</span>
                 </div>
+                {loading ? (
+                  <div className="text-center text-xs text-gray-400 py-2">
+                    Loading additional details...
+                  </div>
+                ) : (
+                  <>
+                    {details?.memo && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Memo:</span>
+                        <span className="break-all font-mono bg-gray-50 px-2 py-1 rounded text-xs">
+                          {sanitiseString(details.memo)}
+                        </span>
+                      </div>
+                    )}
+                    {getExplorerLink() && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Explorer Link:</span>
+                        <a
+                          href={getExplorerLink() || undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          View on Stellar Expert
+                        </a>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </Dialog.Panel>
           </Transition.Child>
@@ -122,3 +196,4 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
     </Transition>
   );
 }
+
