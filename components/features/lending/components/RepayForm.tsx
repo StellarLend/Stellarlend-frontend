@@ -95,6 +95,7 @@ export default function RepayForm({
       return {
         remainingDebt: 0,
         healthFactorAfter: 0,
+        isFullRepay: false,
       };
     }
 
@@ -111,6 +112,7 @@ export default function RepayForm({
     return {
       remainingDebt,
       healthFactorAfter,
+      isFullRepay: remainingDebt === 0 && amount > 0,
     };
   }, [amount, selectedPosition]);
 
@@ -311,9 +313,11 @@ export default function RepayForm({
           <button
             type="button"
             onClick={handleMaxRepayment}
-            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700"
+            disabled={!selectedPosition || selectedPosition.outstandingDebt <= 0}
+            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Repay full debt"
           >
-            MAX
+            Repay full debt
           </button>
         </div>
 
@@ -323,6 +327,11 @@ export default function RepayForm({
               <h3 className="text-xs font-bold text-blue-900 mb-3 uppercase tracking-wider">
                 Repayment Preview
               </h3>
+              {preview.isFullRepay && (
+                <span className="mb-3 inline-block rounded-full bg-green-100 px-3 py-0.5 text-xs font-semibold text-green-700">
+                  Full repayment
+                </span>
+              )}
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-blue-700">Remaining debt</span>

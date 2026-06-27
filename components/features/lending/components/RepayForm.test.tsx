@@ -117,10 +117,67 @@ describe("RepayForm Component", () => {
   it("shows full repayment preview as debt cleared", () => {
     render(<RepayForm positions={positions} onSubmit={onSubmit} />);
 
-    fireEvent.click(screen.getByText("MAX"));
+    fireEvent.click(screen.getByText("Repay full debt"));
 
     expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
     expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it('displays "Full repayment" badge when amount equals outstanding debt', () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    expect(screen.queryByText(/Full repayment/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Repay full debt"));
+
+    expect(screen.getByText(/Full repayment/i)).toBeInTheDocument();
+  });
+
+  it("disables repay full debt button when no position is selected", () => {
+    render(<RepayForm positions={[]} onSubmit={onSubmit} />);
+
+    expect(screen.getByRole("button", { name: /Repay full debt/i })).toBeDisabled();
+  });
+
+  it("disables repay full debt button when debt is zero", () => {
+    const zeroDebtPositions: BorrowPosition[] = [
+      {
+        id: "loan-zero",
+        asset: "XLM",
+        outstandingDebt: 0,
+        interestRate: 12,
+        collateralAsset: "XLM",
+        collateralAmount: 5000,
+        healthFactor: 1.5,
+        duration: 30,
+      },
+    ];
+
+    render(<RepayForm positions={zeroDebtPositions} onSubmit={onSubmit} />);
+
+    expect(screen.getByRole("button", { name: /Repay full debt/i })).toBeDisabled();
+  });
+
+  it("enables repay full debt button when valid position exists with debt", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    expect(
+      screen.getByRole("button", { name: /Repay full debt/i }),
+    ).not.toBeDisabled();
+  });
+
+  it("resets amount and full-repay state when switching positions", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByText("Repay full debt"));
+    expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Borrow position/i), {
+      target: { value: "loan-2" },
+    });
+
+    expect(screen.getByText(/Outstanding: 900.00 USDC/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Full repayment/i)).not.toBeInTheDocument();
   });
 
   it("submits quote preview and repayment data", async () => {
@@ -149,8 +206,10 @@ describe("RepayForm Component", () => {
         }),
         quoteResult,
       );
+      expect(
+        screen.getByText(/Repayment preview ready/i),
+      ).toBeInTheDocument();
     });
-    expect(screen.getByText(/Repayment preview ready/i)).toBeInTheDocument();
   });
 
   it("switching selected position updates the preview", () => {
@@ -300,7 +359,7 @@ describe("RepayForm Component", () => {
     fireEvent.click(screen.getByText(/Review Repayment/i));
 
     expect(
-      await screen.findByText(/Preparing repayment preview/i),
+      await screen.findByText(/Submitting repay request/i),
     ).toBeInTheDocument();
 
     rejectPreview();
