@@ -1,5 +1,6 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@/test/test-utils";
+import { render, screen, fireEvent, waitFor, within } from "@/test/test-utils";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import WithdrawForm, {
   SupplyPosition,
@@ -246,7 +247,8 @@ describe("WithdrawForm", () => {
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
-    it("shows Health Factor Warning for an at-risk withdrawal but allows submission", async () => {
+    it("shows Health Factor Warning for an at-risk withdrawal but allows submission through confirm modal", async () => {
+      const user = userEvent.setup();
       render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
       // newHF = 1.85 * (5000 - 1000) / 5000 = 1.48 → at-risk (1.0 ≤ hf < 2.0)
       fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
@@ -256,6 +258,10 @@ describe("WithdrawForm", () => {
       expect(screen.getByText(/Health Factor Warning/i)).toBeInTheDocument();
 
       fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      const dialog = await screen.findByRole("dialog", { name: /confirm withdrawal transaction/i });
+      await user.click(within(dialog).getByRole("checkbox"));
+      await user.click(within(dialog).getByRole("button", { name: /confirm withdrawal/i }));
 
       await waitFor(() => {
         expect(onSubmit).toHaveBeenCalled();
@@ -388,7 +394,8 @@ describe("WithdrawForm", () => {
   });
 
   describe("successful submission", () => {
-    it("calls onSubmit with correct data for a position with no debt", () => {
+    it("calls onSubmit with correct data for a position with no debt", async () => {
+      const user = userEvent.setup();
       render(
         <WithdrawForm
           positions={positions}
@@ -401,18 +408,25 @@ describe("WithdrawForm", () => {
       });
       fireEvent.click(screen.getByText(/Review Withdrawal/i));
 
-      expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          amount: 500,
-          asset: "USDC",
-          positionId: "supply-2",
-          outstandingDebt: 0,
-          remainingDebt: 2500,
-        }),
-      );
+      const dialog = await screen.findByRole("dialog", { name: /confirm withdrawal transaction/i });
+      await user.click(within(dialog).getByRole("checkbox"));
+      await user.click(within(dialog).getByRole("button", { name: /confirm withdrawal/i }));
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            amount: 500,
+            asset: "USDC",
+            positionId: "supply-2",
+            outstandingDebt: 0,
+            remainingDebt: 2500,
+          }),
+        );
+      });
     });
 
-    it("calls onSubmit with health factor data for a position with debt", () => {
+    it("calls onSubmit with health factor data for a position with debt", async () => {
+      const user = userEvent.setup();
       render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
       // Withdraw 500: newHF = 1.85 * 4500/5000 = 1.665
       fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
@@ -420,21 +434,28 @@ describe("WithdrawForm", () => {
       });
       fireEvent.click(screen.getByText(/Review Withdrawal/i));
 
-      expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          amount: 500,
-          asset: "XLM",
-          positionId: "supply-1",
-          outstandingDebt: 1500,
-          remainingDebt: 4500,
-          healthFactorBefore: 1.85,
-        }),
-      );
+      const dialog = await screen.findByRole("dialog", { name: /confirm withdrawal transaction/i });
+      await user.click(within(dialog).getByRole("checkbox"));
+      await user.click(within(dialog).getByRole("button", { name: /confirm withdrawal/i }));
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            amount: 500,
+            asset: "XLM",
+            positionId: "supply-1",
+            outstandingDebt: 1500,
+            remainingDebt: 4500,
+            healthFactorBefore: 1.85,
+          }),
+        );
+      });
       const callArg = onSubmit.mock.calls[0][0];
       expect(callArg.healthFactorAfter).toBeCloseTo(1.665);
     });
 
-    it("shows a success banner after valid submission", () => {
+    it("shows a success banner after valid submission through confirm modal", async () => {
+      const user = userEvent.setup();
       render(
         <WithdrawForm
           positions={positions}
@@ -447,14 +468,21 @@ describe("WithdrawForm", () => {
       });
       fireEvent.click(screen.getByText(/Review Withdrawal/i));
 
-      expect(
-        screen.getByText(/Withdrawal preview ready/i),
-      ).toBeInTheDocument();
+      const dialog = await screen.findByRole("dialog", { name: /confirm withdrawal transaction/i });
+      await user.click(within(dialog).getByRole("checkbox"));
+      await user.click(within(dialog).getByRole("button", { name: /confirm withdrawal/i }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Withdrawal confirmed/i),
+        ).toBeInTheDocument();
+      });
     });
   });
 
   describe("edge cases", () => {
-    it("handles a position where the full supplied amount is withdrawable (zero locked collateral)", () => {
+    it("handles a position where the full supplied amount is withdrawable (zero locked collateral)", async () => {
+      const user = userEvent.setup();
       const positions: SupplyPosition[] = [
         {
           id: "p1",
@@ -470,9 +498,15 @@ describe("WithdrawForm", () => {
       fireEvent.click(screen.getByText("MAX"));
       fireEvent.click(screen.getByText(/Review Withdrawal/i));
 
-      expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ amount: 2, asset: "ETH", remainingDebt: 0 }),
-      );
+      const dialog = await screen.findByRole("dialog", { name: /confirm withdrawal transaction/i });
+      await user.click(within(dialog).getByRole("checkbox"));
+      await user.click(within(dialog).getByRole("button", { name: /confirm withdrawal/i }));
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ amount: 2, asset: "ETH", remainingDebt: 0 }),
+        );
+      });
     });
 
     it("handles a position where the entire supply is locked (zero withdrawable)", async () => {

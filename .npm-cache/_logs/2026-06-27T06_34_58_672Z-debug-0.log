@@ -1,0 +1,35 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.12.1
+2 info using node@v24.15.0
+3 silly config load:file:C:\Program Files\nodejs\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\DELL\Documents\GitHub\Stellarlend-frontend\.npmrc
+5 silly config load:file:C:\Users\DELL\.npmrc
+6 silly config load:file:C:\Users\DELL\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm exec vitest --version
+8 verbose argv "exec" "--cache" ".npm-cache" "--yes" "false" "--" "vitest" "--version"
+9 verbose logfile logs-max:10 dir:C:\Users\DELL\Documents\GitHub\Stellarlend-frontend\.npm-cache\_logs\2026-06-27T06_34_58_672Z-
+10 verbose logfile C:\Users\DELL\Documents\GitHub\Stellarlend-frontend\.npm-cache\_logs\2026-06-27T06_34_58_672Z-debug-0.log
+11 warn Unknown project config "peer-dependency-rules.ignore-missing-and-mismatched". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+12 silly logfile done cleaning log files
+13 silly packumentCache heap:2348810240 maxSize:587202560 maxEntrySize:293601280
+14 http fetch GET 200 https://registry.npmjs.org/npm 1587ms
+15 http fetch GET 200 https://registry.npmjs.org/vitest 2992ms (cache miss)
+16 silly packumentCache heap:2348810240 maxSize:587202560 maxEntrySize:293601280
+17 silly packumentCache heap:2348810240 maxSize:587202560 maxEntrySize:293601280
+18 verbose stack Error: npx canceled due to missing packages and no YES option: ["vitest@4.1.9"]
+18 verbose stack     at exec (C:\Program Files\nodejs\node_modules\npm\node_modules\libnpmexec\lib\index.js:283:17)
+18 verbose stack     at async Npm.exec (C:\Program Files\nodejs\node_modules\npm\lib\npm.js:193:9)
+18 verbose stack     at async module.exports (C:\Program Files\nodejs\node_modules\npm\lib\cli\entry.js:67:5)
+19 error npx canceled due to missing packages and no YES option: ["vitest@4.1.9"]
+20 verbose cwd C:\Users\DELL\Documents\GitHub\Stellarlend-frontend
+21 verbose os Windows_NT 10.0.22000
+22 verbose node v24.15.0
+23 verbose npm  v11.12.1
+24 notice
+24 notice New minor version of npm available! 11.12.1 -> 11.17.0
+24 notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+24 notice To update run: npm install -g npm@11.17.0
+24 notice  { force: true, Symbol(proc-log.meta): true }
+25 verbose exit 1
+26 verbose code 1
+27 error A complete log of this run can be found in: C:\Users\DELL\Documents\GitHub\Stellarlend-frontend\.npm-cache\_logs\2026-06-27T06_34_58_672Z-debug-0.log
