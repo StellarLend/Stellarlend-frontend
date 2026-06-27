@@ -4,6 +4,7 @@ import "./globals.css";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { WalletProvider } from "@/context/WalletContext";
 import NextTopLoader from "nextjs-toploader";
+import { headers } from "next/headers";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -21,16 +22,13 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Retrieve CSP nonce from middleware header
+  const nonce = headers().get("x-csp-nonce") ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <body className={`${inter.variable} antialiased`}>
-        {/*
-          Top progress bar for route transitions.
-          - color matches --color-primary (#15a350)
-          - showSpinner disabled to avoid duplicate loading indicators
-          - shadow uses the same green with opacity
-          - crawlSpeed / speed tuned so fast navigations don't flicker
-        */}
+        {/* Top progress bar */}
         <NextTopLoader
           color="#15a350"
           initialPosition={0.08}
@@ -43,6 +41,13 @@ export default function RootLayout({
           shadow="0 0 10px #15a350, 0 0 5px #15a350"
           zIndex={9999}
         />
+        {/* Example inline script that uses the CSP nonce */}
+        {nonce && (
+          <script
+            nonce={nonce}
+            dangerouslySetInnerHTML={{ __html: `window.CSP_NONCE = "${nonce}";` }}
+          />
+        )}
         <WalletProvider>
           <SidebarProvider>{children}</SidebarProvider>
         </WalletProvider>
