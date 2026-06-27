@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
@@ -291,23 +292,21 @@ export default function WithdrawForm({
         )}
 
         <div className="relative">
-          <Input
+          <AmountInput
             id="withdraw-amount"
             label="Withdrawal amount"
             type="number"
-            min="0"
             step="0.01"
             placeholder="0.00"
-            value={amount || ""}
+            value={amount || 0}
             error={errors.amount}
             helperText={
               selectedPosition
                 ? `Available: ${formatAmount(withdrawableBalance, selectedPosition.asset)}`
                 : undefined
             }
-            onChange={(e) => {
-              const target = e.target as HTMLInputElement;
-              setAmount(Number.parseFloat(target.value) || 0);
+            onChange={(val) => {
+              setAmount(val);
               if (errors.amount) {
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -316,14 +315,9 @@ export default function WithdrawForm({
                 });
               }
             }}
+            max={withdrawableBalance}
+            onMax={handleMaxWithdraw}
           />
-          <button
-            type="button"
-            onClick={handleMaxWithdraw}
-            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700"
-          >
-            MAX
-          </button>
         </div>
 
         {hasDebt && amount > 0 && isHealthCritical && (
