@@ -1,34 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Info, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Info, ShieldAlert, X, XCircle, CheckCircle } from "lucide-react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
-export type AlertBannerSeverity = "info" | "warning" | "critical";
+export type AlertBannerSeverity = "info" | "warning" | "critical" | "error" | "success";
 
 
 const bannerStyles: Record<AlertBannerSeverity, string> = {
   info: "bg-slate-100 border-slate-200 text-slate-900",
   warning: "bg-amber-100 border-amber-200 text-amber-950",
   critical: "bg-red-100 border-red-200 text-red-950",
+  error: "bg-red-200 border-red-300 text-red-950",
+  success: "bg-green-100 border-green-200 text-green-950",
 };
 
 const iconStyles: Record<AlertBannerSeverity, string> = {
   info: "bg-slate-200 text-slate-900",
   warning: "bg-amber-200 text-amber-950",
   critical: "bg-red-200 text-red-950",
+  error: "bg-red-300 text-red-950",
+  success: "bg-green-200 text-green-950",
 };
 
 const severityLabels: Record<AlertBannerSeverity, string> = {
   info: "Info",
   warning: "Warning",
   critical: "Critical",
+  error: "Error",
+  success: "Success",
 };
 
 const iconMap = {
   info: Info,
   warning: AlertTriangle,
   critical: ShieldAlert,
+  error: XCircle,
+  success: CheckCircle,
 };
 
 export interface AlertBannerProps {
@@ -79,7 +87,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
 
   return (
     <section
-      role="region"
+      role={severity === "critical" || severity === "error" ? "alert" : "status"}
       aria-labelledby={titleId}
       aria-describedby={messageId}
       aria-live={severity === "critical" ? "assertive" : "polite"}
