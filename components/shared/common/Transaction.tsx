@@ -27,7 +27,10 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
-import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
+import {
+  useInfiniteTransactions,
+  type UseInfiniteTransactionsReturn,
+} from "@/hooks/useInfiniteTransactions";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -41,6 +44,8 @@ interface TransactionsProps {
   infiniteScroll?: boolean;
   hideToolbar?: boolean;
   onDataLoad?: (totalCount: number) => void;
+  /** Pre-fetched infinite state. When supplied the component skips its own fetch. */
+  externalInfiniteState?: UseInfiniteTransactionsReturn;
 }
 
 export const Transactions = ({
@@ -48,6 +53,7 @@ export const Transactions = ({
   infiniteScroll = false,
   hideToolbar = false,
   onDataLoad,
+  externalInfiniteState,
 }: TransactionsProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -85,7 +91,7 @@ export const Transactions = ({
   const asset = hideToolbar ? searchParams.get("asset") || "" : "";
   const type = hideToolbar ? searchParams.get("type") || "" : "";
 
-  const infinite = useInfiniteTransactions({
+  const internalInfinite = useInfiniteTransactions({
     limit: itemsPerPage,
     search: search || undefined,
     status: status === "All" ? undefined : status,
@@ -93,7 +99,10 @@ export const Transactions = ({
     dateTo: dateTo || undefined,
     sortBy,
     sortDir,
+    skip: infiniteScroll && externalInfiniteState !== undefined,
   });
+
+  const infinite = (infiniteScroll && externalInfiniteState) ? externalInfiniteState : internalInfinite;
 
   useEffect(() => {
     setCurrentPage(1);

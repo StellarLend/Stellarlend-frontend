@@ -10,6 +10,8 @@ import {
 export interface UseInfiniteTransactionsOptions
   extends Omit<FetchTransactionsOptions, "cursor" | "limit" | "page" | "pageSize"> {
   limit?: number;
+  /** When true the hook mounts without triggering an initial fetch. */
+  skip?: boolean;
 }
 
 export interface UseInfiniteTransactionsReturn {
@@ -26,11 +28,11 @@ export interface UseInfiniteTransactionsReturn {
 export function useInfiniteTransactions(
   options: UseInfiniteTransactionsOptions = {},
 ): UseInfiniteTransactionsReturn {
-  const { limit = 6, ...filters } = options;
+  const { limit = 6, skip = false, ...filters } = options;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!skip);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -79,11 +81,12 @@ export function useInfiniteTransactions(
   );
 
   useEffect(() => {
+    if (skip) return;
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
       fetchPage(null, false);
     }
-  }, [fetchPage]);
+  }, [fetchPage, skip]);
 
   const loadMore = useCallback(() => {
     if (nextCursor && !loadingRef.current) {
