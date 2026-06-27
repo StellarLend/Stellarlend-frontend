@@ -1,6 +1,6 @@
 "use client"
 import ProfileForm from "@/components/features/account/components/ProfileForm";
-import { DataExportButton, PreferencesForm } from "@/components/features/account/components";
+import { AccountDeletion, DataExportButton, PreferencesForm } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
 import { PageHeader } from "@/components/shared/common";
 import { usePathname } from "next/navigation";
@@ -33,6 +33,7 @@ export default function Account() {
                 </p>
                 <DataExportButton />
               </div>
+              <AccountDeletion />
             </>
           )}
         </div>

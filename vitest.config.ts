@@ -78,6 +78,7 @@ export default defineConfig({
             "components/shared/common/**/*.test.tsx",
             "components/shared/ui/**/*.test.tsx",
             "components/features/dashboard/**/*.test.tsx",
+            "components/features/account/**/*.test.tsx",
             "lib/utils/clipboard.test.ts",
             "components/features/lending/**/*.test.tsx",
             "hooks/**/*.test.{ts,tsx}",
