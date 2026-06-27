@@ -17,8 +17,21 @@ import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
 import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
-import TransactionDetail from "@/components/features/dashboard/components/TransactionDetail";
-import { Dialog } from "@headlessui/react";
+import dynamic from "next/dynamic";
+
+const TransactionDetail = dynamic(
+  () => import("@/components/features/dashboard/components/TransactionDetail"),
+  {
+    loading: () => (
+      <div className="fixed inset-0 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center text-sm text-gray-400">
+          Loading…
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 import {
   fetchTransactions,
@@ -184,7 +197,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <Dialog as="div" className="relative z-50" onClose={() => {}} id="transaction-detail-drawer">
+          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
             <div
               className="flex items-center gap-1 cursor-pointer"
               onClick={() => setShowSearch((v) => !v)}
@@ -204,7 +217,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                 />
               </div>
             )}
-          </Dialog>
+          </div>
           <div className="relative" ref={filterRef}>
             <div
               className="flex items-center gap-1 cursor-pointer"
