@@ -153,6 +153,7 @@ Follow the established structure:
 - **`types/`**: TypeScript type definitions
 - **`constants/`**: Application constants
 - **`context/`**: React context providers
+- **`docs/`**: Developer guides, including [Client-side data-fetching conventions](docs/data-fetching.md)
 
 ## 🔄 Git Workflow
 
