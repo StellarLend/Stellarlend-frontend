@@ -1,6 +1,6 @@
-import { getMarket } from '@/lib/markets/registry';
+import { getMarket } from "@/lib/registry";
 
-export type ActionType = 'lend' | 'borrow' | 'repay';
+export type ActionType = "lend" | "borrow" | "repay";
 
 export interface FeeResult {
   feeAmount: number;
@@ -12,9 +12,13 @@ export interface FeeResult {
 /**
  * Calculates the protocol fee applied to an action on a specific market.
  */
-export function calculateProtocolFee(marketId: string, action: ActionType, amount: number): FeeResult {
+export function calculateProtocolFee(
+  marketId: string,
+  action: ActionType,
+  amount: number,
+): FeeResult {
   if (amount < 0) {
-    throw new Error('Amount cannot be negative');
+    throw new Error("Amount cannot be negative");
   }
 
   const market = getMarket(marketId);
@@ -23,11 +27,12 @@ export function calculateProtocolFee(marketId: string, action: ActionType, amoun
   }
 
   const schedule = market.feeSchedule;
-  const bps = action === 'lend' 
-    ? schedule.lendFeeBps 
-    : action === 'borrow' 
-      ? schedule.borrowFeeBps 
-      : schedule.repayFeeBps;
+  const bps =
+    action === "lend"
+      ? schedule.lendFeeBps
+      : action === "borrow"
+        ? schedule.borrowFeeBps
+        : schedule.repayFeeBps;
 
   const calculatedFee = (amount * bps) / 10000;
   const feeAmount = Math.max(calculatedFee, schedule.minFeeAmount);

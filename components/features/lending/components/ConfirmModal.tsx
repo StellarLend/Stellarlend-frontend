@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
 import type { LendingActionType } from "@/lib/lending/types";
+import { getAsset } from "@/lib/assets/registry";
+import { calculateProtocolFee, type ActionType } from "@/lib/fee-calculator";
 import { cn } from "@/lib/utils/cn";
+import { formatCurrency as formatNumber } from "@/lib/utils/format";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -12,6 +15,78 @@ interface ConfirmModalProps {
   data: LendingData;
   calculation: CalculationResult | null;
   type: LendingActionType;
+}
+
+interface FeeBreakdown {
+  grossAmount: number;
+  feeAmount: number | null;
+  netAmount: number;
+  precision: number;
+  unavailableReason?: string;
+}
+
+const DEFAULT_ASSET_PRECISION = 2;
+
+function getAssetPrecision(asset: string): number {
+  try {
+    return getAsset(asset)?.decimals ?? DEFAULT_ASSET_PRECISION;
+  } catch {
+    return DEFAULT_ASSET_PRECISION;
+  }
+}
+
+function getFeeAction(type: LendingActionType): ActionType | null {
+  return type === "lend" || type === "borrow" || type === "repay" ? type : null;
+}
+
+function getFeeBreakdown(
+  amount: number,
+  asset: string,
+  type: LendingActionType,
+): FeeBreakdown {
+  const precision = getAssetPrecision(asset);
+  const action = getFeeAction(type);
+
+  if (!action) {
+    return {
+      grossAmount: amount,
+      feeAmount: null,
+      netAmount: amount,
+      precision,
+      unavailableReason: "No protocol fee is configured for this action.",
+    };
+  }
+
+  try {
+    const { feeAmount } = calculateProtocolFee(
+      asset.toLowerCase(),
+      action,
+      amount,
+    );
+
+    return {
+      grossAmount: amount,
+      feeAmount,
+      netAmount: amount - feeAmount,
+      precision,
+    };
+  } catch {
+    return {
+      grossAmount: amount,
+      feeAmount: null,
+      netAmount: amount,
+      precision,
+      unavailableReason: "Protocol fee estimate unavailable for this asset.",
+    };
+  }
+}
+
+function formatAssetAmount(
+  amount: number,
+  asset: string,
+  precision: number,
+): string {
+  return `${formatNumber(amount, precision)} ${asset}`;
 }
 
 export default function ConfirmModal({
@@ -65,7 +140,8 @@ export default function ConfirmModal({
       if (event.key !== "Tab") return;
 
       const focusableElements = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+        dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ??
+          [],
       ).filter((element) => !element.hasAttribute("disabled"));
 
       if (!focusableElements.length) {
@@ -111,6 +187,7 @@ export default function ConfirmModal({
         : type === "withdraw"
           ? "Amount to Withdraw"
           : "Amount to Repay";
+  const feeBreakdown = getFeeBreakdown(data.amount, data.asset, type);
 
   const handleConfirm = async () => {
     if (!hasAgreed) return;
@@ -260,7 +337,9 @@ export default function ConfirmModal({
                   {typeof data.remainingDebt === "number" && (
                     <div className="flex justify-between border-t pt-2">
                       <span className="font-medium">
-                        {type === "withdraw" ? "Remaining Supplied" : "Remaining Debt"}
+                        {type === "withdraw"
+                          ? "Remaining Supplied"
+                          : "Remaining Debt"}
                       </span>
                       <span className="font-semibold text-gray-900">
                         {formatCurrency(data.remainingDebt, data.asset)}
@@ -271,14 +350,17 @@ export default function ConfirmModal({
                     (data.outstandingDebt ?? 0) > 0 && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">New Health Factor</span>
-                        <span className={cn(
-                          "font-medium",
-                          type === "withdraw" && data.healthFactorAfter < 1
-                            ? "text-red-600"
-                            : type === "withdraw" && data.healthFactorAfter < 2
-                              ? "text-amber-600"
-                              : "text-green-600",
-                        )}>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            type === "withdraw" && data.healthFactorAfter < 1
+                              ? "text-red-600"
+                              : type === "withdraw" &&
+                                  data.healthFactorAfter < 2
+                                ? "text-amber-600"
+                                : "text-green-600",
+                          )}
+                        >
                           {Number.isFinite(data.healthFactorAfter)
                             ? data.healthFactorAfter.toFixed(2)
                             : type === "withdraw"
@@ -344,6 +426,51 @@ export default function ConfirmModal({
                   )}
                 </>
               )}
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <h4 className="font-medium text-gray-900 mb-2">
+                  Protocol Fee Estimate
+                </h4>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Gross Amount</dt>
+                    <dd className="font-medium text-gray-900">
+                      {formatAssetAmount(
+                        feeBreakdown.grossAmount,
+                        data.asset,
+                        feeBreakdown.precision,
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Estimated Protocol Fee</dt>
+                    <dd className="font-medium text-gray-900">
+                      {feeBreakdown.feeAmount === null
+                        ? "N/A"
+                        : formatAssetAmount(
+                            feeBreakdown.feeAmount,
+                            data.asset,
+                            feeBreakdown.precision,
+                          )}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between border-t border-gray-200 pt-2">
+                    <dt className="font-medium text-gray-700">Net Amount</dt>
+                    <dd className="font-semibold text-gray-900">
+                      {formatAssetAmount(
+                        feeBreakdown.netAmount,
+                        data.asset,
+                        feeBreakdown.precision,
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                {feeBreakdown.unavailableReason && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    {feeBreakdown.unavailableReason}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Collateral Info for Borrowing / Repay */}
