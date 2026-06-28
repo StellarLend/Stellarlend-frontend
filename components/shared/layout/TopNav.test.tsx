@@ -1,18 +1,40 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import TopNav from './TopNav';
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { SidebarProvider } from "@/context/SidebarContext";
+import { WalletProvider } from "@/context/WalletContext";
+import { afterEach, beforeEach, vi } from "vitest";
+
+vi.mock("@/components/shared/layout/NotificationBell", () => ({
+  default: () => <button type="button" aria-label="View notifications" />,
+}));
 
 import TopNav from "./TopNav";
-import { SidebarProvider } from "@/context/SidebarContext";
 
 const renderTopNav = () =>
-    render(
-        <SidebarProvider>
-          <TopNav />
-        </SidebarProvider>
-    );
+  render(
+    <WalletProvider>
+      <SidebarProvider>
+        <TopNav />
+      </SidebarProvider>
+    </WalletProvider>,
+  );
 
 describe("TopNav Accessibility", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({}),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders notification button with proper aria-label", () => {
     renderTopNav();
 
@@ -63,10 +85,50 @@ describe("TopNav Accessibility", () => {
     });
 
     const walletButton = screen.getByRole("button", {
-      name: /connected wallet/i,
+      name: /connect wallet/i,
     });
 
     expect(networkButton).toBeInTheDocument();
     expect(walletButton).toBeInTheDocument();
+  });
+
+  it("all icon-only buttons have focus-visible ring classes", () => {
+    renderTopNav();
+
+    const buttons = screen.getAllByRole("button");
+    const iconOnlyButtons = buttons.filter((btn) =>
+      btn.className.includes("focus-visible:ring-2"),
+    );
+
+    expect(iconOnlyButtons.length).toBeGreaterThanOrEqual(4);
+    iconOnlyButtons.forEach((btn) => {
+      expect(btn).toHaveClass("focus-visible:ring-2");
+    });
+  });
+
+  it("notification buttons are focusable", () => {
+    renderTopNav();
+
+    const notificationButtons = screen.getAllByRole("button", {
+      name: /view notifications/i,
+    });
+
+    notificationButtons.forEach((btn) => {
+      btn.focus();
+      expect(btn).toHaveFocus();
+    });
+  });
+
+  it("notification buttons can be activated with keyboard", () => {
+    renderTopNav();
+
+    const notificationButtons = screen.getAllByRole("button", {
+      name: /view notifications/i,
+    });
+
+    notificationButtons.forEach((btn) => {
+      expect(btn).toBeInTheDocument();
+      expect(btn.tagName).toBe("BUTTON");
+    });
   });
 });

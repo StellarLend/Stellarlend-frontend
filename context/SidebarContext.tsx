@@ -22,69 +22,83 @@ interface SidebarProviderProps {
   initialIsMobile?: boolean;
 }
 
-const SidebarContext = createContext<SidebarContextProps | undefined>(
-  undefined
-);
+const SidebarContext = createContext<SidebarContextProps | undefined>(undefined);
+
+// Versioned key to prevent collision and handle clear caching strategies
+const STORAGE_KEY = "stellarlend_sidebar_v1:collapsed";
 
 export const SidebarProvider: FC<SidebarProviderProps> = ({
   children,
   initialSidebarOpen,
   initialIsMobile,
 }) => {
-  const [isMobile, setIsMobile] = useState(initialIsMobile ?? false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(
+  const [isMobile, setIsMobile] = useState<boolean>(initialIsMobile ?? false);
+  
+  // Safe SSR default: start open unless initial overrides are provided
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(
     initialSidebarOpen ?? true
   );
 
+  // 1. Core Window Responsive & Initialization Layer
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
-    if (initialIsMobile !== undefined) {
-      return;
-    }
-
-    const checkIsMobile = () => {
+    const checkDimensions = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
+
       if (mobile) {
+        // Mobile layout always forces sidebars completely shut
         setIsSidebarOpen(false);
+      } else if (initialSidebarOpen === undefined) {
+        // Desktop recovery layout: read what the user explicitly saved
+        try {
+          const savedState = localStorage.getItem(STORAGE_KEY);
+          if (savedState !== null) {
+            // Note: Key tracks "isCollapsed", so open is the inverse
+            setIsSidebarOpen(savedState !== "true");
+          }
+        } catch (error) {
+          console.warn("Storage access denied during layout calculation:", error);
+        }
       }
     };
 
-    checkIsMobile();
-    window.addEventListener("resize", checkIsMobile);
-    return () => window.removeEventListener("resize", checkIsMobile);
-  }, [initialIsMobile]);
+    // Run layout evaluation immediately on mount
+    checkDimensions();
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    window.addEventListener("resize", checkDimensions);
+    return () => window.removeEventListener("resize", checkDimensions);
+  }, [initialSidebarOpen, initialIsMobile]);
 
-    if (initialSidebarOpen !== undefined) {
-      return;
-    }
-
-    const saved = localStorage.getItem("sidebarOpen");
-    if (saved !== null) {
-      setIsSidebarOpen(saved === "true");
-    }
-  }, [initialSidebarOpen]);
-
-  useEffect(() => {
-    if (!isMobile && initialSidebarOpen === undefined) {
-      localStorage.setItem("sidebarOpen", isSidebarOpen.toString());
-    }
-  }, [isSidebarOpen, isMobile, initialSidebarOpen]);
-
+  // 2. State Actions with Safe Persistence Syncing
   const toggleSidebar = () => {
-    setIsSidebarOpen((prev) => !prev);
+    setIsSidebarOpen((prev) => {
+      const nextState = !prev;
+      
+      // Only persist configuration state adjustments if executed on desktop viewports
+      if (!isMobile && initialSidebarOpen === undefined) {
+        try {
+          // If sidebar is open, it is NOT collapsed (false)
+          localStorage.setItem(STORAGE_KEY, (!nextState).toString());
+        } catch (error) {
+          console.warn("Failed to persist sidebar state modification:", error);
+        }
+      }
+      return nextState;
+    });
   };
 
   const closeSidebar = () => {
     setIsSidebarOpen(false);
+    if (!isMobile && initialSidebarOpen === undefined) {
+      try {
+        // Closed sidebar means collapsed is true
+        localStorage.setItem(STORAGE_KEY, "true");
+      } catch (error) {
+        console.warn("Failed to write layout update to localStorage:", error);
+      }
+    }
   };
 
   return (

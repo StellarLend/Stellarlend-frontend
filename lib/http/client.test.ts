@@ -206,6 +206,25 @@ describe('httpPost', () => {
     expect(counts['POST:429']).toBe(1);
     expect(spy).toHaveBeenCalledTimes(2);
   });
+it('clamps Retry-After wait to upper bound when header exceeds it', async () => {
+  const spy = mockFetch(async (url, init) => {
+    if (spy.mock.calls.length === 0) {
+      // Retry-After 10 seconds (exceeds upper bound)
+      return new Response('', { status: 429, headers: { 'Retry-After': '10' } });
+    }
+    return jsonResponse({ created: true });
+  });
+  const { getHttpRetryCounts } = await import('@/lib/metrics');
+  const promise = httpPost<{ created: boolean }>(TEST_URL, { name: 'test' }, { retryOnPost: true, retries: 2, backoffMs: 10, retryAfterUpperBoundMs: 5000 });
+  const assertion = expect(promise).resolves.toEqual({ created: true });
+  // Advance timers by the upper bound (5000 ms)
+  await vi.advanceTimersByTimeAsync(5000);
+  await vi.runAllTimersAsync();
+  await assertion;
+  const counts = getHttpRetryCounts();
+  expect(counts['POST:429']).toBe(1);
+  expect(spy).toHaveBeenCalledTimes(2);
+});
 });
 
 describe('TimeoutError', () => {

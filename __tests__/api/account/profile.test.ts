@@ -1,4 +1,8 @@
-import { describe, test, expect } from "vitest";
+import { describe, test, expect, vi } from "vitest";
+vi.mock('server-only', () => ({}));
+vi.mock("@/lib/api/handler", () => ({
+  withCsrfProtection: (handler: any) => handler,
+}));
 import { NextRequest } from "next/server";
 import { GET, PUT } from "@/app/account/profile/route";
 import { profileRepository } from "@/lib/account/repository";

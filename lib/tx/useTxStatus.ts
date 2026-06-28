@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  TX_API_STATUS,
+  TX_HOOK_STATE,
+  TX_STATUS_ENDPOINT,
+  TX_STATUS_POLL,
+  isTerminalApiStatus,
+} from "./constants";
 
 export type TxStatus =
-  | { state: "processing" }
-  | { state: "completed"; result: any }
-  | { state: "failed"; error?: any }
-  | { state: "rate_limited"; retryAfterSeconds?: number };
+  | { state: typeof TX_HOOK_STATE.PROCESSING }
+  | { state: typeof TX_HOOK_STATE.COMPLETED; result: unknown }
+  | { state: typeof TX_HOOK_STATE.FAILED; error?: unknown }
+  | { state: typeof TX_HOOK_STATE.RATE_LIMITED; retryAfterSeconds?: number };
 
 export default function useTxStatus(hash: string | null) {
   const [status, setStatus] = useState<TxStatus | null>(null);
@@ -24,22 +31,22 @@ export default function useTxStatus(hash: string | null) {
   useEffect(() => {
     if (!hash) return;
 
-    let attempts = 0;
-    let delay = 1000; // 1s
+    let delay = TX_STATUS_POLL.INITIAL_DELAY_MS;
     let stopped = false;
 
     const poll = async () => {
       if (!mounted.current || stopped) return;
-      attempts += 1;
       abortCtrl.current = new AbortController();
       try {
-        setStatus({ state: "processing" });
-        const res = await fetch(`/api/tx/status/${hash}`, { signal: abortCtrl.current.signal });
+        setStatus({ state: TX_HOOK_STATE.PROCESSING });
+        const res = await fetch(TX_STATUS_ENDPOINT(hash), {
+          signal: abortCtrl.current.signal,
+        });
 
         if (res.status === 429) {
           const retry = res.headers.get("Retry-After");
           const retryAfterSeconds = retry ? Number(retry) : undefined;
-          setStatus({ state: "rate_limited", retryAfterSeconds });
+          setStatus({ state: TX_HOOK_STATE.RATE_LIMITED, retryAfterSeconds });
           stopped = true;
           return;
         }
@@ -47,28 +54,31 @@ export default function useTxStatus(hash: string | null) {
         const json = await res.json();
         const apiStatus = (json && json.status) || null;
 
-        if (apiStatus === "SUCCESS") {
-          setStatus({ state: "completed", result: json });
+        if (apiStatus === TX_API_STATUS.SUCCESS) {
+          setStatus({ state: TX_HOOK_STATE.COMPLETED, result: json });
           stopped = true;
           return;
         }
 
-        if (apiStatus === "FAILED" || apiStatus === "NOT_FOUND") {
-          setStatus({ state: "failed", error: json });
+        if (isTerminalApiStatus(apiStatus) && apiStatus !== TX_API_STATUS.SUCCESS) {
+          setStatus({ state: TX_HOOK_STATE.FAILED, error: json });
           stopped = true;
           return;
         }
 
-        // otherwise keep polling with backoff
-        attempts += 0;
-        await new Promise((r) => setTimeout(r, delay));
-        delay = Math.min(30000, delay * 2);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay = Math.min(
+          TX_STATUS_POLL.MAX_DELAY_MS,
+          delay * TX_STATUS_POLL.BACKOFF_MULTIPLIER,
+        );
         if (!stopped) poll();
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
-        // transient network error: backoff and retry
-        await new Promise((r) => setTimeout(r, delay));
-        delay = Math.min(30000, delay * 2);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay = Math.min(
+          TX_STATUS_POLL.MAX_DELAY_MS,
+          delay * TX_STATUS_POLL.BACKOFF_MULTIPLIER,
+        );
         if (!stopped) poll();
       }
     };

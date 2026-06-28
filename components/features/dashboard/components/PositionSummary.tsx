@@ -2,6 +2,9 @@
 
 import { useMemo } from "react";
 import { AlertCircle, TrendingUp } from "lucide-react";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { CollateralBreakdown } from "./CollateralBreakdown";
+import { useCollateralShares } from "@/hooks/usePositions";
 
 interface PositionData {
   suppliedFunds: string;
@@ -104,6 +107,8 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   data,
   isLoading = false,
 }) => {
+  const shouldReduceMotion = useReducedMotion();
+  const { shares, isLoading: sharesLoading } = useCollateralShares();
   const {
     netPosition,
     formattedNetPosition,
@@ -137,7 +142,9 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   if (isLoading) {
     return (
       <div
-        className="bg-gradient-to-br from-[#0A3D1E] to-[#06613D] rounded-xl p-8 md:p-12 border border-[#71B48D33] animate-pulse"
+        className={`bg-gradient-to-br from-[#0A3D1E] to-[#06613D] rounded-xl p-8 md:p-12 border border-[#71B48D33] ${
+          shouldReduceMotion ? "" : "animate-pulse"
+        }`}
         role="status"
         aria-label="Loading position summary"
       >
@@ -166,7 +173,9 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
 
   return (
     <div
-      className="bg-gradient-to-br from-[#0A3D1E] to-[#06613D] rounded-xl p-8 md:p-12 border border-[#71B48D33] mb-8 hover:border-[#71B48D66] transition-colors"
+      className={`bg-gradient-to-br from-[#0A3D1E] to-[#06613D] rounded-xl p-8 md:p-12 border border-[#71B48D33] mb-8 hover:border-[#71B48D66] ${
+        shouldReduceMotion ? "" : "transition-colors"
+      }`}
       role="region"
       aria-label="Position summary"
     >
@@ -264,6 +273,9 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Collateral Breakdown */}
+      <CollateralBreakdown shares={shares} isLoading={sharesLoading} />
 
       {/* Screen reader only summary */}
       <div className="sr-only">

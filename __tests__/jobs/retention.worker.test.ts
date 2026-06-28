@@ -1,6 +1,8 @@
 // __tests__/jobs/retention.worker.test.ts
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { getDeletionCounts } from '../../lib/metrics';
+vi.mock('server-only', () => ({}));
+
+let getDeletionCounts: typeof import('../../lib/metrics').getDeletionCounts;
 
 // Mock bullmq to avoid connecting to a real Redis instance during tests
 vi.mock('bullmq', () => {
@@ -29,9 +31,12 @@ vi.mock('../../lib/db/pool', () => {
 });
 
 describe('Retention Worker', () => {
-  beforeEach(() => {
-    mockQuery.mockClear();
+  beforeEach(async () => {
+    mockQuery.mockReset();
     mockRelease.mockClear();
+    vi.resetModules();
+    const metricsMod = await import('../../lib/metrics');
+    getDeletionCounts = metricsMod.getDeletionCounts;
   });
 
   it('dry run does not delete rows but logs/counts potential deletions', async () => {

@@ -6,6 +6,7 @@ export interface Notification {
   title: string;
   message: string;
   read: boolean;
+  pinned?: boolean;
   createdAt: string;
   type: NotificationType;
 }

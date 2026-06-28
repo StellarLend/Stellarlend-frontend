@@ -141,7 +141,7 @@ const Sidebar = () => {
             onClick={toggleSidebar}
             aria-expanded={isSidebarOpen}
             aria-label={isSidebarOpen ? 'Close account navigation' : 'Open account navigation'}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#15A350]"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350]"
           >
             {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -181,8 +181,8 @@ const Sidebar = () => {
                     <button
                       type="button"
                       onClick={closeSidebar}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#15A350]"
-                      aria-label="Close account navigation drawer"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350]"
+                    aria-label="Close account navigation drawer"
                     >
                       <X size={20} />
                     </button>
@@ -237,7 +237,7 @@ const Sidebar = () => {
           <button
             type="button"
             onClick={toggleSidebar}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#15A350]"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2"
             aria-label={toggleLabel}
             aria-expanded={isSidebarOpen}
           >

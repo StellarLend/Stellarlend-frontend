@@ -15,9 +15,17 @@ interface ServerConfig {
     token: string;
   };
   redisUrl: string;
-  sentry: {
-    dsn?: string;
+  horizon: {
+    urls: string[];
+    primaryUrl: string;
   };
+  db: {
+    url: string;
+  };
+}
+
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, '');
 }
 
 function parseHorizonUrls(rawValue?: string): string[] {
@@ -46,8 +54,12 @@ const serverConfig: ServerConfig = {
     token: process.env.SERVER_TOKEN || '',
   },
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
-  sentry: {
-    dsn: process.env.SENTRY_DSN,
+  horizon: {
+    urls: horizonUrls,
+    primaryUrl: horizonUrls[0] || 'https://horizon-testnet.stellar.org',
+  },
+  db: {
+    url: process.env.DATABASE_URL || 'postgres://localhost:5432/stellarlend',
   },
 };
 

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { httpFetch } from '@/lib/http/client';
 import { UpstreamError } from '@/lib/http/errors';
 
+vi.mock('server-only', () => ({}));
+
 // Use fake timers to control AbortController timeouts
 // We instead mock global fetch directly.
 

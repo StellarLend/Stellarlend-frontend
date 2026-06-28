@@ -45,3 +45,42 @@ export function getAuditEvents(): AuditEvent[] {
 export function clearAuditEventsForTests(): void {
   auditEvents.length = 0;
 }
+
+// Admin Audit Logging
+export type AuditAction =
+  | 'admin.users.read'
+  | 'admin.users.export'
+  | 'admin.user.view'
+  | 'admin.user.update'
+  | 'admin.user.suspend';
+
+export interface AdminAuditEvent {
+  type: 'AUDIT';
+  timestamp: string;
+  action: AuditAction;
+  actorId: string;
+  context?: Record<string, unknown>;
+}
+
+export function emitAuditEvent(
+  action: AuditAction,
+  actorId: string,
+  context?: Record<string, unknown>,
+): void {
+  const event: AdminAuditEvent = {
+    type: 'AUDIT',
+    timestamp: new Date().toISOString(),
+    action,
+    actorId,
+    context,
+  };
+
+  process.stdout.write(JSON.stringify(event) + '\n');
+}
+
+export function auditAdminUsersRead(
+  actorId: string,
+  queryParams: Record<string, unknown>,
+): void {
+  emitAuditEvent('admin.users.read', actorId, { queryParams });
+}

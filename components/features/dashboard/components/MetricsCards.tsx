@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { Copy } from "lucide-react";
 import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { Toast } from "@/components/shared/common";
+import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -24,13 +27,40 @@ const MetricCard: React.FC<MetricCardProps> = ({
   isPrimary = false,
 }) => {
   const [isCopied, setIsCopied] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
+  const [toast, setToast] = useState<{
+    variant: "error" | "info";
+    title: string;
+    description: string;
+  } | null>(null);
 
-  const handleCopy = () => {
-    if (copyValue) {
-      navigator.clipboard.writeText(copyValue);
+  const handleCopy = async () => {
+    if (!copyValue) return;
+
+    const result = await copyToClipboard(copyValue, true);
+
+    if (result.success) {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
+      return;
     }
+
+    const messages: Record<CopyFailureReason, { title: string; description: string }> = {
+      invalid_address: {
+        title: "Invalid Address",
+        description: "The wallet address could not be validated before copying.",
+      },
+      clipboard_error: {
+        title: "Copy Failed",
+        description: "Clipboard access is unavailable. Try copying the address manually.",
+      },
+    };
+
+    setToast({
+      variant: "error",
+      ...messages[result.reason!],
+    });
+    setTimeout(() => setToast(null), 4000);
   };
 
   const cardBg = isPrimary ? "bg-[#0A3D1E]" : "bg-[#097C4C]";
@@ -42,9 +72,8 @@ const MetricCard: React.FC<MetricCardProps> = ({
   return (
     <div
       className={`
-        ${cardBg} rounded-xl overflow-hidden p-4 transform transition-transform
-        hover:scale-[1.02] active:scale-[1.03] w-full border-[#71B48D33] my-6
-        cursor-pointer
+        ${cardBg} rounded-xl overflow-hidden p-4 w-full border-[#71B48D33] my-6
+        cursor-pointer ${shouldReduceMotion ? "" : "transform transition-transform hover:scale-[1.02] active:scale-[1.03]"}
       `}
     >
       <div>
@@ -88,7 +117,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
               </div>
               <button
                 onClick={(e) => {
-                  e.stopPropagation(); // Prevent bubbling to parent
+                  e.stopPropagation();
                   handleCopy();
                 }}
                 className={`${iconBgColor} hover:bg-opacity-80 rounded-md w-9 h-9 flex items-center justify-center transition-all ml-2 shrink-0`}
@@ -103,6 +132,13 @@ const MetricCard: React.FC<MetricCardProps> = ({
             </div>
           ) : null}
         </div>
+      )}
+      {toast && (
+        <Toast
+          variant={toast.variant}
+          title={toast.title}
+          description={toast.description}
+        />
       )}
     </div>
   );

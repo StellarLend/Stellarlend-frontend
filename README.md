@@ -12,6 +12,7 @@ This frontend application provides a modern, responsive web interface for intera
 - [Borrow repayment flow](docs/REPAY_FLOW.md)
 - [Withdraw supplied liquidity flow](docs/WITHDRAW_FLOW.md)
 - [Environment variables reference](docs/ENVIRONMENT.md)
+- [Client-side data fetching and hooks conventions](docs/data-fetching.md)
 
 ## ?? Features
 

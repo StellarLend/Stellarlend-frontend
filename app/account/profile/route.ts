@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { withCsrfProtection } from "@/lib/api/handler";
 import { validateProfile } from "@/lib/account/validation";
 import { profileRepository, ProfileRecord } from "@/lib/account/repository";
 import { db } from "@/lib/db/client";
