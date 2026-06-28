@@ -2,13 +2,13 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { useWallet } from "@/hooks/useWallet";
+import { useWalletContext } from "@/context/WalletContext";
 
 const focusClasses =
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 const Header: React.FC = () => {
-  const { address, status, error, connect, disconnect } = useWallet();
+  const { address, status, error, connect, disconnect } = useWalletContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const loading = status === "connecting";
@@ -22,18 +22,30 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <Image src="/logo.svg" alt="StellarLend logo" width={140} height={40} className="h-10 w-auto" />
+          <Image
+            src="/logo.svg"
+            alt="StellarLend logo"
+            width={140}
+            height={40}
+            className="h-10 w-auto"
+          />
         </div>
 
         {/* Navigation */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
-          <a href="#how-it-works" className="hover:text-white transition-colors">
+          <a
+            href="#how-it-works"
+            className="hover:text-white transition-colors"
+          >
             How It Works
           </a>
           <a href="#features" className="hover:text-white transition-colors">
             Features
           </a>
-          <a href="#testimonials" className="hover:text-white transition-colors">
+          <a
+            href="#testimonials"
+            className="hover:text-white transition-colors"
+          >
             Testimonials
           </a>
         </nav>
@@ -49,8 +61,16 @@ const Header: React.FC = () => {
                 className={`flex items-center gap-2 text-white bg-gray-900 border border-gray-700 py-2 px-4 rounded-full text-sm font-medium hover:bg-gray-800 transition-colors ${focusClasses}`}
               >
                 <span>{getShortAddress(address)}</span>
-                <svg className="w-3 h-3 text-white transition-transform" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                  <path d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z" fill="currentColor" />
+                <svg
+                  className="w-3 h-3 text-white transition-transform"
+                  viewBox="0 0 10 6"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
+                    fill="currentColor"
+                  />
                 </svg>
               </button>
 
