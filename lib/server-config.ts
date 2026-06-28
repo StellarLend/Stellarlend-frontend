@@ -13,6 +13,7 @@ interface ServerConfig {
   };
   server: {
     token: string;
+    cacheInvalidateAllowedOrigins: string[];
   };
   redisUrl: string;
   horizon: {
@@ -28,13 +29,19 @@ function normalizeUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
+function parseCsvList(rawValue?: string): string[] {
+  return Array.from(
+    new Set(
+      (rawValue || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 function parseHorizonUrls(rawValue?: string): string[] {
-  const rawList = rawValue?.trim() || '';
-  const urls = rawList
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map(normalizeUrl);
+  const urls = parseCsvList(rawValue).map(normalizeUrl);
 
   return urls.length ? Array.from(new Set(urls)) : ['https://horizon-testnet.stellar.org'];
 }
@@ -52,6 +59,7 @@ const serverConfig: ServerConfig = {
   },
   server: {
     token: process.env.SERVER_TOKEN || '',
+    cacheInvalidateAllowedOrigins: parseCsvList(process.env.CACHE_INVALIDATE_ALLOWED_ORIGINS).map(normalizeUrl),
   },
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   horizon: {
