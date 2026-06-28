@@ -17,13 +17,13 @@ export const metadata: Metadata = {
   description: "Decentralized lending and borrowing on Stellar",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   // Retrieve CSP nonce from middleware header
-  const nonce = headers().get("x-csp-nonce") ?? undefined;
+  const nonce = (await headers()).get("x-csp-nonce") ?? undefined;
 
   return (
     <html lang="en" suppressHydrationWarning={true}>

@@ -16,13 +16,16 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   const prefs = await preferencesRepository.getByUserId(user.id);
 
   return NextResponse.json(
-    prefs ?? {
-      userId: user.id,
-      locale: "en-US",
-      displayCurrency: "USD",
-      notifications: { email: true, push: true, sms: false, inApp: true },
-      updatedAt: null,
-    }
+    prefs
+      ? { email: user.email, ...prefs }
+      : {
+          userId: user.id,
+          email: user.email,
+          locale: "en-US",
+          displayCurrency: "USD",
+          notifications: { email: true, push: true, sms: false, inApp: true },
+          updatedAt: null,
+        }
   );
 }
 

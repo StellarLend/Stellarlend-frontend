@@ -7,6 +7,7 @@ export interface NotificationPreferences {
 
 export interface PreferencesRecord {
   userId: string;
+  email?: string;
   locale: string;
   displayCurrency: string;
   notifications: NotificationPreferences;

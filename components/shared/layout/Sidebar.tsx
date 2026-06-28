@@ -12,6 +12,7 @@ import {
   ChevronRight,
   X,
   Menu,
+  Settings,
 } from 'lucide-react';
 import { useSidebar } from '@/context/SidebarContext';
 
@@ -27,8 +28,13 @@ const navItems = [
     icon: <Lock size={18} />,
   },
   {
+    label: 'Preferences',
+    href: '/account/preferences',
+    icon: <Settings size={18} />,
+  },
+  {
     label: 'Notification',
-    href: '/account/notification',
+    href: '/account/notifications',
     icon: <Bell size={18} />,
   },
   {

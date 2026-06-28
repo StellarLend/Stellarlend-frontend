@@ -71,6 +71,7 @@ export default defineConfig({
 
           include: [
             "app/lending/**/*.test.tsx",
+            "app/account/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/atoms/Button/Button.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
@@ -78,6 +79,7 @@ export default defineConfig({
             "components/shared/common/**/*.test.tsx",
             "components/shared/ui/**/*.test.tsx",
             "components/features/dashboard/**/*.test.tsx",
+            "components/features/account/**/*.test.tsx",
             "lib/utils/clipboard.test.ts",
             "components/features/lending/**/*.test.tsx",
             "hooks/**/*.test.{ts,tsx}",
@@ -109,7 +111,7 @@ export default defineConfig({
           environment: "node",
           include: [
             "test/server/**/*.test.ts",
-            "app/api/markets/route.test.ts",
+            "app/api/**/*.test.ts",
           ],
           alias: {
             "@": path.resolve(dirname, "."),

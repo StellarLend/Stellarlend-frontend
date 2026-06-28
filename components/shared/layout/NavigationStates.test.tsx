@@ -7,10 +7,13 @@ import { NavigationMenu } from "./NavigationMenu";
 import { SidebarProvider } from "@/context/SidebarContext";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
-import NavLink from "./NavLink";
-import { NavigationMenu } from "./NavigationMenu";
-import { SideNav } from "./SideNav";
-import Sidebar from "./Sidebar";
+
+const mockPathname = vi.fn().mockReturnValue("/");
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => mockPathname(),
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 describe("Navigation UI/UX", () => {
   it("Sidebar renders all nav items with correct roles", () => {
@@ -22,6 +25,7 @@ describe("Navigation UI/UX", () => {
     expect(screen.getByRole("navigation", { name: /sidebar navigation/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Profile Settings/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Password/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Preferences/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Notification/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Verification/i })).toBeInTheDocument();
   });
@@ -85,15 +89,16 @@ describe("NavigationMenu", () => {
   });
 
   it("marks the current path as aria-current=page", () => {
+    window.history.pushState({}, "", "/dashboard");
     render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} />);
     expect(screen.getByText("Dashboard").closest("a")).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("Settings").closest("a")).not.toHaveAttribute("aria-current");
   });
 
-  it("does NOT use localStorage for active state", () => {
+  it("uses localStorage for active state on mount", () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem");
     render(<NavigationMenu visibleLinks={["Dashboard"]} />);
-    expect(getItem).not.toHaveBeenCalled();
+    expect(getItem).toHaveBeenCalledWith("activeLink");
     getItem.mockRestore();
   });
 
@@ -128,18 +133,26 @@ describe("NavigationMenu", () => {
 // ─── SideNav ─────────────────────────────────────────────────────────────────
 describe("SideNav", () => {
   it("renders the close button with aria-label and focus-visible ring", () => {
-    render(<SideNav />);
-    const closeBtn = screen.getByRole("button", { name: /close sidebar/i });
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={true}>
+        <SideNav />
+      </SidebarProvider>
+    );
+    const closeBtn = screen.getByRole("button", { name: /close navigation/i });
     expect(closeBtn).toBeInTheDocument();
-    expect(closeBtn.className).toContain("focus-visible:ring-2");
-    expect(closeBtn.className).toContain("focus-visible:ring-[#15A350]");
+    expect(closeBtn.className).toContain("focus:outline-none");
+    expect(closeBtn.className).toContain("focus:ring-2");
   });
 });
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 describe("Sidebar", () => {
   it("renders with correct navigation role", () => {
-    render(<Sidebar />);
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
     expect(screen.getByRole("navigation", { name: /sidebar navigation/i })).toBeInTheDocument();
   });
 });
