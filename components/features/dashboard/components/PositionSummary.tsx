@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AlertCircle, TrendingUp } from "lucide-react";
+import SupplyApyChart from "./SupplyApyChart";
 
 interface PositionData {
   suppliedFunds: string;
@@ -263,6 +264,10 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
             {data.borrowedAmount}
           </p>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <SupplyApyChart className="w-full" />
       </div>
 
       {/* Screen reader only summary */}
