@@ -39,6 +39,7 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
+import { clientLog } from "@/lib/utils/client-log";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -98,7 +99,7 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
         setTransactions(payload.transactions);
         setTotalCount(payload.total);
       } catch (err) {
-        console.error(err);
+        clientLog.error("Failed to load transactions", err);
         setTransactions([]);
         setTotalCount(0);
       } finally {
