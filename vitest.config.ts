@@ -80,6 +80,7 @@ export default defineConfig({
             "components/features/dashboard/**/*.test.tsx",
             "lib/utils/clipboard.test.ts",
             "components/features/lending/**/*.test.tsx",
+            "context/**/*.test.{ts,tsx}",
             "hooks/**/*.test.{ts,tsx}",
           ],
         },
