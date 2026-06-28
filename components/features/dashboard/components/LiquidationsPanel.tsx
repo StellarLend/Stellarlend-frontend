@@ -1,6 +1,6 @@
 "use client";
-
 import { useEffect, useMemo, useState } from "react";
+import { UtilizationBar } from "@/components/atoms/UtilizationBar/UtilizationBar";
 import type {
   LiquidationPosition,
   LiquidationsResponse,
@@ -226,6 +226,9 @@ export default function LiquidationsPanel({
                   Collateral
                 </th>
                 <th scope="col" className="px-3 py-2 font-semibold">
+                  Utilization
+                </th>
+                <th scope="col" className="px-3 py-2 font-semibold">
                   Health
                 </th>
                 <th scope="col" className="px-3 py-2 font-semibold">
@@ -256,6 +259,9 @@ export default function LiquidationsPanel({
                         position.collateralAmount,
                         position.collateralAsset,
                       )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <UtilizationBar asset={position.asset} />
                     </td>
                     <td className="px-3 py-3 font-mono">
                       {Number.isFinite(position.healthFactor)
