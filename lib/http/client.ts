@@ -128,6 +128,10 @@ export async function httpGet<T>(url: string, options: RequestOptions = {}): Pro
       }
     } catch (err) {
       lastError = err instanceof HttpError ? err : new NetworkError(url, err);
+      // If no retries were allowed for this request, throw the original error immediately
+      if (maxAttempts === 1) {
+        throw lastError;
+      }
       // Don't retry on client errors (4xx except 429)
       if (lastError instanceof UpstreamHttpError && lastError.status! < 500 && lastError.status! !== 429) {
         throw lastError;
