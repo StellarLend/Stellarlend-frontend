@@ -55,8 +55,6 @@ interface TransactionsProps {
   hideToolbar?: boolean;
   rowHeight?: number;
   viewportHeight?: number;
-  hideToolbar?: boolean;
-  infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
 }
 
@@ -66,8 +64,6 @@ export const Transactions = ({
   hideToolbar = false,
   rowHeight: rowHeightProp = 72,
   viewportHeight: viewportHeightProp = 560,
-  hideToolbar = false,
-  infiniteScroll = false,
   onDataLoad,
 }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -304,7 +300,7 @@ export const Transactions = ({
   // Reconcile and deduplicate pending transactions against indexed transactions
   const activePendingRows = pendingTxs.filter((ptx) => {
     return !transactions.some(
-      (tx) => tx.id === ptx.hash || (ptx.hash && tx.id.includes(ptx.hash)),
+      (tx) => tx.id === ptx.hash || (ptx.hash && tx.id.includes(ptx.hash))
     );
   });
 
@@ -334,16 +330,6 @@ export const Transactions = ({
                   />
                 </div>
               )}
-      {!hideToolbar && (
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
-        <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
-            <div
-              className="flex items-center gap-1 cursor-pointer"
-              onClick={() => setShowSearch((v) => !v)}
-            >
-              <Search size={18} />
-              <span>Search</span>
             </div>
             <div className="relative" ref={filterRef}>
               <div
@@ -474,7 +460,6 @@ export const Transactions = ({
             />
           </div>
         </div>
-      </div>
       )}
 
       <div className="">
@@ -493,113 +478,6 @@ export const Transactions = ({
           <>
             {/* Desktop View */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full text-sm border">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
-                    <th className="py-3 px-4 text-left font-semibold">
-                      Transaction Type
-                    </th>
-                    <th className="py-3 px-4 text-left font-semibold">Amount</th>
-                    <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                    <th className="py-3 px-4 text-left font-semibold">Date</th>
-                    <th className="py-3 px-4 text-left font-semibold">Status</th>
-                    <th className="py-3 px-4 text-left font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Optimistic Pending Rows */}
-                  {activePendingRows.map((ptx) => {
-                    const now = new Date();
-                    const pDate = ptx.date || format(now, "yyyy-MM-dd");
-                    let h = now.getHours();
-                    const m = now.getMinutes();
-                    const ampm = h >= 12 ? "PM" : "AM";
-                    h = h % 12 || 12;
-                    const pTime =
-                      ptx.time ||
-                      `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
-
-                    return (
-                      <tr
-                        key={ptx.hash}
-                        data-testid={`pending-row-${ptx.hash}`}
-                        className="border-b border-amber-200 bg-amber-50/50 whitespace-nowrap hover:bg-amber-50/70 transition text-black font-semibold"
-                      >
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-black">{ptx.type}</div>
-                          <div className="text-sm font-normal text-[#667185]">
-                            #{ptx.hash}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-mono">
-                          {ptx.amount > 0
-                            ? `+$${ptx.amount}`
-                            : `-$${Math.abs(ptx.amount)}`}
-                        </td>
-                        <td className="py-6 px-4 flex items-center gap-2">
-                          <Image
-                            src={`/icons/${ptx.asset.toLowerCase()}.svg`}
-                            alt={ptx.asset}
-                            width={24}
-                            height={24}
-                            className="inline-block"
-                          />
-                          <span className="ml-1 font-medium ">{ptx.asset}</span>
-                        </td>
-                        <td className="py-3 px-4 ">
-                          {formatDateTime(pDate, pTime)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <StatusBadge variant="pending" label="Processing" />
-                        </td>
-                        <td className="py-3 px-4 text-gray-400 italic text-xs">
-                          In-flight...
-                        </td>
-                      </tr>
-                    );
-                  })}
-
-                  {/* Confirmed Transactions */}
-                  {transactions.map((txn, idx) => (
-                    <tr
-                      key={txn.id || idx}
-                      className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
-                    >
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-black">{txn.type}</div>
-                        <div className="text-sm font-normal text-[#667185]">
-                          #{txn.id}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono">
-                        {txn.amount > 0
-                          ? `+$${txn.amount}`
-                          : `-$${Math.abs(txn.amount)}`}
-                      </td>
-                      <td className="py-6 px-4 flex items-center gap-2">
-                        <Image
-                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                          alt={txn.asset}
-                          width={24}
-                          height={24}
-                          className="inline-block"
-                        />
-                        <span className="ml-1 font-medium ">{txn.asset}</span>
-                      </td>
-                      <td className="py-3 px-4 ">
-                        {formatDateTime(txn.date, txn.time)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge
-                          variant={transactionStatusToVariant(txn.status)}
-                          label={txn.status}
-                        />
-                      </td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => {
-                            setSelectedTxn(txn);
-                            setIsDetailOpen(true);
               <div
                 ref={scrollContainerRef}
                 data-testid={shouldVirtualize ? "transactions-virtualizer" : undefined}
@@ -621,6 +499,58 @@ export const Transactions = ({
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Optimistic Pending Rows */}
+                    {activePendingRows.map((ptx) => {
+                      const now = new Date();
+                      const pDate = ptx.date || format(now, "yyyy-MM-dd");
+                      let h = now.getHours();
+                      const m = now.getMinutes();
+                      const ampm = h >= 12 ? "PM" : "AM";
+                      h = h % 12 || 12;
+                      const pTime =
+                        ptx.time ||
+                        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
+
+                      return (
+                        <tr
+                          key={ptx.hash}
+                          data-testid={`pending-row-${ptx.hash}`}
+                          className="border-b border-amber-200 bg-amber-50/50 whitespace-nowrap hover:bg-amber-50/70 transition text-black font-semibold"
+                        >
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-black">{ptx.type}</div>
+                            <div className="text-sm font-normal text-[#667185]">
+                              #{ptx.hash}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {ptx.amount > 0
+                              ? `+$${ptx.amount}`
+                              : `-$${Math.abs(ptx.amount)}`}
+                          </td>
+                          <td className="py-6 px-4 flex items-center gap-2">
+                            <Image
+                              src={`/icons/${ptx.asset.toLowerCase()}.svg`}
+                              alt={ptx.asset}
+                              width={24}
+                              height={24}
+                              className="inline-block"
+                            />
+                            <span className="ml-1 font-medium ">{ptx.asset}</span>
+                          </td>
+                          <td className="py-3 px-4 ">
+                            {formatDateTime(pDate, pTime)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <StatusBadge variant="pending" label="Processing" />
+                          </td>
+                          <td className="py-3 px-4 text-gray-400 italic text-xs">
+                            In-flight...
+                          </td>
+                        </tr>
+                      );
+                    })}
+
                     {shouldVirtualize && topSpacerHeight > 0 && (
                       <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
                         <td colSpan={6} />
@@ -645,13 +575,6 @@ export const Transactions = ({
                           onKeyDown={(event) => handleRowKeyDown(event, actualIndex)}
                           className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
                         >
-                          Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
                           <td className="py-3 px-4">
                             <div className="font-medium text-black">{txn.type}</div>
                             <div className="text-sm font-normal text-[#667185]">
@@ -704,7 +627,7 @@ export const Transactions = ({
                       </tr>
                     )}
 
-                    {!shouldVirtualize && transactions.length === 0 && !loading && (
+                    {!shouldVirtualize && transactions.length === 0 && activePendingRows.length === 0 && !loading && (
                       <tr>
                         <td colSpan={6} className="text-center py-6">
                           No transactions found.
@@ -800,9 +723,6 @@ export const Transactions = ({
               })}
 
               {/* Confirmed Mobile Cards */}
-              {transactions.map((txn, idx) => (
-                <div
-                  key={txn.id || idx}
               {visibleTransactions.map((txn, idx) => (
                 <div
                   key={txn.id ?? startIndex + idx}
@@ -880,6 +800,12 @@ export const Transactions = ({
                   </div>
                 </div>
               ))}
+
+              {transactions.length === 0 && activePendingRows.length === 0 && !loading && (
+                <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                  <p className="text-gray-500">No transactions found.</p>
+                </div>
+              )}
             </div>
           </>
         )}
