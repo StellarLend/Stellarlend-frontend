@@ -66,9 +66,15 @@ export async function httpGet<T>(url: string, options: RequestOptions = {}): Pro
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       const { timeoutMs: _t, retries: _r, backoffMs: _b, retryOnPost: _rp, retryAfterUpperBoundMs: _rao, ...fetchOptions } = options;
+      
+      // Inject the request ID into headers
+      const requestId = getActiveRequestId() || generateRequestId();
+      const headers = new Headers(fetchOptions.headers);
+      headers.set(REQUEST_ID_HEADER, requestId);
+      
       let response: Response;
       try {
-        response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+        response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
       } catch (err) {
         clearTimeout(timer);
         if ((err as Error).name === 'AbortError') {
@@ -140,3 +146,8 @@ export async function httpPost<T>(url: string, body: unknown, options: RequestOp
   });
 }
 
+/**
+ * Alias for httpGet to maintain backwards compatibility with existing tests.
+ * @deprecated Use httpGet instead.
+ */
+export const httpFetch = httpGet;
