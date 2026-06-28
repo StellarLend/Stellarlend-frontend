@@ -15,3 +15,22 @@ When displaying memos or rendering explorer links:
 3. Outbound explorer URLs must be built from a validated transaction hash and a fixed allowlisted base (such as `https://stellar.expert/explorer/...`). The transaction hash must be validated, and any URL prefix must be strictly restricted to safe `https` origins.
 4. Always specify `rel="noopener noreferrer"` for external anchors.
 
+## Internal Cache Invalidation Route
+
+`app/api/internal/cache/invalidate/route.ts` is a server-only deployment hook for
+targeted cache busting. It must stay narrow because a public caller that can
+invalidate namespaces repeatedly can force cache stampedes against upstream
+services.
+
+The route applies three checks before parsing the request body:
+
+1. The request method must be `POST`.
+2. The `Authorization` header must be `Bearer <SERVER_TOKEN>`, compared with a
+   timing-safe equality check.
+3. If an `Origin` header is present, it must match one of the comma-separated
+   `CACHE_INVALIDATE_ALLOWED_ORIGINS` entries from `lib/server-config.ts`.
+
+Requests that fail any guard return the same `{ "error": "Unauthorized" }`
+envelope so callers cannot distinguish whether the token, method, or origin
+check failed. Server-to-server callers may omit `Origin`; browser-originated
+calls must be explicitly allowlisted.
