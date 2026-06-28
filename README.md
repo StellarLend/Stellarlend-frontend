@@ -264,6 +264,7 @@ The server-side API surface is documented in two places:
 | Resource                                                       | Description                                                                               |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | [`docs/backend-architecture.md`](docs/backend-architecture.md) | Architecture overview - lib/ modules, caching model, security, and how to add a new route |
+| [`docs/api-cursor.md`](docs/api-cursor.md)                     | Opaque transaction cursor format, validation guarantees, and limit handling               |
 | [`openapi.yaml`](openapi.yaml)                                 | OpenAPI 3.1 spec for all `app/api/*` routes, params, and response shapes                  |
 
 ### Available API Routes
