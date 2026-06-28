@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, forwardRef } from "react";
+import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from "react";
 import {
   Search,
   ArrowRight,
@@ -12,14 +12,26 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
 import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
-import TransactionDetail from "@/components/features/dashboard/components/TransactionDetail";
-import { Dialog } from "@headlessui/react";
+import dynamic from "next/dynamic";
 
+const TransactionDetail = dynamic(
+  () => import("@/components/features/dashboard/components/TransactionDetail"),
+  {
+    loading: () => (
+      <div className="fixed inset-0 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center text-sm text-gray-400">
+          Loading…
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 import {
   fetchTransactions,
@@ -27,7 +39,7 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
-import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
+import { clientLog } from "@/lib/utils/client-log";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -38,29 +50,30 @@ const statusOptions: (TransactionStatus | "All")[] = [
 
 interface TransactionsProps {
   showPagination?: boolean;
-  infiniteScroll?: boolean;
+  rowHeight?: number;
+  viewportHeight?: number;
   hideToolbar?: boolean;
+  infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
 }
 
 export const Transactions = ({
   showPagination = true,
-  infiniteScroll = false,
+  rowHeight: rowHeightProp = 72,
+  viewportHeight: viewportHeightProp = 560,
   hideToolbar = false,
+  infiniteScroll = false,
   onDataLoad,
 }: TransactionsProps) => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [localSearch, setLocalSearch] = useState("");
-  const [localStatus, setLocalStatus] = useState<"All" | TransactionStatus>("All");
-  const [localSortBy, setLocalSortBy] = useState<"date" | "amount">("date");
-  const [localSortDir, setLocalSortDir] = useState<"asc" | "desc">("desc");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<"All" | TransactionStatus>("All");
+  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
-  const [localDateFrom, setLocalDateFrom] = useState("");
-  const [localDateTo, setLocalDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -72,35 +85,21 @@ export const Transactions = ({
   const [dateFromObj, setDateFromObj] = useState<Date | null>(null);
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const itemsPerPage = 6;
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const liveRef = useRef<HTMLParagraphElement>(null);
-
-  const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
-  const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
-  const sortBy = hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy;
-  const sortDir = hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir;
-  const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
-  const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
-  const asset = hideToolbar ? searchParams.get("asset") || "" : "";
-  const type = hideToolbar ? searchParams.get("type") || "" : "";
-
-  const infinite = useInfiniteTransactions({
-    limit: itemsPerPage,
-    search: search || undefined,
-    status: status === "All" ? undefined : status,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    sortBy,
-    sortDir,
-  });
+  const router = useRouter();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<number, HTMLTableRowElement | null>>(new Map());
+  const rowHeight = rowHeightProp;
+  const viewportHeight = viewportHeightProp;
+  const overscan = 4;
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, status, sortBy, sortDir, dateFrom, dateTo, asset, type]);
+  }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   useEffect(() => {
-    if (infiniteScroll) return;
     const loadTransactions = async () => {
       setLoading(true);
 
@@ -112,58 +111,24 @@ export const Transactions = ({
           status: status === "All" ? undefined : status,
           dateFrom: dateFrom || undefined,
           dateTo: dateTo || undefined,
-          asset: asset || undefined,
-          type: type as any || undefined,
           sortBy,
           sortDir,
         });
 
         setTransactions(payload.transactions);
         setTotalCount(payload.total);
-        if (onDataLoad) {
-          onDataLoad(payload.total);
-        }
+        onDataLoad?.(payload.total);
       } catch (err) {
-        console.error(err);
+        clientLog.error("Failed to load transactions", err);
         setTransactions([]);
         setTotalCount(0);
-        if (onDataLoad) onDataLoad(0);
       } finally {
         setLoading(false);
       }
     };
 
     loadTransactions();
-  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, asset, type, onDataLoad, infiniteScroll]);
-
-  useEffect(() => {
-    if (!infiniteScroll) return;
-    if (infinite.hasMore && !infinite.isLoadingMore && sentinelRef.current) {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0]?.isIntersecting && infinite.hasMore && !infinite.isLoadingMore) {
-            infinite.loadMore();
-          }
-        },
-        { rootMargin: "200px" },
-      );
-      observer.observe(sentinelRef.current);
-      return () => observer.disconnect();
-    }
-  }, [infiniteScroll, infinite.hasMore, infinite.isLoadingMore, infinite.loadMore]);
-
-  useEffect(() => {
-    if (!infiniteScroll) return;
-    if (liveRef.current && infinite.transactions.length > 0) {
-      liveRef.current.textContent = `${infinite.transactions.length} transactions loaded`;
-    }
-    if (onDataLoad) {
-      onDataLoad(infinite.transactions.length);
-    }
-  }, [infiniteScroll, infinite.transactions.length, onDataLoad]);
-
-  const displayTransactions = infiniteScroll ? infinite.transactions : transactions;
-  const displayLoading = infiniteScroll ? infinite.isLoading : loading;
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -195,6 +160,88 @@ export const Transactions = ({
       </span>
     );
   };
+
+  useEffect(() => {
+    setScrollTop(0);
+    setFocusedRowIndex(null);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
+
+  const shouldVirtualize = transactions.length > 20;
+  const visibleRowCount = shouldVirtualize
+    ? Math.min(transactions.length, Math.max(10, Math.ceil(viewportHeight / rowHeight)))
+    : transactions.length;
+  const virtualizerHeight = shouldVirtualize ? viewportHeight : transactions.length * rowHeight;
+
+  const { startIndex, endIndex } = useMemo(() => {
+    if (!shouldVirtualize) {
+      return { startIndex: 0, endIndex: transactions.length };
+    }
+
+    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+    const end = Math.min(transactions.length, start + visibleRowCount + overscan * 2);
+    return { startIndex: start, endIndex: end };
+  }, [shouldVirtualize, transactions.length, scrollTop, rowHeight, visibleRowCount]);
+
+  const visibleTransactions = useMemo(() => {
+    return transactions.slice(startIndex, endIndex);
+  }, [transactions, startIndex, endIndex]);
+
+  const topSpacerHeight = shouldVirtualize ? startIndex * rowHeight : 0;
+  const bottomSpacerHeight = shouldVirtualize
+    ? Math.max(0, transactions.length - endIndex) * rowHeight
+    : 0;
+
+  const focusRow = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= transactions.length) return;
+
+      setFocusedRowIndex(index);
+      const row = rowRefs.current.get(index);
+      row?.focus();
+
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const targetTop = index * rowHeight;
+      const preferredTop = Math.max(0, targetTop - Math.floor(viewportHeight / 2) + rowHeight);
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({ top: Math.min(preferredTop, maxScroll) });
+      } else {
+        container.scrollTop = Math.min(preferredTop, maxScroll);
+      }
+    },
+    [transactions.length, rowHeight, viewportHeight]
+  );
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          focusRow(index + 1);
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          focusRow(index - 1);
+          break;
+        case "Home":
+          event.preventDefault();
+          focusRow(0);
+          break;
+        case "End":
+          event.preventDefault();
+          focusRow(transactions.length - 1);
+          break;
+        default:
+          break;
+      }
+    },
+    [focusRow, transactions.length]
+  );
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -254,7 +301,7 @@ export const Transactions = ({
       {!hideToolbar && (
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <Dialog as="div" className="relative z-50" onClose={() => {}} id="transaction-detail-drawer">
+          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
             <div
               className="flex items-center gap-1 cursor-pointer"
               onClick={() => setShowSearch((v) => !v)}
@@ -268,13 +315,13 @@ export const Transactions = ({
                   type="text"
                   placeholder="Search by type, amount, asset, id"
                   className=" rounded p-1  text-sm w-48 focus:outline-none"
-                  value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                   autoFocus
                 />
               </div>
             )}
-          </Dialog>
+          </div>
           <div className="relative" ref={filterRef}>
             <div
               className="flex items-center gap-1 cursor-pointer"
@@ -291,10 +338,10 @@ export const Transactions = ({
                   <button
                     key={opt}
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                      localStatus === opt ? "font-bold text-primary-700" : ""
+                      status === opt ? "font-bold text-primary-700" : ""
                     }`}
                     onClick={() => {
-                      setLocalStatus(opt);
+                      setStatus(opt);
                       setShowFilter(false);
                     }}
                     type="button"
@@ -319,33 +366,33 @@ export const Transactions = ({
               <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 <button
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    localSortBy === "date" ? "font-bold text-primary-700" : ""
+                    sortBy === "date" ? "font-bold text-primary-700" : ""
                   }`}
                   onClick={() => {
-                    setLocalSortBy("date");
+                    setSortBy("date");
                     setShowSort(false);
                   }}
                   type="button"
                 >
-                  Date {localSortBy === "date" && (localSortDir === "asc" ? "↑" : "↓")}
+                  Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
                 </button>
                 <button
                   className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    localSortBy === "amount" ? "font-bold text-primary-700" : ""
+                    sortBy === "amount" ? "font-bold text-primary-700" : ""
                   }`}
                   onClick={() => {
-                    setLocalSortBy("amount");
+                    setSortBy("amount");
                     setShowSort(false);
                   }}
                   type="button"
                 >
                   Amount{" "}
-                  {localSortBy === "amount" && (localSortDir === "asc" ? "↑" : "↓")}
+                  {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
                 </button>
                 <button
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
                   onClick={() => {
-                    setLocalSortDir(localSortDir === "asc" ? "desc" : "asc");
+                    setSortDir(sortDir === "asc" ? "desc" : "asc");
                   }}
                   type="button"
                 >
@@ -361,7 +408,7 @@ export const Transactions = ({
             selected={dateFromObj}
             onChange={(date: Date | null) => {
               setDateFromObj(date);
-              setLocalDateFrom(date ? format(date, "yyyy-MM-dd") : "");
+              setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
             }}
             customInput={
               <CustomDateInput
@@ -382,7 +429,7 @@ export const Transactions = ({
             selected={dateToObj}
             onChange={(date: Date | null) => {
               setDateToObj(date);
-              setLocalDateTo(date ? format(date, "yyyy-MM-dd") : "");
+              setDateTo(date ? format(date, "yyyy-MM-dd") : "");
             }}
             customInput={
               <CustomDateInput
@@ -409,9 +456,9 @@ export const Transactions = ({
       )}
 
       <div className="">
-        {displayLoading ? (
+        {loading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : displayTransactions.length === 0 ? (
+        ) : transactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -424,87 +471,120 @@ export const Transactions = ({
           <>
             {/* Desktop View */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full text-sm border">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
-                    <th className="py-3 px-4 text-left font-semibold">
-                      Transaction Type
-                    </th>
-                    <th className="py-3 px-4 text-left font-semibold">Amount</th>
-                    <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                    <th className="py-3 px-4 text-left font-semibold">Date</th>
-                    <th className="py-3 px-4 text-left font-semibold">Status</th>
-                    <th className="py-3 px-4 text-left font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayTransactions.map((txn, idx) => (
-                    <tr
-                      key={idx}
-                      className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
-                    >
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-black">{txn.type}</div>
-                        <div className="text-sm font-normal text-[#667185]">
-                          #{txn.id}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono">
-                        {txn.amount > 0
-                          ? `+$${txn.amount}`
-                          : `-$${Math.abs(txn.amount)}`}
-                      </td>
-                      <td className="py-6 px-4 flex items-center gap-2">
-                        <Image
-                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                          alt={txn.asset}
-                          width={24}
-                          height={24}
-                          className="inline-block"
-                        />
-                        <span className="ml-1 font-medium ">{txn.asset}</span>
-                      </td>
-                      <td className="py-3 px-4 ">
-                        {formatDateTime(txn.date, txn.time)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <StatusBadge
-                          variant={transactionStatusToVariant(txn.status)}
-                          label={txn.status}
-                        />
-                      </td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => {
-                            setSelectedTxn(txn);
-                            setIsDetailOpen(true);
+              <div
+                ref={scrollContainerRef}
+                data-testid={shouldVirtualize ? "transactions-virtualizer" : undefined}
+                className="overflow-y-auto"
+                style={{ maxHeight: `${viewportHeight}px`, height: `${virtualizerHeight}px` }}
+                onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+              >
+                <table className="min-w-full text-sm border" aria-rowcount={transactions.length + 1}>
+                  <thead className="sticky top-0 z-10 bg-gray-50">
+                    <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
+                      <th className="py-3 px-4 text-left font-semibold">
+                        Transaction Type
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold">Amount</th>
+                      <th className="py-3 px-4 text-left font-semibold">Asset</th>
+                      <th className="py-3 px-4 text-left font-semibold">Date</th>
+                      <th className="py-3 px-4 text-left font-semibold">Status</th>
+                      <th className="py-3 px-4 text-left font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shouldVirtualize && topSpacerHeight > 0 && (
+                      <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
+                        <td colSpan={6} />
+                      </tr>
+                    )}
+                    {visibleTransactions.map((txn, idx) => {
+                      const actualIndex = startIndex + idx;
+                      return (
+                        <tr
+                          key={txn.id ?? actualIndex}
+                          ref={(node) => {
+                            if (node) {
+                              rowRefs.current.set(actualIndex, node);
+                            } else {
+                              rowRefs.current.delete(actualIndex);
+                            }
                           }}
-                          className="text-blue-600 hover:underline"
-                          aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
-                          aria-controls="transaction-detail-drawer"
+                          tabIndex={0}
+                          aria-rowindex={actualIndex + 2}
+                          aria-label={`Transaction ${txn.id}`}
+                          onFocus={() => setFocusedRowIndex(actualIndex)}
+                          onKeyDown={(event) => handleRowKeyDown(event, actualIndex)}
+                          className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
                         >
-                          Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-black">{txn.type}</div>
+                            <div className="text-sm font-normal text-[#667185]">
+                              #{txn.id}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {txn.amount > 0
+                              ? `+$${txn.amount}`
+                              : `-$${Math.abs(txn.amount)}`}
+                          </td>
+                          <td className="py-6 px-4 flex items-center gap-2">
+                            <Image
+                              src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                              alt={txn.asset}
+                              width={24}
+                              height={24}
+                              className="inline-block"
+                            />
+                            <span className="ml-1 font-medium ">{txn.asset}</span>
+                          </td>
+                          <td className="py-3 px-4 ">
+                            {formatDateTime(txn.date, txn.time)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <StatusBadge
+                              variant={transactionStatusToVariant(txn.status)}
+                              label={txn.status}
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => {
+                                setSelectedTxn(txn);
+                                setIsDetailOpen(true);
+                              }}
+                              className="text-blue-600 hover:underline"
+                              aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                              aria-controls="transaction-detail-drawer"
+                            >
+                              Details
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {shouldVirtualize && bottomSpacerHeight > 0 && (
+                      <tr aria-hidden="true" style={{ height: `${bottomSpacerHeight}px` }}>
+                        <td colSpan={6} />
+                      </tr>
+                    )}
 
-                  {displayTransactions.length === 0 && !displayLoading && (
-                    <tr>
-                      <td colSpan={6} className="text-center py-6">
-                        No transactions found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    {!shouldVirtualize && transactions.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-6">
+                          No transactions found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {displayTransactions.map((txn, idx) => (
+              {visibleTransactions.map((txn, idx) => (
                 <div
-                  key={idx}
+                  key={txn.id ?? startIndex + idx}
                   className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div className="flex justify-between items-start mb-3">
@@ -580,7 +660,7 @@ export const Transactions = ({
                 </div>
               ))}
 
-              {displayTransactions.length === 0 && !displayLoading && (
+              {transactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
@@ -591,58 +671,7 @@ export const Transactions = ({
 
 
         <div className="">
-          {infiniteScroll && !displayLoading && (
-            <div className="px-6 pb-4">
-              {infinite.isLoadingMore && (
-                <div className="flex justify-center py-4" role="status">
-                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                  <span className="sr-only">Loading more transactions...</span>
-                </div>
-              )}
-              {infinite.isError && (
-                <div className="text-center py-4">
-                  <p className="text-sm text-red-600 mb-2">
-                    Failed to load more transactions.
-                  </p>
-                  <button
-                    onClick={infinite.loadMore}
-                    className="text-sm font-medium text-blue-600 hover:underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              {!infinite.hasMore && displayTransactions.length > 0 && (
-                <p className="text-center text-sm text-gray-400 py-4">
-                  All transactions loaded
-                </p>
-              )}
-              <div
-                ref={sentinelRef}
-                className="h-4"
-                aria-hidden="true"
-                data-testid="infinite-scroll-sentinel"
-              />
-              {infinite.hasMore && !infinite.isLoadingMore && (
-                <div className="flex justify-center py-4">
-                  <button
-                    onClick={infinite.loadMore}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-                  >
-                    Load more
-                  </button>
-                </div>
-              )}
-              <p
-                ref={liveRef}
-                className="sr-only"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-              />
-            </div>
-          )}
-          {!infiniteScroll && showPagination && totalCount > 0 && (
+          {showPagination && totalCount > 0 && (
             <Pagination
               totalItems={totalCount}
               itemsPerPage={itemsPerPage}
