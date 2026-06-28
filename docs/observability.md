@@ -24,6 +24,8 @@ Usage:
 
 ## Request correlation
 
+See [request-tracing.md](request-tracing.md) for the full end-to-end explanation of request-id generation, propagation, logging, and Sentry correlation.
+
 All `/api/*` requests participate in `x-request-id` correlation:
 
 - Clients may send `x-request-id` as a ULID (26 Crockford Base32 characters, for example `01HZ0000000000000000000000`).

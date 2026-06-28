@@ -9,7 +9,9 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { publicConfig } from "@/lib/config";
+import { safeRedirectPath } from "@/lib/security/safe-redirect";
 
 export interface UseWalletResult {
   account: string | null;
@@ -43,6 +45,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     error: null,
   });
   const checkedSession = useRef(false);
+  const router = useRouter();
 
   const network = publicConfig.stellar.network;
 
@@ -114,12 +117,17 @@ export function WalletProvider({ children }: WalletProviderProps) {
         account: verifiedAddress,
         isConnecting: false,
       }));
+
+      const returnUrl = new URL(window.location.href).searchParams.get('returnUrl');
+      if (returnUrl) {
+        router.push(safeRedirectPath(returnUrl));
+      }
     } catch (err: any) {
       const msg = err.message || "Wallet connection failed";
       setState((prev) => ({ ...prev, error: msg, isConnecting: false }));
       throw err;
     }
-  }, [network]);
+  }, [network, router]);
 
   const disconnect = useCallback(async () => {
     setState((prev) => ({ ...prev, isConnecting: true, error: null }));
@@ -136,8 +144,13 @@ export function WalletProvider({ children }: WalletProviderProps) {
       const msg = err.message || "Failed to disconnect";
       setState((prev) => ({ ...prev, error: msg, isConnecting: false }));
       throw err;
+    } finally {
+      const returnUrl = new URL(window.location.href).searchParams.get('returnUrl');
+      if (returnUrl) {
+        router.push(safeRedirectPath(returnUrl));
+      }
     }
-  }, []);
+  }, [router]);
 
   const value = {
     account: state.account,
