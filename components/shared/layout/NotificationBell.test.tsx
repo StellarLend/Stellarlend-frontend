@@ -2,11 +2,6 @@ import React from "react";
 import { render, screen } from "@/test/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// vi.hoisted is required because vitest hoists vi.mock calls above all
-// module-level declarations — a plain `const` would still be in TDZ when
-// the factory runs. We share a single vi.fn() reference across the default
-// and named exports so the mocked hook is wired up regardless of which
-// import style the consumer resolves.
 const { streamFn } = vi.hoisted(() => ({ streamFn: vi.fn() }));
 
 vi.mock("@/hooks/useNotificationStream", () => ({
@@ -14,12 +9,11 @@ vi.mock("@/hooks/useNotificationStream", () => ({
   useNotificationStream: streamFn,
 }));
 
-// Imports must come after vi.mock so they pick up the mocked module.
-import NotificationBell from "./NotificationBell";
+import NotificationBell, { NotificationBellBase } from "./NotificationBell";
 
 describe("NotificationBell", () => {
   beforeEach(() => {
-    streamFn.mockReturnValue({ unreadCount: 0 });
+    streamFn.mockReturnValue({ unreadCount: 0, connectionState: "connected" });
   });
 
   afterEach(() => {
@@ -29,29 +23,27 @@ describe("NotificationBell", () => {
   it("hides the badge and exposes a no-unread label when count is zero", () => {
     render(<NotificationBell />);
     expect(screen.queryByText("99+")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("No unread notifications")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("No unread notifications"),
+    ).toBeInTheDocument();
   });
 
   it("shows the count and a singular label when unreadCount is 1", () => {
-    streamFn.mockReturnValue({ unreadCount: 1 });
+    streamFn.mockReturnValue({ unreadCount: 1, connectionState: "connected" });
     render(<NotificationBell />);
     expect(screen.getByText("1")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("1 unread notification"),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("1 unread notification")).toBeInTheDocument();
   });
 
   it("shows the count and a plural label for several unread items", () => {
-    streamFn.mockReturnValue({ unreadCount: 5 });
+    streamFn.mockReturnValue({ unreadCount: 5, connectionState: "connected" });
     render(<NotificationBell />);
     expect(screen.getByText("5")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("5 unread notifications"),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("5 unread notifications")).toBeInTheDocument();
   });
 
   it("renders the exact count at the 99-cap boundary", () => {
-    streamFn.mockReturnValue({ unreadCount: 99 });
+    streamFn.mockReturnValue({ unreadCount: 99, connectionState: "connected" });
     render(<NotificationBell />);
     expect(screen.getByText("99")).toBeInTheDocument();
     expect(
@@ -60,7 +52,10 @@ describe("NotificationBell", () => {
   });
 
   it("caps the visible badge at 99+ when count exceeds the threshold", () => {
-    streamFn.mockReturnValue({ unreadCount: 100 });
+    streamFn.mockReturnValue({
+      unreadCount: 100,
+      connectionState: "connected",
+    });
     render(<NotificationBell />);
     expect(screen.getByText("99+")).toBeInTheDocument();
     expect(
@@ -69,11 +64,21 @@ describe("NotificationBell", () => {
   });
 
   it("keeps the 99+ cap for very large unread totals", () => {
-    streamFn.mockReturnValue({ unreadCount: 1500 });
+    streamFn.mockReturnValue({
+      unreadCount: 1500,
+      connectionState: "connected",
+    });
     render(<NotificationBell />);
     expect(screen.getByText("99+")).toBeInTheDocument();
     expect(
       screen.getByLabelText("1500 unread notifications"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the presentational bell with a provided unread count", () => {
+    render(<NotificationBellBase unreadCount={7} />);
+
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByLabelText("7 unread notifications")).toBeInTheDocument();
   });
 });
