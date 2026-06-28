@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
 
@@ -399,15 +400,17 @@ export default function WithdrawForm({
           </div>
         )}
 
-        <Button
-          type="submit"
-          variant="success"
-          size="lg"
-          fullWidth
-          isLoading={false}
-        >
-          Review Withdrawal
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review withdrawal">
+          <Button
+            type="submit"
+            variant="success"
+            size="lg"
+            fullWidth
+            isLoading={false}
+          >
+            Review Withdrawal
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

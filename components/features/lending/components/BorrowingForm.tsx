@@ -6,6 +6,7 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import {
   FALLBACK_PRICES,
@@ -533,15 +534,17 @@ export default function BorrowingForm({
         </div>
 
         {/* Submit Button */}
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          fullWidth
-          isLoading={isSubmitting}
-        >
-          Review Loan Request
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review loan request">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+          >
+            Review Loan Request
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

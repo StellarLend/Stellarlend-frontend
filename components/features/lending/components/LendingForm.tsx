@@ -10,6 +10,7 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -257,15 +258,17 @@ export default function LendingForm({
         </div>
 
         {/* Submit Button */}
-        <Button
-          type="submit"
-          variant="success"
-          size="lg"
-          fullWidth
-          isLoading={isSubmitting}
-        >
-          Review Lending Offer
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review offer">
+          <Button
+            type="submit"
+            variant="success"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+          >
+            Review Lending Offer
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

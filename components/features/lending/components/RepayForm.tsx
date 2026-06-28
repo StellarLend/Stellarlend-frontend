@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
 
@@ -376,15 +377,17 @@ export default function RepayForm({
           </div>
         )}
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          fullWidth
-          isLoading={submitStatus === "loading"}
-        >
-          Review Repayment
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review repayment">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={submitStatus === "loading"}
+          >
+            Review Repayment
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );
