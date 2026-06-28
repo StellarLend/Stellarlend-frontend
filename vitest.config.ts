@@ -110,9 +110,11 @@ export default defineConfig({
         },
       },
       {
+        extends: true,
         test: {
           name: "server",
           environment: "node",
+          globals: true,
           setupFiles: "./vitest.setup.ts",
           include: [
             "test/server/**/*.test.ts",
