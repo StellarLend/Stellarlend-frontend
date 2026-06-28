@@ -15,6 +15,9 @@ interface ServerConfig {
     token: string;
   };
   redisUrl: string;
+  sentry: {
+    dsn?: string;
+  };
 }
 
 function parseHorizonUrls(rawValue?: string): string[] {
@@ -43,6 +46,9 @@ const serverConfig: ServerConfig = {
     token: process.env.SERVER_TOKEN || '',
   },
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  sentry: {
+    dsn: process.env.SENTRY_DSN,
+  },
 };
 
 export const AUDIT_RETENTION_DAYS = Number(process.env.AUDIT_RETENTION_DAYS ?? '30');

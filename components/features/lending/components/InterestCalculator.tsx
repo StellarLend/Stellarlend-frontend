@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
 import { calculateQuote } from '@/lib/lending/quote';
-import Tooltip from '@/components/atoms/Tooltip/Tooltip';
-import IconButton from '@/components/atoms/IconButton/IconButton';
+import { Tooltip } from '@/components/atoms/Tooltip';
+import { IconButton } from '@/components/atoms/IconButton';
 
 interface InterestCalculatorProps {
   data: LendingData;

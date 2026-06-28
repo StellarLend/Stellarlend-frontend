@@ -7,6 +7,9 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
+import { Tooltip } from "@/components/atoms/Tooltip";
+import { IconButton } from "@/components/atoms/IconButton";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
