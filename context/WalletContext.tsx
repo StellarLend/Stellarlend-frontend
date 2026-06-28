@@ -1,7 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, FC, ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import config from "@/lib/config";
+import { safeRedirectPath } from "@/lib/security/safe-redirect";
 
 declare global {
   interface Window {
@@ -30,6 +32,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(null);
   const [status, setStatus] = useState<WalletStatus>("disconnected");
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   // Map config network to PUBLIC or TESTNET
   const network: StellarNetwork =
@@ -130,6 +133,11 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       setAddress(verifiedAddress);
       setStatus("connected");
       sessionStorage.setItem("walletAddress", verifiedAddress);
+
+      const returnUrl = new URL(window.location.href).searchParams.get("returnUrl");
+      if (returnUrl) {
+        router.push(safeRedirectPath(returnUrl));
+      }
     } catch (err: any) {
       console.error("Wallet connection failed:", err);
       setError(err.message || "Wallet connection failed");
@@ -152,6 +160,11 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       setAddress(null);
       setStatus("disconnected");
       sessionStorage.removeItem("walletAddress");
+    }
+
+    const returnUrl = new URL(window.location.href).searchParams.get("returnUrl");
+    if (returnUrl) {
+      router.push(safeRedirectPath(returnUrl));
     }
   };
 

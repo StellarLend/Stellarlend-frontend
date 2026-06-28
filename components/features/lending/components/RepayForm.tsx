@@ -5,6 +5,7 @@ import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
@@ -433,6 +434,17 @@ export default function RepayForm({
           </div>
         )}
 
+        <WalletGate fallbackText="Connect wallet to review repayment">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={submitStatus === "loading"}
+          >
+            Review Repayment
+          </Button>
+        </WalletGate>
         <Button
           type="submit"
           variant="primary"
