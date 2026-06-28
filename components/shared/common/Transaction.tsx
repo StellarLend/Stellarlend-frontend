@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, forwardRef } from "react";
+import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from "react";
 import {
   Search,
   ArrowRight,
@@ -40,6 +40,7 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
+import { clientLog } from "@/lib/utils/client-log";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -52,6 +53,10 @@ interface TransactionsProps {
   showPagination?: boolean;
   infiniteScroll?: boolean;
   hideToolbar?: boolean;
+  rowHeight?: number;
+  viewportHeight?: number;
+  hideToolbar?: boolean;
+  infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
 }
 
@@ -59,6 +64,10 @@ export const Transactions = ({
   showPagination = true,
   infiniteScroll = false,
   hideToolbar = false,
+  rowHeight: rowHeightProp = 72,
+  viewportHeight: viewportHeightProp = 560,
+  hideToolbar = false,
+  infiniteScroll = false,
   onDataLoad,
 }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -81,8 +90,15 @@ export const Transactions = ({
   const [dateFromObj, setDateFromObj] = useState<Date | null>(null);
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const itemsPerPage = 6;
   const router = useRouter();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<number, HTMLTableRowElement | null>>(new Map());
+  const rowHeight = rowHeightProp;
+  const viewportHeight = viewportHeightProp;
+  const overscan = 4;
 
   const { pendingTxs, ItemTrackers } = usePendingTransactions();
 
@@ -110,7 +126,7 @@ export const Transactions = ({
         setTotalCount(payload.total);
         onDataLoad?.(payload.total);
       } catch (err) {
-        console.error(err);
+        clientLog.error("Failed to load transactions", err);
         setTransactions([]);
         setTotalCount(0);
         onDataLoad?.(0);
@@ -149,6 +165,88 @@ export const Transactions = ({
       </span>
     );
   };
+
+  useEffect(() => {
+    setScrollTop(0);
+    setFocusedRowIndex(null);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
+
+  const shouldVirtualize = transactions.length > 20;
+  const visibleRowCount = shouldVirtualize
+    ? Math.min(transactions.length, Math.max(10, Math.ceil(viewportHeight / rowHeight)))
+    : transactions.length;
+  const virtualizerHeight = shouldVirtualize ? viewportHeight : transactions.length * rowHeight;
+
+  const { startIndex, endIndex } = useMemo(() => {
+    if (!shouldVirtualize) {
+      return { startIndex: 0, endIndex: transactions.length };
+    }
+
+    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+    const end = Math.min(transactions.length, start + visibleRowCount + overscan * 2);
+    return { startIndex: start, endIndex: end };
+  }, [shouldVirtualize, transactions.length, scrollTop, rowHeight, visibleRowCount]);
+
+  const visibleTransactions = useMemo(() => {
+    return transactions.slice(startIndex, endIndex);
+  }, [transactions, startIndex, endIndex]);
+
+  const topSpacerHeight = shouldVirtualize ? startIndex * rowHeight : 0;
+  const bottomSpacerHeight = shouldVirtualize
+    ? Math.max(0, transactions.length - endIndex) * rowHeight
+    : 0;
+
+  const focusRow = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= transactions.length) return;
+
+      setFocusedRowIndex(index);
+      const row = rowRefs.current.get(index);
+      row?.focus();
+
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const targetTop = index * rowHeight;
+      const preferredTop = Math.max(0, targetTop - Math.floor(viewportHeight / 2) + rowHeight);
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({ top: Math.min(preferredTop, maxScroll) });
+      } else {
+        container.scrollTop = Math.min(preferredTop, maxScroll);
+      }
+    },
+    [transactions.length, rowHeight, viewportHeight]
+  );
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          focusRow(index + 1);
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          focusRow(index - 1);
+          break;
+        case "Home":
+          event.preventDefault();
+          focusRow(0);
+          break;
+        case "End":
+          event.preventDefault();
+          focusRow(transactions.length - 1);
+          break;
+        default:
+          break;
+      }
+    },
+    [focusRow, transactions.length]
+  );
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -236,6 +334,16 @@ export const Transactions = ({
                   />
                 </div>
               )}
+      {!hideToolbar && (
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
+        <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
+          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
+            <div
+              className="flex items-center gap-1 cursor-pointer"
+              onClick={() => setShowSearch((v) => !v)}
+            >
+              <Search size={18} />
+              <span>Search</span>
             </div>
             <div className="relative" ref={filterRef}>
               <div
@@ -366,6 +474,7 @@ export const Transactions = ({
             />
           </div>
         </div>
+      </div>
       )}
 
       <div className="">
@@ -491,10 +600,50 @@ export const Transactions = ({
                           onClick={() => {
                             setSelectedTxn(txn);
                             setIsDetailOpen(true);
+              <div
+                ref={scrollContainerRef}
+                data-testid={shouldVirtualize ? "transactions-virtualizer" : undefined}
+                className="overflow-y-auto"
+                style={{ maxHeight: `${viewportHeight}px`, height: `${virtualizerHeight}px` }}
+                onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+              >
+                <table className="min-w-full text-sm border" aria-rowcount={transactions.length + 1}>
+                  <thead className="sticky top-0 z-10 bg-gray-50">
+                    <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
+                      <th className="py-3 px-4 text-left font-semibold">
+                        Transaction Type
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold">Amount</th>
+                      <th className="py-3 px-4 text-left font-semibold">Asset</th>
+                      <th className="py-3 px-4 text-left font-semibold">Date</th>
+                      <th className="py-3 px-4 text-left font-semibold">Status</th>
+                      <th className="py-3 px-4 text-left font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shouldVirtualize && topSpacerHeight > 0 && (
+                      <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
+                        <td colSpan={6} />
+                      </tr>
+                    )}
+                    {visibleTransactions.map((txn, idx) => {
+                      const actualIndex = startIndex + idx;
+                      return (
+                        <tr
+                          key={txn.id ?? actualIndex}
+                          ref={(node) => {
+                            if (node) {
+                              rowRefs.current.set(actualIndex, node);
+                            } else {
+                              rowRefs.current.delete(actualIndex);
+                            }
                           }}
-                          className="text-blue-600 hover:underline"
-                          aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
-                          aria-controls="transaction-detail-drawer"
+                          tabIndex={0}
+                          aria-rowindex={actualIndex + 2}
+                          aria-label={`Transaction ${txn.id}`}
+                          onFocus={() => setFocusedRowIndex(actualIndex)}
+                          onKeyDown={(event) => handleRowKeyDown(event, actualIndex)}
+                          className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
                         >
                           Details
                         </button>
@@ -503,6 +652,68 @@ export const Transactions = ({
                   ))}
                 </tbody>
               </table>
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-black">{txn.type}</div>
+                            <div className="text-sm font-normal text-[#667185]">
+                              #{txn.id}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {txn.amount > 0
+                              ? `+$${txn.amount}`
+                              : `-$${Math.abs(txn.amount)}`}
+                          </td>
+                          <td className="py-6 px-4 flex items-center gap-2">
+                            <Image
+                              src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                              alt={txn.asset}
+                              width={24}
+                              height={24}
+                              className="inline-block"
+                            />
+                            <span className="ml-1 font-medium ">{txn.asset}</span>
+                          </td>
+                          <td className="py-3 px-4 ">
+                            {formatDateTime(txn.date, txn.time)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <StatusBadge
+                              variant={transactionStatusToVariant(txn.status)}
+                              label={txn.status}
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => {
+                                setSelectedTxn(txn);
+                                setIsDetailOpen(true);
+                              }}
+                              className="text-blue-600 hover:underline"
+                              aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                              aria-controls="transaction-detail-drawer"
+                            >
+                              Details
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {shouldVirtualize && bottomSpacerHeight > 0 && (
+                      <tr aria-hidden="true" style={{ height: `${bottomSpacerHeight}px` }}>
+                        <td colSpan={6} />
+                      </tr>
+                    )}
+
+                    {!shouldVirtualize && transactions.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-6">
+                          No transactions found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile View */}
@@ -592,6 +803,9 @@ export const Transactions = ({
               {transactions.map((txn, idx) => (
                 <div
                   key={txn.id || idx}
+              {visibleTransactions.map((txn, idx) => (
+                <div
+                  key={txn.id ?? startIndex + idx}
                   className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div className="flex justify-between items-start mb-3">

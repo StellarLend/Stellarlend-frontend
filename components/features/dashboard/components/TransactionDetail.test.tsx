@@ -9,6 +9,7 @@ import {
 import TransactionDetail from "./TransactionDetail";
 import type { Transaction } from "@/types/Transaction";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { copyToClipboard } from "@/lib/utils/clipboard";
 
 vi.mock("@/lib/utils/clipboard", () => ({
   copyToClipboard: vi.fn(),
@@ -22,6 +23,11 @@ vi.mock("next/image", () => ({
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     <img {...props} />
   ),
+}));
+
+// Mock the clipboard helper
+vi.mock("@/lib/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(),
 }));
 
 const buildTransaction = (overrides: Partial<Transaction> = {}): Transaction => ({
@@ -44,11 +50,13 @@ describe("TransactionDetail Modal", () => {
       cb(0);
       return 0;
     });
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   it("renders nothing when transaction is null", () => {
@@ -100,6 +108,27 @@ describe("TransactionDetail Modal", () => {
     });
   });
 
+  it("calls the clipboard helper with the transaction id when copy is clicked", async () => {
+    vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+    
+    render(
+      <TransactionDetail
+        transaction={buildTransaction({ id: "TXN-COPY-42" })}
+        isOpen
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
+
+    await waitFor(() => {
+      expect(copyToClipboard).toHaveBeenCalledWith("TXN-COPY-42");
+    });
+  });
+
+  it("shows a success toast when copy succeeds", async () => {
+    vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+    
   it("calls copyToClipboard with the transaction id when copy is clicked", async () => {
     const mockCopy = vi.mocked(copyToClipboard).mockResolvedValue({
       success: true,
@@ -116,6 +145,77 @@ describe("TransactionDetail Modal", () => {
     fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
 
     await waitFor(() => {
+      expect(screen.getByText("Copied")).toBeInTheDocument();
+      expect(screen.getByText("Transaction ID copied to clipboard")).toBeInTheDocument();
+    });
+  });
+
+  it("shows an error toast when copy fails", async () => {
+    vi.mocked(copyToClipboard).mockResolvedValue({ success: false, reason: "clipboard_error" });
+    
+    render(
+      <TransactionDetail
+        transaction={buildTransaction({ id: "TXN-COPY-42" })}
+        isOpen
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Copy failed")).toBeInTheDocument();
+      expect(screen.getByText("Failed to copy transaction ID")).toBeInTheDocument();
+    });
+  });
+
+  it("removes the toast after 3 seconds on success", async () => {
+    vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+    
+    render(
+      <TransactionDetail
+        transaction={buildTransaction({ id: "TXN-COPY-42" })}
+        isOpen
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Copied")).toBeInTheDocument();
+    });
+
+    // Fast-forward time by 3 seconds
+    vi.advanceTimersByTime(3000);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Copied")).not.toBeInTheDocument();
+    });
+  });
+
+  it("removes the toast after 3 seconds on failure", async () => {
+    vi.mocked(copyToClipboard).mockResolvedValue({ success: false, reason: "clipboard_error" });
+    
+    render(
+      <TransactionDetail
+        transaction={buildTransaction({ id: "TXN-COPY-42" })}
+        isOpen
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Copy failed")).toBeInTheDocument();
+    });
+
+    // Fast-forward time by 3 seconds
+    vi.advanceTimersByTime(3000);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Copy failed")).not.toBeInTheDocument();
       expect(mockCopy).toHaveBeenCalledWith("TXN-COPY-42");
     });
   });
