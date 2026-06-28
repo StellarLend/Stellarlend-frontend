@@ -98,6 +98,18 @@ app/lending/page.tsx                                                      │
 | `healthFactorBefore` | Health factor before withdrawal             |
 | `healthFactorAfter`  | Projected health factor after withdrawal    |
 
+## Transaction Summary
+
+After a withdrawal is confirmed via `ConfirmModal`, `TransactionSummary` renders a confirmation breakdown in the right-hand panel with `type="withdraw"`:
+
+| Row | Source | Condition |
+|-----|--------|-----------|
+| Amount Redeemed | `LendingData.amount` | Always shown |
+| Remaining Supply | `LendingData.remainingDebt` | Always shown |
+| New Health Factor | `LendingData.healthFactorAfter` | Only when `outstandingDebt > 0` |
+
+The empty state is shown until `WithdrawForm` calls its `onSubmit` callback with an amount greater than zero. No `CalculationResult` is used for the withdraw breakdown.
+
 ## Key Files
 
 | File | Role |
