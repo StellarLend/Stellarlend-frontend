@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import serverConfig from '@/lib/server-config';
 import { globalCache } from '@/lib/cache';
@@ -5,14 +6,45 @@ import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
+function errorResponse(status: number) {
+  return NextResponse.json({ error: 'Unauthorized' }, { status });
+}
+
+function normalizeOrigin(origin: string): string {
+  return origin.replace(/\/+$/, '');
+}
+
+function safeTokenEquals(actual: string, expected: string): boolean {
+  if (!actual || !expected) return false;
+
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length) return false;
+
+  return timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
 async function authorize(request: NextRequest): Promise<boolean> {
+  if (request.method !== 'POST') return false;
+
+  const origin = request.headers.get('Origin');
+  if (origin) {
+    const allowedOrigins = serverConfig.server.cacheInvalidateAllowedOrigins;
+    if (
+      allowedOrigins.length === 0 ||
+      !allowedOrigins.includes(normalizeOrigin(origin))
+    ) {
+      return false;
+    }
+  }
+
   const auth = request.headers.get('Authorization') || '';
   if (!auth) return false;
 
   // Accept Bearer <token>
   const parts = auth.split(' ');
   if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
-    return parts[1] === serverConfig.server.token;
+    return safeTokenEquals(parts[1], serverConfig.server.token);
   }
 
   return false;
@@ -22,7 +54,7 @@ export async function POST(request: NextRequest) {
   try {
     const ok = await authorize(request);
     if (!ok) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse(401);
     }
 
     const body = await request.json().catch(() => null);
