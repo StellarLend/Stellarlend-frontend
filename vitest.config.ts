@@ -103,6 +103,7 @@ export default defineConfig({
             "__tests__/**/*.test.ts",
             "lib/streams/**/*.test.ts",
             "lib/security/**/*.test.ts",
+            "lib/utils/**/*.test.ts",
           ],
         },
       },
