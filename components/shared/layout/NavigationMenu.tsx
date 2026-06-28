@@ -1,17 +1,41 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Notification } from "../ui/icons/Notification";
-import { LoginCircleFill } from "../ui/icons";
-import { ArrowLeftRightLine } from "../ui/icons/ArrowLeftRightLine";
-import { DashboardFill } from "../ui/icons/DashboardFill";
-import { ReceiptFill } from "../ui/icons/ReceiptFill";
-import { Settings5Fill } from "../ui/icons/Settings5Fill";
-import { WalletFill } from "../ui/icons/WalletFill";
-import { Bank } from "../ui/icons/Bank";
-import { CoinIcon } from "../ui/icons/CoinIcon";
-import { TransactionIcon } from "../ui/icons/TransactionIcon";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { navClasses, navTokens } from "@/constants/design-tokens";
+import { IconPlaceholder } from "../ui/icons/IconPlaceholder";
+
+// Lazy load icons to reduce initial bundle size
+const Notification = dynamic(() => import("../ui/icons/Notification").then(mod => ({ default: mod.Notification })), {
+  loading: () => <IconPlaceholder />,
+});
+const LoginCircleFill = dynamic(() => import("../ui/icons/LoginCircleFill").then(mod => ({ default: mod.LoginCircleFill })), {
+  loading: () => <IconPlaceholder />,
+});
+const ArrowLeftRightLine = dynamic(() => import("../ui/icons/ArrowLeftRightLine").then(mod => ({ default: mod.ArrowLeftRightLine })), {
+  loading: () => <IconPlaceholder />,
+});
+const DashboardFill = dynamic(() => import("../ui/icons/DashboardFill").then(mod => ({ default: mod.DashboardFill })), {
+  loading: () => <IconPlaceholder />,
+});
+const ReceiptFill = dynamic(() => import("../ui/icons/ReceiptFill").then(mod => ({ default: mod.ReceiptFill })), {
+  loading: () => <IconPlaceholder />,
+});
+const Settings5Fill = dynamic(() => import("../ui/icons/Settings5Fill").then(mod => ({ default: mod.Settings5Fill })), {
+  loading: () => <IconPlaceholder />,
+});
+const WalletFill = dynamic(() => import("../ui/icons/WalletFill").then(mod => ({ default: mod.WalletFill })), {
+  loading: () => <IconPlaceholder />,
+});
+const Bank = dynamic(() => import("../ui/icons/Bank").then(mod => ({ default: mod.Bank })), {
+  loading: () => <IconPlaceholder />,
+});
+const CoinIcon = dynamic(() => import("../ui/icons/CoinIcon").then(mod => ({ default: mod.CoinIcon })), {
+  loading: () => <IconPlaceholder />,
+});
+const TransactionIcon = dynamic(() => import("../ui/icons/TransactionIcon").then(mod => ({ default: mod.TransactionIcon })), {
+  loading: () => <IconPlaceholder />,
+});
 
 type NavigationMenuProps = {
   visibleLinks?: string[];

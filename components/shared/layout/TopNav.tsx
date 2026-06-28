@@ -15,6 +15,8 @@ declare global {
   }
 }
 
+import { useWallet } from "@/hooks/useWallet";
+
 /** Shared focus-visible classes for TopNav interactive elements */
 const focusClasses = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-green-600";
 
@@ -36,6 +38,16 @@ export const SidebarToggle = () => {
 const TopNav = () => {
   const { walletAddress, isConnected, isLoading, error, connect, disconnect } = useWalletConnection();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const { address: walletAddress, status, error, connect: handleConnect, disconnect } = useWallet();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const loading = status === "connecting";
+
+  const handleDisconnect = async () => {
+    await disconnect();
+    setIsDropdownOpen(false);
+  };
 
   const getShortAddress = (addr: string) => {
     return `${addr.slice(0, 5)}...${addr.slice(-4)}`;

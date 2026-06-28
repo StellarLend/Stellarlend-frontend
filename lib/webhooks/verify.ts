@@ -39,15 +39,19 @@ export function verifyWebhookSignature(
     .update(payload)
     .digest("hex");
 
-  // timingSafeEqual requires equal-length buffers
-  if (receivedHex.length !== expectedHex.length) {
-    return false;
-  }
+  // Constant-time comparison: pad shorter buffer with zeros to match length
+  const receivedBuf = Buffer.from(receivedHex, "hex");
+  const expectedBuf = Buffer.from(expectedHex, "hex");
 
-  return timingSafeEqual(
-    Buffer.from(receivedHex, "hex"),
-    Buffer.from(expectedHex, "hex"),
-  );
+  // Create buffers of equal length by padding the shorter one
+  const maxLength = Math.max(receivedBuf.length, expectedBuf.length);
+  const receivedPadded = Buffer.alloc(maxLength);
+  const expectedPadded = Buffer.alloc(maxLength);
+
+  receivedBuf.copy(receivedPadded);
+  expectedBuf.copy(expectedPadded);
+
+  return timingSafeEqual(receivedPadded, expectedPadded);
 }
 
 /**

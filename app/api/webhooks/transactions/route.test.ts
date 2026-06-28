@@ -116,6 +116,16 @@ describe("POST /api/webhooks/transactions – signature verification", () => {
     expect(json.error).toMatch(/signature/i);
   });
 
+  it("returns 401 when signature header is empty string", async () => {
+    const body = JSON.stringify(makePayload());
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "" });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+
+    const json = await res.json();
+    expect(json.error).toMatch(/signature/i);
+  });
+
   it("returns 401 when signature is invalid (tampered payload)", async () => {
     const payload = makePayload();
     const body = JSON.stringify(payload);
@@ -130,6 +140,40 @@ describe("POST /api/webhooks/transactions – signature verification", () => {
     const body = JSON.stringify(payload);
     const signature = signPayload(body, "wrong-secret");
     const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: signature });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature has wrong length (too short)", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "sha256=abc123" });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature has wrong length (too long)", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const longHex = "a".repeat(128); // SHA256 hex is 64 chars, this is double
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: `sha256=${longHex}` });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature lacks sha256= prefix", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const signature = signPayload(body, TEST_SECRET).replace("sha256=", "");
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: signature });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature is malformed (invalid hex)", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "sha256=not-valid-hex!!!" });
     const res = await POST(req);
     expect(res.status).toBe(401);
   });

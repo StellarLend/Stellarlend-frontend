@@ -1,4 +1,7 @@
-export type HealthBand = "healthy" | "at-risk" | "critical";
+export type HealthBand = "healthy" | "at-risk" | "critical" | "cleared";
+
+export const HEALTHY_HEALTH_FACTOR_THRESHOLD = 2;
+export const CRITICAL_HEALTH_FACTOR_THRESHOLD = 1;
 
 export type PriceMap = Record<string, number>;
 
@@ -27,15 +30,32 @@ export interface BorrowHealthPreview {
 }
 
 export function getHealthBand(healthFactor: number): HealthBand {
-  if (healthFactor >= 2) {
+  if (!Number.isFinite(healthFactor)) {
+    return "cleared";
+  }
+
+  if (healthFactor >= HEALTHY_HEALTH_FACTOR_THRESHOLD) {
     return "healthy";
   }
 
-  if (healthFactor >= 1) {
+  if (healthFactor >= CRITICAL_HEALTH_FACTOR_THRESHOLD) {
     return "at-risk";
   }
 
   return "critical";
+}
+
+export function getHealthLabel(healthFactor: number): string {
+  switch (getHealthBand(healthFactor)) {
+    case "healthy":
+      return "Healthy";
+    case "at-risk":
+      return "At Risk";
+    case "critical":
+      return "Critical";
+    case "cleared":
+      return "Debt cleared";
+  }
 }
 
 export function calculateProjectedBorrowHealth({

@@ -2,13 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import appConfig from '@/lib/config';
 import { getOrCreateRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
+import crypto from 'crypto';
 
 function getRequestIdHeaders(request: NextRequest) {
   const { requestId } = getOrCreateRequestId(request.headers);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(REQUEST_ID_HEADER, requestId);
 
-  return { requestId, requestHeaders };
+  // Generate CSP nonce per request
+  const nonce = crypto.randomBytes(16).toString('base64');
+  requestHeaders.set('x-csp-nonce', nonce);
+
+  return { requestId, requestHeaders, nonce };
 }
 
 function setRequestIdHeader(response: NextResponse, requestId: string): NextResponse {
@@ -21,23 +26,31 @@ export function middleware(request: NextRequest) {
 
   // 1. Path Filter: Only apply to API routes
   if (!pathname.startsWith('/api')) {
-    return NextResponse.next();
+    // For non‑API routes, still set CSP header with nonce for inline scripts
+    const nonce = crypto.randomBytes(16).toString('base64');
+    const response = NextResponse.next();
+    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+    response.headers.set('x-csp-nonce', nonce);
+    return response;
   }
 
-  const { requestId, requestHeaders } = getRequestIdHeaders(request);
+  const { requestId, requestHeaders, nonce } = getRequestIdHeaders(request);
 
   // 2. Exemption: Health checks should never be rate limited
   if (pathname === '/api/health') {
-    return setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
+    const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
+    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+    return response;
   }
 
   // 3. Exemption: Authenticated internal calls
-  // We check for the existence of the session cookie defined in our auth system
   const sessionCookieName = appConfig.rateLimit ? (process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session') : 'session';
   const isAuth = request.cookies.has(sessionCookieName);
-  
+
   if (isAuth) {
-    return setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
+    const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
+    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+    return response;
   }
 
   // 4. Identification (IP-based for anonymous requests)
@@ -60,10 +73,13 @@ export function middleware(request: NextRequest) {
       JSON.stringify({ 
         error: 'Too Many Requests',
         message: 'Rate limit exceeded. Please try again later.' 
-      }), 
+      }),
       { status: 429, headers: { 'Content-Type': 'application/json' } }
     );
   }
+
+  // Set CSP header on every response
+  response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
 
   // 6. Standard Rate Limit Headers
   response.headers.set('X-RateLimit-Limit', limit.toString());

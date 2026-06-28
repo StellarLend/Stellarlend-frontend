@@ -3,10 +3,13 @@
 import { useMemo, useState } from "react";
 import type { CalculationResult, LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
+import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
+import StatusAnnouncer from '@/components/shared/common/StatusAnnouncer';
 
 export interface BorrowPosition {
   id: string;
@@ -54,19 +57,16 @@ const formatAmount = (amount: number, asset: string) =>
     maximumFractionDigits: 4,
   })} ${asset}`;
 
-const getHealthLabel = (healthFactor: number) => {
-  if (!Number.isFinite(healthFactor)) return "Debt cleared";
-  if (healthFactor >= 2) return "Healthy";
-  if (healthFactor >= 1) return "At Risk";
-  return "Critical";
-};
-
-const computeHealthAfterRepayment = (
+export const computeHealthAfterRepayment = (
   currentHealthFactor: number,
   outstandingDebt: number,
   repaymentAmount: number,
 ) => {
-  const remainingDebt = Math.max(outstandingDebt - repaymentAmount, 0);
+  const appliedRepayment = Math.min(
+    Math.max(repaymentAmount, 0),
+    outstandingDebt,
+  );
+  const remainingDebt = Math.max(outstandingDebt - appliedRepayment, 0);
 
   if (remainingDebt === 0) return Infinity;
 
@@ -84,7 +84,7 @@ export default function RepayForm({
   const [amount, setAmount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "loading" | "success" | "error"
+    "idle" | "submitting" | "success" | "error"
   >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
 
@@ -97,7 +97,7 @@ export default function RepayForm({
       return {
         remainingDebt: 0,
         healthFactorAfter: 0,
-        label: "Unavailable",
+        isFullRepay: false,
       };
     }
 
@@ -114,7 +114,7 @@ export default function RepayForm({
     return {
       remainingDebt,
       healthFactorAfter,
-      label: getHealthLabel(healthFactorAfter),
+      isFullRepay: remainingDebt === 0 && amount > 0,
     };
   }, [amount, selectedPosition]);
 
@@ -182,7 +182,7 @@ export default function RepayForm({
       return;
     }
 
-    setSubmitStatus("loading");
+    setSubmitStatus("submitting");
     setSubmitMessage("Preparing repayment preview...");
 
     try {
@@ -245,22 +245,7 @@ export default function RepayForm({
         </p>
       </div>
 
-      {submitMessage && (
-        <div
-          className={cn(
-            "p-4 rounded-xl mb-6 text-sm font-medium",
-            submitStatus === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : submitStatus === "loading"
-                ? "bg-blue-50 text-blue-800 border border-blue-200"
-                : "bg-red-50 text-red-800 border border-red-200",
-          )}
-          role="alert"
-          aria-live="polite"
-        >
-          {submitMessage}
-        </div>
-      )}
+      <StatusAnnouncer status={submitStatus} message={submitMessage} type="repay" />
 
       <form onSubmit={handleSubmit} noValidate className="space-y-8">
         <div>
@@ -299,14 +284,13 @@ export default function RepayForm({
         </div>
 
         <div className="relative">
-          <Input
+          <AmountInput
             id="repay-amount"
             label="Repayment amount"
             type="number"
-            min="0"
             step="0.01"
             placeholder="0.00"
-            value={amount || ""}
+            value={amount || 0}
             error={errors.amount}
             helperText={
               selectedPosition
@@ -316,8 +300,8 @@ export default function RepayForm({
                   )}`
                 : undefined
             }
-            onChange={(event) => {
-              setAmount(Number.parseFloat(event.target.value) || 0);
+            onChange={(val) => {
+              setAmount(val);
               if (errors.amount) {
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -326,15 +310,81 @@ export default function RepayForm({
                 });
               }
             }}
+            max={selectedPosition?.outstandingDebt}
+            onMax={handleMaxRepayment}
           />
           <button
             type="button"
             onClick={handleMaxRepayment}
-            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700"
+            disabled={!selectedPosition || selectedPosition.outstandingDebt <= 0}
+            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Repay full debt"
           >
-            MAX
+            Repay full debt
           </button>
         </div>
+
+        {selectedPosition && (
+          <div className="px-1 pt-2">
+            <label htmlFor="repay-percentage" className="sr-only">
+              Repayment percentage
+            </label>
+            <input
+              id="repay-percentage"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={
+                selectedPosition.outstandingDebt > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        Math.round(
+                          (amount / selectedPosition.outstandingDebt) * 100
+                        )
+                      )
+                    )
+                  : 0
+              }
+              onChange={(e) => {
+                const percentage = Number(e.target.value);
+                const calculatedAmount =
+                  (percentage / 100) * selectedPosition.outstandingDebt;
+                setAmount(calculatedAmount);
+                if (errors.amount) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.amount;
+                    return next;
+                  });
+                }
+              }}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#2600FF]"
+              aria-valuetext={`${
+                selectedPosition.outstandingDebt > 0
+                  ? Math.min(
+                      100,
+                      Math.max(
+                        0,
+                        Math.round(
+                          (amount / selectedPosition.outstandingDebt) * 100
+                        )
+                      )
+                    )
+                  : 0
+              }%`}
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-2">
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        )}
 
         {selectedPosition && (
           <div className="space-y-5">
@@ -342,6 +392,11 @@ export default function RepayForm({
               <h3 className="text-xs font-bold text-blue-900 mb-3 uppercase tracking-wider">
                 Repayment Preview
               </h3>
+              {preview.isFullRepay && (
+                <span className="mb-3 inline-block rounded-full bg-green-100 px-3 py-0.5 text-xs font-semibold text-green-700">
+                  Full repayment
+                </span>
+              )}
               <div className="space-y-2.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-blue-700">Remaining debt</span>
@@ -354,12 +409,14 @@ export default function RepayForm({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-blue-700">Health factor</span>
-                  <span className="font-semibold text-gray-900">
-                    {Number.isFinite(preview.healthFactorAfter)
-                      ? preview.healthFactorAfter.toFixed(2)
-                      : "Debt cleared"}{" "}
-                    ({preview.label})
-                  </span>
+                  <div className="flex items-center gap-2 text-right">
+                    <span className="font-semibold text-gray-900">
+                      {Number.isFinite(preview.healthFactorAfter)
+                        ? preview.healthFactorAfter.toFixed(2)
+                        : "Debt cleared"}
+                    </span>
+                    <HealthFactorBadge healthFactor={preview.healthFactorAfter} />
+                  </div>
                 </div>
                 <div className="flex justify-between border-t border-blue-200 pt-2.5">
                   <span className="text-blue-700">Collateral</span>
@@ -388,6 +445,15 @@ export default function RepayForm({
             Review Repayment
           </Button>
         </WalletGate>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          isLoading={submitStatus === "submitting"}
+        >
+          Review Repayment
+        </Button>
       </form>
     </div>
   );

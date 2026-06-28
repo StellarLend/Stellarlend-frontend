@@ -3,10 +3,17 @@
 import { useMemo, useState } from "react";
 import type { LendingData } from "@/lib/lending/types";
 import { Input } from "@/components/shared/ui/Input";
+import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
+import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
+import {
+  CRITICAL_HEALTH_FACTOR_THRESHOLD,
+  HEALTHY_HEALTH_FACTOR_THRESHOLD,
+} from "@/lib/lending/health";
 import { cn } from "@/lib/utils/cn";
+import ConfirmModal from "./ConfirmModal";
 
 export interface SupplyPosition {
   id: string;
@@ -42,21 +49,11 @@ const DEFAULT_POSITIONS: SupplyPosition[] = [
   },
 ];
 
-const AT_RISK_THRESHOLD = 2.0;
-const CRITICAL_THRESHOLD = 1.0;
-
 const formatAmount = (amount: number, asset: string) =>
   `${amount.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   })} ${asset}`;
-
-const getHealthLabel = (healthFactor: number, hasDebt: boolean) => {
-  if (!hasDebt) return "N/A";
-  if (healthFactor >= AT_RISK_THRESHOLD) return "Healthy";
-  if (healthFactor >= CRITICAL_THRESHOLD) return "At Risk";
-  return "Critical";
-};
 
 export function computeWithdrawHealthFactor(
   currentHealthFactor: number,
@@ -85,15 +82,20 @@ export default function WithdrawForm({
     "idle" | "success" | "error"
   >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingData, setPendingData] = useState<LendingData | null>(null);
 
   const selectedPosition = positions.find((p) => p.id === selectedPositionId);
   const withdrawableBalance = selectedPosition
-    ? Math.max(0, selectedPosition.suppliedAmount - selectedPosition.lockedCollateral)
+    ? Math.max(
+        0,
+        selectedPosition.suppliedAmount - selectedPosition.lockedCollateral,
+      )
     : 0;
 
   const preview = useMemo(() => {
     if (!selectedPosition) {
-      return { remainingSupplied: 0, healthFactorAfter: 0, label: "Unavailable" };
+      return { remainingSupplied: 0, healthFactorAfter: 0 };
     }
 
     const remainingSupplied = Math.max(
@@ -106,23 +108,22 @@ export default function WithdrawForm({
       amount,
       selectedPosition.outstandingDebt,
     );
-    const hasDebt = selectedPosition.outstandingDebt > 0;
-
     return {
       remainingSupplied,
       healthFactorAfter,
-      label: getHealthLabel(healthFactorAfter, hasDebt),
     };
   }, [amount, selectedPosition]);
 
   const hasDebt = (selectedPosition?.outstandingDebt ?? 0) > 0;
   const isHealthCritical =
-    hasDebt && amount > 0 && preview.healthFactorAfter < CRITICAL_THRESHOLD;
+    hasDebt &&
+    amount > 0 &&
+    preview.healthFactorAfter < CRITICAL_HEALTH_FACTOR_THRESHOLD;
   const isHealthAtRisk =
     hasDebt &&
     amount > 0 &&
-    preview.healthFactorAfter >= CRITICAL_THRESHOLD &&
-    preview.healthFactorAfter < AT_RISK_THRESHOLD;
+    preview.healthFactorAfter >= CRITICAL_HEALTH_FACTOR_THRESHOLD &&
+    preview.healthFactorAfter < HEALTHY_HEALTH_FACTOR_THRESHOLD;
 
   const positionSummaryData = selectedPosition
     ? {
@@ -175,6 +176,20 @@ export default function WithdrawForm({
     });
   };
 
+  const handleConfirm = () => {
+    if (!pendingData) return;
+    setSubmitStatus("success");
+    setSubmitMessage("Withdrawal confirmed.");
+    onSubmit(pendingData);
+    setShowConfirmModal(false);
+    setPendingData(null);
+  };
+
+  const handleCancelConfirm = () => {
+    setShowConfirmModal(false);
+    setPendingData(null);
+  };
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitStatus("idle");
@@ -198,9 +213,8 @@ export default function WithdrawForm({
       healthFactorAfter: preview.healthFactorAfter,
     };
 
-    setSubmitStatus("success");
-    setSubmitMessage("Withdrawal preview ready.");
-    onSubmit(data);
+    setPendingData(data);
+    setShowConfirmModal(true);
   };
 
   return (
@@ -292,23 +306,21 @@ export default function WithdrawForm({
         )}
 
         <div className="relative">
-          <Input
+          <AmountInput
             id="withdraw-amount"
             label="Withdrawal amount"
             type="number"
-            min="0"
             step="0.01"
             placeholder="0.00"
-            value={amount || ""}
+            value={amount || 0}
             error={errors.amount}
             helperText={
               selectedPosition
                 ? `Available: ${formatAmount(withdrawableBalance, selectedPosition.asset)}`
                 : undefined
             }
-            onChange={(e) => {
-              const target = e.target as HTMLInputElement;
-              setAmount(Number.parseFloat(target.value) || 0);
+            onChange={(val) => {
+              setAmount(val);
               if (errors.amount) {
                 setErrors((prev) => {
                   const next = { ...prev };
@@ -317,14 +329,9 @@ export default function WithdrawForm({
                 });
               }
             }}
+            max={withdrawableBalance}
+            onMax={handleMaxWithdraw}
           />
-          <button
-            type="button"
-            onClick={handleMaxWithdraw}
-            className="absolute right-3 top-8 rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600 transition-colors hover:text-green-700"
-          >
-            MAX
-          </button>
         </div>
 
         {hasDebt && amount > 0 && isHealthCritical && (
@@ -379,9 +386,12 @@ export default function WithdrawForm({
                 {hasDebt && (
                   <div className="flex justify-between">
                     <span className="text-green-700">Health factor</span>
-                    <span className="font-semibold text-gray-900">
-                      {preview.healthFactorAfter.toFixed(2)} ({preview.label})
-                    </span>
+                    <div className="flex items-center gap-2 text-right">
+                      <span className="font-semibold text-gray-900">
+                        {preview.healthFactorAfter.toFixed(2)}
+                      </span>
+                      <HealthFactorBadge healthFactor={preview.healthFactorAfter} />
+                    </div>
                   </div>
                 )}
                 <div className="flex justify-between border-t border-green-200 pt-2.5">
@@ -412,6 +422,17 @@ export default function WithdrawForm({
           </Button>
         </WalletGate>
       </form>
+
+      {pendingData && (
+        <ConfirmModal
+          isOpen={showConfirmModal}
+          onClose={handleCancelConfirm}
+          onConfirm={handleConfirm}
+          data={pendingData}
+          calculation={null}
+          type="withdraw"
+        />
+      )}
     </div>
   );
 }
