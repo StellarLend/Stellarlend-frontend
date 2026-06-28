@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { AlertCircle, TrendingUp } from "lucide-react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
+import { CollateralBreakdown } from "./CollateralBreakdown";
+import { useCollateralShares } from "@/hooks/usePositions";
 
 interface PositionData {
   suppliedFunds: string;
@@ -106,6 +108,7 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   isLoading = false,
 }) => {
   const shouldReduceMotion = useReducedMotion();
+  const { shares, isLoading: sharesLoading } = useCollateralShares();
   const {
     netPosition,
     formattedNetPosition,
@@ -270,6 +273,9 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Collateral Breakdown */}
+      <CollateralBreakdown shares={shares} isLoading={sharesLoading} />
 
       {/* Screen reader only summary */}
       <div className="sr-only">

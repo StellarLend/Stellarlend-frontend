@@ -14,7 +14,16 @@ class MockEventSource {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: (() => void) | null = null;
   onopen: (() => void) | null = null;
+  listeners = new Map<string, Set<EventListener>>();
   close = vi.fn();
+  addEventListener = vi.fn((type: string, listener: EventListener) => {
+    const listeners = this.listeners.get(type) ?? new Set<EventListener>();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  });
+  removeEventListener = vi.fn((type: string, listener: EventListener) => {
+    this.listeners.get(type)?.delete(listener);
+  });
 
   constructor(url: string) {
     this.url = url;
@@ -29,6 +38,20 @@ class MockEventSource {
 
   receiveRawMessage(data: string) {
     this.onmessage?.(new MessageEvent("message", { data }));
+  }
+
+  receiveNamedEvent(type: string, data: unknown) {
+    const event = new MessageEvent(type, { data: JSON.stringify(data) });
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener(event);
+    }
+  }
+
+  receiveRawNamedEvent(type: string, data: string) {
+    const event = new MessageEvent(type, { data });
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener(event);
+    }
   }
 
   triggerError() {
@@ -67,6 +90,59 @@ describe("useNotificationStream", () => {
     });
 
     expect(result.current.unreadCount).toBe(5);
+  });
+
+  it("updates unreadCount from named unreadCount events", () => {
+    const { result } = renderHook(() => useNotificationStream());
+
+    act(() => {
+      MockEventSource.instances[0].receiveNamedEvent("unreadCount", {
+        unreadCount: 7,
+      });
+    });
+
+    expect(result.current.unreadCount).toBe(7);
+  });
+
+  it("delivers named notification events to the notification callback", () => {
+    const onNotification = vi.fn();
+    renderHook(() => useNotificationStream({ onNotification }));
+
+    const notification = {
+      id: "notif-live",
+      userId: "user-1",
+      title: "Payment due",
+      message: "Your loan payment is due soon.",
+      read: false,
+      createdAt: "2026-06-27T12:00:00.000Z",
+      type: "warning",
+    };
+
+    act(() => {
+      MockEventSource.instances[0].receiveNamedEvent(
+        "notification",
+        notification,
+      );
+    });
+
+    expect(onNotification).toHaveBeenCalledWith(notification);
+  });
+
+  it("ignores malformed named notification events", () => {
+    const onNotification = vi.fn();
+    renderHook(() => useNotificationStream({ onNotification }));
+
+    act(() => {
+      MockEventSource.instances[0].receiveRawNamedEvent(
+        "notification",
+        "not-json",
+      );
+      MockEventSource.instances[0].receiveNamedEvent("notification", {
+        id: "missing-fields",
+      });
+    });
+
+    expect(onNotification).not.toHaveBeenCalled();
   });
 
   it("ignores malformed JSON without crashing", () => {

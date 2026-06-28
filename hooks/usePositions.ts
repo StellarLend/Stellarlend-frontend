@@ -1,11 +1,45 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 export interface BorrowPosition {
   id: string;
   asset: string;
   amount: number;
+  /** USD value of this position used as collateral */
+  collateralUsd?: number;
   healthFactor?: number;
   nextDue?: string;
+}
+
+export interface CollateralShare {
+  asset: string;
+  usdValue: number;
+  /** Integer percentage 0-100; sum across all shares equals exactly 100 */
+  share: number;
+}
+
+/**
+ * Derives per-asset collateral shares from positions.
+ * Rounding is handled via largest-remainder so the shares always sum to 100.
+ */
+export function deriveCollateralShares(positions: BorrowPosition[]): CollateralShare[] {
+  const collateral = positions.filter((p) => (p.collateralUsd ?? 0) > 0);
+  if (!collateral.length) return [];
+
+  const total = collateral.reduce((s, p) => s + (p.collateralUsd ?? 0), 0);
+  if (total === 0) return [];
+
+  // Initial floored percentages + fractional remainders
+  const rows = collateral.map((p) => {
+    const exact = ((p.collateralUsd ?? 0) / total) * 100;
+    return { asset: p.asset, usdValue: p.collateralUsd ?? 0, floored: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+
+  // Distribute remaining percentage points to rows with largest remainders
+  const distributed = 100 - rows.reduce((s, r) => s + r.floored, 0);
+  rows.sort((a, b) => b.remainder - a.remainder);
+  rows.forEach((r, i) => { r.floored += i < distributed ? 1 : 0; });
+
+  return rows.map(({ asset, usdValue, floored }) => ({ asset, usdValue, share: floored }));
 }
 
 export interface UsePositionsResult {
@@ -109,4 +143,11 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
     error,
     refetch: fetchPositions,
   };
+}
+
+/** Convenience hook: returns collateral shares derived from usePositions data. */
+export function useCollateralShares(): { shares: CollateralShare[]; isLoading: boolean; error: Error | null } {
+  const { positions, isLoading, error } = usePositions();
+  const shares = useMemo(() => deriveCollateralShares(positions), [positions]);
+  return { shares, isLoading, error };
 }
