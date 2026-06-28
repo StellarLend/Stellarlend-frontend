@@ -2,7 +2,7 @@
 
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment, useState, useEffect } from "react";
-import { Copy, X } from "lucide-react";
+import { Copy, X, Printer } from "lucide-react";
 import Image from "next/image";
 import type { Transaction } from "../../../../types/Transaction";
 import { sanitiseString } from "@/lib/security/input-sanitizer";
@@ -12,6 +12,7 @@ import { copyToClipboard } from "@/lib/utils/clipboard";
 import Toast from "@/components/shared/common/Toast";
 import { Toast } from "@/components/shared/common";
 import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
+import TransactionReceipt from "./TransactionReceipt";
 
 interface TransactionDetailProps {
   transaction: Transaction | null;
@@ -22,6 +23,7 @@ interface TransactionDetailProps {
 export default function TransactionDetail({ transaction, isOpen, onClose }: TransactionDetailProps) {
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [toast, setToast] = useState<{ title?: string; description?: string; variant?: "success" | "error" } | null>(null);
   const [toast, setToast] = useState<{
     variant: "success" | "error";
@@ -50,6 +52,7 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
         });
     } else {
       setDetails(null);
+      setShowReceipt(false);
     }
   }, [isOpen, id]);
 
@@ -126,6 +129,17 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
     
     return `${baseUrl}${id}`;
   };
+
+  // If showing receipt, render it in full screen mode
+  if (showReceipt && transaction) {
+    return (
+      <TransactionReceipt
+        transaction={transaction}
+        details={details}
+        onBack={() => setShowReceipt(false)}
+      />
+    );
+  }
 
   return (
     <>
@@ -238,6 +252,20 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
                   </>
                 )}
               </div>
+              
+              {/* Print Receipt Button */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowReceipt(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  aria-label="Print receipt"
+                  type="button"
+                >
+                  <Printer size={18} />
+                  <span>Print Receipt</span>
+                </button>
+              </div>
+
               {toast && (
                 <Toast
                   variant={toast.variant}
