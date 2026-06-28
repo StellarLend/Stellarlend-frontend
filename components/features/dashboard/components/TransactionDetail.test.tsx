@@ -11,6 +11,12 @@ import type { Transaction } from "@/types/Transaction";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { copyToClipboard } from "@/lib/utils/clipboard";
 
+import { copyToClipboard } from "@/lib/utils/clipboard";
+
+vi.mock("@/lib/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(),
+}));
+
 // Mock next/image so JSDOM does not need the Next.js runtime/config.
 vi.mock("next/image", () => ({
   default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
