@@ -1,9 +1,9 @@
-import { LendingData, CalculationResult } from '@/app/lending/page';
+import type { LendingData, CalculationResult } from '@/lib/lending/types';
 
 interface TransactionSummaryProps {
   data: LendingData;
   calculation: CalculationResult | null;
-  type: 'lend' | 'borrow';
+  type: 'lend' | 'borrow' | 'repay' | 'withdraw';
 }
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
@@ -37,7 +37,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
     );
   }
 
-  if (!calculation) {
+  if (!calculation && (type === 'lend' || type === 'borrow')) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse h-full flex flex-col justify-center">
         <div className="h-6 bg-gray-200 rounded w-1/2 mb-6"></div>
@@ -62,14 +62,18 @@ export default function TransactionSummary({ data, calculation, type }: Transact
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">
-              {type === 'lend' ? 'Lending' : 'Borrowing'}
+              {type === 'lend' ? 'Lending' : type === 'borrow' ? 'Borrowing' : type === 'repay' ? 'Repaying' : 'Withdrawing'}
             </span>
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              type === 'lend' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-blue-100 text-blue-800'
+              type === 'lend'
+                ? 'bg-green-100 text-green-800'
+                : type === 'borrow'
+                  ? 'bg-blue-100 text-blue-800'
+                  : type === 'repay'
+                    ? 'bg-orange-100 text-orange-800'
+                    : 'bg-purple-100 text-purple-800'
             }`}>
-              {type === 'lend' ? 'LEND' : 'BORROW'}
+              {type.toUpperCase()}
             </span>
           </div>
           <div className="text-2xl font-bold text-gray-900">
@@ -134,104 +138,168 @@ export default function TransactionSummary({ data, calculation, type }: Transact
           </div>
         )}
 
-        {/* Financial Summary */}
-        <div className="border-t pt-4">
-          <h4 className="font-medium text-gray-900 mb-3">
-            {type === 'lend' ? 'Expected Returns' : 'Repayment Details'}
-          </h4>
-          
-          {type === 'lend' ? (
+        {/* Financial Summary — lend / borrow */}
+        {(type === 'lend' || type === 'borrow') && calculation && (
+          <div className="border-t pt-4">
+            <h4 className="font-medium text-gray-900 mb-3">
+              {type === 'lend' ? 'Expected Returns' : 'Repayment Details'}
+            </h4>
+
+            {type === 'lend' ? (
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Daily Earnings</span>
+                  <span className="font-medium text-green-600">
+                    +{formatCurrency(calculation.dailyEarnings, data.asset)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Earnings</span>
+                  <span className="font-semibold text-green-600">
+                    +{formatCurrency(calculation.totalEarnings, data.asset)}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="font-medium">Total Return</span>
+                  <span className="font-semibold text-lg">
+                    {formatCurrency(data.amount + calculation.totalEarnings, data.asset)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {calculation.monthlyPayment && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Monthly Payment</span>
+                    <span className="font-medium text-blue-600">
+                      {formatCurrency(calculation.monthlyPayment, data.asset)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Interest</span>
+                  <span className="font-medium text-red-500">
+                    {formatCurrency(calculation.totalEarnings, data.asset)}
+                  </span>
+                </div>
+                {calculation.totalRepayment && (
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="font-medium">Total Repayment</span>
+                    <span className="font-semibold text-lg">
+                      {formatCurrency(calculation.totalRepayment, data.asset)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Repayment Breakdown Visualization — borrow */}
+        {type === 'borrow' && calculation && (
+          <div className="mt-6">
+            <table className="w-full text-sm border border-gray-200 mb-4" aria-label="Repayment breakdown table">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-1 text-left">Component</th>
+                  <th className="px-2 py-1 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="px-2 py-1">Principal</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(data.amount, data.asset)}</td>
+                </tr>
+                <tr>
+                  <td className="px-2 py-1">Total Interest</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalEarnings, data.asset)}</td>
+                </tr>
+                <tr className="font-medium border-t border-gray-200">
+                  <td className="px-2 py-1">Total Repayment</td>
+                  <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalRepayment, data.asset)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="w-full bg-gray-200 rounded h-4 flex overflow-hidden" aria-label="Repayment breakdown bar" role="img">
+              <div
+                className="bg-green-600"
+                style={{ width: `${(data.amount / (calculation.totalRepayment)) * 100}%` }}
+              />
+              <div
+                className="bg-red-600"
+                style={{ width: `${(calculation.totalEarnings / (calculation.totalRepayment)) * 100}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs mt-1 text-gray-600">
+              <span>Principal</span>
+              <span>Interest</span>
+            </div>
+          </div>
+        )}
+
+        {/* Repay breakdown */}
+        {type === 'repay' && (
+          <div className="border-t pt-4">
+            <h4 className="font-medium text-gray-900 mb-3">Repayment Breakdown</h4>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-gray-600">Daily Earnings</span>
-                <span className="font-medium text-green-600">
-                  +{formatCurrency(calculation.dailyEarnings, data.asset)}
+                <span className="text-gray-600">Amount Repaid</span>
+                <span className="font-medium text-orange-600">
+                  {formatCurrency(data.amount, data.asset)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Total Earnings</span>
-                <span className="font-semibold text-green-600">
-                  +{formatCurrency(calculation.totalEarnings, data.asset)}
+                <span className="text-gray-600">Remaining Debt</span>
+                <span className="font-medium">
+                  {(data.remainingDebt ?? 0) === 0
+                    ? <span className="text-green-600">Debt cleared</span>
+                    : formatCurrency(data.remainingDebt ?? 0, data.asset)}
                 </span>
               </div>
               <div className="flex justify-between border-t pt-2">
-                <span className="font-medium">Total Return</span>
-                <span className="font-semibold text-lg">
-                  {formatCurrency(data.amount + calculation.totalEarnings, data.asset)}
+                <span className="font-medium">New Health Factor</span>
+                <span className="font-semibold">
+                  {data.healthFactorAfter === undefined || data.healthFactorAfter === null
+                    ? '—'
+                    : !Number.isFinite(data.healthFactorAfter)
+                      ? <span className="text-green-600">Debt cleared</span>
+                      : data.healthFactorAfter.toFixed(2)}
                 </span>
               </div>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {calculation.monthlyPayment && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Monthly Payment</span>
-                  <span className="font-medium text-blue-600">
-                    {formatCurrency(calculation.monthlyPayment, data.asset)}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total Interest</span>
-                <span className="font-medium text-red-500">
-                  {formatCurrency(calculation.totalEarnings, data.asset)}
-                </span>
-              </div>
-              {calculation.totalRepayment && (
-                <div className="flex justify-between border-t pt-2">
-                  <span className="font-medium">Total Repayment</span>
-                  <span className="font-semibold text-lg">
-                    {formatCurrency(calculation.totalRepayment, data.asset)}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
-            {/* Repayment Breakdown Visualization */}
-            {type === 'borrow' && calculation && (
-              <div className="mt-6">
-                {/* Accessible fallback table */}
-                <table className="w-full text-sm border border-gray-200 mb-4" aria-label="Repayment breakdown table">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-2 py-1 text-left">Component</th>
-                      <th className="px-2 py-1 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="px-2 py-1">Principal</td>
-                      <td className="px-2 py-1 text-right">{formatCurrency(data.amount, data.asset)}</td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-1">Total Interest</td>
-                      <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalEarnings, data.asset)}</td>
-                    </tr>
-                    <tr className="font-medium border-t border-gray-200">
-                      <td className="px-2 py-1">Total Repayment</td>
-                      <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalRepayment, data.asset)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                {/* Visual bar */}
-                <div className="w-full bg-gray-200 rounded h-4 flex overflow-hidden" aria-label="Repayment breakdown bar" role="img">
-                  <div
-                    className="bg-green-600"
-                    style={{ width: `${(data.amount / (calculation.totalRepayment)) * 100}%` }}
-                  ></div>
-                  <div
-                    className="bg-red-600"
-                    style={{ width: `${(calculation.totalEarnings / (calculation.totalRepayment)) * 100}%` }}
-                  ></div>
-                </div>
-                <div className="flex justify-between text-xs mt-1 text-gray-600">
-                  <span>Principal</span>
-                  <span>Interest</span>
-                </div>
+        {/* Withdraw breakdown */}
+        {type === 'withdraw' && (
+          <div className="border-t pt-4">
+            <h4 className="font-medium text-gray-900 mb-3">Withdrawal Breakdown</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Amount Redeemed</span>
+                <span className="font-medium text-purple-600">
+                  {formatCurrency(data.amount, data.asset)}
+                </span>
               </div>
-            )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Remaining Supply</span>
+                <span className="font-medium">
+                  {formatCurrency(data.remainingDebt ?? 0, data.asset)}
+                </span>
+              </div>
+              {(data.outstandingDebt ?? 0) > 0 && (
+                <div className="flex justify-between border-t pt-2">
+                  <span className="font-medium">New Health Factor</span>
+                  <span className="font-semibold">
+                    {data.healthFactorAfter === undefined || data.healthFactorAfter === null
+                      ? '—'
+                      : data.healthFactorAfter.toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

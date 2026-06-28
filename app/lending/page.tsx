@@ -351,18 +351,11 @@ export default function LendingPage() {
 
           <div className="space-y-6">
             {activeTab === "repay" || activeTab === "withdraw" ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-2 text-lg font-semibold text-gray-900">
-                  {activeTab === "repay"
-                    ? "Repayment Status"
-                    : "Withdrawal Status"}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {activeTab === "repay"
-                    ? "Submit a repayment preview to open the confirmation step and review quote details before signing."
-                    : "Submit a withdrawal preview to open the confirmation step before signing."}
-                </p>
-              </div>
+              <TransactionSummary
+                data={activeTab === "repay" ? repayData : withdrawData}
+                calculation={activeTab === "repay" ? calculationResult : null}
+                type={activeTab}
+              />
             ) : (
               <>
                 <InterestCalculator
