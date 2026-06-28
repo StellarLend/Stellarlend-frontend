@@ -141,4 +141,64 @@ describe("AmountInput Component", () => {
     expect(onChange).toHaveBeenCalledWith(1000);
     expect(input.value).toBe("1,000");
   });
+
+  describe("Quick-fill chips", () => {
+    it("renders chips when max is provided", () => {
+      render(<AmountInput label="Amount" value={0} onChange={() => {}} max={1000} />);
+      expect(screen.getByRole("button", { name: "Fill 25 percent" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Fill 50 percent" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Fill 75 percent" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Fill maximum amount" })).toBeInTheDocument();
+    });
+
+    it("does not render chips when max is not provided", () => {
+      render(<AmountInput label="Amount" value={0} onChange={() => {}} />);
+      expect(screen.queryByRole("button", { name: "Fill 25 percent" })).not.toBeInTheDocument();
+    });
+
+    it("calls onChange with correct percentage of max", () => {
+      const onChange = vi.fn();
+      render(<AmountInput label="Amount" value={0} onChange={onChange} max={1000} />);
+      
+      fireEvent.click(screen.getByRole("button", { name: "Fill 25 percent" }));
+      expect(onChange).toHaveBeenCalledWith(250);
+
+      fireEvent.click(screen.getByRole("button", { name: "Fill 50 percent" }));
+      expect(onChange).toHaveBeenCalledWith(500);
+
+      fireEvent.click(screen.getByRole("button", { name: "Fill 75 percent" }));
+      expect(onChange).toHaveBeenCalledWith(750);
+
+      fireEvent.click(screen.getByRole("button", { name: "Fill maximum amount" }));
+      expect(onChange).toHaveBeenCalledWith(1000);
+    });
+
+    it("respects decimal clamping when calculating percentage", () => {
+      const onChange = vi.fn();
+      render(<AmountInput label="Amount" value={0} onChange={onChange} max={10.55} precision={1} />);
+      
+      // 10.55 * 50% = 5.275, clamped to 1 precision => 5.2
+      fireEvent.click(screen.getByRole("button", { name: "Fill 50 percent" }));
+      expect(onChange).toHaveBeenCalledWith(5.2);
+    });
+
+    it("calls onQuickFill if provided", () => {
+      const onChange = vi.fn();
+      const onQuickFill = vi.fn();
+      render(<AmountInput label="Amount" value={0} onChange={onChange} max={1000} onQuickFill={onQuickFill} />);
+      
+      fireEvent.click(screen.getByRole("button", { name: "Fill 50 percent" }));
+      expect(onQuickFill).toHaveBeenCalledWith(50, 500);
+      expect(onChange).toHaveBeenCalledWith(500);
+    });
+
+    it("handles max 0 correctly", () => {
+      const onChange = vi.fn();
+      render(<AmountInput label="Amount" value={0} onChange={onChange} max={0} />);
+      
+      fireEvent.click(screen.getByRole("button", { name: "Fill 50 percent" }));
+      expect(onChange).toHaveBeenCalledWith(0);
+    });
+  });
 });
+

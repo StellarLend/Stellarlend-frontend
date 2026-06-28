@@ -9,3 +9,5 @@ export type { PageHeaderProps, PageHeaderTone } from './PageHeader';
 export type { AlertBannerSeverity, AlertBannerProps } from './AlertBanner';
 export { default as Toast } from './Toast';
 export type { ToastVariant } from './Toast';
+export { FeatureGate } from './FeatureGate';
+export type { FeatureGateProps } from './FeatureGate';
