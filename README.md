@@ -13,6 +13,7 @@ This frontend application provides a modern, responsive web interface for intera
 - [Withdraw supplied liquidity flow](docs/WITHDRAW_FLOW.md)
 - [Environment variables reference](docs/ENVIRONMENT.md)
 - [Client-side data fetching and hooks conventions](docs/data-fetching.md)
+- [Wallet context and Freighter integration guide](docs/wallet-integration.md)
 
 ## ?? Features
 
