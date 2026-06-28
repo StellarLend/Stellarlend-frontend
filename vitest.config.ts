@@ -113,9 +113,14 @@ export default defineConfig({
         test: {
           name: "server",
           environment: "node",
+          setupFiles: "./vitest.setup.ts",
           include: [
             "test/server/**/*.test.ts",
-            "app/api/markets/route.test.ts",
+            "lib/**/*.test.ts",
+            "app/api/**/*.test.ts",
+            "src/jobs/**/*.test.ts",
+            "types/enums.test.ts",
+            "__tests__/**/*.test.ts",
           ],
           alias: {
             "@": path.resolve(dirname, "."),
