@@ -1,4 +1,5 @@
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { formatCurrency as formatCurrencyUtil } from '@/lib/utils/format';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -8,10 +9,7 @@ interface TransactionSummaryProps {
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
   const formatCurrency = (amount: number, currency: string) => {
-    return `${amount.toLocaleString(undefined, { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 4 
-    })} ${currency}`;
+    return `${formatCurrencyUtil(amount, 4)} ${currency}`;
   };
 
   const formatDate = (daysFromNow: number) => {

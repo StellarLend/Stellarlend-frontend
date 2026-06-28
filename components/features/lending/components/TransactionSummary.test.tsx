@@ -122,6 +122,37 @@ describe('TransactionSummary — lend/borrow unchanged', () => {
   });
 });
 
+describe('TransactionSummary — currency formatting and edge cases', () => {
+  it('formats currency correctly for large maximum amount', () => {
+    const largeAmountData: LendingData = {
+      asset: 'XLM',
+      amount: 1000000.1234,
+      interestRate: 5,
+    };
+    const largeCalculation: CalculationResult = {
+      totalEarnings: 50000.12,
+      dailyEarnings: 136.986,
+      totalRepayment: 1050000.2434,
+    };
+    render(
+      <TransactionSummary data={largeAmountData} calculation={largeCalculation} type="lend" />,
+    );
+    expect(screen.getByText('1,000,000.1234 XLM')).toBeInTheDocument();
+  });
+
+  it('handles zero fees (zero totalEarnings for lend)', () => {
+    const zeroFeeCalc: CalculationResult = {
+      totalEarnings: 0,
+      dailyEarnings: 0,
+      totalRepayment: 1000,
+    };
+    render(
+      <TransactionSummary data={baseLendData} calculation={zeroFeeCalc} type="lend" />,
+    );
+    expect(screen.getByText('+0.0000 XLM')).toBeInTheDocument();
+  });
+});
+
 describe('TransactionSummary — repay type', () => {
   it('renders REPAY badge', () => {
     render(
