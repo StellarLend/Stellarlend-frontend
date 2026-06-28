@@ -11,15 +11,19 @@ declare global {
   interface Window {
     stellar?: {
       getPublicKey: () => Promise<string>;
-      signTransaction: (xdr: string, opts?: { network: string }) => Promise<string>;
+      signTransaction: (
+        xdr: string,
+        opts?: { network: string },
+      ) => Promise<string>;
     };
   }
 }
 
-import { useWallet } from "@/hooks/useWallet";
+import { useWalletContext } from "@/context/WalletContext";
 
 /** Shared focus-visible classes for TopNav interactive elements */
-const focusClasses = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-green-600";
+const focusClasses =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-green-600";
 
 export const SidebarToggle = () => {
   const { toggleSidebar } = useSidebar();
@@ -37,7 +41,13 @@ export const SidebarToggle = () => {
 };
 
 const TopNav = () => {
-  const { address: walletAddress, status, error, connect: handleConnect, disconnect } = useWallet();
+  const {
+    address: walletAddress,
+    status,
+    error,
+    connect: handleConnect,
+    disconnect,
+  } = useWalletContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const loading = status === "connecting";
@@ -67,10 +77,23 @@ const TopNav = () => {
             aria-label="Select network"
             className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
           >
-            <Image src="/icons/stellar.png" alt="Stellar network" width={22} height={22} />
+            <Image
+              src="/icons/stellar.png"
+              alt="Stellar network"
+              width={22}
+              height={22}
+            />
             <span>Stellar</span>
-            <svg className="w-3 h-3 text-white" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-              <path d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z" fill="#FFFFFF" />
+            <svg
+              className="w-3 h-3 text-white"
+              viewBox="0 0 10 6"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
+                fill="#FFFFFF"
+              />
             </svg>
           </button>
 
@@ -85,8 +108,16 @@ const TopNav = () => {
                   className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
                 >
                   <span>{getShortAddress(walletAddress)}</span>
-                  <svg className="w-3 h-3 text-white" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                    <path d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z" fill="#FFFFFF" />
+                  <svg
+                    className="w-3 h-3 text-white"
+                    viewBox="0 0 10 6"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
+                      fill="#FFFFFF"
+                    />
                   </svg>
                 </button>
                 {isDropdownOpen && (
@@ -107,23 +138,30 @@ const TopNav = () => {
                 aria-label="Connect wallet"
                 onClick={handleConnect}
                 disabled={loading && walletAddress === null}
-                className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-4 w-[139px] rounded-full ${focusClasses} ${loading ? 'opacity-80' : ''}`}
+                className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-4 w-[139px] rounded-full ${focusClasses} ${loading ? "opacity-80" : ""}`}
               >
                 <span>{loading ? "Connecting..." : "Connect Wallet"}</span>
               </button>
             )}
             {error && (
-              <span data-testid="wallet-error" className="text-xs text-red-200 absolute -bottom-5 right-0 whitespace-nowrap bg-red-800/80 px-2 py-0.5 rounded">
+              <span
+                data-testid="wallet-error"
+                className="text-xs text-red-200 absolute -bottom-5 right-0 whitespace-nowrap bg-red-800/80 px-2 py-0.5 rounded"
+              >
                 {error}
               </span>
             )}
           </div>
 
           {/* Divider */}
-          <div className="h-8 border-l" style={{ borderColor: "#71B48D" }} aria-hidden="true" />
+          <div
+            className="h-8 border-l"
+            style={{ borderColor: "#71B48D" }}
+            aria-hidden="true"
+          />
 
           <div className="flex gap-4 items-center">
-<NotificationBell />
+            <NotificationBell />
 
             {/* Profile Avatar */}
             <button
@@ -131,7 +169,13 @@ const TopNav = () => {
               className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
               aria-label="View profile"
             >
-              <Image src="/images/profile.jpg" alt="User profile" className="rounded-full" width={32} height={32} />
+              <Image
+                src="/images/profile.jpg"
+                alt="User profile"
+                className="rounded-full"
+                width={32}
+                height={32}
+              />
             </button>
           </div>
         </div>
@@ -141,11 +185,13 @@ const TopNav = () => {
       <div className="md:hidden flex justify-between w-full items-center">
         <div className="flex items-center gap-2">
           <SidebarToggle />
-          <h1 className="text-white md:text-[24px] text-xl font-bold">Dashboard</h1>
+          <h1 className="text-white md:text-[24px] text-xl font-bold">
+            Dashboard
+          </h1>
         </div>
 
         <div className="flex gap-4 items-center">
-<NotificationBell />
+          <NotificationBell />
 
           {/* Profile Avatar */}
           <button
@@ -153,7 +199,13 @@ const TopNav = () => {
             className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
             aria-label="View profile"
           >
-            <Image src="/images/profile.jpg" alt="User profile" className="rounded-full" width={32} height={32} />
+            <Image
+              src="/images/profile.jpg"
+              alt="User profile"
+              className="rounded-full"
+              width={32}
+              height={32}
+            />
           </button>
         </div>
       </div>
