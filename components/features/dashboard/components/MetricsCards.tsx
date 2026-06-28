@@ -144,8 +144,12 @@ const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
+import { useCurrencyPreference } from "@/context/CurrencyContext";
+import { formatCurrency } from "@/lib/utils/format";
+
 export default function MetricsCards() {
   const [data, setData] = useState<any>(null);
+  const { currency } = useCurrencyPreference();
 
   useEffect(() => {
     fetch("/api/positions")
@@ -156,6 +160,12 @@ export default function MetricsCards() {
 
   if (!data) return <div className="text-white p-4 text-sm font-medium">Loading metrics...</div>;
 
+  const parseValue = (val: any) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    return parseFloat(String(val).replace(/[^\d.-]/g, '')) || 0;
+  };
+
   return (
     <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -163,22 +173,22 @@ export default function MetricsCards() {
           isPrimary
           icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
           label="Available Balance"
-          value={data.availableBalance}
+          value={formatCurrency(parseValue(data.availableBalance), 2, currency)}
           copyValue={data.copyAddress}
         />
         <MetricCard
           icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
           label="Total Borrowed Amount"
-          value={data.borrowedAmount}
+          value={formatCurrency(parseValue(data.borrowedAmount), 2, currency)}
           subLabel="Next Due Payment"
           subValue={data.nextDue}
         />
         <MetricCard
           icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
           label={`Total Supplied (Health Factor: ${data.healthFactor})`}
-          value={data.suppliedFunds}
+          value={formatCurrency(parseValue(data.suppliedFunds), 2, currency)}
           subLabel="Earnings from Lending"
-          subValue={data.earnings}
+          subValue={formatCurrency(parseValue(data.earnings), 2, currency)}
         />
       </div>
     </ScrollCues>
