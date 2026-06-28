@@ -6,6 +6,8 @@ const routePath = '@/app/api/internal/cache/invalidate/route';
 describe('POST /api/internal/cache/invalidate', () => {
   beforeEach(() => {
     vi.resetModules();
+    delete process.env.SERVER_TOKEN;
+    delete process.env.CACHE_INVALIDATE_ALLOWED_ORIGINS;
   });
 
   afterEach(() => {
@@ -30,11 +32,16 @@ describe('POST /api/internal/cache/invalidate', () => {
 
   it('validates request body', async () => {
     process.env.SERVER_TOKEN = 'test-token-123';
+    process.env.CACHE_INVALIDATE_ALLOWED_ORIGINS = 'https://deploy.stellarlend.test';
     const { POST } = await import(routePath);
 
     const req = new NextRequest('http://localhost/api/internal/cache/invalidate', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.SERVER_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${process.env.SERVER_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Origin': 'https://deploy.stellarlend.test',
+      },
       body: JSON.stringify({}),
     });
 
@@ -46,6 +53,7 @@ describe('POST /api/internal/cache/invalidate', () => {
 
   it('invalidates specified namespaces and emits logs/metrics', async () => {
     process.env.SERVER_TOKEN = 'server-token-xyz';
+    process.env.CACHE_INVALIDATE_ALLOWED_ORIGINS = 'https://deploy.stellarlend.test';
 
     // Prepare cache
     const { globalCache } = await import('@/lib/cache');
@@ -64,7 +72,11 @@ describe('POST /api/internal/cache/invalidate', () => {
 
     const req = new NextRequest('http://localhost/api/internal/cache/invalidate', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.SERVER_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${process.env.SERVER_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Origin': 'https://deploy.stellarlend.test',
+      },
       body: JSON.stringify({ namespaces: ['prices'] }),
     });
 
@@ -84,5 +96,86 @@ describe('POST /api/internal/cache/invalidate', () => {
 
     loggerSpy.mockRestore();
     consoleSpy.mockRestore();
+  });
+
+  it('rejects requests with an unexpected method', async () => {
+    process.env.SERVER_TOKEN = 'server-token-xyz';
+    process.env.CACHE_INVALIDATE_ALLOWED_ORIGINS = 'https://deploy.stellarlend.test';
+    const { POST } = await import(routePath);
+
+    const req = new NextRequest('http://localhost/api/internal/cache/invalidate', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${process.env.SERVER_TOKEN}`,
+        'Origin': 'https://deploy.stellarlend.test',
+      },
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
+  });
+
+  it('rejects requests from a disallowed origin', async () => {
+    process.env.SERVER_TOKEN = 'server-token-xyz';
+    process.env.CACHE_INVALIDATE_ALLOWED_ORIGINS = 'https://deploy.stellarlend.test';
+    const { POST } = await import(routePath);
+
+    const req = new NextRequest('http://localhost/api/internal/cache/invalidate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SERVER_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Origin': 'https://attacker.example',
+      },
+      body: JSON.stringify({ namespaces: ['prices'] }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
+  });
+
+  it('rejects origin-bearing requests when the allowlist is empty', async () => {
+    process.env.SERVER_TOKEN = 'server-token-xyz';
+    const { POST } = await import(routePath);
+
+    const req = new NextRequest('http://localhost/api/internal/cache/invalidate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SERVER_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Origin': 'https://deploy.stellarlend.test',
+      },
+      body: JSON.stringify({ namespaces: ['prices'] }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
+  });
+
+  it('rejects malformed bearer tokens without leaking guard details', async () => {
+    process.env.SERVER_TOKEN = 'server-token-xyz';
+    process.env.CACHE_INVALIDATE_ALLOWED_ORIGINS = 'https://deploy.stellarlend.test';
+    const { POST } = await import(routePath);
+
+    const req = new NextRequest('http://localhost/api/internal/cache/invalidate', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer',
+        'Content-Type': 'application/json',
+        'Origin': 'https://deploy.stellarlend.test',
+      },
+      body: JSON.stringify({ namespaces: ['prices'] }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('Unauthorized');
   });
 });
