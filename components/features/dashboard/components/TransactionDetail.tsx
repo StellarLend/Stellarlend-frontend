@@ -10,6 +10,9 @@ import { isValidTxHash } from "@/lib/validation/stellar";
 import config from "@/lib/config";
 import { copyToClipboard } from "@/lib/utils/clipboard";
 import Toast from "@/components/shared/common/Toast";
+import { Toast } from "@/components/shared/common";
+import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
+import TransactionReceipt from "./TransactionReceipt";
 
 interface TransactionDetailProps {
   transaction: Transaction | null;
@@ -20,6 +23,7 @@ interface TransactionDetailProps {
 export default function TransactionDetail({ transaction, isOpen, onClose }: TransactionDetailProps) {
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [toast, setToast] = useState<{ title?: string; description?: string; variant?: "success" | "error" } | null>(null);
 
   const id = transaction?.id || "";
