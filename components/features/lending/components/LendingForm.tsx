@@ -16,6 +16,7 @@ import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -360,15 +361,17 @@ export default function LendingForm({
         )}
 
         {/* Submit Button */}
-        <Button
-          type="submit"
-          variant="success"
-          size="lg"
-          fullWidth
-          isLoading={isSubmitting}
-        >
-          Review Lending Offer
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review offer">
+          <Button
+            type="submit"
+            variant="success"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+          >
+            Review Lending Offer
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

@@ -6,6 +6,7 @@ import { Input } from "@/components/shared/ui/Input";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import {
   CRITICAL_HEALTH_FACTOR_THRESHOLD,
@@ -409,15 +410,17 @@ export default function WithdrawForm({
           </div>
         )}
 
-        <Button
-          type="submit"
-          variant="success"
-          size="lg"
-          fullWidth
-          isLoading={false}
-        >
-          Review Withdrawal
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review withdrawal">
+          <Button
+            type="submit"
+            variant="success"
+            size="lg"
+            fullWidth
+            isLoading={false}
+          >
+            Review Withdrawal
+          </Button>
+        </WalletGate>
       </form>
 
       {pendingData && (
