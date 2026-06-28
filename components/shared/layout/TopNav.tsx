@@ -1,11 +1,10 @@
-"use client";
-
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu } from "lucide-react";
 import NotificationBell from "@/components/shared/layout/NotificationBell";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 
 declare global {
   interface Window {
@@ -37,6 +36,9 @@ export const SidebarToggle = () => {
 };
 
 const TopNav = () => {
+  const { walletAddress, isConnected, isLoading, error, connect, disconnect } = useWalletConnection();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
   const { address: walletAddress, status, error, connect: handleConnect, disconnect } = useWallet();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -93,7 +95,7 @@ const TopNav = () => {
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700">
                     <button
                       type="button"
-                      onClick={handleDisconnect}
+                      onClick={disconnect}
                       className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 text-red-600 font-medium"
                     >
                       Disconnect Wallet
@@ -105,11 +107,11 @@ const TopNav = () => {
               <button
                 type="button"
                 aria-label="Connect wallet"
-                onClick={handleConnect}
-                disabled={loading && walletAddress === null}
-                className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-4 w-[139px] rounded-full ${focusClasses} ${loading ? 'opacity-80' : ''}`}
+                onClick={connect}
+                disabled={isLoading && walletAddress === null}
+                className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-4 w-[139px] rounded-full ${focusClasses} ${isLoading ? 'opacity-80' : ''}`}
               >
-                <span>{loading ? "Connecting..." : "Connect Wallet"}</span>
+                <span>{isLoading ? "Connecting..." : "Connect Wallet"}</span>
               </button>
             )}
             {error && (
