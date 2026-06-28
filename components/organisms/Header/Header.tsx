@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useWalletContext } from "@/context/WalletContext";
+import NotificationCenter from "@/components/features/notifications/NotificationCenter";
 
 const focusClasses =
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black";
@@ -51,7 +52,8 @@ const Header: React.FC = () => {
         </nav>
 
         {/* Wallet Interaction */}
-        <div className="flex items-center gap-4 relative">
+        <div className="flex items-center gap-3 relative">
+          {address && <NotificationCenter />}
           {address ? (
             <div className="relative">
               <button
