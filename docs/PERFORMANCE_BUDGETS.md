@@ -11,6 +11,26 @@ The lending route chunk is budgeted at **150kb**.
 - This ensures that only the essential code for the landing state (Lending tab) is loaded initially.
 - The `BorrowingForm`, `InterestCalculator`, and `ConfirmModal` are loaded lazily on demand.
 
+### Icon Lazy Loading (2026-06-27)
+
+To further reduce the initial bundle size, all icon imports have been converted to lazy-loaded components using `next/dynamic`:
+
+- **NavigationMenu**: 10 icons (Notification, LoginCircleFill, ArrowLeftRightLine, DashboardFill, ReceiptFill, Settings5Fill, WalletFill, Bank, CoinIcon, TransactionIcon)
+- **ExploreFeatures**: 6 icons (Dollar, ShieldBlockchain, Zap, Global, Union, File)
+- **Transactions page**: 1 icon (Bank)
+- **NotificationBell**: 1 icon (Notification)
+
+**Implementation Details:**
+- Icons are loaded on-demand using `next/dynamic` with `IconPlaceholder` as the loading state
+- `IconPlaceholder` provides a lightweight skeleton with pulse animation during icon load
+- This reduces the initial bundle by deferring icon code until the component is rendered
+- No visual regression - icons appear seamlessly after loading
+
+**Expected Impact:**
+- Reduces initial bundle size by approximately 50-100KB (depending on icon usage)
+- Improves Time to Interactive (TTI) for navigation and marketing pages
+- Maintains accessibility with proper loading states
+
 ## Dashboard Route
 
 The dashboard is the most data-heavy authenticated page and is tested with Lighthouse CI assertions in CI.

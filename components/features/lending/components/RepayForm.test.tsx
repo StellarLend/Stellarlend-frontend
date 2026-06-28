@@ -1,7 +1,10 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@/test/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import RepayForm, { BorrowPosition } from "./RepayForm";
+import RepayForm, {
+  BorrowPosition,
+  computeHealthAfterRepayment,
+} from "./RepayForm";
 
 const positions: BorrowPosition[] = [
   {
@@ -105,16 +108,76 @@ describe("RepayForm Component", () => {
     });
 
     expect(screen.getByText("1,000.00 XLM")).toBeInTheDocument();
-    expect(screen.getByText(/2.25 \(Healthy\)/i)).toBeInTheDocument();
+    expect(screen.getByText("2.25")).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: /Projected health: Healthy/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows full repayment preview as debt cleared", () => {
     render(<RepayForm positions={positions} onSubmit={onSubmit} />);
 
-    fireEvent.click(screen.getByText("MAX"));
+    fireEvent.click(screen.getByText("Repay full debt"));
 
     expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
     expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it('displays "Full repayment" badge when amount equals outstanding debt', () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    expect(screen.queryByText(/Full repayment/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Repay full debt"));
+
+    expect(screen.getByText(/Full repayment/i)).toBeInTheDocument();
+  });
+
+  it("disables repay full debt button when no position is selected", () => {
+    render(<RepayForm positions={[]} onSubmit={onSubmit} />);
+
+    expect(screen.getByRole("button", { name: /Repay full debt/i })).toBeDisabled();
+  });
+
+  it("disables repay full debt button when debt is zero", () => {
+    const zeroDebtPositions: BorrowPosition[] = [
+      {
+        id: "loan-zero",
+        asset: "XLM",
+        outstandingDebt: 0,
+        interestRate: 12,
+        collateralAsset: "XLM",
+        collateralAmount: 5000,
+        healthFactor: 1.5,
+        duration: 30,
+      },
+    ];
+
+    render(<RepayForm positions={zeroDebtPositions} onSubmit={onSubmit} />);
+
+    expect(screen.getByRole("button", { name: /Repay full debt/i })).toBeDisabled();
+  });
+
+  it("enables repay full debt button when valid position exists with debt", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    expect(
+      screen.getByRole("button", { name: /Repay full debt/i }),
+    ).not.toBeDisabled();
+  });
+
+  it("resets amount and full-repay state when switching positions", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByText("Repay full debt"));
+    expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Borrow position/i), {
+      target: { value: "loan-2" },
+    });
+
+    expect(screen.getByText(/Outstanding: 900.00 USDC/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Full repayment/i)).not.toBeInTheDocument();
   });
 
   it("submits quote preview and repayment data", async () => {
@@ -143,8 +206,10 @@ describe("RepayForm Component", () => {
         }),
         quoteResult,
       );
+      expect(
+        screen.getByText(/Repayment preview ready/i),
+      ).toBeInTheDocument();
     });
-    expect(screen.getByText(/Repayment preview ready/i)).toBeInTheDocument();
   });
 
   it("switching selected position updates the preview", () => {
@@ -199,6 +264,10 @@ describe("RepayForm Component", () => {
 
     expect(screen.getByText("0.00 XLM")).toBeInTheDocument();
     expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it("caps projected health at debt cleared when the input exceeds outstanding debt", () => {
+    expect(computeHealthAfterRepayment(1.5, 1500, 2000)).toBe(Infinity);
   });
 
   it("shows Healthy label for health factor >= 2", () => {
@@ -290,7 +359,7 @@ describe("RepayForm Component", () => {
     fireEvent.click(screen.getByText(/Review Repayment/i));
 
     expect(
-      await screen.findByText(/Preparing repayment preview/i),
+      await screen.findByText(/Submitting repay request/i),
     ).toBeInTheDocument();
 
     rejectPreview();
@@ -299,5 +368,69 @@ describe("RepayForm Component", () => {
       await screen.findByText(/Unable to prepare repayment preview/i),
     ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("syncs slider changes to repayment amount", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(slider, { target: { value: "50" } });
+    expect(amountInput).toHaveValue(750);
+  });
+
+  it("syncs amount changes to slider percentage", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(amountInput, { target: { value: "375" } });
+    expect(slider).toHaveValue("25");
+  });
+
+  it("handles 0% slider value", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(slider, { target: { value: "0" } });
+    expect(amountInput).toHaveValue(0);
+  });
+
+  it("handles 100% full repay slider value", () => {
+    render(<RepayForm positions={positions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+
+    fireEvent.change(slider, { target: { value: "100" } });
+    expect(amountInput).toHaveValue(1500);
+    expect(screen.getAllByText(/Debt cleared/i).length).toBeGreaterThan(0);
+  });
+
+  it("slider stays at 0 when outstanding debt is zero", () => {
+    const zeroDebtPositions: BorrowPosition[] = [
+      {
+        id: "loan-zero",
+        asset: "XLM",
+        outstandingDebt: 0,
+        interestRate: 10,
+        collateralAsset: "XLM",
+        collateralAmount: 5000,
+        healthFactor: Infinity,
+      },
+    ];
+
+    render(<RepayForm positions={zeroDebtPositions} onSubmit={onSubmit} />);
+    
+    const slider = screen.getByLabelText(/Repayment percentage/i);
+    expect(slider).toHaveValue("0");
+
+    fireEvent.change(slider, { target: { value: "50" } });
+    const amountInput = screen.getByLabelText(/Repayment amount/i);
+    expect(amountInput).toHaveValue(0);
   });
 });

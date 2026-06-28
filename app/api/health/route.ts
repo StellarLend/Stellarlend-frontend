@@ -1,16 +1,13 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
-import { cacheHeaders, generateETag, isNotModified, notModifiedResponse } from '@/lib/api/etag';
 
 export const runtime = 'nodejs';
 
-type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
-
-async function checkUrl(url: string): Promise<HealthStatus> {
+async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(url, { timeoutMs: 5000, retries: 1 });
+    await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -19,27 +16,64 @@ async function checkUrl(url: string): Promise<HealthStatus> {
   }
 }
 
-function combineStatuses(statuses: HealthStatus[]): HealthStatus {
-  if (statuses.includes('unhealthy')) return 'unhealthy';
-  if (statuses.includes('degraded')) return 'degraded';
-  return 'healthy';
+async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+  try {
+    await httpGet(`${config.stellar.sorobanRpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
 }
 
-async function handleHealth(request: NextRequest) {
+async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+  try {
+    await httpGet(`${config.api.baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
+}
+
+async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+  try {
+    await httpGet(`${config.api.baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
+    return 'healthy';
+  } catch (err) {
+    if (err instanceof TimeoutError) return 'degraded';
+    if (err instanceof UpstreamHttpError) return 'degraded';
+    return 'unhealthy';
+  }
+}
+
+async function handleHealth() {
   try {
     const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
-      checkUrl(`${config.stellar.horizonUrl}/`),
-      checkUrl(`${config.stellar.sorobanRpcUrl ?? config.stellar.horizonUrl}/health`),
-      checkUrl(`${config.api.baseUrl}/health`),
-      checkUrl(`${config.api.baseUrl}/health`),
+      checkHorizon(),
+      checkSorobanRpc(),
+      checkApi(),
+      checkDatabase(),
     ]);
 
-    const stellarStatus = combineStatuses([horizonStatus, sorobanStatus]);
-    const overallStatus = combineStatuses([stellarStatus, apiStatus, dbStatus]);
+    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy' 
+      ? 'unhealthy' 
+      : horizonStatus === 'degraded' || sorobanStatus === 'degraded'
+      ? 'degraded'
+      : 'healthy';
 
-    // Stable fields for ETag calculation (excl. volatile timestamp)
-    const stableFields = {
+    const overallStatus = 
+      stellarStatus === 'unhealthy' || apiStatus === 'unhealthy' || dbStatus === 'unhealthy'
+        ? 'unhealthy'
+        : stellarStatus === 'degraded' || apiStatus === 'degraded' || dbStatus === 'degraded'
+        ? 'degraded'
+        : 'healthy';
+
+    const healthData = {
       status: overallStatus,
+      timestamp: new Date().toISOString(),
       environment: config.app.environment,
       version: config.app.version,
       checks: {
@@ -49,24 +83,8 @@ async function handleHealth(request: NextRequest) {
       },
     };
 
-    const etag = generateETag(stableFields);
-
-    if (isNotModified(request, etag)) {
-      return new NextResponse(null, notModifiedResponse(etag, 'public'));
-    }
-
-    const healthData = {
-      ...stableFields,
-      timestamp: new Date().toISOString(),
-    };
-
-    const httpStatus = healthData.status === 'unhealthy' ? 503 : 200;
-    const headers = cacheHeaders(etag, 30, 'public');
-
-    return NextResponse.json(healthData, {
-      status: httpStatus,
-      headers,
-    });
+    const httpStatus = healthData.status === 'healthy' ? 200 : 503;
+    return NextResponse.json(healthData, { status: httpStatus });
   } catch {
     return NextResponse.json(
       {
