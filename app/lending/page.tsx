@@ -7,7 +7,7 @@ import useTxStatus from "@/lib/tx/useTxStatus";
 import { Toast } from "@/components/shared/common";
 import LendingForm from "@/components/features/lending/components/LendingForm";
 import TabSelector from "@/components/features/lending/components/TabSelector";
-import { PageHeader } from "@/components/shared/common";
+import { PageHeader, PriceTicker } from "@/components/shared/common";
 import { Skeleton } from "@/components/shared/common/Skeleton";
 import type { LendingActionType } from "@/lib/lending/types";
 
@@ -323,6 +323,9 @@ export default function LendingPage() {
               description="Earn interest, borrow against collateral, repay open debt positions, or withdraw supplied liquidity."
               className="mb-0"
             />
+            <div className="mt-4">
+              <PriceTicker />
+            </div>
           </div>
         </section>
 
