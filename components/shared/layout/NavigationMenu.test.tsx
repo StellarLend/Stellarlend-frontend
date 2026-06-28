@@ -17,6 +17,12 @@ vi.mock("next/dynamic", () => ({
   },
 }));
 
+vi.mock("next/link", () => ({
+  default: ({ children, href, ...props }: { children: React.ReactNode; href: string; [key: string]: unknown }) => {
+    return React.createElement("a", { href, ...props }, children);
+  },
+}));
+
 describe("NavigationMenu", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -159,6 +165,21 @@ describe("NavigationMenu", () => {
         expect(fundwalletLink).toHaveAttribute("aria-current", "page");
       });
     });
+
+    it("click-based active state overrides route-based for non-path links", async () => {
+      vi.stubGlobal("window", { location: { pathname: "/dashboard/loan" } });
+      render(<NavigationMenu visibleLinks={["Fundwallet", "Loan"]} />);
+      
+      const fundwalletLink = screen.getByText("Fundwallet").closest("a");
+      const loanLink = screen.getByText("Loan").closest("a");
+      
+      await userEvent.click(fundwalletLink!);
+      
+      await waitFor(() => {
+        expect(fundwalletLink).toHaveAttribute("aria-current", "page");
+        expect(loanLink).not.toHaveAttribute("aria-current");
+      });
+    });
   });
 
   describe("accessibility semantics", () => {
@@ -256,6 +277,22 @@ describe("NavigationMenu", () => {
       render(<NavigationMenu visibleLinks={["Dashboard"]} />);
       const link = screen.getByRole("link", { name: /dashboard/i });
       expect(link).toHaveAttribute("aria-label", "Dashboard");
+    });
+
+    it("inactive indicator bar has opacity-0 class", async () => {
+      vi.stubGlobal("window", { location: { pathname: "/dashboard" } });
+      render(<NavigationMenu visibleLinks={["Settings"]} />);
+      await waitFor(() => {
+        const indicator = screen.getByText("Settings").closest("a")?.querySelector("span[aria-hidden='true']");
+        expect(indicator).toHaveClass("opacity-0");
+      });
+    });
+
+    it("inactive link has hover classes for visual feedback", () => {
+      render(<NavigationMenu visibleLinks={["Dashboard"]} />);
+      const link = screen.getByText("Dashboard").closest("a");
+      expect(link).toHaveClass("hover:bg-white/5");
+      expect(link).toHaveClass("hover:text-white");
     });
   });
 });

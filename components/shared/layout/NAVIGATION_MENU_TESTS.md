@@ -6,53 +6,74 @@ This document outlines the testing strategy for the `NavigationMenu` component, 
 ## Test Categories
 
 ### 1. Link Rendering Tests
-- Semantic structure: `<nav aria-label="Main navigation"> > <ul> > <li>` 
-- Filtering by `visibleLinks` prop
-- All links have accessible `aria-label` attributes
-- Renders all links when `visibleLinks` is omitted
+| Test | Description | Status |
+|------|-------------|--------|
+| Semantic structure | Renders `<nav aria-label="Main navigation"> > <ul> > <li>` hierarchy | ✅ |
+| Link filtering | Filters links based on `visibleLinks` prop | ✅ |
+| All links rendered | Renders all links when `visibleLinks` is omitted | ✅ |
+| Accessible labels | All links have accessible `aria-label` attributes | ✅ |
 
 ### 2. Active-State Derivation Tests
 
 #### Route-based Links (links with `path` property)
-- Root route `/dashboard` marks Dashboard as active
-- Nested route `/dashboard/loan` marks Loan as active
-- Nested route `/dashboard/transactions` marks Transactions as active
-- Nested route `/dashboard/settings` marks Settings as active
-- Non-matching paths do not mark links as active
+| Test | Route | Expected | Status |
+|------|-------|----------|--------|
+| Root route active | `/dashboard` | Dashboard marked active | ✅ |
+| Nested route active | `/dashboard/loan` | Loan marked active | ✅ |
+| Nested route active | `/dashboard/transactions` | Transactions marked active | ✅ |
+| Nested route active | `/dashboard/settings` | Settings marked active | ✅ |
+| No match | `/dashboard` for Settings link | Not marked active | ✅ |
+| Unknown route | `/unknown-route` | All links inactive | ✅ |
+| Dynamic segment | `/dashboard/loan/123` | Loan not marked active (exact match required) | ✅ |
+| Multiple matches | `/dashboard` with Dashboard, Cash and receipt, Notification | Only Dashboard marked active | ✅ |
 
 #### Click-based Links (links without `path` property)
-- Links without paths become active on click (e.g., "Fundwallet", "Lending")
-- Active state persists to localStorage
-- Active state restores from localStorage on mount
+| Test | Description | Status |
+|------|-------------|--------|
+| Click activates | Links without paths become active on click (Fundwallet, Lending) | ✅ |
+| localStorage persistence | Active state persists to localStorage on click | ✅ |
+| localStorage restore | Active state restores from localStorage on mount | ✅ |
 
 ### 3. Accessibility Semantics Tests
-- Nav landmark has `aria-label="Main navigation"`
-- All links have `focus-visible:ring-2` and `focus-visible:ring-[#15A350]` classes
-- Links meet minimum touch-target height (`py-3.5`)
-- Active links receive `aria-current="page"` attribute
+| Test | Description | Status |
+|------|-------------|--------|
+| Nav landmark | Nav has `aria-label="Main navigation"` | ✅ |
+| Focus-visible ring | All links have `focus-visible:ring-2` and `focus-visible:ring-[#15A350]` | ✅ |
+| Touch target | Links meet minimum touch-target height (`py-3.5`) | ✅ |
+| aria-current | Active links receive `aria-current="page"` attribute | ✅ |
 
 ### 4. Active Styling Tests
-- Active styling uses class/attribute checks, not color alone
-- Active indicator bar has `opacity-100` class (not just color)
-- Inactive indicator bar has `opacity-0` class
+| Test | Description | Status |
+|------|-------------|--------|
+| Background class | Active link has `bg-[#15A350]/15` class | ✅ |
+| Text class | Active link has `text-[#15A350]` class | ✅ |
+| Indicator bar | Active indicator has `opacity-100` class | ✅ |
+| Inactive indicator | Inactive indicator has `opacity-0` class | ✅ |
 
 ### 5. Collapsed State Tests
-- `isCollapsed={true}` applies compact layout classes
-- Link text hidden with `sr-only` when collapsed
-- `isCollapsed={false}` shows full link text
+| Test | Description | Status |
+|------|-------------|--------|
+| Collapsed layout | `isCollapsed={true}` applies compact layout classes | ✅ |
+| Expanded layout | `isCollapsed={false}` shows full link text | ✅ |
+| Text hidden | Link text hidden with `sr-only` when collapsed | ✅ |
+| Text visible | Link text shown when not collapsed | ✅ |
 
 ### 6. Callback Tests
-- `onLinkClick` callback invoked on link click
-- Each click triggers independent callback invocation
+| Test | Description | Status |
+|------|-------------|--------|
+| onLinkClick | Callback invoked on link click | ✅ |
+| Multiple clicks | Each click triggers independent callback | ✅ |
 
 ### 7. Edge Cases
-- Dynamic segment routes (e.g., `/dashboard/loan/123`) - exact match required for active state
-- Multiple candidate matches - uses exact path matching (only Dashboard matches `/dashboard`)
-- Empty `visibleLinks` array renders no items
-- Label fallback to link name
+| Test | Description | Status |
+|------|-------------|--------|
+| Empty array | Empty `visibleLinks` renders no items | ✅ |
+| Label fallback | Link without explicit label uses link name | ✅ |
 
 ## Test Implementation Notes
 
+- Uses `vi.stubGlobal` for window mocking to simulate route scenarios
 - Uses `vi.mock` for `next/dynamic` to handle dynamic icon imports
+- Uses `vi.mock` for `next/link` to simplify DOM structure in tests
 - Tests use `@testing-library/react` with `userEvent` for interactions
 - Coverage threshold: 95% lines, functions, statements; 90% branches
