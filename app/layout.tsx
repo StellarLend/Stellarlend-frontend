@@ -5,6 +5,8 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { WalletProvider } from "@/context/WalletContext";
 import NextTopLoader from "nextjs-toploader";
 import { headers } from "next/headers";
+import { ToastProvider } from "@/components/shared/common/Toast";
+import NotificationToastBridge from "@/components/shared/common/NotificationToastBridge";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -17,13 +19,13 @@ export const metadata: Metadata = {
   description: "Decentralized lending and borrowing on Stellar",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   // Retrieve CSP nonce from middleware header
-  const nonce = headers().get("x-csp-nonce") ?? undefined;
+  const nonce = (await headers()).get("x-csp-nonce") ?? undefined;
 
   return (
     <html lang="en" suppressHydrationWarning={true}>
@@ -45,12 +47,17 @@ export default function RootLayout({
         {nonce && (
           <script
             nonce={nonce}
-            dangerouslySetInnerHTML={{ __html: `window.CSP_NONCE = "${nonce}";` }}
+            dangerouslySetInnerHTML={{
+              __html: `window.CSP_NONCE = "${nonce}";`,
+            }}
           />
         )}
-        <WalletProvider>
-          <SidebarProvider>{children}</SidebarProvider>
-        </WalletProvider>
+        <ToastProvider>
+          <NotificationToastBridge />
+          <WalletProvider>
+            <SidebarProvider>{children}</SidebarProvider>
+          </WalletProvider>
+        </ToastProvider>
       </body>
     </html>
   );
