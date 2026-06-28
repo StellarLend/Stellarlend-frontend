@@ -47,28 +47,45 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Typed GET with automatic timeout (via AbortController) and exponential
- * backoff retry.  Only GET/HEAD requests are retried by default — mutating methods
+ * backoff retry. Only GET/HEAD requests are retried by default — mutating methods
  * such as POST are passed through once, unless retryOnPost is explicitly enabled.
  */
 export async function httpGet<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const method = (options.method ?? 'GET').toUpperCase();
   const isIdempotent = method === 'GET' || method === 'HEAD';
-  const maxRetries = (isIdempotent || (method === 'POST' && options.retryOnPost)) ? (options.retries ?? 3) : 1;
+  const retryCount = options.maxRetries ?? options.retries ?? 3;
+  const maxAttempts = (isIdempotent || (method === 'POST' && options.retryOnPost)) ? (retryCount + 1) : 1;
   const backoffMs = options.backoffMs ?? 200;
   const retryAfterUpperBoundMs = options.retryAfterUpperBoundMs ?? 30000;
 
   let lastError: HttpError | undefined;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let nextDelay = backoffMs * 2 ** (attempt - 1);
     try {
       const timeoutMs = options.timeoutMs ?? config.api.timeout;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
-      const { timeoutMs: _t, retries: _r, backoffMs: _b, retryOnPost: _rp, retryAfterUpperBoundMs: _rao, ...fetchOptions } = options;
+      const {
+        timeoutMs: _t,
+        retries: _r,
+        maxRetries: _mr,
+        backoffMs: _b,
+        retryOnPost: _rp,
+        retryAfterUpperBoundMs: _rao,
+        headers: customHeaders,
+        ...fetchOptions
+      } = options;
+
+      const activeRequestId = getActiveRequestId();
+      const headers = new Headers(customHeaders || {});
+      if (activeRequestId && !headers.has(REQUEST_ID_HEADER)) {
+        headers.set(REQUEST_ID_HEADER, activeRequestId);
+      }
+
       let response: Response;
       try {
-        response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+        response = await fetch(url, { ...fetchOptions, method, headers, signal: controller.signal });
       } catch (err) {
         clearTimeout(timer);
         if ((err as Error).name === 'AbortError') {
@@ -118,13 +135,20 @@ export async function httpGet<T>(url: string, options: RequestOptions = {}): Pro
       if (lastError instanceof TimeoutError) {
         throw lastError;
       }
-      if (attempt < maxRetries) {
+      if (attempt < maxAttempts) {
         await sleep(nextDelay);
       }
     }
   }
 
-  throw new RetryExhaustedError(url, maxRetries, lastError!);
+  throw new RetryExhaustedError(url, maxAttempts, lastError!);
+}
+
+/**
+ * Generic HTTP fetch helper alias.
+ */
+export async function httpFetch<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  return httpGet<T>(url, options);
 }
 
 /**
@@ -139,4 +163,3 @@ export async function httpPost<T>(url: string, body: unknown, options: RequestOp
     body: JSON.stringify(body),
   });
 }
-
