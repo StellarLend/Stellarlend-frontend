@@ -14,3 +14,4 @@ export { Dropdown } from './Dropdown';
 export { File } from './File';
 export { Global } from './Global';
 export { FastSecure } from './FastSecure';
+export { IconPlaceholder } from './IconPlaceholder';

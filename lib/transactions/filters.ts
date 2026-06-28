@@ -1,4 +1,12 @@
-import { TransactionFilter } from './repository';
+import type { TransactionStatus, TransactionAsset } from './types';
+
+export interface TransactionFilter {
+  type?: string;
+  status?: TransactionStatus;
+  asset?: TransactionAsset | string;
+  fromDate?: string;
+  toDate?: string;
+}
 
 const ALLOWED_TYPES   = new Set(['lend', 'borrow', 'repay', 'withdraw']);
 const ALLOWED_STATUSES = new Set(['completed', 'pending', 'failed']);

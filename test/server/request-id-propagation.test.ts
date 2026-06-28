@@ -5,6 +5,8 @@ import { withRequestLogging } from '@/lib/api/handler';
 import { httpGet } from '@/lib/http/client';
 import { normalizeRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
 
+vi.mock('server-only', () => ({}));
+
 vi.mock('@/lib/rate-limit', () => ({
   rateLimit: vi.fn(() => ({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60_000 })),
 }));

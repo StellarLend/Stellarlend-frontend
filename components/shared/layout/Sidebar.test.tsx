@@ -33,10 +33,26 @@ describe("Sidebar responsive navigation states", () => {
       </SidebarProvider>
     );
 
-    expect(screen.getByRole("button", { name: /Expand sidebar/i })).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /Expand sidebar/i });
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveClass("focus-visible:ring-2");
+
     const profileLink = screen.getByRole("link", { name: /Profile Settings/i });
     expect(profileLink).toBeInTheDocument();
     expect(screen.queryByText(/Profile Settings/i, { selector: "span:not(.sr-only)" })).toBeNull();
+  });
+
+  it("desktop toggle is keyboard-activatable", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={false} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
+
+    const toggle = screen.getByRole("button", { name: /Expand sidebar/i });
+    toggle.focus();
+    expect(toggle).toHaveFocus();
   });
 
   it("opens mobile drawer with overlay and locks body scroll", async () => {
@@ -56,6 +72,7 @@ describe("Sidebar responsive navigation states", () => {
       name: /Close account navigation drawer/i,
     });
     await waitFor(() => expect(closeButton).toHaveFocus());
+    expect(closeButton).toHaveClass("focus-visible:ring-2");
 
     const overlay = screen.getByTestId("sidebar-overlay");
     await userEvent.click(overlay);
@@ -65,6 +82,21 @@ describe("Sidebar responsive navigation states", () => {
     expect(document.body.style.overflow).not.toBe("hidden");
   });
 
+  it("mobile drawer close button is keyboard-activatable", async () => {
+    render(
+      <SidebarProvider initialSidebarOpen initialIsMobile>
+        <Sidebar />
+      </SidebarProvider>
+    );
+
+    const closeButton = await screen.findByRole("button", {
+      name: /Close account navigation drawer/i,
+    });
+    expect(closeButton).toBeInTheDocument();
+    closeButton.focus();
+    expect(closeButton).toHaveFocus();
+  });
+
   it("shows mobile drawer trigger when closed on small screens", () => {
     render(
       <SidebarProvider initialSidebarOpen={false} initialIsMobile>
@@ -72,6 +104,9 @@ describe("Sidebar responsive navigation states", () => {
       </SidebarProvider>
     );
 
-    expect(screen.getByRole("button", { name: /Open account navigation/i })).toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: /Open account navigation/i });
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveClass("focus-visible:ring-2");
   });
 });

@@ -61,72 +61,30 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
   return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
     const request = args[0] as NextRequest | undefined;
     const method = request?.method ?? 'UNKNOWN';
-    let requestContext: any = null;
+    const startedAt = Date.now();
+    const requestId = request?.headers ? getOrCreateRequestId(request.headers).requestId : 'internal-' + startedAt;
 
-    const chaosResponse = await chaosInject(request as NextRequest);
-    if (chaosResponse) {
-      return chaosResponse;
-    }
-
-    try {
-      requestContext = {
-        method,
-        route,
-        query: request?.nextUrl?.searchParams.toString() ?? '',
-        headers: {
-          authorization: request?.headers?.get('authorization'),
-          'x-forwarded-for': request?.headers?.get('x-forwarded-for'),
-        },
-      };
-
-      const response = await handler(...args);
-      const durationMs = Date.now() - startedAt;
-      const status = typeof (response as any)?.status === 'number' ? (response as any).status : 0;
-
-      try {
-        metrics.httpRequests.inc({ method, route, status: String(status) });
-        metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: String(status) });
-      } catch (e) {
-        // swallow metrics errors
-      }
-
-      logger.info('request completed', route, {
-        status,
-        durationMs,
-        request: requestContext,
-      });
-
-      return response;
-    } catch (error) {
-      const durationMs = Date.now() - startedAt;
-
-      try {
-        metrics.httpRequests.inc({ method, route, status: '500' });
-        metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: '500' });
-        metrics.httpErrors.inc({ route, error: (error as Error)?.name ?? 'Error' });
-      } catch (e) {
-        // swallow metrics errors
-      }
-
-      captureServerError(error, {
-        route,
-        method,
-        route,
-        query: request?.nextUrl?.searchParams.toString() ?? '',
-        headers: {
-          authorization: request?.headers.get('authorization'),
-          'x-forwarded-for': request?.headers.get('x-forwarded-for'),
-          [REQUEST_ID_HEADER]: requestId,
-        },
-      };
-
+    return runWithRequestContext({ requestId }, async () => {
       const chaosResponse = await chaosInject(request as NextRequest);
       if (chaosResponse) {
         chaosResponse.headers.set(REQUEST_ID_HEADER, requestId);
         return chaosResponse as ReturnType<T>;
       }
 
+      let requestContext: any = null;
       try {
+        requestContext = {
+          method,
+          route,
+          query: request?.nextUrl?.searchParams.toString() ?? '',
+          requestId,
+          headers: {
+            authorization: request?.headers?.get('authorization') ?? undefined,
+            'x-forwarded-for': request?.headers?.get('x-forwarded-for') ?? undefined,
+            [REQUEST_ID_HEADER]: requestId,
+          },
+        };
+
         const response = await handler(...args);
         const durationMs = Date.now() - startedAt;
         const status = typeof (response as any)?.status === 'number' ? (response as any).status : 0;
@@ -144,9 +102,15 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
           request: requestContext,
         });
 
-        response.headers.set(REQUEST_ID_HEADER, requestId);
+        if (response instanceof NextResponse) {
+          response.headers.set(REQUEST_ID_HEADER, requestId);
+        }
         return response;
       } catch (error) {
+        if (error instanceof Response) {
+          error.headers.set(REQUEST_ID_HEADER, requestId);
+          return error as ReturnType<T>;
+        }
         const durationMs = Date.now() - startedAt;
 
         try {
@@ -157,12 +121,20 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
           // swallow metrics errors
         }
 
-        captureServerError(error, {
-          route,
-          method,
-          sessionId,
-          requestId,
-        });
+        try {
+          captureServerError(error, {
+            route,
+            method,
+            query: request?.nextUrl?.searchParams.toString() ?? '',
+            headers: {
+              authorization: request?.headers?.get('authorization') ?? undefined,
+              'x-forwarded-for': request?.headers?.get('x-forwarded-for') ?? undefined,
+              [REQUEST_ID_HEADER]: requestId,
+            },
+          });
+        } catch {
+          // swallow Sentry errors
+        }
 
         logger.error('request failed', route, {
           durationMs,
@@ -170,10 +142,11 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
           request: requestContext,
         });
 
-        return NextResponse.json(
+        const errorResponse = NextResponse.json(
           { error: 'Internal server error' },
           { status: 500, headers: { [REQUEST_ID_HEADER]: requestId } },
-        ) as ReturnType<T>;
+        );
+        return errorResponse as ReturnType<T>;
       }
     }) as Promise<ReturnType<T>>;
   };

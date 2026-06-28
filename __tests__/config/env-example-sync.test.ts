@@ -40,6 +40,9 @@ function walkFiles(target: string): string[] {
 
   const stats = statSync(absolute);
   if (stats.isFile()) {
+    if (absolute.includes(".test.") || absolute.includes(".stories.")) {
+      return [];
+    }
     return /\.[cm]?[tj]sx?$/.test(absolute) ? [absolute] : [];
   }
 

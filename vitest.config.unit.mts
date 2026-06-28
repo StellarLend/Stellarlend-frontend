@@ -9,6 +9,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "lib/config.test.ts",
+      "lib/validation/**/*.test.ts",
     ],
     alias: {
       "@": path.resolve(dirname, "."),

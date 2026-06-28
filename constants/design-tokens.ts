@@ -81,6 +81,7 @@ export const colorBorder = {
 
 // Flatten everything the Tailwind theme needs into one map
 export const colors = {
+  primary: colorGreen,
   "green-50":  colorGreen[50],
   "green-100": colorGreen[100],
   "green-200": colorGreen[200],
@@ -266,6 +267,8 @@ export const navClasses = {
   base: "group flex items-center gap-2 px-4 rounded-lg font-medium transition-all duration-200 relative focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2",
   /** Minimum touch target — py value that gives ≥ 44 px height */
   touchTarget: "py-3.5",
+  /** Focus-visible ring for icon-only controls (IconButton, collapse toggle, etc.) */
+  iconButtonFocusClasses: "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2",
   active: "bg-[#15A350]/10 text-[#15A350]",
   activeDark: "bg-[#15A350]/15 text-[#15A350]",
   inactive: "text-[#AAABAB] hover:bg-gray-100 hover:text-[#15A350]",

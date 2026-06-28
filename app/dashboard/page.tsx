@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
-import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
+import LiquidationsPanel from "@/components/features/dashboard/components/LiquidationsPanel";
+import NextPaymentDue from "@/components/features/dashboard/components/NextPaymentDue";
 import { DashboardLayout } from "@/components";
 import { AlertBanner, PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
@@ -165,6 +165,10 @@ export default function Dashboard() {
           ) : null}
 
           <MetricsCards />
+          <NextPaymentDue />
+          <div className="mt-6">
+            <LiquidationsPanel />
+          </div>
         </div>
 
         <div className="pt-8 ">

@@ -1,6 +1,10 @@
 import type { Notification } from './types';
 import { enqueue, type NotificationsJobPayload } from '@/lib/queue';
 import { logger } from '@/lib/logger';
+import { db } from '@/lib/db';
+import { notifications as notificationsTable } from '@/lib/db/schema/notifications';
+import { eq, desc, and, sql } from 'drizzle-orm';
+import { notificationHub } from '@/lib/streams/notification-hub';
 
 // Seeded demo notifications used to populate new users' inboxes.
 const SEED_NOTIFICATIONS: Omit<Notification, 'userId'>[] = [
@@ -34,6 +38,17 @@ const SEED_NOTIFICATIONS: Omit<Notification, 'userId'>[] = [
 // Replace with a database-backed repository (e.g. Prisma, Supabase) in production.
 const store = new Map<string, Notification[]>();
 const ROUTE = 'lib/notifications/repository';
+
+async function seedUser(userId: string): Promise<Notification[]> {
+  const seeded = SEED_NOTIFICATIONS.map((n) => ({
+    id: `${userId}-${n.id}`,
+    userId,
+    title: n.title,
+    message: n.message,
+    read: n.read,
+    createdAt: new Date(n.createdAt),
+    type: n.type,
+  }));
 
   for (const item of seeded) {
     await db.insert(notificationsTable).values(item).onConflictDoNothing();
@@ -157,20 +172,27 @@ export async function markNotificationRead(
 }
 
 /**
- * Adds a new notification for a user.
+ * Marks all unread notifications as read for `userId`.
+ * Returns the count of updated notifications.
  */
-export function addNotification(
-  userId: string,
-  notification: Omit<Notification, 'userId'>
-): Notification {
-  const notifications = getNotifications(userId);
-  const record: Notification = {
-    ...notification,
-    userId,
-  };
-  notifications.unshift(record);
-  store.set(userId, notifications);
-  return record;
+export async function markAllNotificationsRead(userId: string): Promise<number> {
+  const rows = await db
+    .update(notificationsTable)
+    .set({ read: true })
+    .where(and(eq(notificationsTable.userId, userId), eq(notificationsTable.read, false)))
+    .returning({ id: notificationsTable.id });
+
+  const count = rows.length;
+
+  if (count > 0) {
+    try {
+      notificationHub.publish(userId, { type: 'unreadCount', unreadCount: 0 });
+    } catch (e) {
+      // noop
+    }
+  }
+
+  return count;
 }
 
 /**

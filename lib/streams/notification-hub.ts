@@ -19,6 +19,10 @@ class NotificationHub {
     this.emitter.emit(key, evt);
   }
 
+  listenerCount(userId: string): number {
+    return this.emitter.listenerCount(this.keyFor(userId));
+  }
+
   private keyFor(userId: string) {
     return `notifications:${userId}`;
   }

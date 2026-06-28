@@ -14,6 +14,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { hasRole, Role, requireAdmin, requireOpsOrAdmin } from '@/lib/auth/rbac';
+import { adminUsersQuerySchema, ADMIN_USERS_DEFAULT_PAGE_SIZE, ADMIN_USERS_MAX_PAGE_SIZE } from '@/lib/validation/schemas/admin';
+import { getUsers, USER_STORE } from '@/lib/db/users';
+import { emitAuditEvent, auditAdminUsersRead } from '@/lib/audit/logger';
+import { GET } from '@/app/api/admin/users/route';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,8 +63,6 @@ function makeRequest(
 // ---------------------------------------------------------------------------
 
 describe('lib/auth/rbac', () => {
-  const { hasRole, Role, requireAdmin, requireOpsOrAdmin } =
-    await import('@/lib/auth/rbac');
 
   describe('hasRole()', () => {
     it('returns true when the role claim matches', () => {
@@ -148,8 +151,6 @@ describe('lib/auth/rbac', () => {
 // ---------------------------------------------------------------------------
 
 describe('lib/validation/schemas/admin – adminUsersQuerySchema', () => {
-  const { adminUsersQuerySchema, ADMIN_USERS_DEFAULT_PAGE_SIZE, ADMIN_USERS_MAX_PAGE_SIZE } =
-    await import('@/lib/validation/schemas/admin');
 
   it('applies default page and pageSize when no params provided', () => {
     const result = adminUsersQuerySchema.parse({});
@@ -199,7 +200,6 @@ describe('lib/validation/schemas/admin – adminUsersQuerySchema', () => {
 // ---------------------------------------------------------------------------
 
 describe('lib/db/users – getUsers()', () => {
-  const { getUsers, USER_STORE } = await import('@/lib/db/users');
 
   it('returns the first page with correct total', () => {
     const result = getUsers({ page: 1, pageSize: 2 });
@@ -280,8 +280,7 @@ describe('lib/audit/logger – emitAuditEvent()', () => {
     writeSpy.mockRestore();
   });
 
-  const { emitAuditEvent, auditAdminUsersRead } =
-    await import('@/lib/audit/logger');
+  // emit audit event tests
 
   it('writes a JSON line to stdout', () => {
     emitAuditEvent('admin.users.read', 'actor-1', { page: 1 });
@@ -338,7 +337,7 @@ describe('GET /api/admin/users – route handler', () => {
     writeSpy.mockRestore();
   });
 
-  const { GET } = await import('@/app/api/admin/users/route');
+
 
   // ── Authentication / Authorisation ─────────────────────────────────────────
 

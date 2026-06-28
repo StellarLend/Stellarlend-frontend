@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { User, Session, AuthError } from "@/types/common";
-import { cookies } from "next/headers";
 
 /**
  * Auth Configuration
@@ -112,29 +111,7 @@ export async function getUser(): Promise<User | null> {
 /**
  * Check if the current user is authenticated
  */
-export async function isAuthenticated(): Promise<boolean> {
-  const user = await getUser();
-  return !!user;
-}
 
-/**
- * Get session expiry information
- */
-export async function getSessionExpiry(): Promise<{
-  expiresAt: Date;
-  expiresIn: number;
-} | null> {
-  const session = await getSession();
-  if (!session) return null;
-
-  const now = new Date();
-  const expiresIn = Math.max(0, session.expiresAt.getTime() - now.getTime());
-
-  return {
-    expiresAt: session.expiresAt,
-    expiresIn,
-  };
-}
 
 /**
  * Get authenticated user with error handling
@@ -218,29 +195,6 @@ export function requireAuth(req: NextRequest): AuthUser {
   return user;
 }
 
-  try {
-    const payload = jwt.verify(token, JWT_SECRET) as {
-      sub?: string;
-      email?: string;
-    };
-    if (!payload.sub || !payload.email) return null;
-    return { id: payload.sub, email: payload.email };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Enforces authentication on a Request object.
- * Throws a 401 NextResponse if unauthorized.
- */
-export function requireAuth(req: NextRequest): AuthUser {
-  const user = getAuthUser(req);
-  if (!user) {
-    throw NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  return user;
-}
 
 /**
  * Create a signed JWT for testing or internal use.

@@ -1,5 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { fetchTransactions } from '@/lib/transactions/repository';
+
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/db', () => {
+  return {
+    db: {
+      select: vi.fn(() => ({
+        from: vi.fn(() => []),
+      })),
+      insert: vi.fn(() => ({
+        values: vi.fn(() => ({
+          onConflictDoNothing: vi.fn(async () => ({})),
+        })),
+      })),
+    },
+  };
+});
 
 describe('fetchTransactions', () => {
   it('returns all transactions when no filter is applied', async () => {
