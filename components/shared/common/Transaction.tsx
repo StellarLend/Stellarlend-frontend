@@ -43,7 +43,10 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
-import { clientLog } from "@/lib/utils/client-log";
+import {
+  useInfiniteTransactions,
+  type UseInfiniteTransactionsReturn,
+} from "@/hooks/useInfiniteTransactions";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -59,9 +62,8 @@ export interface TransactionsProps {
   hideToolbar?: boolean;
   infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
-  rowComponent?: React.ComponentType<TransactionRowProps>;
-  mobileRowComponent?: React.ComponentType<TransactionMobileRowProps>;
-  transactions?: Transaction[];
+  /** Pre-fetched infinite state. When supplied the component skips its own fetch. */
+  externalInfiniteState?: UseInfiniteTransactionsReturn;
 }
 
 export const Transactions = ({
@@ -71,9 +73,7 @@ export const Transactions = ({
   hideToolbar = false,
   infiniteScroll = false,
   onDataLoad,
-  rowComponent: RowComponent = TransactionRow,
-  mobileRowComponent: MobileRowComponent = TransactionMobileRow,
-  transactions: controlledTransactions,
+  externalInfiniteState,
 }: TransactionsProps) => {
   const [internalTransactions, setInternalTransactions] = useState<Transaction[]>([]);
   const transactions = controlledTransactions ?? internalTransactions;
@@ -99,12 +99,30 @@ export const Transactions = ({
   const [scrollTop, setScrollTop] = useState(0);
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const itemsPerPage = 6;
-  const router = useRouter();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef<Map<number, HTMLTableRowElement | null>>(new Map());
-  const rowHeight = rowHeightProp;
-  const viewportHeight = viewportHeightProp;
-  const overscan = 4;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const liveRef = useRef<HTMLParagraphElement>(null);
+
+  const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
+  const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
+  const sortBy = hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy;
+  const sortDir = hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir;
+  const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
+  const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
+  const asset = hideToolbar ? searchParams.get("asset") || "" : "";
+  const type = hideToolbar ? searchParams.get("type") || "" : "";
+
+  const internalInfinite = useInfiniteTransactions({
+    limit: itemsPerPage,
+    search: search || undefined,
+    status: status === "All" ? undefined : status,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    sortBy,
+    sortDir,
+    skip: infiniteScroll && externalInfiniteState !== undefined,
+  });
+
+  const infinite = (infiniteScroll && externalInfiniteState) ? externalInfiniteState : internalInfinite;
 
   useEffect(() => {
     setCurrentPage(1);

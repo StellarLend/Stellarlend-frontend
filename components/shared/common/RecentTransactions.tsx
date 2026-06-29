@@ -3,11 +3,16 @@
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import React from "react";
+import { useRouter } from "next/navigation";
+import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
+import { EmptyState } from "./EmptyState";
+import { TransactionsSkeleton } from "./Skeleton";
 import { Transactions } from "./Transaction";
 import { TRANSACTION_TYPE_OPTIONS } from "@/lib/transactions/filters";
 
 export const RecentTransactions = () => {
-  const [selectedType, setSelectedType] = useState("");
+  const router = useRouter();
+  const infiniteState = useInfiniteTransactions({ limit: 6 });
 
   return (
     <section className="bg-white rounded-xl shadow h-full">
@@ -52,7 +57,27 @@ export const RecentTransactions = () => {
         </p>
       </div>
 
-      <Transactions showPagination={false} infiniteScroll typeFilter={selectedType} />
+      {infiniteState.isLoading ? (
+        <div className="px-6 pb-6">
+          <TransactionsSkeleton count={6} />
+        </div>
+      ) : infiniteState.transactions.length === 0 ? (
+        <div className="px-6 py-8">
+          <EmptyState
+            title="No transactions yet"
+            description="Your transaction history will appear here once you start lending, borrowing, or making payments on Stellarlend."
+            actionLabel="Explore lending"
+            onAction={() => router.push("/lending")}
+          />
+        </div>
+      ) : (
+        <Transactions
+          showPagination={false}
+          infiniteScroll
+          hideToolbar
+          externalInfiniteState={infiniteState}
+        />
+      )}
     </section>
   );
 };
