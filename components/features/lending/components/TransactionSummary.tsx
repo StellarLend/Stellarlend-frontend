@@ -1,9 +1,4 @@
-import { useState } from 'react';
-import { Copy } from 'lucide-react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
-import { copyToClipboard } from '@/lib/utils/clipboard';
-import { Toast } from '@/components/shared/common';
-import { formatCurrency as formatCurrencyUtil } from '@/lib/utils/format';
 
 interface TransactionSummaryProps {
   data: LendingData;

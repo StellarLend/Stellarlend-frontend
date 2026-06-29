@@ -1,215 +1,213 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "@/test/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen } from "@/test/test-utils";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { RecentTransactions } from "./RecentTransactions";
+import type { Transaction } from "@/types/Transaction";
 
-const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }));
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
-  useSearchParams: () => ({ get: vi.fn(() => null) }),
-}));
+// ---------------------------------------------------------------------------
+// Module mocks
+// ---------------------------------------------------------------------------
 
 vi.mock("next/image", () => ({
-  default: ({ src, alt, width, height, className }: {
-    src: string; alt: string; width: number; height: number; className?: string;
-  }) => <img src={src} alt={alt} width={width} height={height} className={className} />,
+  default: ({ src, alt, width, height }: any) => (
+    <img src={src} alt={alt} width={width} height={height} />
+  ),
 }));
 
-const mockTransactions = [
-  {
-    id: "t1",
-    type: "Lend",
-    amount: 100,
-    asset: "XLM",
-    date: "2024-01-03",
-    time: "10:00",
-    status: "Completed",
-  },
-  {
-    id: "t2",
-    type: "Borrow",
-    amount: -200,
-    asset: "USDC",
-    date: "2024-01-02",
-    time: "11:00",
-    status: "Processing",
-  },
-];
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => ({ get: () => null }),
+}));
 
-const emptyResponse = { transactions: [], total: 0, nextCursor: null };
-const populatedResponse = { transactions: mockTransactions, total: 2, nextCursor: null };
+vi.mock("@headlessui/react", () => ({
+  Dialog: ({ children }: any) => <div>{children}</div>,
+  Transition: ({ children }: any) => <>{children}</>,
+  TransitionChild: ({ children }: any) => <>{children}</>,
+}));
 
-function stubFetch(json: object) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockResolvedValue({ ok: true, json: async () => json }),
-  );
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const makeTxn = (overrides: Partial<Transaction> = {}): Transaction => ({
+  id: "txn-001",
+  type: "Deposit",
+  amount: 100,
+  asset: "USDC",
+  date: "2024-01-15",
+  time: "10:30AM",
+  status: "Completed",
+  ...overrides,
+});
+
+const inflowTxn  = makeTxn({ id: "txn-in",   type: "Deposit",      amount: 250,  asset: "XLM"  });
+const outflowTxn = makeTxn({ id: "txn-out",  type: "Withdrawal",   amount: -80,  asset: "USDC" });
+const zeroTxn    = makeTxn({ id: "txn-zero", type: "Loan Payment", amount: 0,    asset: "ETH"  });
+const processTxn = makeTxn({ id: "txn-proc", type: "Lend Funds",   amount: 500,  asset: "BTC",  status: "Processing" });
+const failedTxn  = makeTxn({ id: "txn-fail", type: "Withdrawal",   amount: -40,  asset: "USDC", status: "Failed" });
+const negTxn     = makeTxn({ id: "txn-neg",  type: "Loan Payment", amount: -999, asset: "ETH",  status: "Completed" });
+
+function mockApi(transactions: Transaction[], total = transactions.length) {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ transactions, total, nextCursor: null }),
+  } as any);
 }
 
-function stubFetchPending() {
-  vi.stubGlobal("fetch", vi.fn().mockImplementation(() => new Promise(() => {})));
-}
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe("RecentTransactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockApi([]);
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  // --- Structural ---
 
-  // ─── Section header ───────────────────────────────────────────────────────
-
-  it("always renders the section heading and View All button", async () => {
-    stubFetch(emptyResponse);
+  it("renders the section heading", async () => {
     render(<RecentTransactions />);
+    expect(screen.getByText("Recent Transactions")).toBeInTheDocument();
+  });
 
-    expect(screen.getByRole("heading", { name: "Recent Transactions" })).toBeInTheDocument();
+  it("renders the View All button", () => {
+    render(<RecentTransactions />);
     expect(screen.getByRole("button", { name: /view all/i })).toBeInTheDocument();
   });
 
-  it("keeps View All button visible while loading", () => {
-    stubFetchPending();
+  // --- Loading state ---
+
+  it("shows loading skeleton initially", () => {
     render(<RecentTransactions />);
-
-    expect(screen.getByRole("button", { name: /view all/i })).toBeInTheDocument();
-  });
-
-  it("keeps View All button visible in empty state", async () => {
-    stubFetch(emptyResponse);
-    render(<RecentTransactions />);
-
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "No transactions yet" })).toBeInTheDocument(),
-    );
-
-    expect(screen.getByRole("button", { name: /view all/i })).toBeInTheDocument();
-  });
-
-  it("keeps View All button visible in populated state", async () => {
-    stubFetch(populatedResponse);
-    render(<RecentTransactions />);
-
-    await waitFor(() =>
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument(),
-    );
-
-    expect(screen.getByRole("button", { name: /view all/i })).toBeInTheDocument();
-  });
-
-  // ─── Loading state ────────────────────────────────────────────────────────
-
-  it("shows skeleton while the hook is loading", () => {
-    stubFetchPending();
-    render(<RecentTransactions />);
-
     expect(screen.getByLabelText("Loading transactions")).toBeInTheDocument();
   });
 
-  it("does not show EmptyState while loading", () => {
-    stubFetchPending();
-    render(<RecentTransactions />);
+  // --- Empty feed ---
 
-    expect(
-      screen.queryByRole("heading", { name: "No transactions yet" }),
-    ).not.toBeInTheDocument();
+  it("shows empty state when there are no transactions", async () => {
+    mockApi([]);
+    render(<RecentTransactions />);
+    expect(await screen.findByText("No transactions yet")).toBeInTheDocument();
   });
 
-  // ─── loading → empty transition ───────────────────────────────────────────
+  // --- Row content (both desktop table + mobile card render the same txn) ---
 
-  it("transitions from skeleton to EmptyState when feed returns no rows", async () => {
-    stubFetch(emptyResponse);
+  it("renders transaction type", async () => {
+    mockApi([inflowTxn]);
     render(<RecentTransactions />);
-
-    // Initially the skeleton is shown
-    expect(screen.getByLabelText("Loading transactions")).toBeInTheDocument();
-
-    // After the fetch resolves the skeleton is gone and EmptyState appears
-    await waitFor(() =>
-      expect(
-        screen.getByRole("heading", { name: "No transactions yet" }),
-      ).toBeInTheDocument(),
-    );
-
-    expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument();
+    const items = await screen.findAllByText("Deposit");
+    expect(items.length).toBeGreaterThan(0);
   });
 
-  it("renders EmptyState description when feed is empty", async () => {
-    stubFetch(emptyResponse);
+  it("renders transaction ID", async () => {
+    mockApi([inflowTxn]);
     render(<RecentTransactions />);
-
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "No transactions yet" })).toBeInTheDocument(),
-    );
-
-    expect(
-      screen.getByText(/your transaction history will appear here/i),
-    ).toBeInTheDocument();
+    await screen.findAllByText("Deposit");
+    const idEls = screen.getAllByText(`#${inflowTxn.id}`);
+    expect(idEls.length).toBeGreaterThan(0);
   });
 
-  it("renders the Explore lending CTA in empty state", async () => {
-    stubFetch(emptyResponse);
+  it("renders asset symbol and icon", async () => {
+    mockApi([inflowTxn]);
     render(<RecentTransactions />);
-
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Explore lending" })).toBeInTheDocument(),
-    );
+    await screen.findAllByText("Deposit");
+    expect(screen.getAllByText("XLM").length).toBeGreaterThan(0);
+    expect(screen.getAllByAltText("XLM").length).toBeGreaterThan(0);
   });
 
-  it("calls router.push('/lending') when Explore lending CTA is clicked", async () => {
-    stubFetch(emptyResponse);
+  // --- Signed-amount semantics ---
+
+  it("displays inflow amount with leading +", async () => {
+    mockApi([inflowTxn]);
     render(<RecentTransactions />);
-
-    const cta = await screen.findByRole("button", { name: "Explore lending" });
-    fireEvent.click(cta);
-
-    expect(mockPush).toHaveBeenCalledWith("/lending");
+    await screen.findAllByText("Deposit");
+    expect(screen.getAllByText(`+$${inflowTxn.amount}`).length).toBeGreaterThan(0);
   });
 
-  // ─── loading → populated transition ──────────────────────────────────────
-
-  it("transitions from skeleton to transaction list when feed has rows", async () => {
-    stubFetch(populatedResponse);
+  it("displays outflow amount with leading -", async () => {
+    mockApi([outflowTxn]);
     render(<RecentTransactions />);
-
-    // Initially loading
-    expect(screen.getByLabelText("Loading transactions")).toBeInTheDocument();
-
-    // After load, skeleton is gone and EmptyState is NOT shown
-    await waitFor(() =>
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument(),
-    );
-
-    expect(
-      screen.queryByRole("heading", { name: "No transactions yet" }),
-    ).not.toBeInTheDocument();
+    await screen.findAllByText("Withdrawal");
+    expect(screen.getAllByText(`-$${Math.abs(outflowTxn.amount)}`).length).toBeGreaterThan(0);
   });
 
-  it("does not render EmptyState when transactions are present", async () => {
-    stubFetch(populatedResponse);
+  it("displays large negative amount correctly", async () => {
+    mockApi([negTxn]);
     render(<RecentTransactions />);
-
-    await waitFor(() =>
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument(),
-    );
-
-    expect(
-      screen.queryByRole("heading", { name: "No transactions yet" }),
-    ).not.toBeInTheDocument();
+    await screen.findAllByText("Loan Payment");
+    expect(screen.getAllByText("-$999").length).toBeGreaterThan(0);
   });
 
-  it("renders transaction types from the feed in populated state", async () => {
-    stubFetch(populatedResponse);
+  it("displays zero amount with - prefix (non-positive path)", async () => {
+    mockApi([zeroTxn]);
     render(<RecentTransactions />);
+    await screen.findAllByText("Loan Payment");
+    // amount 0 is falsy → component renders -$0
+    expect(screen.getAllByText("-$0").length).toBeGreaterThan(0);
+  });
 
-    await waitFor(() =>
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument(),
-    );
+  // --- Status rendering ---
 
-    // Both transaction types should appear in the rendered table/cards
-    expect(screen.getAllByText("Lend").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Borrow").length).toBeGreaterThan(0);
+  it("renders Completed status badge", async () => {
+    mockApi([inflowTxn]);
+    render(<RecentTransactions />);
+    await screen.findAllByText("Deposit");
+    expect(screen.getAllByText("Completed").length).toBeGreaterThan(0);
+  });
+
+  it("renders Processing status badge", async () => {
+    mockApi([processTxn]);
+    render(<RecentTransactions />);
+    await screen.findAllByText("Lend Funds");
+    expect(screen.getAllByText("Processing").length).toBeGreaterThan(0);
+  });
+
+  it("renders Failed status badge", async () => {
+    mockApi([failedTxn]);
+    render(<RecentTransactions />);
+    await screen.findAllByText("Withdrawal");
+    expect(screen.getAllByText("Failed").length).toBeGreaterThan(0);
+  });
+
+  // --- Multiple rows ---
+
+  it("renders multiple transaction rows", async () => {
+    mockApi([inflowTxn, outflowTxn, processTxn]);
+    render(<RecentTransactions />);
+    await screen.findAllByText("Deposit");
+    expect(screen.getAllByText("Withdrawal").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Lend Funds").length).toBeGreaterThan(0);
+  });
+
+  // --- Asset variety ---
+
+  it("renders BTC asset icon", async () => {
+    mockApi([processTxn]);
+    render(<RecentTransactions />);
+    await screen.findAllByText("Lend Funds");
+    expect(screen.getAllByAltText("BTC").length).toBeGreaterThan(0);
+  });
+
+  it("renders ETH asset icon", async () => {
+    mockApi([zeroTxn]);
+    render(<RecentTransactions />);
+    await screen.findAllByText("Loan Payment");
+    expect(screen.getAllByAltText("ETH").length).toBeGreaterThan(0);
+  });
+
+  // --- Wrapped inside Transactions with infiniteScroll — toolbar IS present ---
+
+  it("renders the toolbar search toggle", async () => {
+    render(<RecentTransactions />);
+    expect(screen.getByText("Search")).toBeInTheDocument();
+  });
+
+  it("renders the toolbar filter toggle", async () => {
+    render(<RecentTransactions />);
+    expect(screen.getByText("Filter")).toBeInTheDocument();
   });
 });

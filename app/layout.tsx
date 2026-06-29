@@ -7,7 +7,6 @@ import NextTopLoader from "nextjs-toploader";
 import { headers } from "next/headers";
 import { ToastProvider } from "@/components/shared/common/Toast";
 import NotificationToastBridge from "@/components/shared/common/NotificationToastBridge";
-import SessionExpiryModal from "@/components/shared/common/SessionExpiryModal";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -58,8 +57,6 @@ export default async function RootLayout({
           <WalletProvider>
             <SidebarProvider>{children}</SidebarProvider>
           </WalletProvider>
-          {/* Single app-wide instance — drives proactive session-expiry UX. */}
-          <SessionExpiryModal />
         </ToastProvider>
       </body>
     </html>

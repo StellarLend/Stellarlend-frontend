@@ -1,8 +1,4 @@
 "use client";
-import { AmountInput } from '@/components/shared/ui/AmountInput';
-import { Tooltip } from '@/components/atoms/Tooltip';
-import { IconButton } from '@/components/atoms/IconButton';
-
 import { useState, useEffect, useRef } from "react";
 import { LendingData } from "@/app/lending/page";
 import type { CalculationResult } from "@/lib/lending/types";
@@ -17,6 +13,7 @@ import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -151,7 +148,7 @@ export default function LendingForm({
         setIsSubmitting(false);
       }
     } else {
-      setSubmitStatus("error");
+      setStatus("error");
       setSubmitMessage("Please fix the errors in the form before continuing.");
     }
   };

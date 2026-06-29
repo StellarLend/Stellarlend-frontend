@@ -84,14 +84,8 @@ describe("TopNav Accessibility", () => {
       name: /select network/i,
     });
 
-    expect(networkButton).toBeInTheDocument();
-  });
-
-  it("account menu trigger is present", () => {
-    renderTopNav();
-
-    const accountButtons = screen.getAllByRole("button", {
-      name: /account menu|connect wallet/i,
+    const walletButton = screen.getByRole("button", {
+      name: /connect wallet/i,
     });
 
     const walletButton = screen.getByRole("button", {

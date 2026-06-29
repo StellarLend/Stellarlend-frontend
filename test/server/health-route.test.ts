@@ -2,15 +2,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { GET } from '@/app/api/health/route';
 import { TimeoutError } from '@/lib/http/errors';
 
-vi.mock('server-only', () => ({}));
-
-vi.mock('@/lib/http', async (importActual) => {
-  const actual = await importActual<typeof import('@/lib/http')>();
-  return {
-    ...actual,
-    httpGet: vi.fn().mockResolvedValue({}),
-  };
-});
+vi.mock('@/lib/http/client', () => ({
+  httpGet: vi.fn().mockResolvedValue({}),
+}));
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -24,7 +18,7 @@ describe('GET /api/health', () => {
   });
 
   it('returns degraded status when stellar is unreachable', async () => {
-    const { httpGet } = await import('@/lib/http');
+    const { httpGet } = await import('@/lib/http/client');
     (httpGet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TimeoutError('url', 5000));
 
     const response = await GET();
@@ -34,3 +28,4 @@ describe('GET /api/health', () => {
     expect(body.checks.stellar).toBe('degraded');
   });
 });
+

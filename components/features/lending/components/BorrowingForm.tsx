@@ -41,33 +41,6 @@ const LOAN_DURATIONS = [
   { days: 180, label: "6 Months" },
 ];
 
-const HEALTH_BAND_STYLES = {
-  healthy: {
-    label: "Healthy",
-    text: "text-emerald-700",
-    border: "border-emerald-200",
-    bg: "bg-emerald-50",
-    helper:
-      "Projected collateral buffer is comfortably above the liquidation threshold.",
-  },
-  "at-risk": {
-    label: "At Risk",
-    text: "text-amber-700",
-    border: "border-amber-200",
-    bg: "bg-amber-50",
-    helper:
-      "Projected position is close to the liquidation threshold. Consider adding collateral.",
-  },
-  critical: {
-    label: "Critical",
-    text: "text-red-700",
-    border: "border-red-200",
-    bg: "bg-red-50",
-    helper:
-      "Projected position is undercollateralised. Add collateral before submitting.",
-  },
-} as const;
-
 /** Inclusive lower bound for a custom loan duration (days). */
 export const CUSTOM_DURATION_MIN_DAYS = 1;
 
@@ -95,6 +68,13 @@ export default function BorrowingForm({
   const [durationMode, setDurationMode] = useState<"preset" | "custom">(
     "preset",
   );
+  // Raw string so the input can be empty / partially typed without coercion
+  const [customDays, setCustomDays] = useState<string>("");
+  const [customDaysError, setCustomDaysError] = useState<string>("");
+
+  // "preset" = one of the LOAN_DURATIONS chips is active
+  // "custom" = the Custom chip is active and the numeric input is visible
+  const [durationMode, setDurationMode] = useState<"preset" | "custom">("preset");
   // Raw string so the input can be empty / partially typed without coercion
   const [customDays, setCustomDays] = useState<string>("");
   const [customDaysError, setCustomDaysError] = useState<string>("");
@@ -202,6 +182,65 @@ export default function BorrowingForm({
       window.clearTimeout(timer);
     };
   }, [formData.asset, formData.collateral]);
+
+  // ---------------------------------------------------------------------------
+  // Custom-duration helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Validates the raw string coming from the custom-days input.
+   *
+   * Returns an error message string on failure, or `""` on success.
+   * When valid, it also calls the `onValid` callback with the parsed integer.
+   */
+  const validateCustomDays = (
+    raw: string,
+    onValid?: (days: number) => void,
+  ): string => {
+    if (raw.trim() === "" || isNaN(Number(raw))) {
+      return "Please enter a number of days";
+    }
+
+    const parsed = Number(raw);
+
+    if (!Number.isInteger(parsed)) {
+      return "Duration must be a whole number of days";
+    }
+
+    if (parsed < CUSTOM_DURATION_MIN_DAYS) {
+      return `Minimum duration is ${CUSTOM_DURATION_MIN_DAYS} day`;
+    }
+
+    if (parsed > CUSTOM_DURATION_MAX_DAYS) {
+      return `Maximum duration is ${CUSTOM_DURATION_MAX_DAYS} days`;
+    }
+
+    onValid?.(parsed);
+    return "";
+  };
+
+  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setCustomDays(raw);
+
+    const errorMsg = validateCustomDays(raw, (days) => {
+      setFormData((prev) => ({ ...prev, duration: days }));
+      // Clear the duration field error if the user fixes it
+      if (errors.duration) {
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next.duration;
+          return next;
+        });
+      }
+    });
+
+    setCustomDaysError(errorMsg);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Form validation / submission
+  // ---------------------------------------------------------------------------
 
   // ---------------------------------------------------------------------------
   // Custom-duration helpers
@@ -429,8 +468,7 @@ export default function BorrowingForm({
                 }}
                 className={cn(
                   "p-3 rounded-xl border-2 text-center transition-all duration-200",
-                  durationMode === "preset" &&
-                    formData.duration === duration.days
+                  durationMode === "preset" && formData.duration === duration.days
                     ? "border-[#2600FF] bg-blue-50 text-[#2600FF] ring-1 ring-[#2600FF]"
                     : "border-gray-100 hover:border-gray-200 bg-gray-50/30 text-gray-600",
                 )}
@@ -487,9 +525,7 @@ export default function BorrowingForm({
                 onChange={handleCustomDaysChange}
                 placeholder={`${CUSTOM_DURATION_MIN_DAYS}–${CUSTOM_DURATION_MAX_DAYS}`}
                 aria-label="Custom loan duration in days"
-                aria-describedby={
-                  customDaysError ? "custom-days-error" : undefined
-                }
+                aria-describedby={customDaysError ? "custom-days-error" : undefined}
                 aria-invalid={customDaysError ? true : undefined}
                 className={cn(
                   "w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors",

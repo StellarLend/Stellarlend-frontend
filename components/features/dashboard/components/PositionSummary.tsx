@@ -275,9 +275,6 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
         </div>
       </div>
 
-      <div className="mt-6">
-        <SupplyApyChart className="w-full" />
-      </div>
       {/* Collateral Breakdown */}
       <CollateralBreakdown shares={shares} isLoading={sharesLoading} />
 

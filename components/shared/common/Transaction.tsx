@@ -38,7 +38,7 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
-import { useInfiniteTransactions, type UseInfiniteTransactionsReturn } from "@/hooks/useInfiniteTransactions";
+import { clientLog } from "@/lib/utils/client-log";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -49,27 +49,21 @@ const statusOptions: (TransactionStatus | "All")[] = [
 
 export interface TransactionsProps {
   showPagination?: boolean;
-  infiniteScroll?: boolean;
-  hideToolbar?: boolean;
   rowHeight?: number;
   viewportHeight?: number;
+  hideToolbar?: boolean;
+  infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
-  /** Pre-fetched infinite state. When supplied the component skips its own fetch. */
-  externalInfiniteState?: UseInfiniteTransactionsReturn;
 }
 
 export const Transactions = ({
   showPagination = true,
-  infiniteScroll = false,
-  hideToolbar = false,
   rowHeight: rowHeightProp = 72,
   viewportHeight: viewportHeightProp = 560,
+  hideToolbar = false,
+  infiniteScroll = false,
   onDataLoad,
-  infiniteHook,
-}: TransactionsProps & { infiniteHook?: UseInfiniteTransactionsReturn }) => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
+}: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [localSearch, setLocalSearch] = useState("");
@@ -93,32 +87,12 @@ export const Transactions = ({
   const [scrollTop, setScrollTop] = useState(0);
   const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const itemsPerPage = 6;
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const liveRef = useRef<HTMLParagraphElement>(null);
-
-  const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
-  const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
-  const sortBy = hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy;
-  const sortDir = hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir;
-  const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
-  const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
-  const asset = hideToolbar ? searchParams.get("asset") || "" : "";
-  const type = hideToolbar ? searchParams.get("type") || "" : "";
-
-  const internalInfinite = useInfiniteTransactions({
-    limit: itemsPerPage,
-    search: search || undefined,
-    status: status === "All" ? undefined : status,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    sortBy,
-    sortDir,
-    enabled: !infiniteHook,
-  });
-
-  const infinite = infiniteHook || internalInfinite;
-
-  const { pendingTxs, ItemTrackers } = usePendingTransactions();
+  const router = useRouter();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<number, HTMLTableRowElement | null>>(new Map());
+  const rowHeight = rowHeightProp;
+  const viewportHeight = viewportHeightProp;
+  const overscan = 4;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -151,7 +125,7 @@ export const Transactions = ({
         onDataLoad?.(payload.total);
       } catch (err) {
         clientLog.error("Failed to load transactions", err);
-        setInternalTransactions([]);
+        setTransactions([]);
         setTotalCount(0);
         onDataLoad?.(0);
       } finally {
@@ -225,7 +199,7 @@ export const Transactions = ({
 
   const focusRow = useCallback(
     (index: number) => {
-      if (index < 0 || index >= transactionsRef.current.length) return;
+      if (index < 0 || index >= transactions.length) return;
 
       setFocusedRowIndex(index);
       const row = rowRefs.current.get(index);
@@ -243,12 +217,8 @@ export const Transactions = ({
         container.scrollTop = Math.min(preferredTop, maxScroll);
       }
     },
-    [rowHeight, viewportHeight]
+    [transactions.length, rowHeight, viewportHeight]
   );
-
-  const handleFocusRow = useCallback((index: number) => {
-    setFocusedRowIndex(index);
-  }, []);
 
   const handleRowKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
@@ -267,27 +237,14 @@ export const Transactions = ({
           break;
         case "End":
           event.preventDefault();
-          focusRow(transactionsRef.current.length - 1);
+          focusRow(transactions.length - 1);
           break;
         default:
           break;
       }
     },
-    [focusRow]
+    [focusRow, transactions.length]
   );
-
-  const handleSelectTxn = useCallback((txn: Transaction) => {
-    setSelectedTxn(txn);
-    setIsDetailOpen(true);
-  }, []);
-
-  const setRowRef = useCallback((index: number, node: HTMLTableRowElement | null) => {
-    if (node) {
-      rowRefs.current.set(index, node);
-    } else {
-      rowRefs.current.delete(index);
-    }
-  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -351,17 +308,27 @@ export const Transactions = ({
 
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
-      <ItemTrackers />
       {!hideToolbar && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
-          <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-            <div className="relative" ref={searchRef} id="transaction-detail-drawer">
-              <div
-                className="flex items-center gap-1 cursor-pointer"
-                onClick={() => setShowSearch((v) => !v)}
-              >
-                <Search size={18} />
-                <span>Search</span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
+        <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
+          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
+            <div
+              className="flex items-center gap-1 cursor-pointer"
+              onClick={() => setShowSearch((v) => !v)}
+            >
+              <Search size={18} />
+              <span>Search</span>
+            </div>
+            {showSearch && (
+              <div className="absolute left-0 mt-2 z-10 bg-white border rounded shadow p-2">
+                <input
+                  type="text"
+                  placeholder="Search by type, amount, asset, id"
+                  className=" rounded p-1  text-sm w-48 focus:outline-none"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  autoFocus
+                />
               </div>
               {showSearch && (
                 <div className="absolute left-0 mt-2 z-10 bg-white border rounded shadow p-2">
@@ -505,6 +472,57 @@ export const Transactions = ({
             />
           </div>
         </div>
+
+        <div className="hidden md:flex gap-2 items-center mt-2 sm:mt-0 text-black/40">
+          <DatePicker
+            selected={dateFromObj}
+            onChange={(date: Date | null) => {
+              setDateFromObj(date);
+              setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
+            }}
+            customInput={
+              <CustomDateInput
+                value={dateFromObj ? format(dateFromObj, "MM-dd-yyyy") : ""}
+                placeholder="MM-DD-YYYY"
+                icon={<CalendarDays size={16} />}
+                onClick={() => {}}
+              />
+            }
+            dateFormat="MM-dd-yyyy"
+            className="w-[140px] placeholder:text-sm"
+            maxDate={new Date()}
+            isClearable
+            placeholderText="MM-DD-YYYY"
+          />
+          <span className="text-gray-400 text-sm">to</span>
+          <DatePicker
+            selected={dateToObj}
+            onChange={(date: Date | null) => {
+              setDateToObj(date);
+              setDateTo(date ? format(date, "yyyy-MM-dd") : "");
+            }}
+            customInput={
+              <CustomDateInput
+                value={dateToObj ? format(dateToObj, "MM-dd-yyyy") : ""}
+                placeholder="MM-DD-YYYY"
+                icon={<CalendarDays size={16} />}
+                onClick={() => {}}
+              />
+            }
+            dayClassName={(date) => {
+              if (date < new Date()) {
+                return "text-gray-400";
+              }
+              return "";
+            }}
+            dateFormat="MM-dd-yyyy"
+            className="w-[140px] placeholder:text-sm"
+            maxDate={new Date()}
+            isClearable
+            placeholderText="MM-DD-YYYY"
+          />
+        </div>
+      </div>
       )}
 
       <div className="">
@@ -544,58 +562,6 @@ export const Transactions = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Optimistic Pending Rows */}
-                    {activePendingRows.map((ptx) => {
-                      const now = new Date();
-                      const pDate = ptx.date || format(now, "yyyy-MM-dd");
-                      let h = now.getHours();
-                      const m = now.getMinutes();
-                      const ampm = h >= 12 ? "PM" : "AM";
-                      h = h % 12 || 12;
-                      const pTime =
-                        ptx.time ||
-                        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
-
-                      return (
-                        <tr
-                          key={ptx.hash}
-                          data-testid={`pending-row-${ptx.hash}`}
-                          className="border-b border-amber-200 bg-amber-50/50 whitespace-nowrap hover:bg-amber-50/70 transition text-black font-semibold"
-                        >
-                          <td className="py-3 px-4">
-                            <div className="font-medium text-black">{ptx.type}</div>
-                            <div className="text-sm font-normal text-[#667185]">
-                              #{ptx.hash}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 font-mono">
-                            {ptx.amount > 0
-                              ? `+$${ptx.amount}`
-                              : `-$${Math.abs(ptx.amount)}`}
-                          </td>
-                          <td className="py-6 px-4 flex items-center gap-2">
-                            <Image
-                              src={`/icons/${ptx.asset.toLowerCase()}.svg`}
-                              alt={ptx.asset}
-                              width={24}
-                              height={24}
-                              className="inline-block"
-                            />
-                            <span className="ml-1 font-medium ">{ptx.asset}</span>
-                          </td>
-                          <td className="py-3 px-4 ">
-                            {formatDateTime(pDate, pTime)}
-                          </td>
-                          <td className="py-3 px-4">
-                            <StatusBadge variant="pending" label="Processing" />
-                          </td>
-                          <td className="py-3 px-4 text-gray-400 italic text-xs">
-                            In-flight...
-                          </td>
-                        </tr>
-                      );
-                    })}
-
                     {shouldVirtualize && topSpacerHeight > 0 && (
                       <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
                         <td colSpan={6} />
@@ -604,17 +570,66 @@ export const Transactions = ({
                     {visibleTransactions.map((txn, idx) => {
                       const actualIndex = startIndex + idx;
                       return (
-                        <RowComponent
+                        <tr
                           key={txn.id ?? actualIndex}
-                          txn={txn}
-                          actualIndex={actualIndex}
-                          isFocused={focusedRowIndex === actualIndex}
-                          isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
-                          onFocusRow={handleFocusRow}
-                          onKeyDownRow={handleRowKeyDown}
-                          onSelectTxn={handleSelectTxn}
-                          setRowRef={setRowRef}
-                        />
+                          ref={(node) => {
+                            if (node) {
+                              rowRefs.current.set(actualIndex, node);
+                            } else {
+                              rowRefs.current.delete(actualIndex);
+                            }
+                          }}
+                          tabIndex={0}
+                          aria-rowindex={actualIndex + 2}
+                          aria-label={`Transaction ${txn.id}`}
+                          onFocus={() => setFocusedRowIndex(actualIndex)}
+                          onKeyDown={(event) => handleRowKeyDown(event, actualIndex)}
+                          className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
+                        >
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-black">{txn.type}</div>
+                            <div className="text-sm font-normal text-[#667185]">
+                              #{txn.id}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {txn.amount > 0
+                              ? `+$${txn.amount}`
+                              : `-$${Math.abs(txn.amount)}`}
+                          </td>
+                          <td className="py-6 px-4 flex items-center gap-2">
+                            <Image
+                              src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                              alt={txn.asset}
+                              width={24}
+                              height={24}
+                              className="inline-block"
+                            />
+                            <span className="ml-1 font-medium ">{txn.asset}</span>
+                          </td>
+                          <td className="py-3 px-4 ">
+                            {formatDateTime(txn.date, txn.time)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <StatusBadge
+                              variant={transactionStatusToVariant(txn.status)}
+                              label={txn.status}
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => {
+                                setSelectedTxn(txn);
+                                setIsDetailOpen(true);
+                              }}
+                              className="text-blue-600 hover:underline"
+                              aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                              aria-controls="transaction-detail-drawer"
+                            >
+                              Details
+                            </button>
+                          </td>
+                        </tr>
                       );
                     })}
                     {shouldVirtualize && bottomSpacerHeight > 0 && (
@@ -623,7 +638,7 @@ export const Transactions = ({
                       </tr>
                     )}
 
-                    {!shouldVirtualize && transactions.length === 0 && activePendingRows.length === 0 && !loading && (
+                    {!shouldVirtualize && transactions.length === 0 && !loading && (
                       <tr>
                         <td colSpan={6} className="text-center py-6">
                           No transactions found.
@@ -637,88 +652,6 @@ export const Transactions = ({
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {/* Optimistic Pending Mobile Cards */}
-              {activePendingRows.map((ptx) => {
-                const now = new Date();
-                const pDate = ptx.date || format(now, "yyyy-MM-dd");
-                let h = now.getHours();
-                const m = now.getMinutes();
-                const ampm = h >= 12 ? "PM" : "AM";
-                h = h % 12 || 12;
-                const pTime =
-                  ptx.time ||
-                  `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
-
-                return (
-                  <div
-                    key={ptx.hash}
-                    data-testid={`pending-card-${ptx.hash}`}
-                    className="p-4 border border-amber-200 rounded-xl bg-amber-50/40 shadow-sm transition-shadow"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-1">
-                          Type (Pending)
-                        </span>
-                        <div className="font-bold text-gray-900">{ptx.type}</div>
-                        <div className="text-xs text-gray-500 font-mono">
-                          #{ptx.hash}
-                        </div>
-                      </div>
-                      <StatusBadge variant="pending" label="Processing" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-amber-100">
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                          Asset
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Image
-                            src={`/icons/${ptx.asset.toLowerCase()}.svg`}
-                            alt={ptx.asset}
-                            width={20}
-                            height={20}
-                          />
-                          <span className="font-bold text-gray-900">
-                            {ptx.asset}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                          Amount
-                        </span>
-                        <div
-                          className={`font-mono font-bold text-base ${
-                            ptx.amount > 0 ? "text-green-600" : "text-gray-900"
-                          }`}
-                        >
-                          {ptx.amount > 0
-                            ? `+$${ptx.amount}`
-                            : `-$${Math.abs(ptx.amount)}`}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 pt-3 border-t border-amber-100 flex justify-between items-center">
-                      <div>
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                          Date & Time
-                        </span>
-                        <div className="text-sm text-gray-700">
-                          {formatDateTime(pDate, pTime)}
-                        </div>
-                      </div>
-                      <span className="text-xs text-amber-700 italic">
-                        In-flight...
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Confirmed Mobile Cards */}
               {visibleTransactions.map((txn, idx) => (
                 <div
                   key={txn.id ?? startIndex + idx}

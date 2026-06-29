@@ -6,22 +6,18 @@ import { DashboardLayout } from "@/components";
 import { Transactions } from "@/components/shared/common/Transaction";
 import { PageHeader } from "@/components/shared/common";
 import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
-import { TransactionExportButton, TransactionsSummaryHeader } from "@/components/features/dashboard/components";
+import { TransactionsSummaryHeader } from "@/components/features/dashboard/components";
 import { useTransactionSummary } from "@/hooks/useTransactionSummary";
+
+// Lazy load Bank icon to reduce initial bundle size
+const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod => ({ default: mod.Bank })), {
+  loading: () => <IconPlaceholder />,
+  ssr: true,
+});
 
 export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const { inflow, outflow, net, isLoading } = useTransactionSummary();
-  const searchParams = useSearchParams();
-
-  const filters = useMemo(() => ({
-    asset: searchParams.get("asset") ?? undefined,
-    type: searchParams.get("type") ?? undefined,
-    status: searchParams.get("status") ?? undefined,
-    search: searchParams.get("search") ?? undefined,
-    dateFrom: searchParams.get("fromDate") ?? undefined,
-    dateTo: searchParams.get("toDate") ?? undefined,
-  }), [searchParams]);
 
   return (
     <DashboardLayout>

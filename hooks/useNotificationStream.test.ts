@@ -12,8 +12,9 @@ class MockEventSource {
 
   url: string;
   onmessage: ((event: MessageEvent) => void) | null = null;
-  onerror: ((event: Event) => void) | null = null;
-  onopen: ((event: Event) => void) | null = null;
+  onerror: (() => void) | null = null;
+  onopen: (() => void) | null = null;
+  listeners = new Map<string, Set<EventListener>>();
   close = vi.fn();
   addEventListener = vi.fn((type: string, listener: EventListener) => {
     const listeners = this.listeners.get(type) ?? new Set<EventListener>();
