@@ -1,9 +1,14 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
-import { Menu } from "lucide-react";
+import { Menu, WalletCards } from "lucide-react";
 import NotificationBell from "@/components/shared/layout/NotificationBell";
+import { useWallet } from "@/hooks/useWallet";
+import {
+  fetchWalletBalances,
+  type WalletBalanceSummaryItem,
+} from "@/lib/wallet/balances";
 
 declare global {
   interface Window {
@@ -16,8 +21,6 @@ declare global {
     };
   }
 }
-
-import { useWalletContext } from "@/context/WalletContext";
 
 /** Shared focus-visible classes for TopNav interactive elements */
 const focusClasses =
@@ -41,19 +44,76 @@ export const SidebarToggle = () => {
 const TopNav = () => {
   const {
     address: walletAddress,
+    network,
     status,
     error,
     connect: handleConnect,
     disconnect,
-  } = useWalletContext();
+  } = useWallet();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isBalanceOpen, setIsBalanceOpen] = useState(false);
+  const [balanceStatus, setBalanceStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [balances, setBalances] = useState<WalletBalanceSummaryItem[]>([]);
+  const balanceTriggerRef = useRef<HTMLButtonElement>(null);
 
   const loading = status === "connecting";
 
   const handleDisconnect = async () => {
     await disconnect();
     setIsDropdownOpen(false);
+    setIsBalanceOpen(false);
   };
+
+  const closeBalancePopover = useCallback(() => {
+    setIsBalanceOpen(false);
+    balanceTriggerRef.current?.focus();
+  }, []);
+
+  const loadBalances = useCallback(async () => {
+    if (!walletAddress) return;
+
+    setBalanceStatus("loading");
+    try {
+      const nextBalances = await fetchWalletBalances(walletAddress);
+      setBalances(nextBalances);
+      setBalanceStatus("success");
+    } catch {
+      setBalances([]);
+      setBalanceStatus("error");
+    }
+  }, [walletAddress]);
+
+  const handleBalanceToggle = () => {
+    setIsBalanceOpen((current) => {
+      const next = !current;
+      if (next && walletAddress) {
+        void loadBalances();
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!isBalanceOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeBalancePopover();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [closeBalancePopover, isBalanceOpen]);
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setBalances([]);
+      setBalanceStatus("idle");
+    }
+  }, [walletAddress]);
 
   const getShortAddress = (addr: string) => {
     return `${addr.slice(0, 5)}...${addr.slice(-4)}`;
@@ -122,7 +182,7 @@ const TopNav = () => {
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700">
                     <button
                       type="button"
-                      onClick={disconnect}
+                      onClick={handleDisconnect}
                       className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 text-red-600 font-medium"
                     >
                       Disconnect Wallet
@@ -148,6 +208,98 @@ const TopNav = () => {
               >
                 {error}
               </span>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              ref={balanceTriggerRef}
+              type="button"
+              aria-label="Wallet balances"
+              aria-expanded={isBalanceOpen}
+              aria-controls="topnav-wallet-balances"
+              onClick={handleBalanceToggle}
+              className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-3 rounded-full ${focusClasses}`}
+            >
+              <WalletCards className="h-4 w-4" aria-hidden="true" />
+            </button>
+
+            {isBalanceOpen && (
+              <div
+                id="topnav-wallet-balances"
+                role="dialog"
+                aria-label="Wallet balance summary"
+                className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border border-gray-200 dark:border-gray-700 p-4 text-gray-900 dark:text-gray-100"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold">Wallet balances</h2>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {walletAddress
+                        ? `${network} · ${getShortAddress(walletAddress)}`
+                        : "Connect a wallet to view balances."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeBalancePopover}
+                    className={`text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white ${focusClasses}`}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {!walletAddress && (
+                  <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+                    Not connected.
+                  </p>
+                )}
+
+                {walletAddress && balanceStatus === "loading" && (
+                  <p
+                    role="status"
+                    className="mt-4 text-sm text-gray-600 dark:text-gray-300"
+                  >
+                    Loading balances...
+                  </p>
+                )}
+
+                {walletAddress && balanceStatus === "error" && (
+                  <p role="alert" className="mt-4 text-sm text-red-600">
+                    Could not load balances. Try again later.
+                  </p>
+                )}
+
+                {walletAddress && balanceStatus === "success" && (
+                  <ul className="mt-4 space-y-3">
+                    {balances.length === 0 ? (
+                      <li className="text-sm text-gray-600 dark:text-gray-300">
+                        No balances found for this account.
+                      </li>
+                    ) : (
+                      balances.map((balance) => (
+                        <li
+                          key={`${balance.symbol}-${balance.name}`}
+                          className="flex items-center justify-between gap-3"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">
+                              {balance.symbol}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {balance.name}
+                              {!balance.hasMetadata ? " · unregistered" : ""}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold">
+                            {balance.formatted}
+                          </span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
 
