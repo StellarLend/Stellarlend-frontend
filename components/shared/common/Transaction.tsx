@@ -28,6 +28,7 @@ import {
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
 import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
+import { sortTransactions, type TransactionSortKey, type TransactionSortOrder } from "@/lib/transactions/sort";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -41,6 +42,9 @@ interface TransactionsProps {
   infiniteScroll?: boolean;
   hideToolbar?: boolean;
   onDataLoad?: (totalCount: number) => void;
+  sortKey?: TransactionSortKey;
+  sortOrder?: TransactionSortOrder;
+  onSortChange?: (nextKey: TransactionSortKey, nextOrder?: TransactionSortOrder) => void;
 }
 
 export const Transactions = ({
@@ -48,6 +52,9 @@ export const Transactions = ({
   infiniteScroll = false,
   hideToolbar = false,
   onDataLoad,
+  sortKey,
+  sortOrder,
+  onSortChange,
 }: TransactionsProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,8 +85,10 @@ export const Transactions = ({
 
   const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
   const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
-  const sortBy = hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy;
-  const sortDir = hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir;
+  const effectiveSortKey = sortKey ?? (hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy);
+  const effectiveSortOrder = sortOrder ?? (hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir);
+  const sortBy = effectiveSortKey === "status" ? "date" : effectiveSortKey;
+  const sortDir = effectiveSortOrder;
   const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
   const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
   const asset = hideToolbar ? searchParams.get("asset") || "" : "";
@@ -162,8 +171,26 @@ export const Transactions = ({
     }
   }, [infiniteScroll, infinite.transactions.length, onDataLoad]);
 
-  const displayTransactions = infiniteScroll ? infinite.transactions : transactions;
+  const displayTransactions = infiniteScroll
+    ? sortTransactions(infinite.transactions, effectiveSortKey, effectiveSortOrder)
+    : sortTransactions(transactions, effectiveSortKey, effectiveSortOrder);
   const displayLoading = infiniteScroll ? infinite.isLoading : loading;
+
+  const handleHeaderClick = (nextKey: TransactionSortKey) => {
+    if (!onSortChange) {
+      return;
+    }
+
+    const nextOrder = sortKey === nextKey && sortOrder === "asc" ? "desc" : "asc";
+    onSortChange(nextKey, nextOrder);
+  };
+
+  const handleHeaderKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, nextKey: TransactionSortKey) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleHeaderClick(nextKey);
+    }
+  };
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -427,13 +454,47 @@ export const Transactions = ({
               <table className="min-w-full text-sm border">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
-                    <th className="py-3 px-4 text-left font-semibold">
-                      Transaction Type
+                    <th className="py-3 px-4 text-left font-semibold">Transaction Type</th>
+                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-left font-semibold"
+                        aria-sort={sortKey === "amount" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                        aria-label="Sort by amount"
+                        onClick={() => handleHeaderClick("amount")}
+                        onKeyDown={(event) => handleHeaderKeyDown(event, "amount")}
+                      >
+                        <span>Amount</span>
+                        {sortKey === "amount" ? (sortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
+                      </button>
                     </th>
-                    <th className="py-3 px-4 text-left font-semibold">Amount</th>
                     <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                    <th className="py-3 px-4 text-left font-semibold">Date</th>
-                    <th className="py-3 px-4 text-left font-semibold">Status</th>
+                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-left font-semibold"
+                        aria-sort={sortKey === "date" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                        aria-label="Sort by date"
+                        onClick={() => handleHeaderClick("date")}
+                        onKeyDown={(event) => handleHeaderKeyDown(event, "date")}
+                      >
+                        <span>Date</span>
+                        {sortKey === "date" ? (sortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
+                      </button>
+                    </th>
+                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-left font-semibold"
+                        aria-sort={sortKey === "status" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                        aria-label="Sort by status"
+                        onClick={() => handleHeaderClick("status")}
+                        onKeyDown={(event) => handleHeaderKeyDown(event, "status")}
+                      >
+                        <span>Status</span>
+                        {sortKey === "status" ? (sortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
+                      </button>
+                    </th>
                     <th className="py-3 px-4 text-left font-semibold">Actions</th>
                   </tr>
                 </thead>
