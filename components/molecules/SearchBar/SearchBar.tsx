@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { X, Search } from 'lucide-react';
+import { sanitiseString } from '@/lib/security/input-sanitizer';
 
 export interface SearchBarProps {
   /**
@@ -66,6 +67,12 @@ export interface SearchBarProps {
    * @default "Search input"
    */
   ariaLabel?: string;
+
+  /**
+   * Maximum allowed input length
+   * @default 200
+   */
+  maxLength?: number;
 }
 
 const maxWidthClasses = {
@@ -114,6 +121,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       maxWidth = 'md',
       initialValue = '',
       ariaLabel = 'Search input',
+      maxLength = 200,
     },
     ref
   ) => {
@@ -130,20 +138,24 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       }
     }, [ref]);
 
-    // Debounced search callback
+    // Debounced search callback with sanitization
     const handleValueChange = useCallback(
       (newValue: string) => {
-        setValue(newValue);
+        // Sanitize input
+        const sanitized = sanitiseString(newValue);
+        // Truncate if exceeds max length
+        const truncated = sanitized.slice(0, maxLength);
+        setValue(truncated);
 
         if (debounceTimeoutRef.current) {
           clearTimeout(debounceTimeoutRef.current);
         }
 
         debounceTimeoutRef.current = setTimeout(() => {
-          onSearch?.(newValue);
+          onSearch?.(truncated);
         }, debounceDelay);
       },
-      [onSearch, debounceDelay]
+      [onSearch, debounceDelay, maxLength]
     );
 
     // Handle clear button click
@@ -196,6 +208,9 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       };
     }, []);
 
+    const isNearMaxLength = value.length >= maxLength * 0.9;
+    const isAtMaxLength = value.length >= maxLength;
+
     return (
       <div className={`w-full ${maxWidthClasses[maxWidth]} ${className}`}>
         <div className="relative w-full">
@@ -221,7 +236,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             className={`
               w-full
               ${showSearchIcon ? 'pl-10' : 'pl-4'}
-              ${showClearButton && value ? 'pr-10' : 'pr-4'}
+              ${showClearButton && value ? 'pr-20' : 'pr-10'}
               py-3
               rounded-xl
               font-semibold
@@ -234,12 +249,12 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               placeholder-gray-500
               dark:placeholder-gray-400
               border
-              border-[var(--New-outline,rgb(113,180,141))]
+              ${isAtMaxLength ? 'border-red-500' : 'border-[var(--New-outline,rgb(113,180,141))]'}
               focus:outline-none
               focus:ring-2
-              focus:ring-[var(--New-outline,rgb(113,180,141))]
+              ${isAtMaxLength ? 'focus:ring-red-500' : 'focus:ring-[var(--New-outline,rgb(113,180,141))]'}
               focus:ring-opacity-50
-              hover:border-[var(--New-outline,rgb(113,180,141))]
+              ${isAtMaxLength ? 'hover:border-red-500' : 'hover:border-[var(--New-outline,rgb(113,180,141))]'}
               transition-colors
               duration-200
             `}
@@ -253,7 +268,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               aria-label="Clear search input"
               className={`
                 absolute
-                right-3
+                ${isAtMaxLength ? 'right-12' : 'right-3'}
                 top-1/2
                 -translate-y-1/2
                 text-gray-400
@@ -280,9 +295,25 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             </button>
           )}
 
+          {/* Length Hint */}
+          <div className={`
+            absolute
+            right-3
+            top-1/2
+            -translate-y-1/2
+            text-xs
+            font-medium
+            ${isAtMaxLength ? 'text-red-500' : isNearMaxLength ? 'text-amber-500' : 'text-gray-400'}
+            pointer-events-none
+            hidden
+            sm:block
+          `}>
+            {value.length}/{maxLength}
+          </div>
+
           {/* Keyboard shortcut hint - only show when empty and slash shortcut enabled */}
-          {enableSlashShortcut && !value && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none hidden sm:block">
+          {enableSlashShortcut && !value && !isNearMaxLength && (
+            <div className="absolute right-12 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none hidden sm:block">
               <kbd className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
                 /
               </kbd>
