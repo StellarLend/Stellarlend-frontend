@@ -1,5 +1,13 @@
 import type { TransactionStatus, TransactionAsset } from './types';
 
+export type TransactionTypeFilter = (typeof TRANSACTION_TYPES)[number];
+
+export const TRANSACTION_TYPES = ['lend', 'borrow', 'repay', 'withdraw'] as const;
+export const TRANSACTION_TYPE_OPTIONS = TRANSACTION_TYPES.map((type) => ({
+  value: type,
+  label: type.charAt(0).toUpperCase() + type.slice(1),
+}));
+
 export interface TransactionFilter {
   type?: string;
   status?: TransactionStatus;
@@ -8,8 +16,8 @@ export interface TransactionFilter {
   toDate?: string;
 }
 
-const ALLOWED_TYPES   = new Set(['lend', 'borrow', 'repay', 'withdraw']);
-const ALLOWED_STATUSES = new Set(['completed', 'processing', 'failed', 'all']);
+const ALLOWED_TYPES = new Set<string>(TRANSACTION_TYPES);
+const ALLOWED_STATUSES = new Set(['completed', 'pending', 'failed']);
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$/;
 
 export interface FilterValidationResult {

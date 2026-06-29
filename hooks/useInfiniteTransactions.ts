@@ -79,10 +79,16 @@ export function useInfiniteTransactions(
   );
 
   useEffect(() => {
-    if (!initialLoadRef.current) {
-      initialLoadRef.current = true;
-      fetchPage(null, false);
-    }
+    setTransactions([]);
+    setNextCursor(null);
+    setIsError(false);
+    setError(null);
+    setIsLoading(true);
+    setIsLoadingMore(false);
+    loadingRef.current = false;
+    initialLoadRef.current = false;
+
+    fetchPage(null, false);
   }, [fetchPage]);
 
   const loadMore = useCallback(() => {
