@@ -162,11 +162,8 @@ export async function httpPost<T>(url: string, body: unknown, options: RequestOp
 }
 
 /**
- * Alias for httpGet to maintain backwards compatibility with existing tests.
- * @deprecated Use httpGet instead.
+ * Generic fetch wrapper that propagates the active x-request-id from async context.
+ * Alias for httpGet, exported separately to satisfy callers that import httpFetch by name.
  */
 export const httpFetch = httpGet;
- * Backward-compatible fetch helper. `maxRetries` is interpreted as retries after
- * the first attempt, while `retries` on httpGet is total attempts.
- */
-export const httpFetch = httpGet;
+

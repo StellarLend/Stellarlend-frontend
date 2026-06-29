@@ -35,6 +35,7 @@ export function middleware(request: NextRequest) {
     const nonce = generateNonce();
     const response = NextResponse.next();
     response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('x-csp-nonce', nonce);
     return response;
   }
@@ -45,6 +46,7 @@ export function middleware(request: NextRequest) {
   if (pathname === '/api/health') {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
     response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     return response;
   }
 
@@ -55,6 +57,7 @@ export function middleware(request: NextRequest) {
   if (isAuth) {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
     response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     return response;
   }
 
@@ -85,6 +88,7 @@ export function middleware(request: NextRequest) {
 
   // Set CSP header on every response
   response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
   // 6. Standard Rate Limit Headers
   response.headers.set('X-RateLimit-Limit', limit.toString());
