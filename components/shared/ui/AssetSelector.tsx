@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { AssetInfo } from "@/lib/assets";
 import { cn } from "@/lib/utils/cn";
+import { Tooltip } from "@/components/atoms/Tooltip";
+import { usePrices } from "@/hooks/usePrices";
 import { ChevronDown, Search } from "lucide-react";
 
 interface AssetSelectorProps {
@@ -45,6 +47,17 @@ export default function AssetSelector({
   const listboxRef = useRef<HTMLDivElement>(null);
 
   const selectedAsset = assets.find((a) => a.symbol === value) || assets[0];
+  const assetSymbols = useMemo(
+    () => assets.map((asset) => asset.symbol),
+    [assets],
+  );
+  const { getPriceLabel, refresh } = usePrices(assetSymbols);
+
+  useEffect(() => {
+    if (isOpen) {
+      void refresh();
+    }
+  }, [isOpen, refresh]);
 
   // Filter assets based on search query
   const filteredAssets = assets.filter(
@@ -244,48 +257,55 @@ export default function AssetSelector({
                 const active = index === activeIndex;
 
                 return (
-                  <button
+                  <Tooltip
                     key={asset.symbol}
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    id={`asset-option-${asset.symbol}`}
-                    onClick={() => handleSelect(asset.symbol)}
-                    className={cn(
-                      "w-full p-3 rounded-lg text-left flex items-center justify-between transition-colors focus:outline-none text-sm cursor-pointer",
-                      selected && "bg-blue-50 text-blue-900 font-semibold",
-                      active && !selected && "bg-gray-100",
-                      !active && !selected && "hover:bg-gray-50 text-gray-700"
-                    )}
+                    content={getPriceLabel(asset.symbol)}
+                    position="left"
+                    delay={200}
+                    wrapperClassName="block w-full"
                   >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={cn(
-                          "w-5 h-5 rounded-full",
-                          TOKEN_COLORS[asset.symbol] || "bg-gray-400"
-                        )}
-                      />
-                      <div className="flex flex-col">
-                        <span className="font-bold">{asset.symbol}</span>
-                        <span className="text-xs opacity-75">
-                          {asset.name}
-                        </span>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      id={`asset-option-${asset.symbol}`}
+                      onClick={() => handleSelect(asset.symbol)}
+                      className={cn(
+                        "w-full p-3 rounded-lg text-left flex items-center justify-between transition-colors focus:outline-none text-sm cursor-pointer",
+                        selected && "bg-blue-50 text-blue-900 font-semibold",
+                        active && !selected && "bg-gray-100",
+                        !active && !selected && "hover:bg-gray-50 text-gray-700"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={cn(
+                            "w-5 h-5 rounded-full",
+                            TOKEN_COLORS[asset.symbol] || "bg-gray-400"
+                          )}
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-bold">{asset.symbol}</span>
+                          <span className="text-xs opacity-75">
+                            {asset.name}
+                          </span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="text-right">
-                      {interestRates?.[asset.symbol] && (
-                        <span className="text-xs font-semibold text-blue-600 block mb-0.5">
-                          {interestRates[asset.symbol]}% APR
-                        </span>
-                      )}
-                      {showBalance && (
-                        <span className="text-xs opacity-60 block">
-                          Bal: {asset.balance.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                      <div className="text-right">
+                        {interestRates?.[asset.symbol] && (
+                          <span className="text-xs font-semibold text-blue-600 block mb-0.5">
+                            {interestRates[asset.symbol]}% APR
+                          </span>
+                        )}
+                        {showBalance && (
+                          <span className="text-xs opacity-60 block">
+                            Bal: {asset.balance.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </Tooltip>
                 );
               })
             )}
