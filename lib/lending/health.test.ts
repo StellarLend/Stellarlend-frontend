@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateCollateralForTargetHealth,
   calculateProjectedBorrowHealth,
   calculateRequiredCollateralAmount,
   CRITICAL_HEALTH_FACTOR_THRESHOLD,
@@ -70,6 +71,72 @@ describe("lending health preview", () => {
         loanAmount: 100,
         borrowAsset: "USDC",
         collateralAsset: "BTC",
+        prices,
+      }),
+    ).toBeNull();
+  });
+
+  it("calculates collateral needed for a target health factor", () => {
+    expect(
+      calculateCollateralForTargetHealth({
+        loanAmount: 100,
+        borrowAsset: "USDC",
+        collateralAsset: "USDC",
+        targetHealthFactor: 2,
+        prices,
+      }),
+    ).toBe(240);
+
+    expect(
+      calculateCollateralForTargetHealth({
+        loanAmount: 100,
+        borrowAsset: "USDC",
+        collateralAsset: "XLM",
+        targetHealthFactor: 2,
+        prices,
+      }),
+    ).toBe(2000);
+  });
+
+  it("clamps target health factors to sane bounds", () => {
+    expect(
+      calculateCollateralForTargetHealth({
+        loanAmount: 100,
+        borrowAsset: "USDC",
+        collateralAsset: "USDC",
+        targetHealthFactor: 0.2,
+        prices,
+      }),
+    ).toBe(120);
+
+    expect(
+      calculateCollateralForTargetHealth({
+        loanAmount: 100,
+        borrowAsset: "USDC",
+        collateralAsset: "USDC",
+        targetHealthFactor: 999,
+        prices,
+      }),
+    ).toBe(600);
+  });
+
+  it("returns no target collateral when loan inputs or prices are missing", () => {
+    expect(
+      calculateCollateralForTargetHealth({
+        loanAmount: 0,
+        borrowAsset: "USDC",
+        collateralAsset: "USDC",
+        targetHealthFactor: 2,
+        prices,
+      }),
+    ).toBeNull();
+
+    expect(
+      calculateCollateralForTargetHealth({
+        loanAmount: 100,
+        borrowAsset: "BTC",
+        collateralAsset: "USDC",
+        targetHealthFactor: 2,
         prices,
       }),
     ).toBeNull();

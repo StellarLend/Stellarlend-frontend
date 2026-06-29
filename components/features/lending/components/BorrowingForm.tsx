@@ -13,6 +13,10 @@ import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
 import {
   FALLBACK_PRICES,
+  MAX_TARGET_HEALTH_FACTOR,
+  MIN_TARGET_HEALTH_FACTOR,
+  calculateCollateralForTargetHealth,
+  clampTargetHealthFactor,
   calculateProjectedBorrowHealth,
   calculateRequiredCollateralAmount,
   getHealthBand,
@@ -40,6 +44,35 @@ const LOAN_DURATIONS = [
   { days: 90, label: "3 Months" },
   { days: 180, label: "6 Months" },
 ];
+
+const TARGET_HEALTH_PRESETS = [1.5, 2, 2.5] as const;
+
+const HEALTH_BAND_STYLES = {
+  healthy: {
+    label: "Healthy",
+    text: "text-emerald-700",
+    border: "border-emerald-200",
+    bg: "bg-emerald-50",
+    helper:
+      "Projected collateral buffer is comfortably above the liquidation threshold.",
+  },
+  "at-risk": {
+    label: "At Risk",
+    text: "text-amber-700",
+    border: "border-amber-200",
+    bg: "bg-amber-50",
+    helper:
+      "Projected position is close to the liquidation threshold. Consider adding collateral.",
+  },
+  critical: {
+    label: "Critical",
+    text: "text-red-700",
+    border: "border-red-200",
+    bg: "bg-red-50",
+    helper:
+      "Projected position is undercollateralised. Add collateral before submitting.",
+  },
+} as const;
 
 /** Inclusive lower bound for a custom loan duration (days). */
 export const CUSTOM_DURATION_MIN_DAYS = 1;
@@ -71,6 +104,11 @@ export default function BorrowingForm({
   // Raw string so the input can be empty / partially typed without coercion
   const [customDays, setCustomDays] = useState<string>("");
   const [customDaysError, setCustomDaysError] = useState<string>("");
+  const [targetHealthMode, setTargetHealthMode] = useState<"preset" | "custom">(
+    "preset",
+  );
+  const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
+  const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
   // "preset" = one of the LOAN_DURATIONS chips is active
   // "custom" = the Custom chip is active and the numeric input is visible
@@ -104,6 +142,30 @@ export default function BorrowingForm({
   const projectedBandStyle = projectedBand
     ? HEALTH_BAND_STYLES[projectedBand]
     : null;
+  const targetCollateralAmount = calculateCollateralForTargetHealth({
+    loanAmount: formData.amount,
+    borrowAsset: formData.asset,
+    collateralAsset: formData.collateral ?? "",
+    prices: priceMap,
+    targetHealthFactor,
+  });
+  const topUpAmount =
+    targetCollateralAmount === null
+      ? null
+      : Math.max(0, targetCollateralAmount - collateralAmount);
+  const targetFillAmount =
+    targetCollateralAmount === null
+      ? null
+      : Math.max(collateralAmount, targetCollateralAmount);
+  const clampedTargetFillAmount =
+    targetFillAmount !== null && collateralAsset
+      ? Math.min(targetFillAmount, collateralAsset.balance)
+      : targetFillAmount;
+  const targetExceedsBalance = Boolean(
+    targetCollateralAmount !== null &&
+    collateralAsset &&
+    targetCollateralAmount > collateralAsset.balance,
+  );
   const borrowPrice = priceMap[formData.asset];
   const collateralPrice = formData.collateral
     ? priceMap[formData.collateral]
@@ -238,6 +300,47 @@ export default function BorrowingForm({
     setCustomDaysError(errorMsg);
   };
 
+  const formatCollateralUnits = (amount: number): string =>
+    amount.toLocaleString(undefined, {
+      maximumFractionDigits: collateralAsset?.precision ?? 2,
+    });
+
+  const handleTargetPreset = (target: number) => {
+    setTargetHealthMode("preset");
+    setCustomTargetHealth("");
+    setTargetHealthFactor(target);
+  };
+
+  const handleCustomTargetHealthChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const raw = e.target.value;
+    setCustomTargetHealth(raw);
+
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed)) {
+      setTargetHealthFactor(clampTargetHealthFactor(parsed));
+    }
+  };
+
+  const applyTargetCollateral = () => {
+    if (clampedTargetFillAmount === null) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      collateralAmount: clampedTargetFillAmount,
+    }));
+    if (errors.collateralAmount) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.collateralAmount;
+        return next;
+      });
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Form validation / submission
   // ---------------------------------------------------------------------------
@@ -312,9 +415,13 @@ export default function BorrowingForm({
       newErrors.duration = "Please select a loan duration";
     }
 
-    // In custom mode, an in-progress validation error must also block submit
-    if (durationMode === "custom" && customDaysError) {
-      newErrors.duration = customDaysError;
+    // In custom mode, validate the current raw input at submit time so a quick
+    // submit cannot race the customDaysError state update.
+    if (durationMode === "custom") {
+      const customDurationError = validateCustomDays(customDays);
+      if (customDurationError) {
+        newErrors.duration = customDurationError;
+      }
     }
 
     if (!formData.collateral) {
@@ -621,6 +728,137 @@ export default function BorrowingForm({
           precision={collateralAsset?.precision ?? 2}
           max={collateralAsset?.balance ?? 0}
         />
+
+        {/* Target Health Shortcut */}
+        <div className="bg-blue-50 rounded-xl p-5 border border-blue-100 space-y-4">
+          <div>
+            <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+              Target Health Shortcut
+            </h3>
+            <p className="text-xs text-blue-700 font-medium mt-1">
+              Pick a target health factor to prefill the collateral amount.
+            </p>
+          </div>
+
+          <div
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+            role="group"
+            aria-label="Target health presets"
+          >
+            {TARGET_HEALTH_PRESETS.map((target) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => handleTargetPreset(target)}
+                className={cn(
+                  "rounded-lg border-2 px-3 py-2 text-sm font-bold transition-colors",
+                  targetHealthMode === "preset" && targetHealthFactor === target
+                    ? "border-[#2600FF] bg-white text-[#2600FF]"
+                    : "border-blue-100 bg-white/70 text-blue-700 hover:border-blue-200",
+                )}
+                aria-pressed={
+                  targetHealthMode === "preset" && targetHealthFactor === target
+                }
+              >
+                {target.toFixed(1)}x
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-label="Use target health input"
+              onClick={() => {
+                setTargetHealthMode("custom");
+                if (!customTargetHealth) {
+                  setCustomTargetHealth(targetHealthFactor.toString());
+                }
+              }}
+              className={cn(
+                "rounded-lg border-2 px-3 py-2 text-sm font-bold transition-colors",
+                targetHealthMode === "custom"
+                  ? "border-[#2600FF] bg-white text-[#2600FF]"
+                  : "border-blue-100 bg-white/70 text-blue-700 hover:border-blue-200",
+              )}
+              aria-pressed={targetHealthMode === "custom"}
+            >
+              Target
+            </button>
+          </div>
+
+          {targetHealthMode === "custom" && (
+            <div>
+              <label
+                htmlFor="custom-target-health-factor"
+                className="block text-xs font-medium text-blue-800 mb-1"
+              >
+                Custom target health factor
+              </label>
+              <input
+                id="custom-target-health-factor"
+                aria-label="Custom target health factor"
+                type="number"
+                min={MIN_TARGET_HEALTH_FACTOR}
+                max={MAX_TARGET_HEALTH_FACTOR}
+                step="0.1"
+                value={customTargetHealth}
+                onChange={handleCustomTargetHealthChange}
+                className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#2600FF] focus:ring-1 focus:ring-[#2600FF]"
+              />
+              <p className="text-[11px] text-blue-600 font-medium mt-1">
+                Targets are clamped between{" "}
+                {MIN_TARGET_HEALTH_FACTOR.toFixed(1)}x and{" "}
+                {MAX_TARGET_HEALTH_FACTOR.toFixed(1)}x.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-medium">
+            <div className="rounded-lg bg-white/75 p-3">
+              <span className="block text-blue-700">Suggested collateral</span>
+              <span className="text-base font-bold text-gray-900">
+                {targetCollateralAmount === null
+                  ? "Enter borrow details"
+                  : `${formatCollateralUnits(targetCollateralAmount)} ${
+                      formData.collateral
+                    }`}
+              </span>
+            </div>
+            <div className="rounded-lg bg-white/75 p-3">
+              <span className="block text-blue-700">Top-up needed</span>
+              <span className="text-base font-bold text-gray-900">
+                {topUpAmount === null
+                  ? "Unavailable"
+                  : `${formatCollateralUnits(topUpAmount)} ${
+                      formData.collateral
+                    }`}
+              </span>
+            </div>
+          </div>
+
+          {targetExceedsBalance && collateralAsset && (
+            <p className="text-xs font-semibold text-amber-700" role="status">
+              Target requires more than your balance, so applying uses your
+              available {formatCollateralUnits(collateralAsset.balance)}{" "}
+              {formData.collateral}.
+            </p>
+          )}
+          {topUpAmount === 0 && targetCollateralAmount !== null && (
+            <p className="text-xs font-semibold text-green-700" role="status">
+              Existing collateral already reaches the selected target.
+            </p>
+          )}
+
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={clampedTargetFillAmount === null}
+            onClick={applyTargetCollateral}
+          >
+            {targetExceedsBalance
+              ? "Apply Available Balance"
+              : "Apply Suggested Collateral"}
+          </Button>
+        </div>
 
         {/* Collateral Requirements */}
         {formData.amount > 0 && (
