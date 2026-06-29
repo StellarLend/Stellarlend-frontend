@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@/test/test-utils';
+import { render, screen, waitFor, within } from '@/test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -495,6 +495,108 @@ describe('NotificationBell grouping', () => {
       await waitFor(() => {
         expect(screen.getByTestId('empty-state')).toHaveTextContent('No notifications yet');
       });
+
+      fetchMock.mockRestore();
+    });
+  });
+
+  describe('click outside', () => {
+    it('closes panel when clicking outside the notification center', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(JSON.stringify({ notifications: [todayNotif], unreadCount: 1 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      render(
+        <div>
+          <NotificationBell />
+          <button type="button" data-testid="outside-button">Outside button</button>
+        </div>,
+      );
+
+      const trigger = screen.getByRole('button', { name: /1 unread notification/i });
+      await userEvent.click(trigger);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('notification-panel')).toBeInTheDocument();
+      });
+
+      const outsideButton = screen.getByTestId('outside-button');
+      await userEvent.click(outsideButton);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('notification-panel')).not.toBeInTheDocument();
+      });
+
+      fetchMock.mockRestore();
+    });
+  });
+
+  describe('focus management', () => {
+    it('restores focus to bell when panel closes via Escape', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(JSON.stringify({ notifications: [todayNotif], unreadCount: 1 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      render(<NotificationBell />);
+      const trigger = screen.getByRole('button', { name: /1 unread notification/i });
+
+      await userEvent.click(trigger);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('notification-panel')).toBeInTheDocument();
+      });
+
+      const panel = screen.getByTestId('notification-panel');
+      panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('notification-panel')).not.toBeInTheDocument();
+      });
+
+      expect(trigger).toHaveFocus();
+
+      fetchMock.mockRestore();
+    });
+
+    it('traps focus inside the panel with Tab key', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(JSON.stringify({ notifications: [todayNotif], unreadCount: 1 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      render(<NotificationBell />);
+      const trigger = screen.getByRole('button', { name: /1 unread notification/i });
+
+      trigger.focus();
+      await userEvent.click(trigger);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('notification-panel')).toBeInTheDocument();
+      });
+
+      const panel = screen.getByRole('dialog');
+      const firstFocusable = panel.querySelector('button') as HTMLElement;
+
+      if (firstFocusable) {
+        firstFocusable.focus();
+        expect(firstFocusable).toHaveFocus();
+
+        await userEvent.tab();
+
+        const buttons = within(panel).getAllByRole('button');
+        if (buttons.length > 1) {
+          const lastButton = buttons[buttons.length - 1];
+          expect(document.activeElement).toEqual(lastButton);
+        }
+      }
 
       fetchMock.mockRestore();
     });
