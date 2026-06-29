@@ -71,7 +71,7 @@ export default defineConfig({
 
           include: [
             "app/lending/**/*.test.tsx",
-            "components/atoms/Tooltip/**/*.test.tsx",
+            "app/account/sessions/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/atoms/Button/Button.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
