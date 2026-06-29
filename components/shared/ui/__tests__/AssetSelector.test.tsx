@@ -2,9 +2,29 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AssetSelector from "../AssetSelector";
 import { ASSETS } from "@/lib/assets";
-import { describe, it, expect, vi } from "vitest";
+import { resetPricesCache } from "@/hooks/usePrices";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe("AssetSelector", () => {
+  beforeEach(() => {
+    resetPricesCache();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          prices: { XLM: 0.12, USDC: 1, BTC: 65000, ETH: 3500 },
+          timestamp: new Date().toISOString(),
+          source: "test",
+        }),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders trigger with the selected asset and toggles dropdown on click", async () => {
     render(<AssetSelector assets={ASSETS} value="XLM" onChange={() => {}} />);
 

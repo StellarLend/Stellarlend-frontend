@@ -1,4 +1,9 @@
+import { useState } from 'react';
+import { Copy } from 'lucide-react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { copyToClipboard } from '@/lib/utils/clipboard';
+import { Toast } from '@/components/shared/common';
+import { formatCurrency as formatCurrencyUtil } from '@/lib/utils/format';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -7,11 +12,15 @@ interface TransactionSummaryProps {
 }
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [toast, setToast] = useState<{
+    variant: 'success' | 'error';
+    title: string;
+    description: string;
+  } | null>(null);
+
   const formatCurrency = (amount: number, currency: string) => {
-    return `${amount.toLocaleString(undefined, { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 4 
-    })} ${currency}`;
+    return `${formatCurrencyUtil(amount, 4)} ${currency}`;
   };
 
   const formatDate = (daysFromNow: number) => {
@@ -22,6 +31,112 @@ export default function TransactionSummary({ data, calculation, type }: Transact
       day: 'numeric', 
       year: 'numeric' 
     });
+  };
+
+  /**
+   * Serialises the transaction breakdown to plain text
+   * for clipboard export.
+   * 
+   * @security Never includes session tokens, wallet keys,
+   * or any secret values — display values only.
+   */
+  function buildSummaryText(): string {
+    const lines = [
+      'Transaction Summary',
+      '==================',
+      '',
+      `Type:               ${type === 'lend' ? 'Lending' : 'Borrowing'}`,
+      `Asset:              ${data.asset}`,
+      `Amount:             ${formatCurrency(data.amount, data.asset)}`,
+      `Interest Rate:      ${data.interestRate.toFixed(1)}% ${type === 'lend' ? 'APY' : 'APR'}`,
+    ];
+
+    if (type === 'borrow' && data.duration) {
+      lines.push(`Duration:           ${data.duration} days`);
+    }
+
+    lines.push(`Start Date:         ${formatDate(0)}`);
+
+    if (data.duration) {
+      lines.push(`End Date:           ${formatDate(data.duration)}`);
+    }
+
+    if (type === 'borrow' && data.collateral && data.collateralAmount) {
+      lines.push('');
+      lines.push('Collateral');
+      lines.push('----------');
+      lines.push(`Asset:              ${data.collateral}`);
+      lines.push(`Amount:             ${formatCurrency(data.collateralAmount, data.collateral)}`);
+      lines.push(`Ratio:              150%`);
+    }
+
+    if (calculation) {
+      lines.push('');
+      lines.push(type === 'lend' ? 'Expected Returns' : 'Repayment Details');
+      lines.push(type === 'lend' ? '----------------' : '-------------------');
+
+      if (type === 'lend') {
+        lines.push(`Daily Earnings:     ${formatCurrency(calculation.dailyEarnings, data.asset)}`);
+        lines.push(`Total Earnings:     ${formatCurrency(calculation.totalEarnings, data.asset)}`);
+        lines.push(`Total Return:       ${formatCurrency(data.amount + calculation.totalEarnings, data.asset)}`);
+      } else {
+        if (calculation.monthlyPayment) {
+          lines.push(`Monthly Payment:    ${formatCurrency(calculation.monthlyPayment, data.asset)}`);
+        }
+        lines.push(`Total Interest:     ${formatCurrency(calculation.totalEarnings, data.asset)}`);
+        if (calculation.totalRepayment) {
+          lines.push(`Total Repayment:    ${formatCurrency(calculation.totalRepayment, data.asset)}`);
+        }
+      }
+    }
+
+    lines.push('');
+    lines.push(`Exported at:        ${new Date().toISOString()}`);
+
+    return lines.join('\n');
+  }
+
+  const handleCopy = async () => {
+    const text = buildSummaryText();
+
+    try {
+      const result = await copyToClipboard(text);
+
+      if (result.success) {
+        setCopyStatus('copied');
+        setToast({
+          variant: 'success',
+          title: 'Copied!',
+          description: 'Summary copied to clipboard.',
+        });
+        setTimeout(() => {
+          setCopyStatus('idle');
+          setToast(null);
+        }, 2000);
+      } else {
+        setCopyStatus('failed');
+        setToast({
+          variant: 'error',
+          title: 'Copy Failed',
+          description: 'Failed to copy summary to clipboard.',
+        });
+        setTimeout(() => {
+          setCopyStatus('idle');
+          setToast(null);
+        }, 2000);
+      }
+    } catch {
+      setCopyStatus('failed');
+      setToast({
+        variant: 'error',
+        title: 'Copy Failed',
+        description: 'An unexpected error occurred while copying.',
+      });
+      setTimeout(() => {
+        setCopyStatus('idle');
+        setToast(null);
+      }, 2000);
+    }
   };
 
   if (!data || data.amount <= 0) {
@@ -53,9 +168,50 @@ export default function TransactionSummary({ data, calculation, type }: Transact
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Transaction Summary
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Transaction Summary
+        </h3>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label={
+            copyStatus === 'copied'
+              ? 'Summary copied to clipboard'
+              : 'Copy transaction summary to clipboard'
+          }
+          aria-live="polite"
+          disabled={copyStatus !== 'idle'}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-all ${
+            copyStatus === 'idle'
+              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300'
+              : copyStatus === 'copied'
+                ? 'bg-green-100 text-green-700'
+                : 'bg-red-100 text-red-700'
+          } ${copyStatus !== 'idle' ? 'cursor-not-allowed opacity-75' : ''}`}
+        >
+          {copyStatus === 'copied' ? (
+            <>
+              <span>✓</span>
+              <span>Copied</span>
+            </>
+          ) : copyStatus === 'failed' ? (
+            <>
+              <span>✗</span>
+              <span>Failed</span>
+            </>
+          ) : (
+            <>
+              <Copy size={18} />
+              <span>Copy Summary</span>
+            </>
+          )}
+        </button>
+      </div>
+      <span role="status" aria-live="polite" className="sr-only">
+        {copyStatus === 'copied' ? 'Summary copied to clipboard' : ''}
+        {copyStatus === 'failed' ? 'Failed to copy summary' : ''}
+      </span>
 
       <div className="space-y-4">
         {/* Header Info */}
@@ -302,6 +458,13 @@ export default function TransactionSummary({ data, calculation, type }: Transact
         )}
 
       </div>
+      {toast && (
+        <Toast
+          variant={toast.variant}
+          title={toast.title}
+          description={toast.description}
+        />
+      )}
     </div>
   );
 }

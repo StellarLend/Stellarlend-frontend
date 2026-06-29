@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AlertCircle, TrendingUp } from "lucide-react";
+import SupplyApyChart from "./SupplyApyChart";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { CollateralBreakdown } from "./CollateralBreakdown";
 import { useCollateralShares } from "@/hooks/usePositions";
@@ -274,6 +275,9 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
         </div>
       </div>
 
+      <div className="mt-6">
+        <SupplyApyChart className="w-full" />
+      </div>
       {/* Collateral Breakdown */}
       <CollateralBreakdown shares={shares} isLoading={sharesLoading} />
 
