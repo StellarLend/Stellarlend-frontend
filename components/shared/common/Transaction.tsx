@@ -16,12 +16,7 @@ import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
 import dynamic from "next/dynamic";
-import {
-  TransactionRow,
-  TransactionMobileRow,
-  type TransactionRowProps,
-  type TransactionMobileRowProps,
-} from "./TransactionRow";
+import { usePendingTransactions } from "@/hooks/usePendingTransactions";
 
 const TransactionDetail = dynamic(
   () => import("@/components/features/dashboard/components/TransactionDetail"),
@@ -54,10 +49,10 @@ const statusOptions: (TransactionStatus | "All")[] = [
 
 export interface TransactionsProps {
   showPagination?: boolean;
+  infiniteScroll?: boolean;
+  hideToolbar?: boolean;
   rowHeight?: number;
   viewportHeight?: number;
-  hideToolbar?: boolean;
-  infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
   /** Pre-fetched infinite state. When supplied the component skips its own fetch. */
   externalInfiniteState?: UseInfiniteTransactionsReturn;
@@ -65,10 +60,10 @@ export interface TransactionsProps {
 
 export const Transactions = ({
   showPagination = true,
+  infiniteScroll = false,
+  hideToolbar = false,
   rowHeight: rowHeightProp = 72,
   viewportHeight: viewportHeightProp = 560,
-  hideToolbar = false,
-  infiniteScroll = false,
   onDataLoad,
   infiniteHook,
 }: TransactionsProps & { infiniteHook?: UseInfiniteTransactionsReturn }) => {
@@ -123,6 +118,8 @@ export const Transactions = ({
 
   const infinite = infiniteHook || internalInfinite;
 
+  const { pendingTxs, ItemTrackers } = usePendingTransactions();
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
@@ -156,13 +153,42 @@ export const Transactions = ({
         clientLog.error("Failed to load transactions", err);
         setInternalTransactions([]);
         setTotalCount(0);
+        onDataLoad?.(0);
       } finally {
         setLoading(false);
       }
     };
 
     loadTransactions();
-  }, [controlledTransactions, currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
+
+  const formatDateTime = (date: string, time: string) => {
+    let fixedTime = time.replace(/(AM|PM)$/i, " $1");
+    const d = new Date(date + " " + fixedTime);
+
+    const options: Intl.DateTimeFormatOptions = {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    };
+
+    const dateStr = isNaN(d.getTime()) ? date : d.toLocaleDateString("en-US", options);
+    let timeStr = time;
+    if (!isNaN(d.getTime())) {
+      let [h, m] = [d.getHours(), d.getMinutes()];
+      const ampm = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12;
+      timeStr = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
+    }
+
+    return (
+      <span className="flex items-center gap-2">
+        <span>{dateStr}</span>
+        <span className="w-px h-4 bg-gray-300 mx-1 inline-block" />
+        <span>{timeStr}</span>
+      </span>
+    );
+  };
 
   useEffect(() => {
     setScrollTop(0);
@@ -316,169 +342,175 @@ export const Transactions = ({
   });
   CustomDateInput.displayName = "CustomDateInput";
 
+  // Reconcile and deduplicate pending transactions against indexed transactions
+  const activePendingRows = pendingTxs.filter((ptx) => {
+    return !transactions.some(
+      (tx) => tx.id === ptx.hash || (ptx.hash && tx.id.includes(ptx.hash))
+    );
+  });
+
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
+      <ItemTrackers />
       {!hideToolbar && (
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
-        <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
-            <div
-              className="flex items-center gap-1 cursor-pointer"
-              onClick={() => setShowSearch((v) => !v)}
-            >
-              <Search size={18} />
-              <span>Search</span>
-            </div>
-            {showSearch && (
-              <div className="absolute left-0 mt-2 z-10 bg-white border rounded shadow p-2">
-                <input
-                  type="text"
-                  placeholder="Search by type, amount, asset, id"
-                  className=" rounded p-1  text-sm w-48 focus:outline-none"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  autoFocus
-                />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
+          <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
+            <div className="relative" ref={searchRef} id="transaction-detail-drawer">
+              <div
+                className="flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowSearch((v) => !v)}
+              >
+                <Search size={18} />
+                <span>Search</span>
               </div>
-            )}
-          </div>
-          <div className="relative" ref={filterRef}>
-            <div
-              className="flex items-center gap-1 cursor-pointer"
-              onClick={() => setShowFilter((v) => !v)}
-            >
-              <ListFilter size={18} />
-              <span>Filter</span>
+              {showSearch && (
+                <div className="absolute left-0 mt-2 z-10 bg-white border rounded shadow p-2">
+                  <input
+                    type="text"
+                    placeholder="Search by type, amount, asset, id"
+                    className=" rounded p-1  text-sm w-48 focus:outline-none"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
             </div>
+            <div className="relative" ref={filterRef}>
+              <div
+                className="flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowFilter((v) => !v)}
+              >
+                <ListFilter size={18} />
+                <span>Filter</span>
+              </div>
 
-            {/*  */}
-            {showFilter && (
-              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
-                {statusOptions.map((opt) => (
+              {showFilter && (
+                <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
+                  {statusOptions.map((opt) => (
+                    <button
+                      key={opt}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                        status === opt ? "font-bold text-primary-700" : ""
+                      }`}
+                      onClick={() => {
+                        setStatus(opt);
+                        setShowFilter(false);
+                      }}
+                      type="button"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={sortRef}>
+              <div
+                className="flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowSort((v) => !v)}
+              >
+                <ChevronsUpDown size={18} />
+                <span>Sort</span>
+              </div>
+
+              {showSort && (
+                <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                   <button
-                    key={opt}
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                      status === opt ? "font-bold text-primary-700" : ""
+                      sortBy === "date" ? "font-bold text-primary-700" : ""
                     }`}
                     onClick={() => {
-                      setStatus(opt);
-                      setShowFilter(false);
+                      setSortBy("date");
+                      setShowSort(false);
                     }}
                     type="button"
                   >
-                    {opt}
+                    Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="relative" ref={sortRef}>
-            <div
-              className="flex items-center gap-1 cursor-pointer"
-              onClick={() => setShowSort((v) => !v)}
-            >
-              <ChevronsUpDown size={18} />
-              <span>Sort</span>
+                  <button
+                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                      sortBy === "amount" ? "font-bold text-primary-700" : ""
+                    }`}
+                    onClick={() => {
+                      setSortBy("amount");
+                      setShowSort(false);
+                    }}
+                    type="button"
+                  >
+                    Amount{" "}
+                    {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
+                  </button>
+                  <button
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                    onClick={() => {
+                      setSortDir(sortDir === "asc" ? "desc" : "asc");
+                    }}
+                    type="button"
+                  >
+                    Toggle Direction
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
 
-            {/*  */}
-            {showSort && (
-              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
-                <button
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    sortBy === "date" ? "font-bold text-primary-700" : ""
-                  }`}
-                  onClick={() => {
-                    setSortBy("date");
-                    setShowSort(false);
-                  }}
-                  type="button"
-                >
-                  Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
-                </button>
-                <button
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    sortBy === "amount" ? "font-bold text-primary-700" : ""
-                  }`}
-                  onClick={() => {
-                    setSortBy("amount");
-                    setShowSort(false);
-                  }}
-                  type="button"
-                >
-                  Amount{" "}
-                  {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
-                </button>
-                <button
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                  onClick={() => {
-                    setSortDir(sortDir === "asc" ? "desc" : "asc");
-                  }}
-                  type="button"
-                >
-                  Toggle Direction
-                </button>
-              </div>
-            )}
+          <div className="hidden md:flex gap-2 items-center mt-2 sm:mt-0 text-black/40">
+            <DatePicker
+              selected={dateFromObj}
+              onChange={(date: Date | null) => {
+                setDateFromObj(date);
+                setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
+              }}
+              customInput={
+                <CustomDateInput
+                  value={dateFromObj ? format(dateFromObj, "MM-dd-yyyy") : ""}
+                  placeholder="MM-DD-YYYY"
+                  icon={<CalendarDays size={16} />}
+                  onClick={() => {}}
+                />
+              }
+              dateFormat="MM-dd-yyyy"
+              className="w-[140px] placeholder:text-sm"
+              maxDate={new Date()}
+              isClearable
+              placeholderText="MM-DD-YYYY"
+            />
+            <span className="text-gray-400 text-sm">to</span>
+            <DatePicker
+              selected={dateToObj}
+              onChange={(date: Date | null) => {
+                setDateToObj(date);
+                setDateTo(date ? format(date, "yyyy-MM-dd") : "");
+              }}
+              customInput={
+                <CustomDateInput
+                  value={dateToObj ? format(dateToObj, "MM-dd-yyyy") : ""}
+                  placeholder="MM-DD-YYYY"
+                  icon={<CalendarDays size={16} />}
+                  onClick={() => {}}
+                />
+              }
+              dayClassName={(date) => {
+                if (date < new Date()) {
+                  return "text-gray-400";
+                }
+                return "";
+              }}
+              dateFormat="MM-dd-yyyy"
+              className="w-[140px] placeholder:text-sm"
+              maxDate={new Date()}
+              isClearable
+              placeholderText="MM-DD-YYYY"
+            />
           </div>
         </div>
-
-        <div className="hidden md:flex gap-2 items-center mt-2 sm:mt-0 text-black/40">
-          <DatePicker
-            selected={dateFromObj}
-            onChange={(date: Date | null) => {
-              setDateFromObj(date);
-              setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
-            }}
-            customInput={
-              <CustomDateInput
-                value={dateFromObj ? format(dateFromObj, "MM-dd-yyyy") : ""}
-                placeholder="MM-DD-YYYY"
-                icon={<CalendarDays size={16} />}
-                onClick={() => {}}
-              />
-            }
-            dateFormat="MM-dd-yyyy"
-            className="w-[140px] placeholder:text-sm"
-            maxDate={new Date()}
-            isClearable
-            placeholderText="MM-DD-YYYY"
-          />
-          <span className="text-gray-400 text-sm">to</span>
-          <DatePicker
-            selected={dateToObj}
-            onChange={(date: Date | null) => {
-              setDateToObj(date);
-              setDateTo(date ? format(date, "yyyy-MM-dd") : "");
-            }}
-            customInput={
-              <CustomDateInput
-                value={dateToObj ? format(dateToObj, "MM-dd-yyyy") : ""}
-                placeholder="MM-DD-YYYY"
-                icon={<CalendarDays size={16} />}
-                onClick={() => {}}
-              />
-            }
-            dayClassName={(date) => {
-              if (date < new Date()) {
-                return "text-gray-400";
-              }
-              return "";
-            }}
-            dateFormat="MM-dd-yyyy"
-            className="w-[140px] placeholder:text-sm"
-            maxDate={new Date()}
-            isClearable
-            placeholderText="MM-DD-YYYY"
-          />
-        </div>
-      </div>
       )}
 
       <div className="">
         {loading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : transactions.length === 0 ? (
+        ) : transactions.length === 0 && activePendingRows.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -512,6 +544,58 @@ export const Transactions = ({
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Optimistic Pending Rows */}
+                    {activePendingRows.map((ptx) => {
+                      const now = new Date();
+                      const pDate = ptx.date || format(now, "yyyy-MM-dd");
+                      let h = now.getHours();
+                      const m = now.getMinutes();
+                      const ampm = h >= 12 ? "PM" : "AM";
+                      h = h % 12 || 12;
+                      const pTime =
+                        ptx.time ||
+                        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
+
+                      return (
+                        <tr
+                          key={ptx.hash}
+                          data-testid={`pending-row-${ptx.hash}`}
+                          className="border-b border-amber-200 bg-amber-50/50 whitespace-nowrap hover:bg-amber-50/70 transition text-black font-semibold"
+                        >
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-black">{ptx.type}</div>
+                            <div className="text-sm font-normal text-[#667185]">
+                              #{ptx.hash}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {ptx.amount > 0
+                              ? `+$${ptx.amount}`
+                              : `-$${Math.abs(ptx.amount)}`}
+                          </td>
+                          <td className="py-6 px-4 flex items-center gap-2">
+                            <Image
+                              src={`/icons/${ptx.asset.toLowerCase()}.svg`}
+                              alt={ptx.asset}
+                              width={24}
+                              height={24}
+                              className="inline-block"
+                            />
+                            <span className="ml-1 font-medium ">{ptx.asset}</span>
+                          </td>
+                          <td className="py-3 px-4 ">
+                            {formatDateTime(pDate, pTime)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <StatusBadge variant="pending" label="Processing" />
+                          </td>
+                          <td className="py-3 px-4 text-gray-400 italic text-xs">
+                            In-flight...
+                          </td>
+                        </tr>
+                      );
+                    })}
+
                     {shouldVirtualize && topSpacerHeight > 0 && (
                       <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
                         <td colSpan={6} />
@@ -539,7 +623,7 @@ export const Transactions = ({
                       </tr>
                     )}
 
-                    {!shouldVirtualize && transactions.length === 0 && !loading && (
+                    {!shouldVirtualize && transactions.length === 0 && activePendingRows.length === 0 && !loading && (
                       <tr>
                         <td colSpan={6} className="text-center py-6">
                           No transactions found.
@@ -553,19 +637,167 @@ export const Transactions = ({
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {visibleTransactions.map((txn, idx) => {
-                const actualIndex = startIndex + idx;
+              {/* Optimistic Pending Mobile Cards */}
+              {activePendingRows.map((ptx) => {
+                const now = new Date();
+                const pDate = ptx.date || format(now, "yyyy-MM-dd");
+                let h = now.getHours();
+                const m = now.getMinutes();
+                const ampm = h >= 12 ? "PM" : "AM";
+                h = h % 12 || 12;
+                const pTime =
+                  ptx.time ||
+                  `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
+
                 return (
-                  <MobileRowComponent
-                    key={txn.id ?? actualIndex}
-                    txn={txn}
-                    isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
-                    onSelectTxn={handleSelectTxn}
-                  />
+                  <div
+                    key={ptx.hash}
+                    data-testid={`pending-card-${ptx.hash}`}
+                    className="p-4 border border-amber-200 rounded-xl bg-amber-50/40 shadow-sm transition-shadow"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-1">
+                          Type (Pending)
+                        </span>
+                        <div className="font-bold text-gray-900">{ptx.type}</div>
+                        <div className="text-xs text-gray-500 font-mono">
+                          #{ptx.hash}
+                        </div>
+                      </div>
+                      <StatusBadge variant="pending" label="Processing" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-amber-100">
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                          Asset
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Image
+                            src={`/icons/${ptx.asset.toLowerCase()}.svg`}
+                            alt={ptx.asset}
+                            width={20}
+                            height={20}
+                          />
+                          <span className="font-bold text-gray-900">
+                            {ptx.asset}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                          Amount
+                        </span>
+                        <div
+                          className={`font-mono font-bold text-base ${
+                            ptx.amount > 0 ? "text-green-600" : "text-gray-900"
+                          }`}
+                        >
+                          {ptx.amount > 0
+                            ? `+$${ptx.amount}`
+                            : `-$${Math.abs(ptx.amount)}`}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-amber-100 flex justify-between items-center">
+                      <div>
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                          Date & Time
+                        </span>
+                        <div className="text-sm text-gray-700">
+                          {formatDateTime(pDate, pTime)}
+                        </div>
+                      </div>
+                      <span className="text-xs text-amber-700 italic">
+                        In-flight...
+                      </span>
+                    </div>
+                  </div>
                 );
               })}
 
-              {transactions.length === 0 && !loading && (
+              {/* Confirmed Mobile Cards */}
+              {visibleTransactions.map((txn, idx) => (
+                <div
+                  key={txn.id ?? startIndex + idx}
+                  className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Type
+                      </span>
+                      <div className="font-bold text-gray-900">{txn.type}</div>
+                      <div className="text-xs text-gray-500 font-mono">
+                        #{txn.id}
+                      </div>
+                    </div>
+                    <StatusBadge
+                      variant={transactionStatusToVariant(txn.status)}
+                      label={txn.status}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Asset
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                          alt={txn.asset}
+                          width={20}
+                          height={20}
+                        />
+                        <span className="font-bold text-gray-900">
+                          {txn.asset}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Amount
+                      </span>
+                      <div
+                        className={`font-mono font-bold text-base ${
+                          txn.amount > 0 ? "text-green-600" : "text-gray-900"
+                        }`}
+                      >
+                        {txn.amount > 0
+                          ? `+$${txn.amount}`
+                          : `-$${Math.abs(txn.amount)}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Date & Time
+                      </span>
+                      <div className="text-sm text-gray-700">
+                        {formatDateTime(txn.date, txn.time)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedTxn(txn);
+                        setIsDetailOpen(true);
+                      }}
+                      className="mt-2 text-blue-600 hover:underline"
+                      aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                      aria-controls="transaction-detail-drawer"
+                    >
+                      Details
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {transactions.length === 0 && activePendingRows.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
@@ -573,7 +805,6 @@ export const Transactions = ({
             </div>
           </>
         )}
-
 
         <div className="">
           {showPagination && totalCount > 0 && (

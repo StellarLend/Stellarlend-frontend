@@ -18,6 +18,37 @@ const mockFetchTransactions = vi.hoisted(() =>
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
+vi.mock("@/components/features/dashboard/components/TransactionDetail", () => ({
+  default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) =>
+    isOpen ? (
+      <div>
+        <h2>Transaction Details</h2>
+        <button onClick={onClose} aria-label="Close">Close</button>
+      </div>
+    ) : null,
+}));
+
+vi.mock("@headlessui/react", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@headlessui/react")>();
+  return {
+    ...original,
+    Transition: Object.assign(
+      ({ children, show }: { children: React.ReactNode; show?: boolean }) =>
+        show !== false ? <>{children}</> : null,
+      {
+        Child: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+      },
+    ),
+    Dialog: Object.assign(
+      ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      {
+        Panel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+        Title: ({ children, className }: { children: React.ReactNode; className?: string }) => <h2 className={className}>{children}</h2>,
+      },
+    ),
+  };
+});
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => "/",
@@ -53,7 +84,6 @@ vi.mock("@/types/Transaction", async (importOriginal) => {
 describe("Transactions Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Re-assert the resolved value after clearAllMocks resets it
     mockFetchTransactions.mockResolvedValue({
       transactions: [
         { id: "TXN-001", type: "Deposit",    amount: 100,  asset: "XLM",  date: "2024-04-01", time: "10:00AM", status: "Completed" },
@@ -62,6 +92,31 @@ describe("Transactions Component", () => {
       ],
       total: 3,
     });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/api/transactions/")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              transaction: {
+                id: "TXN-001",
+                type: "Deposit",
+                amount: 100,
+                asset: "XLM",
+                date: "2024-04-01",
+                time: "10:00AM",
+                status: "Completed",
+              },
+            }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ status: "PENDING" }),
+        });
+      }),
+    );
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
   });
 
