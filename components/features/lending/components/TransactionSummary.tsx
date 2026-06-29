@@ -6,16 +6,14 @@ interface TransactionSummaryProps {
   type: 'lend' | 'borrow' | 'repay' | 'withdraw';
 }
 
-export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const [toast, setToast] = useState<{
-    variant: 'success' | 'error';
-    title: string;
-    description: string;
-  } | null>(null);
+import { useCurrencyPreference } from '@/context/CurrencyContext';
+import { formatCurrency } from '@/lib/utils/format';
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return `${formatCurrencyUtil(amount, 4)} ${currency}`;
+export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
+  const { currency } = useCurrencyPreference();
+
+  const formatValue = (amount: number) => {
+    return formatCurrency(amount, 4, currency);
   };
 
   const formatDate = (daysFromNow: number) => {
@@ -228,7 +226,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
             </span>
           </div>
           <div className="text-2xl font-bold text-gray-900">
-            {formatCurrency(data.amount, data.asset)}
+            {formatValue(data.amount)}
           </div>
         </div>
 
@@ -278,7 +276,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount</span>
                 <span className="font-medium">
-                  {formatCurrency(data.collateralAmount, data.collateral)}
+                  {formatValue(data.collateralAmount)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -301,19 +299,19 @@ export default function TransactionSummary({ data, calculation, type }: Transact
                 <div className="flex justify-between">
                   <span className="text-gray-600">Daily Earnings</span>
                   <span className="font-medium text-green-600">
-                    +{formatCurrency(calculation.dailyEarnings, data.asset)}
+                    +{formatValue(calculation.dailyEarnings)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Earnings</span>
                   <span className="font-semibold text-green-600">
-                    +{formatCurrency(calculation.totalEarnings, data.asset)}
+                    +{formatValue(calculation.totalEarnings)}
                   </span>
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="font-medium">Total Return</span>
                   <span className="font-semibold text-lg">
-                    {formatCurrency(data.amount + calculation.totalEarnings, data.asset)}
+                    {formatValue(data.amount + calculation.totalEarnings)}
                   </span>
                 </div>
               </div>
@@ -323,21 +321,21 @@ export default function TransactionSummary({ data, calculation, type }: Transact
                   <div className="flex justify-between">
                     <span className="text-gray-600">Monthly Payment</span>
                     <span className="font-medium text-blue-600">
-                      {formatCurrency(calculation.monthlyPayment, data.asset)}
+                      {formatValue(calculation.monthlyPayment)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Interest</span>
                   <span className="font-medium text-red-500">
-                    {formatCurrency(calculation.totalEarnings, data.asset)}
+                    {formatValue(calculation.totalEarnings)}
                   </span>
                 </div>
                 {calculation.totalRepayment && (
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-medium">Total Repayment</span>
                     <span className="font-semibold text-lg">
-                      {formatCurrency(calculation.totalRepayment, data.asset)}
+                      {formatValue(calculation.totalRepayment)}
                     </span>
                   </div>
                 )}
@@ -359,15 +357,15 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <tbody>
                 <tr>
                   <td className="px-2 py-1">Principal</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(data.amount, data.asset)}</td>
+                  <td className="px-2 py-1 text-right">{formatValue(data.amount)}</td>
                 </tr>
                 <tr>
                   <td className="px-2 py-1">Total Interest</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalEarnings, data.asset)}</td>
+                  <td className="px-2 py-1 text-right">{formatValue(calculation.totalEarnings)}</td>
                 </tr>
                 <tr className="font-medium border-t border-gray-200">
                   <td className="px-2 py-1">Total Repayment</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalRepayment, data.asset)}</td>
+                  <td className="px-2 py-1 text-right">{formatValue(calculation.totalRepayment)}</td>
                 </tr>
               </tbody>
             </table>
@@ -396,7 +394,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Repaid</span>
                 <span className="font-medium text-orange-600">
-                  {formatCurrency(data.amount, data.asset)}
+                  {formatValue(data.amount)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -404,7 +402,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
                 <span className="font-medium">
                   {(data.remainingDebt ?? 0) === 0
                     ? <span className="text-green-600">Debt cleared</span>
-                    : formatCurrency(data.remainingDebt ?? 0, data.asset)}
+                    : formatValue(data.remainingDebt ?? 0)}
                 </span>
               </div>
               <div className="flex justify-between border-t pt-2">
@@ -429,13 +427,13 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Redeemed</span>
                 <span className="font-medium text-purple-600">
-                  {formatCurrency(data.amount, data.asset)}
+                  {formatValue(data.amount)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Remaining Supply</span>
                 <span className="font-medium">
-                  {formatCurrency(data.remainingDebt ?? 0, data.asset)}
+                  {formatValue(data.remainingDebt ?? 0)}
                 </span>
               </div>
               {(data.outstandingDebt ?? 0) > 0 && (

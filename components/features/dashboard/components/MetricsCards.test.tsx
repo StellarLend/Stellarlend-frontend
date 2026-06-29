@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act } from "@testing-library/react";
+import { render } from "@/test/test-utils";
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
 
 vi.mock("@/lib/utils/clipboard", () => ({
