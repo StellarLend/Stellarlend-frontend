@@ -106,11 +106,6 @@ export const Transactions = ({
   const viewportHeight = viewportHeightProp;
   const overscan = 4;
 
-  const transactionsRef = useRef(transactions);
-  useEffect(() => {
-    transactionsRef.current = transactions;
-  }, [transactions]);
-
   useEffect(() => {
     setCurrentPage(1);
   }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
