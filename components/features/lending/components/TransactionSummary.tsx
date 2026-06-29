@@ -3,6 +3,7 @@ import { Copy } from 'lucide-react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
 import { copyToClipboard } from '@/lib/utils/clipboard';
 import { Toast } from '@/components/shared/common';
+import { formatCurrency as formatCurrencyUtil } from '@/lib/utils/format';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -19,10 +20,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
   } | null>(null);
 
   const formatCurrency = (amount: number, currency: string) => {
-    return `${amount.toLocaleString(undefined, { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 4 
-    })} ${currency}`;
+    return `${formatCurrencyUtil(amount, 4)} ${currency}`;
   };
 
   const formatDate = (daysFromNow: number) => {
