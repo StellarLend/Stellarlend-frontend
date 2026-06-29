@@ -12,6 +12,13 @@ export interface Transaction {
   status: TransactionStatus;
 }
 
+export interface InFlightTx {
+  hash: string;
+  type: TransactionType;
+  amount: number;
+  asset: AssetSymbol;
+}
+
 export type FetchTransactionsOptions = {
   page?: number;
   pageSize?: number;

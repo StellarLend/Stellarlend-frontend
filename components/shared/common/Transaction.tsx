@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import {
   Search,
   ArrowRight,
@@ -62,6 +62,7 @@ export interface TransactionsProps {
   rowComponent?: React.ComponentType<TransactionRowProps>;
   mobileRowComponent?: React.ComponentType<TransactionMobileRowProps>;
   transactions?: Transaction[];
+  pendingTx?: Transaction;
 }
 
 export const Transactions = ({
@@ -74,6 +75,7 @@ export const Transactions = ({
   rowComponent: RowComponent = TransactionRow,
   mobileRowComponent: MobileRowComponent = TransactionMobileRow,
   transactions: controlledTransactions,
+  pendingTx,
 }: TransactionsProps) => {
   const [internalTransactions, setInternalTransactions] = useState<Transaction[]>([]);
   const transactions = controlledTransactions ?? internalTransactions;
@@ -160,29 +162,41 @@ export const Transactions = ({
     }
   }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
 
-  const shouldVirtualize = transactions.length > 20;
+  const displayTransactions = useMemo(() => {
+    if (!pendingTx) return transactions;
+    const isDuplicate = transactions.some(
+      (t) =>
+        t.type === pendingTx.type &&
+        t.amount === pendingTx.amount &&
+        t.asset === pendingTx.asset
+    );
+    if (isDuplicate) return transactions;
+    return [pendingTx, ...transactions];
+  }, [pendingTx, transactions]);
+
+  const shouldVirtualize = displayTransactions.length > 20;
   const visibleRowCount = shouldVirtualize
-    ? Math.min(transactions.length, Math.max(10, Math.ceil(viewportHeight / rowHeight)))
-    : transactions.length;
-  const virtualizerHeight = shouldVirtualize ? viewportHeight : transactions.length * rowHeight;
+    ? Math.min(displayTransactions.length, Math.max(10, Math.ceil(viewportHeight / rowHeight)))
+    : displayTransactions.length;
+  const virtualizerHeight = shouldVirtualize ? viewportHeight : displayTransactions.length * rowHeight;
 
   const { startIndex, endIndex } = useMemo(() => {
     if (!shouldVirtualize) {
-      return { startIndex: 0, endIndex: transactions.length };
+      return { startIndex: 0, endIndex: displayTransactions.length };
     }
 
     const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
-    const end = Math.min(transactions.length, start + visibleRowCount + overscan * 2);
+    const end = Math.min(displayTransactions.length, start + visibleRowCount + overscan * 2);
     return { startIndex: start, endIndex: end };
-  }, [shouldVirtualize, transactions.length, scrollTop, rowHeight, visibleRowCount]);
+  }, [shouldVirtualize, displayTransactions.length, scrollTop, rowHeight, visibleRowCount]);
 
   const visibleTransactions = useMemo(() => {
-    return transactions.slice(startIndex, endIndex);
-  }, [transactions, startIndex, endIndex]);
+    return displayTransactions.slice(startIndex, endIndex);
+  }, [displayTransactions, startIndex, endIndex]);
 
   const topSpacerHeight = shouldVirtualize ? startIndex * rowHeight : 0;
   const bottomSpacerHeight = shouldVirtualize
-    ? Math.max(0, transactions.length - endIndex) * rowHeight
+    ? Math.max(0, displayTransactions.length - endIndex) * rowHeight
     : 0;
 
   const focusRow = useCallback(
@@ -304,6 +318,8 @@ export const Transactions = ({
   });
   CustomDateInput.displayName = "CustomDateInput";
 
+  const isPendingRow = (txn: Transaction) => pendingTx && txn.id === pendingTx.id;
+
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       {!hideToolbar && (
@@ -339,7 +355,6 @@ export const Transactions = ({
               <span>Filter</span>
             </div>
 
-            {/*  */}
             {showFilter && (
               <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 {statusOptions.map((opt) => (
@@ -369,7 +384,6 @@ export const Transactions = ({
               <span>Sort</span>
             </div>
 
-            {/*  */}
             {showSort && (
               <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 <button
@@ -466,7 +480,7 @@ export const Transactions = ({
       <div className="">
         {loading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : transactions.length === 0 ? (
+        ) : displayTransactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -486,7 +500,7 @@ export const Transactions = ({
                 style={{ maxHeight: `${viewportHeight}px`, height: `${virtualizerHeight}px` }}
                 onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
               >
-                <table className="min-w-full text-sm border" aria-rowcount={transactions.length + 1}>
+                <table className="min-w-full text-sm border" aria-rowcount={displayTransactions.length + 1}>
                   <thead className="sticky top-0 z-10 bg-gray-50">
                     <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
                       <th className="py-3 px-4 text-left font-semibold">
@@ -507,13 +521,15 @@ export const Transactions = ({
                     )}
                     {visibleTransactions.map((txn, idx) => {
                       const actualIndex = startIndex + idx;
+                      const isPending = isPendingRow(txn);
                       return (
                         <RowComponent
-                          key={txn.id ?? actualIndex}
+                          key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                           txn={txn}
                           actualIndex={actualIndex}
                           isFocused={focusedRowIndex === actualIndex}
                           isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          isPending={isPending}
                           onFocusRow={handleFocusRow}
                           onKeyDownRow={handleRowKeyDown}
                           onSelectTxn={handleSelectTxn}
@@ -527,7 +543,7 @@ export const Transactions = ({
                       </tr>
                     )}
 
-                    {!shouldVirtualize && transactions.length === 0 && !loading && (
+                    {!shouldVirtualize && displayTransactions.length === 0 && !loading && (
                       <tr>
                         <td colSpan={6} className="text-center py-6">
                           No transactions found.
@@ -543,17 +559,19 @@ export const Transactions = ({
             <div className="md:hidden space-y-4">
               {visibleTransactions.map((txn, idx) => {
                 const actualIndex = startIndex + idx;
+                const isPending = isPendingRow(txn);
                 return (
                   <MobileRowComponent
-                    key={txn.id ?? actualIndex}
+                    key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                     txn={txn}
                     isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                    isPending={isPending}
                     onSelectTxn={handleSelectTxn}
                   />
                 );
               })}
 
-              {transactions.length === 0 && !loading && (
+              {displayTransactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>

@@ -1,11 +1,47 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import React from "react";
+import React, { useMemo } from "react";
 import { Transactions, type TransactionsProps } from "./Transaction";
 import { TransactionRow, TransactionMobileRow } from "./TransactionRow";
+import useTxStatus from "@/lib/tx/useTxStatus";
+import { TX_HOOK_STATE } from "@/lib/tx/constants";
+import type { InFlightTx, Transaction } from "@/types/Transaction";
 
-export const RecentTransactions = (props?: Partial<TransactionsProps>) => {
+export interface RecentTransactionsProps extends Partial<TransactionsProps> {
+  inFlightTx?: InFlightTx;
+}
+
+export const RecentTransactions = ({ inFlightTx, ...props }: RecentTransactionsProps) => {
+  const txStatus = useTxStatus(inFlightTx?.hash ?? null);
+
+  const pendingTx: Transaction | undefined = useMemo(() => {
+    if (!inFlightTx || !txStatus) return undefined;
+
+    if (txStatus.state === TX_HOOK_STATE.COMPLETED) return undefined;
+
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const hours = now.getHours();
+    const minutes = now.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const h = hours % 12 || 12;
+    const time = `${h.toString().padStart(2, "0")}:${minutes}${ampm}`;
+
+    const status =
+      txStatus.state === TX_HOOK_STATE.FAILED ? "Failed" : "Processing";
+
+    return {
+      id: inFlightTx.hash.slice(0, 8),
+      type: inFlightTx.type,
+      amount: inFlightTx.amount,
+      asset: inFlightTx.asset,
+      date,
+      time,
+      status: status as "Processing" | "Failed",
+    };
+  }, [inFlightTx, txStatus]);
+
   return (
     <section className="bg-white rounded-xl shadow h-full">
       <div className="flex items-center justify-between px-6 md:px-12 pt-6 pb-2">
@@ -19,6 +55,7 @@ export const RecentTransactions = (props?: Partial<TransactionsProps>) => {
         infiniteScroll
         rowComponent={TransactionRow}
         mobileRowComponent={TransactionMobileRow}
+        pendingTx={pendingTx}
         {...props}
       />
     </section>
