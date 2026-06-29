@@ -1,8 +1,17 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { afterEach, beforeEach, vi } from "vitest";
 import { useWallet } from "@/hooks/useWallet";
+
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => routerMock,
+}));
 
 vi.mock("@/components/shared/layout/NotificationBell", () => ({
   default: () => <button type="button" aria-label="View notifications" />,
@@ -10,15 +19,19 @@ vi.mock("@/components/shared/layout/NotificationBell", () => ({
 
 vi.mock("@/components/molecules/SearchBar", () => ({
   SearchBar: ({ placeholder }: { placeholder: string }) => (
-    <input aria-label={placeholder} placeholder={placeholder} />
+    <input aria-label={placeholder} />
   ),
 }));
 
-vi.mock("@/hooks/useWallet", () => ({
-  useWallet: vi.fn(),
-}));
-
 import TopNav from "./TopNav";
+
+const TEST_ADDRESS = "GABCD1234567890EFGH";
+
+const mockSessionResponse = (walletAddress: string | null = TEST_ADDRESS) => ({
+  ok: Boolean(walletAddress),
+  json: async () =>
+    walletAddress ? { session: { user: { walletAddress } } } : {},
+});
 
 const renderTopNav = () =>
   render(
@@ -27,33 +40,24 @@ const renderTopNav = () =>
     </SidebarProvider>,
   );
 
-const mockUseWallet = vi.mocked(useWallet);
-const connectedAddress =
-  "GABCDEFGHIJKLMNOPQRSTUVWXYZ234567890123456789012345678901234";
+const renderConnectedTopNav = async () => {
+  sessionStorage.setItem("walletAddress", TEST_ADDRESS);
+  vi.mocked(fetch).mockResolvedValue(mockSessionResponse());
 
-function setWalletState(overrides: Partial<ReturnType<typeof useWallet>> = {}) {
-  mockUseWallet.mockReturnValue({
-    address: null,
-    network: "TESTNET",
-    status: "disconnected",
-    error: null,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    ...overrides,
-  });
-}
+  const view = renderTopNav();
+  await screen.findByRole("button", { name: /connected wallet/i });
+  return view;
+};
 
 describe("TopNav Accessibility", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
-    setWalletState();
+    routerMock.push.mockReset();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({}),
-      }),
+      vi.fn().mockResolvedValue(mockSessionResponse(null)),
     );
+    delete window.stellar;
   });
 
   afterEach(() => {
@@ -161,121 +165,169 @@ describe("TopNav Accessibility", () => {
     });
   });
 
-  it("shows a not-connected balance summary without fetching", () => {
-    renderTopNav();
+  it("opens the account menu with menu semantics without focusing the destructive action first", async () => {
+    const user = userEvent.setup();
+    await renderConnectedTopNav();
 
-    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
+    const walletButton = screen.getByRole("button", {
+      name: /connected wallet/i,
+    });
+    await user.click(walletButton);
 
-    expect(
-      screen.getByRole("dialog", { name: /wallet balance summary/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Not connected.")).toBeInTheDocument();
-    expect(fetch).not.toHaveBeenCalled();
+    const menu = await screen.findByRole("menu", {
+      name: /connected wallet actions/i,
+    });
+    const disconnectItem = within(menu).getByRole("menuitem", {
+      name: /disconnect wallet/i,
+    });
+
+    expect(walletButton).toHaveAttribute("aria-expanded", "true");
+    expect(walletButton).toHaveAttribute("aria-controls", "topnav-wallet-menu");
+    await waitFor(() => expect(menu).toHaveFocus());
+    expect(disconnectItem).not.toHaveFocus();
   });
 
-  it("loads and renders connected wallet balances with registry decimals", async () => {
-    setWalletState({
-      address: connectedAddress,
-      status: "connected",
+  it("traps Tab focus inside the open account menu", async () => {
+    const user = userEvent.setup();
+    await renderConnectedTopNav();
+
+    await user.click(screen.getByRole("button", { name: /connected wallet/i }));
+
+    const menu = await screen.findByRole("menu", {
+      name: /connected wallet actions/i,
     });
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        balances: [
-          { asset_type: "native", balance: "0.0000000" },
-          {
-            asset_type: "credit_alphanum4",
-            asset_code: "USDC",
-            balance: "1234567.123456",
-          },
-        ],
-      }),
-    } as Response);
+    const disconnectItem = within(menu).getByRole("menuitem", {
+      name: /disconnect wallet/i,
+    });
+    await waitFor(() => expect(menu).toHaveFocus());
 
-    renderTopNav();
-    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
+    await user.tab();
+    expect(disconnectItem).toHaveFocus();
 
-    expect(screen.getByRole("status")).toHaveTextContent("Loading balances...");
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining(`/accounts/${connectedAddress}`),
-    );
-    expect(await screen.findByText("XLM")).toBeInTheDocument();
-    expect(screen.getByText("0.0000000")).toBeInTheDocument();
-    expect(screen.getByText("USDC")).toBeInTheDocument();
-    expect(screen.getByText("1,234,567.123456")).toBeInTheDocument();
+    await user.tab();
+    expect(disconnectItem).toHaveFocus();
+
+    await user.tab({ shift: true });
+    expect(disconnectItem).toHaveFocus();
   });
 
-  it("shows unknown asset metadata and grouped large balances", async () => {
-    setWalletState({
-      address: connectedAddress,
-      status: "connected",
+  it("closes on Escape and restores focus to the wallet trigger", async () => {
+    const user = userEvent.setup();
+    await renderConnectedTopNav();
+
+    const walletButton = screen.getByRole("button", {
+      name: /connected wallet/i,
     });
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        balances: [
-          {
-            asset_type: "credit_alphanum4",
-            asset_code: "DOGE",
-            balance: "987654321.1234567",
-          },
-        ],
-      }),
-    } as Response);
-
-    renderTopNav();
-    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
-
-    expect(await screen.findByText("DOGE")).toBeInTheDocument();
-    expect(screen.getByText(/Unknown asset/)).toBeInTheDocument();
-    expect(screen.getByText(/unregistered/)).toBeInTheDocument();
-    expect(screen.getByText("987,654,321.1234567")).toBeInTheDocument();
-  });
-
-  it("shows a non-blocking error state when the balance fetch fails", async () => {
-    setWalletState({
-      address: connectedAddress,
-      status: "connected",
+    await user.click(walletButton);
+    const menu = await screen.findByRole("menu", {
+      name: /connected wallet actions/i,
     });
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({}),
-    } as Response);
+    await waitFor(() => expect(menu).toHaveFocus());
 
-    renderTopNav();
-    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Could not load balances",
-    );
-    expect(
-      screen.getByRole("button", { name: /connected wallet/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("closes the balance summary with Escape and restores focus", async () => {
-    setWalletState({
-      address: connectedAddress,
-      status: "connected",
-    });
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ balances: [] }),
-    } as Response);
-
-    renderTopNav();
-    const trigger = screen.getByRole("button", { name: /wallet balances/i });
-    fireEvent.click(trigger);
-
-    expect(
-      await screen.findByRole("dialog", { name: /wallet balance summary/i }),
-    ).toBeInTheDocument();
-
-    fireEvent.keyDown(document, { key: "Escape" });
+    await user.keyboard("{Escape}");
 
     await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole("menu", { name: /connected wallet actions/i }),
+      ).not.toBeInTheDocument(),
     );
-    expect(trigger).toHaveFocus();
+    expect(walletButton).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(walletButton).toHaveFocus());
+  });
+
+  it("closes on outside click and restores the collapsed ARIA state", async () => {
+    const user = userEvent.setup();
+    await renderConnectedTopNav();
+
+    const walletButton = screen.getByRole("button", {
+      name: /connected wallet/i,
+    });
+    const networkButton = screen.getByRole("button", {
+      name: /select network/i,
+    });
+
+    await user.click(walletButton);
+    expect(
+      await screen.findByRole("menu", { name: /connected wallet actions/i }),
+    ).toBeInTheDocument();
+
+    await user.click(networkButton);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("menu", { name: /connected wallet actions/i }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(walletButton).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("supports rapid trigger open and close without leaving stale menu state", async () => {
+    const user = userEvent.setup();
+    await renderConnectedTopNav();
+
+    const walletButton = screen.getByRole("button", {
+      name: /connected wallet/i,
+    });
+
+    await user.click(walletButton);
+    expect(
+      await screen.findByRole("menu", { name: /connected wallet actions/i }),
+    ).toBeInTheDocument();
+
+    await user.click(walletButton);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("menu", { name: /connected wallet actions/i }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(walletButton).toHaveAttribute("aria-expanded", "false");
+    expect(walletButton).toHaveFocus();
+  });
+
+  it("disconnects from the menu without restoring focus to the removed wallet trigger", async () => {
+    const user = userEvent.setup();
+    await renderConnectedTopNav();
+
+    await user.click(screen.getByRole("button", { name: /connected wallet/i }));
+    const menu = await screen.findByRole("menu", {
+      name: /connected wallet actions/i,
+    });
+    const disconnectItem = within(menu).getByRole("menuitem", {
+      name: /disconnect wallet/i,
+    });
+
+    await user.click(disconnectItem);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("menu", { name: /connected wallet actions/i }),
+      ).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /connected wallet/i }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(sessionStorage.getItem("walletAddress")).toBeNull();
+  });
+
+  it("renders and invokes the connect wallet action when disconnected", async () => {
+    const user = userEvent.setup();
+    renderTopNav();
+
+    const connectButton = screen.getByRole("button", {
+      name: /connect wallet/i,
+    });
+    expect(connectButton).toHaveTextContent("Connect Wallet");
+    expect(connectButton).toBeEnabled();
+
+    await user.click(connectButton);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("wallet-error")).toHaveTextContent(
+        /not detected/i,
+      ),
+    );
   });
 });
