@@ -12,9 +12,8 @@ class MockEventSource {
 
   url: string;
   onmessage: ((event: MessageEvent) => void) | null = null;
-  onerror: (() => void) | null = null;
-  onopen: (() => void) | null = null;
-  listeners = new Map<string, Set<EventListener>>();
+  onerror: ((event: Event) => void) | null = null;
+  onopen: ((event: Event) => void) | null = null;
   close = vi.fn();
   addEventListener = vi.fn((type: string, listener: EventListener) => {
     const listeners = this.listeners.get(type) ?? new Set<EventListener>();
@@ -174,6 +173,18 @@ describe("useNotificationStream", () => {
     expect(result.current.unreadCount).toBe(0);
   });
 
+  it("reports connected after the stream opens", () => {
+    const { result } = renderHook(() => useNotificationStream());
+
+    expect(result.current.connectionState).toBe("reconnecting");
+
+    act(() => {
+      MockEventSource.instances[0].triggerOpen();
+    });
+
+    expect(result.current.connectionState).toBe("connected");
+  });
+
   it("closes source before scheduling reconnect on error", () => {
     renderHook(() => useNotificationStream());
     const instance = MockEventSource.instances[0];
@@ -193,6 +204,54 @@ describe("useNotificationStream", () => {
       vi.advanceTimersByTime(1);
     });
     expect(MockEventSource.instances).toHaveLength(2);
+  });
+
+  it("debounces brief reconnects to avoid flicker", () => {
+    const { result } = renderHook(() => useNotificationStream());
+
+    act(() => {
+      MockEventSource.instances[0].triggerOpen();
+    });
+    expect(result.current.connectionState).toBe("connected");
+
+    act(() => {
+      MockEventSource.instances[0].triggerError();
+      vi.advanceTimersByTime(1000);
+      MockEventSource.instances[1].triggerOpen();
+    });
+
+    expect(result.current.connectionState).toBe("connected");
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(result.current.connectionState).toBe("connected");
+  });
+
+  it("transitions from connected to reconnecting to offline for a prolonged outage", () => {
+    const { result } = renderHook(() => useNotificationStream());
+
+    act(() => {
+      MockEventSource.instances[0].triggerOpen();
+    });
+    expect(result.current.connectionState).toBe("connected");
+
+    act(() => {
+      MockEventSource.instances[0].triggerError();
+      vi.advanceTimersByTime(1499);
+    });
+    expect(result.current.connectionState).toBe("connected");
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.connectionState).toBe("reconnecting");
+
+    act(() => {
+      vi.advanceTimersByTime(3500);
+    });
+    expect(result.current.connectionState).toBe("offline");
   });
 
   it("reconnects with exponential backoff up to 30s cap", () => {
@@ -285,10 +344,18 @@ describe("useNotificationStream", () => {
     expect(MockEventSource.instances).toHaveLength(3);
   });
 
-  it("unmount closes EventSource and clears pending reconnect timer", () => {
-    const { unmount } = renderHook(() => useNotificationStream());
-    const instance = MockEventSource.instances[0];
+  it("unmount closes EventSource and clears pending reconnect and state timers", () => {
+    const { result, unmount } = renderHook(() => useNotificationStream());
 
+    act(() => {
+      MockEventSource.instances[0].triggerOpen();
+      MockEventSource.instances[0].triggerError();
+      vi.advanceTimersByTime(1499);
+    });
+
+    expect(result.current.connectionState).toBe("connected");
+
+    const instance = MockEventSource.instances[0];
     unmount();
 
     expect(instance.close).toHaveBeenCalledTimes(1);
@@ -296,6 +363,7 @@ describe("useNotificationStream", () => {
     act(() => {
       vi.runAllTimers();
     });
+
     expect(MockEventSource.instances).toHaveLength(1);
   });
 
