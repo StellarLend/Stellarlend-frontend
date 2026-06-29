@@ -75,6 +75,7 @@ export interface SearchBarProps {
    * @default 200
    */
   maxLength?: number;
+
   /**
    * Search results data to display in the live-results dropdown.
    * When provided, a dropdown appears below the input showing
