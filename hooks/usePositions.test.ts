@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { usePositions, mapPositionsResponse } from "./usePositions";
+import {
+  usePositions,
+  mapPositionsResponse,
+  mapSupplyPositionsResponse,
+} from "./usePositions";
 
 describe("mapPositionsResponse", () => {
   it("should return empty array if input is null or undefined", () => {
@@ -59,6 +63,33 @@ describe("mapPositionsResponse", () => {
       healthFactor: 1.8,
       nextDue: "due in 2 days",
     });
+  });
+});
+
+describe("mapSupplyPositionsResponse", () => {
+  it("maps the live /api/positions payload into supply positions", () => {
+    const mockData = {
+      positions: [
+        {
+          asset: "XLM",
+          suppliedFunds: "$5,000.00 XLM",
+          availableBalance: "$3,750.00 XLM",
+          borrowedAmount: "$1,500.00 XLM",
+          healthFactor: 1.5,
+        },
+      ],
+    };
+
+    expect(mapSupplyPositionsResponse(mockData)).toEqual([
+      {
+        id: "supply-XLM-0",
+        asset: "XLM",
+        suppliedAmount: 5000,
+        lockedCollateral: 1250,
+        outstandingDebt: 1500,
+        healthFactor: 1.5,
+      },
+    ]);
   });
 });
 
@@ -135,6 +166,41 @@ describe("usePositions Hook", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.positions).toEqual([]);
+    expect(result.current.supplyPositions).toEqual([]);
     expect(result.current.error).toBeNull();
+  });
+
+  it("should expose supply positions derived from the API response", async () => {
+    const mockResponse = {
+      positions: [
+        {
+          asset: "USDC",
+          suppliedFunds: "$3,000.00 USDC",
+          availableBalance: "$2,000.00 USDC",
+          borrowedAmount: "$0.00 USDC",
+          healthFactor: undefined,
+        },
+      ],
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    const { result } = renderHook(() => usePositions());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.supplyPositions).toEqual([
+      {
+        id: "supply-USDC-0",
+        asset: "USDC",
+        suppliedAmount: 3000,
+        lockedCollateral: 1000,
+        outstandingDebt: 0,
+        healthFactor: undefined,
+      },
+    ]);
   });
 });

@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import useTxStatus from "@/lib/tx/useTxStatus";
 import { Toast } from "@/components/shared/common";
 import LendingForm from "@/components/features/lending/components/LendingForm";
+import { usePositions } from "@/hooks/usePositions";
 import TabSelector from "@/components/features/lending/components/TabSelector";
 import TxProgressStepper, {
   type TxProgressState,
@@ -142,8 +143,8 @@ export default function LendingPage() {
     useState<CalculationResult | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [txProgressState, setTxProgressState] =
-    useState<TxProgressState | null>(null);
+  const { supplyPositions, isLoading: isPositionsLoading, error: positionsError } =
+    usePositions();
   const [toast, setToast] = useState<{
     variant: "processing" | "success" | "error" | "info";
     title?: string;
@@ -374,7 +375,12 @@ export default function LendingPage() {
             ) : activeTab === "repay" ? (
               <RepayForm onSubmit={handleRepaySubmit} />
             ) : (
-              <WithdrawForm onSubmit={handleWithdrawSubmit} />
+              <WithdrawForm
+                onSubmit={handleWithdrawSubmit}
+                positions={supplyPositions}
+                isLoading={isPositionsLoading}
+                error={positionsError}
+              />
             )}
             {txProgressState && (
               <div className="mt-4">
