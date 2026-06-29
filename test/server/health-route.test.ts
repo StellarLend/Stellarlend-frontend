@@ -2,12 +2,15 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { GET } from '@/app/api/health/route';
 import { TimeoutError } from '@/lib/http/errors';
 
-vi.mock('@/lib/http', () => ({
-  httpGet: vi.fn().mockResolvedValue({}),
-  TimeoutError: class TimeoutError extends Error {
-    code = 'TIMEOUT';
-  },
-}));
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/http', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/http')>();
+  return {
+    ...actual,
+    httpGet: vi.fn().mockResolvedValue({}),
+  };
+});
 
 afterEach(() => { vi.restoreAllMocks(); });
 
