@@ -1,6 +1,6 @@
 "use client"
 import ProfileForm from "@/components/features/account/components/ProfileForm";
-import { DataExportButton, PreferencesForm } from "@/components/features/account/components";
+import { DataExportButton, PreferencesForm, AccountDeletion } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
 import { PageHeader } from "@/components/shared/common";
 import { usePathname } from "next/navigation";
@@ -28,10 +28,13 @@ export default function Account() {
               <div className="mt-8 pt-6 border-t border-gray-200">
                 <h3 className="text-lg font-semibold mb-4">Data Export</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Download a copy of your personal data including profile information, 
+                  Download a copy of your personal data including profile information,
                   preferences, and transaction history. This feature is subject to a 24-hour rate limit.
                 </p>
                 <DataExportButton />
+              </div>
+              <div className="mt-8 pt-6 border-t border-red-100">
+                <AccountDeletion />
               </div>
             </>
           )}
