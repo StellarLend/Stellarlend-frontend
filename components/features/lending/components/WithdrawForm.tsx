@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LendingData } from "@/lib/lending/types";
+import type { SupplyPosition as HookSupplyPosition } from "@/hooks/usePositions";
 import { Input } from "@/components/shared/ui/Input";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
@@ -15,19 +16,14 @@ import {
 import { cn } from "@/lib/utils/cn";
 import ConfirmModal from "./ConfirmModal";
 
-export interface SupplyPosition {
-  id: string;
-  asset: string;
-  suppliedAmount: number;
-  lockedCollateral: number;
-  outstandingDebt: number;
-  healthFactor: number;
-}
+export interface SupplyPosition extends HookSupplyPosition {}
 
 interface WithdrawFormProps {
   onSubmit: (data: LendingData) => void;
   positions?: SupplyPosition[];
   initialPositionId?: string;
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
 const DEFAULT_POSITIONS: SupplyPosition[] = [
@@ -56,13 +52,16 @@ const formatAmount = (amount: number, asset: string) =>
   })} ${asset}`;
 
 export function computeWithdrawHealthFactor(
-  currentHealthFactor: number,
+  currentHealthFactor: number | null | undefined,
   suppliedAmount: number,
   withdrawAmount: number,
   outstandingDebt: number,
 ): number {
-  if (outstandingDebt <= 0) return currentHealthFactor;
+  if (outstandingDebt <= 0) return currentHealthFactor ?? 0;
   if (suppliedAmount <= 0) return 0;
+  if (typeof currentHealthFactor !== "number" || !Number.isFinite(currentHealthFactor)) {
+    return 0;
+  }
   const remaining = suppliedAmount - withdrawAmount;
   if (remaining <= 0) return 0;
   return (currentHealthFactor * remaining) / suppliedAmount;
@@ -70,11 +69,14 @@ export function computeWithdrawHealthFactor(
 
 export default function WithdrawForm({
   onSubmit,
-  positions = DEFAULT_POSITIONS,
+  positions,
   initialPositionId,
+  isLoading = false,
+  error = null,
 }: WithdrawFormProps) {
+  const resolvedPositions = positions ?? DEFAULT_POSITIONS;
   const [selectedPositionId, setSelectedPositionId] = useState(
-    initialPositionId ?? positions[0]?.id ?? "",
+    initialPositionId ?? resolvedPositions[0]?.id ?? "",
   );
   const [amount, setAmount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -85,7 +87,18 @@ export default function WithdrawForm({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingData, setPendingData] = useState<LendingData | null>(null);
 
-  const selectedPosition = positions.find((p) => p.id === selectedPositionId);
+  useEffect(() => {
+    if (!resolvedPositions.length) {
+      setSelectedPositionId("");
+      return;
+    }
+
+    if (!resolvedPositions.some((position) => position.id === selectedPositionId)) {
+      setSelectedPositionId(initialPositionId ?? resolvedPositions[0]?.id ?? "");
+    }
+  }, [initialPositionId, resolvedPositions, selectedPositionId]);
+
+  const selectedPosition = resolvedPositions.find((p) => p.id === selectedPositionId);
   const withdrawableBalance = selectedPosition
     ? Math.max(
         0,
@@ -129,7 +142,7 @@ export default function WithdrawForm({
     ? {
         suppliedFunds: `$${preview.remainingSupplied.toLocaleString()} ${selectedPosition.asset}`,
         borrowedAmount: `$${selectedPosition.outstandingDebt.toLocaleString()} ${selectedPosition.asset}`,
-        healthFactor: Number.isFinite(preview.healthFactorAfter)
+        healthFactor: hasDebt && selectedPosition.healthFactor != null
           ? preview.healthFactorAfter
           : 99,
       }
@@ -209,13 +222,49 @@ export default function WithdrawForm({
       outstandingDebt: selectedPosition.outstandingDebt,
       remainingDebt: preview.remainingSupplied,
       collateralAmount: selectedPosition.lockedCollateral,
-      healthFactorBefore: selectedPosition.healthFactor,
+      healthFactorBefore: selectedPosition.healthFactor ?? undefined,
       healthFactorAfter: preview.healthFactorAfter,
     };
 
     setPendingData(data);
     setShowConfirmModal(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Withdraw Supplied Assets
+          </h2>
+          <p className="text-gray-600 text-sm">
+            Loading your supply positions from the live account data.
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+          Loading your supply positions...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Withdraw Supplied Assets
+          </h2>
+          <p className="text-gray-600 text-sm">
+            Unable to load your supply positions right now.
+          </p>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Unable to load your supply positions. Please try again.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -244,6 +293,12 @@ export default function WithdrawForm({
         </div>
       )}
 
+      {!resolvedPositions.length && (
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600 mb-6">
+          No withdrawable supply positions found.
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-8">
         <div>
           <label
@@ -262,7 +317,7 @@ export default function WithdrawForm({
               errors.position ? "withdraw-position-error" : undefined
             }
           >
-            {positions.map((position) => (
+            {resolvedPositions.map((position) => (
               <option key={position.id} value={position.id}>
                 {position.asset} supply —{" "}
                 {formatAmount(position.suppliedAmount, position.asset)}
@@ -309,8 +364,6 @@ export default function WithdrawForm({
           <AmountInput
             id="withdraw-amount"
             label="Withdrawal amount"
-            type="number"
-            step="0.01"
             placeholder="0.00"
             value={amount || 0}
             error={errors.amount}
@@ -329,7 +382,6 @@ export default function WithdrawForm({
                 });
               }
             }}
-            max={withdrawableBalance}
             onMax={handleMaxWithdraw}
           />
         </div>
