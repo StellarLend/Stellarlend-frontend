@@ -71,6 +71,7 @@ export default defineConfig({
 
           include: [
             "app/lending/**/*.test.tsx",
+            "components/atoms/Tooltip/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/atoms/Button/Button.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
@@ -134,6 +135,7 @@ export default defineConfig({
       include: [
         "app/api/**",
         "lib/**",
+        "components/atoms/Tooltip/Tooltip.tsx",
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/ui/AmountInput.tsx",
         "components/shared/layout/TopNav.tsx",
