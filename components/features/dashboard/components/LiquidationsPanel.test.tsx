@@ -202,12 +202,12 @@ describe("LiquidationsPanel", () => {
     );
 
     expect(fetcher).toHaveBeenCalledWith(
-      "/api/account/preferences?userId=wallet-1",
+      "/api/account/notification-preferences?userId=wallet-1",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
-  it("saves liquidation alert toggles through account preferences", async () => {
+  it("saves liquidation alert toggles through notification preferences", async () => {
     const fetcher = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ error: "not found" }, 404))
@@ -235,7 +235,7 @@ describe("LiquidationsPanel", () => {
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
 
     expect(fetcher).toHaveBeenLastCalledWith(
-      "/api/account/preferences",
+      "/api/account/notification-preferences",
       expect.objectContaining({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -249,6 +249,40 @@ describe("LiquidationsPanel", () => {
         liquidationAlerts: ["liquidation:XLM:XLM"],
       },
     });
+  });
+
+  it("prevents rapid repeated toggles while a save is pending", async () => {
+    let resolveSave: (response: Response) => void = () => {};
+    const savePromise = new Promise<Response>((resolve) => {
+      resolveSave = resolve;
+    });
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ error: "not found" }, 404))
+      .mockReturnValueOnce(savePromise);
+
+    render(
+      <LiquidationsPanel
+        initialPositions={[position({ asset: "XLM", collateralAsset: "XLM" })]}
+        walletAddress="wallet-1"
+        fetcher={fetcher}
+      />,
+    );
+
+    const toggle = await screen.findByRole("switch", {
+      name: /enable liquidation alerts for xlm/i,
+    });
+
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(toggle).toBeDisabled());
+    fireEvent.click(toggle);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    resolveSave(jsonResponse(savedPreferences(["liquidation:XLM:XLM"])));
+
+    await waitFor(() => expect(toggle).not.toBeDisabled());
   });
 
   it("rolls back the alert toggle when saving fails", async () => {

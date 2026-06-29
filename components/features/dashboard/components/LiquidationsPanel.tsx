@@ -263,7 +263,7 @@ export default function LiquidationsPanel({
     setPreferencesError(null);
 
     fetcher(
-      `/api/account/preferences?userId=${encodeURIComponent(walletAddress)}`,
+      `/api/account/notification-preferences?userId=${encodeURIComponent(walletAddress)}`,
       {
         signal: controller.signal,
       },
@@ -331,7 +331,7 @@ export default function LiquidationsPanel({
     setPendingAlertKeys((current) => new Set(current).add(alertKey));
 
     try {
-      const response = await fetcher("/api/account/preferences", {
+      const response = await fetcher("/api/account/notification-preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
