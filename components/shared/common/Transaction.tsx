@@ -134,27 +134,56 @@ export const Transactions = ({
     };
 
     loadTransactions();
-  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
+
+  const handleSort = useCallback((field: "date" | "amount") => {
+    if (sortBy === field) {
+      // Toggle direction if already sorting by this field
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      // Switch to new field with descending as default
+      setSortBy(field);
+      setSortDir("desc");
+    }
+  }, [sortBy]);
+
+  const handleHeaderKeyDown = useCallback((
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    field: "date" | "amount"
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleSort(field);
+    }
+  }, [handleSort]);
+
+  const getAriaSortValue = useCallback((column: string): "none" | "ascending" | "descending" => {
+    if (column !== sortBy) return "none";
+    return sortDir === "asc" ? "ascending" : "descending";
+  }, [sortBy, sortDir]);
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
     const d = new Date(date + " " + fixedTime);
 
+    //  date for month
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
       day: "2-digit",
       year: "numeric",
     };
 
-    const dateStr = isNaN(d.getTime()) ? date : d.toLocaleDateString("en-US", options);
-    let timeStr = time;
-    if (!isNaN(d.getTime())) {
-      let [h, m] = [d.getHours(), d.getMinutes()];
-      const ampm = h >= 12 ? "PM" : "AM";
-      h = h % 12 || 12;
-      timeStr = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
-    }
+    // date for hours and minites
+    const dateStr = d.toLocaleDateString("en-US", options);
+    let [h, m] = [d.getHours(), d.getMinutes()];
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12;
+    h = h ? h : 12;
 
+    // time
+    const timeStr = `${h.toString().padStart(2, "0")}:${m
+      .toString()
+      .padStart(2, "0")}${ampm}`;
     return (
       <span className="flex items-center gap-2">
         <span>{dateStr}</span>
@@ -163,6 +192,7 @@ export const Transactions = ({
       </span>
     );
   };
+  }, [controlledTransactions, currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
 
   useEffect(() => {
     setScrollTop(0);
@@ -551,14 +581,52 @@ export const Transactions = ({
                 <table className="min-w-full text-sm border" aria-rowcount={transactions.length + 1}>
                   <thead className="sticky top-0 z-10 bg-gray-50">
                     <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
-                      <th className="py-3 px-4 text-left font-semibold">
+                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
                         Transaction Type
                       </th>
-                      <th className="py-3 px-4 text-left font-semibold">Amount</th>
-                      <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                      <th className="py-3 px-4 text-left font-semibold">Date</th>
-                      <th className="py-3 px-4 text-left font-semibold">Status</th>
-                      <th className="py-3 px-4 text-left font-semibold">Actions</th>
+                      <th 
+                        className="py-3 px-4 text-left font-semibold" 
+                        aria-sort={getAriaSortValue("amount")}
+                      >
+                        <button
+                          onClick={() => handleSort("amount")}
+                          onKeyDown={(e) => handleHeaderKeyDown(e, "amount")}
+                          className="flex items-center gap-2 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors"
+                          aria-label={`Sort by Amount ${sortBy === "amount" ? (sortDir === "asc" ? "ascending" : "descending") : ""}`}
+                          type="button"
+                        >
+                          <span>Amount</span>
+                          {sortBy === "amount" && (
+                            <span aria-hidden="true">{sortDir === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </button>
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
+                        Asset
+                      </th>
+                      <th 
+                        className="py-3 px-4 text-left font-semibold" 
+                        aria-sort={getAriaSortValue("date")}
+                      >
+                        <button
+                          onClick={() => handleSort("date")}
+                          onKeyDown={(e) => handleHeaderKeyDown(e, "date")}
+                          className="flex items-center gap-2 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors"
+                          aria-label={`Sort by Date ${sortBy === "date" ? (sortDir === "asc" ? "ascending" : "descending") : ""}`}
+                          type="button"
+                        >
+                          <span>Date</span>
+                          {sortBy === "date" && (
+                            <span aria-hidden="true">{sortDir === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </button>
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
+                        Status
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -584,7 +652,7 @@ export const Transactions = ({
                           aria-label={`Transaction ${txn.id}`}
                           onFocus={() => setFocusedRowIndex(actualIndex)}
                           onKeyDown={(event) => handleRowKeyDown(event, actualIndex)}
-                          className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
+                          className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
                         >
                           <td className="py-3 px-4">
                             <div className="font-medium text-black">{txn.type}</div>
@@ -622,14 +690,25 @@ export const Transactions = ({
                                 setSelectedTxn(txn);
                                 setIsDetailOpen(true);
                               }}
-                              className="text-blue-600 hover:underline"
+                              className="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
                               aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
                               aria-controls="transaction-detail-drawer"
+                              aria-label={`View details for transaction ${txn.id}`}
+                              type="button"
                             >
                               Details
                             </button>
                           </td>
                         </tr>
+                          txn={txn}
+                          actualIndex={actualIndex}
+                          isFocused={focusedRowIndex === actualIndex}
+                          isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          onFocusRow={handleFocusRow}
+                          onKeyDownRow={handleRowKeyDown}
+                          onSelectTxn={handleSelectTxn}
+                          setRowRef={setRowRef}
+                        />
                       );
                     })}
                     {shouldVirtualize && bottomSpacerHeight > 0 && (
@@ -672,6 +751,76 @@ export const Transactions = ({
                       label={txn.status}
                     />
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Asset
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
+                          alt={txn.asset}
+                          width={20}
+                          height={20}
+                        />
+                        <span className="font-bold text-gray-900">
+                          {txn.asset}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Amount
+                      </span>
+                      <div
+                        className={`font-mono font-bold text-base ${
+                          txn.amount > 0 ? "text-green-600" : "text-gray-900"
+                        }`}
+                      >
+                        {txn.amount > 0
+                          ? `+$${txn.amount}`
+                          : `-$${Math.abs(txn.amount)}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                        Date & Time
+                      </span>
+                      <div className="text-sm text-gray-700">
+                        {formatDateTime(txn.date, txn.time)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedTxn(txn);
+                        setIsDetailOpen(true);
+                      }}
+                      className="mt-2 text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-2 py-1 transition-colors"
+                      aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
+                      aria-controls="transaction-detail-drawer"
+                      aria-label={`View details for transaction ${txn.id}`}
+                      type="button"
+                    >
+                      Details
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {visibleTransactions.map((txn, idx) => {
+                const actualIndex = startIndex + idx;
+                return (
+                  <MobileRowComponent
+                    key={txn.id ?? actualIndex}
+                    txn={txn}
+                    isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                    onSelectTxn={handleSelectTxn}
+                  />
+                );
+              })}
 
                   <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
                     <div>

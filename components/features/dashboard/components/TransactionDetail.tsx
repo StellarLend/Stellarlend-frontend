@@ -25,6 +25,11 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
   const [loading, setLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [toast, setToast] = useState<{ title?: string; description?: string; variant?: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{
+    variant: "success" | "error";
+    title: string;
+    description: string;
+  } | null>(null);
 
   const id = transaction?.id || "";
 

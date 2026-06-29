@@ -5,6 +5,15 @@ import { TimeoutError } from '@/lib/http/errors';
 vi.mock('@/lib/http/client', () => ({
   httpGet: vi.fn().mockResolvedValue({}),
 }));
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/http', async (importActual) => {
+  const actual = await importActual<typeof import('@/lib/http')>();
+  return {
+    ...actual,
+    httpGet: vi.fn().mockResolvedValue({}),
+  };
+});
 
 afterEach(() => { vi.restoreAllMocks(); });
 

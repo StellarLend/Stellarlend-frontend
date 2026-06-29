@@ -73,6 +73,9 @@ export async function httpGet<T>(url: string, options: RequestOptions = {}): Pro
       const headers = new Headers(fetchOptions.headers);
       headers.set(REQUEST_ID_HEADER, requestId);
       
+      const headers = new Headers(fetchOptions.headers);
+      headers.set(REQUEST_ID_HEADER, requestId);
+      
       let response: Response;
       try {
         response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
@@ -161,5 +164,9 @@ export async function httpPost<T>(url: string, body: unknown, options: RequestOp
 /**
  * Alias for httpGet to maintain backwards compatibility with existing tests.
  * @deprecated Use httpGet instead.
+ */
+export const httpFetch = httpGet;
+ * Backward-compatible fetch helper. `maxRetries` is interpreted as retries after
+ * the first attempt, while `retries` on httpGet is total attempts.
  */
 export const httpFetch = httpGet;
