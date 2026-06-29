@@ -1,8 +1,14 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import TopNav from "./TopNav";
 import { SidebarProvider } from "@/context/SidebarContext";
-import { vi } from "vitest";
+import { WalletProvider } from "@/context/WalletContext";
+import { afterEach, beforeEach, vi } from "vitest";
+
+vi.mock("@/components/shared/layout/NotificationBell", () => ({
+  default: () => <button type="button" aria-label="View notifications" />,
+}));
+
+import TopNav from "./TopNav";
 
 vi.mock("./NotificationBell", () => ({
   default: () => <button aria-label="View notifications">Notifications</button>,
@@ -10,12 +16,29 @@ vi.mock("./NotificationBell", () => ({
 
 const renderTopNav = () =>
   render(
-    <SidebarProvider>
-      <TopNav />
-    </SidebarProvider>
+    <WalletProvider>
+      <SidebarProvider>
+        <TopNav />
+      </SidebarProvider>
+    </WalletProvider>,
   );
 
 describe("TopNav Accessibility", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({}),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders notification button with proper aria-label", () => {
     renderTopNav();
 
@@ -73,6 +96,8 @@ describe("TopNav Accessibility", () => {
 
     const accountButtons = screen.getAllByRole("button", {
       name: /account menu|connect wallet/i,
+    const walletButton = screen.getByRole("button", {
+      name: /connect wallet/i,
     });
 
     expect(accountButtons.length).toBeGreaterThanOrEqual(1);
@@ -82,8 +107,8 @@ describe("TopNav Accessibility", () => {
     renderTopNav();
 
     const buttons = screen.getAllByRole("button");
-    const iconOnlyButtons = buttons.filter(
-      (btn) => btn.className.includes("focus-visible:ring-2")
+    const iconOnlyButtons = buttons.filter((btn) =>
+      btn.className.includes("focus-visible:ring-2"),
     );
 
     expect(iconOnlyButtons.length).toBeGreaterThanOrEqual(4);

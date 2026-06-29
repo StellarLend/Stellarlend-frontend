@@ -2,9 +2,10 @@
 
 import { ArrowRight } from "lucide-react";
 import React from "react";
-import { Transactions } from "./Transaction";
+import { Transactions, type TransactionsProps } from "./Transaction";
+import { TransactionRow, TransactionMobileRow } from "./TransactionRow";
 
-export const RecentTransactions = () => {
+export const RecentTransactions = (props?: Partial<TransactionsProps>) => {
   return (
     <section className="bg-white rounded-xl shadow h-full">
       <div className="flex items-center justify-between px-6 md:px-12 pt-6 pb-2">
@@ -13,7 +14,13 @@ export const RecentTransactions = () => {
           View All <ArrowRight size={16} />
         </button>
       </div>
-      <Transactions showPagination={false} infiniteScroll />
+      <Transactions
+        showPagination={false}
+        infiniteScroll
+        rowComponent={TransactionRow}
+        mobileRowComponent={TransactionMobileRow}
+        {...props}
+      />
     </section>
   );
 };

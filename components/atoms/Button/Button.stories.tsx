@@ -2,12 +2,12 @@
 
 import Button from "./Button";
 
-const storyConfig = {
+const meta = {
   title: "Components/Button",
   component: Button,
 };
 
-export default storyConfig;
+export default meta;
 
 export const Primary = {
   args: {

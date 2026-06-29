@@ -8,7 +8,8 @@ export type AuditEventType =
   | 'data.cleanup.completed'
   | 'data.cleanup.failed'
   | 'auth.challenge.issued'
-  | 'auth.challenge.verified';
+  | 'auth.challenge.verified'
+  | 'auth.challenge.rate_limited';
 
 export interface AuditEvent {
   id: string;

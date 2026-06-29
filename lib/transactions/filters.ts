@@ -9,13 +9,25 @@ export interface TransactionFilter {
 }
 
 const ALLOWED_TYPES   = new Set(['lend', 'borrow', 'repay', 'withdraw']);
-const ALLOWED_STATUSES = new Set(['completed', 'pending', 'failed']);
+const ALLOWED_STATUSES = new Set(['completed', 'processing', 'failed', 'all']);
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$/;
 
 export interface FilterValidationResult {
   valid: boolean;
   filter: TransactionFilter;
   error?: string;
+}
+
+export function serializeTransactionFilters(filters: TransactionFilter): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (filters.type) params.set('type', filters.type);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.asset) params.set('asset', filters.asset);
+  if (filters.fromDate) params.set('fromDate', filters.fromDate);
+  if (filters.toDate) params.set('toDate', filters.toDate);
+
+  return params;
 }
 
 /**
@@ -35,10 +47,20 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
 
   const status = params.get('status');
   if (status) {
-    if (!ALLOWED_STATUSES.has(status)) {
+    const normalizedStatus = status.toLowerCase();
+    if (!ALLOWED_STATUSES.has(normalizedStatus)) {
       return { valid: false, filter, error: `Invalid status: ${status}` };
     }
-    filter.status = status as TransactionFilter['status'];
+
+    if (normalizedStatus === 'all') {
+      filter.status = 'All';
+    } else if (normalizedStatus === 'completed') {
+      filter.status = 'Completed';
+    } else if (normalizedStatus === 'processing') {
+      filter.status = 'Processing';
+    } else {
+      filter.status = 'Failed';
+    }
   }
 
   const asset = params.get('asset');

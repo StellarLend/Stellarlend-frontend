@@ -271,7 +271,14 @@ export default function ConfirmModal({
                     (data.outstandingDebt ?? 0) > 0 && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">New Health Factor</span>
-                        <span className="font-medium text-green-600">
+                        <span className={cn(
+                          "font-medium",
+                          type === "withdraw" && data.healthFactorAfter < 1
+                            ? "text-red-600"
+                            : type === "withdraw" && data.healthFactorAfter < 2
+                              ? "text-amber-600"
+                              : "text-green-600",
+                        )}>
                           {Number.isFinite(data.healthFactorAfter)
                             ? data.healthFactorAfter.toFixed(2)
                             : type === "withdraw"
@@ -358,6 +365,49 @@ export default function ConfirmModal({
                 </div>
               )}
           </div>
+
+          {/* Withdraw Health Warning */}
+          {type === "withdraw" &&
+            typeof data.healthFactorAfter === "number" &&
+            (data.outstandingDebt ?? 0) > 0 &&
+            data.healthFactorAfter < 2 && (
+              <div
+                className={cn(
+                  "rounded-xl border p-4 text-sm mb-6",
+                  data.healthFactorAfter < 1
+                    ? "border-red-200 bg-red-50"
+                    : "border-amber-200 bg-amber-50",
+                )}
+                role="alert"
+                aria-live="assertive"
+              >
+                <p
+                  className={cn(
+                    "font-bold mb-1",
+                    data.healthFactorAfter < 1
+                      ? "text-red-700"
+                      : "text-amber-700",
+                  )}
+                >
+                  {data.healthFactorAfter < 1
+                    ? "Critical Health Risk"
+                    : "Health Factor Warning"}
+                </p>
+                <p
+                  className={cn(
+                    data.healthFactorAfter < 1
+                      ? "text-red-600"
+                      : "text-amber-600",
+                  )}
+                >
+                  This withdrawal would lower your health factor to{" "}
+                  <strong>{data.healthFactorAfter.toFixed(2)}</strong>
+                  {data.healthFactorAfter < 1
+                    ? " (Critical). Your position could be liquidated. Reduce the amount or repay some debt first."
+                    : " (At Risk). Consider withdrawing less to maintain a safer position."}
+                </p>
+              </div>
+            )}
 
           {/* Terms Agreement */}
           <div className="mb-6">

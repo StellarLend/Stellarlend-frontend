@@ -19,9 +19,13 @@ export interface TooltipProps {
    */
   delay?: number;
   /**
-   * Additional CSS classes
+   * Additional CSS classes for the tooltip bubble
    */
   className?: string;
+  /**
+   * CSS classes for the trigger wrapper element
+   */
+  wrapperClassName?: string;
 }
 
 const positionClasses: Record<string, string> = {
@@ -44,6 +48,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   position = "top",
   delay = 300,
   className,
+  wrapperClassName,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [timeoutId, setTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -101,7 +106,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   } as React.HTMLAttributes<HTMLElement>);
 
   return (
-    <div ref={triggerRef} className="relative inline-block">
+    <div ref={triggerRef} className={cn("relative", wrapperClassName ?? "inline-block")}>
       {triggerElement}
 
       {isVisible && (
