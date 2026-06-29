@@ -116,6 +116,28 @@ describe("lending health preview", () => {
     ).toBeNull();
   });
 
+  it("uses the supplied borrow APR to lower the projected health factor", () => {
+    const withoutApr = calculateProjectedBorrowHealth({
+      loanAmount: 100,
+      borrowAsset: "USDC",
+      collateralAmount: 300,
+      collateralAsset: "USDC",
+      prices,
+    });
+
+    const withApr = calculateProjectedBorrowHealth({
+      loanAmount: 100,
+      borrowAsset: "USDC",
+      collateralAmount: 300,
+      collateralAsset: "USDC",
+      prices,
+      borrowApr: 12,
+    });
+
+    expect(withoutApr?.healthFactor).toBeGreaterThan(withApr?.healthFactor ?? 0);
+    expect(withApr?.loanValueUsd).toBeCloseTo(112);
+  });
+
   it("maps health bands to the PositionSummary thresholds", () => {
     expect(getHealthBand(HEALTHY_HEALTH_FACTOR_THRESHOLD)).toBe("healthy");
     expect(getHealthBand(1.5)).toBe("at-risk");
