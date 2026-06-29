@@ -1,3 +1,4 @@
+import "@testing-library/jest-dom";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import DataExportButton from "./DataExportButton";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -16,7 +17,7 @@ describe("DataExportButton", () => {
 
   it("renders button with correct text", () => {
     render(<DataExportButton />);
-    expect(screen.getByText("Export My Data")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /export my data/i })).toBeInTheDocument();
   });
 
   it("shows processing state when clicked", async () => {
@@ -30,11 +31,11 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText("Preparing...")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /preparing/i })).toBeInTheDocument();
     });
   });
 
@@ -45,13 +46,13 @@ describe("DataExportButton", () => {
     );
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
 
     fireEvent.click(button);
     fireEvent.click(button); // Second click should be ignored
 
     await waitFor(() => {
-      expect(screen.getByText("Preparing...")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /preparing/i })).toBeInTheDocument();
     });
 
     // Resolve the fetch
@@ -80,7 +81,7 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -107,7 +108,7 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -125,7 +126,7 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -137,12 +138,34 @@ describe("DataExportButton", () => {
     (global.fetch as any).mockRejectedValue(new Error("Network error"));
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
       expect(screen.getByText("Export failed")).toBeInTheDocument();
       expect(screen.getByText("Network error occurred. Please check your connection and try again.")).toBeInTheDocument();
+    });
+  });
+
+  it("offers a retry affordance after a failed export", async () => {
+    (global.fetch as any).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: "Internal Server Error",
+      }),
+    });
+
+    render(<DataExportButton />);
+    const button = screen.getByRole("button", { name: /export my data/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Export failed")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
     });
   });
 
@@ -157,7 +180,7 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -172,7 +195,7 @@ describe("DataExportButton", () => {
     );
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -194,7 +217,7 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -205,7 +228,7 @@ describe("DataExportButton", () => {
 
   it("applies custom className", () => {
     render(<DataExportButton className="custom-class" />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     expect(button).toHaveClass("custom-class");
   });
 });
