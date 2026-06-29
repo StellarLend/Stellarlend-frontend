@@ -25,14 +25,18 @@ export async function GET(request: NextRequest) {
 
   const prefs = repo.getByUserId(userId);
 
-  if (!prefs) {
-    return NextResponse.json(
-      { error: 'Preferences not found for the specified user' },
-      { status: 404 },
-    );
-  }
-
-  return NextResponse.json(prefs, { status: 200 });
+  return NextResponse.json(
+    prefs
+      ? { email: user.email, ...prefs }
+      : {
+          userId: user.id,
+          email: user.email,
+          locale: "en-US",
+          displayCurrency: "USD",
+          notifications: { email: true, push: true, sms: false, inApp: true },
+          updatedAt: null,
+        }
+  );
 }
 
 /**

@@ -1,12 +1,8 @@
-import React from "react";
-import dynamic from "next/dynamic";
-import { IconButton } from "@/components/atoms/IconButton/IconButton";
-import { IconPlaceholder } from "@/components/shared/ui/icons/IconPlaceholder";
-import useNotificationStream from "@/hooks/useNotificationStream";
-
-interface NotificationBellProps {
-  unreadCount: number;
-}
+import React from 'react';
+import dynamic from 'next/dynamic';
+import { IconButton } from '@/components/atoms/IconButton/IconButton';
+import { IconPlaceholder } from '@/components/shared/ui/icons/IconPlaceholder';
+import { useNotificationStream } from '@/hooks/useNotificationStream';
 
 // Lazy load Notification icon to reduce initial bundle size
 const NotificationIcon = dynamic(

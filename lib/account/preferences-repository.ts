@@ -9,6 +9,7 @@ export interface NotificationSettings {
 
 export interface UserPreferences {
   userId: string;
+  email?: string;
   locale: string;
   displayCurrency: string;
   notifications: NotificationSettings;

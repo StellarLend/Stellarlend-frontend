@@ -78,7 +78,7 @@ test.describe('Account Preferences E2E', () => {
       }
     });
 
-    await page.goto('/account/profile');
+    await page.goto('/account/preferences');
   });
 
   test('should display default preferences on load', async ({ page }) => {
@@ -133,7 +133,7 @@ test.describe('Account Preferences E2E', () => {
       await route.fulfill({ status: 500 });
     });
 
-    await page.goto('/account/profile');
+    await page.goto('/account/preferences');
 
     await expect(page.getByText(/Failed to load preferences/i)).toBeVisible();
   });
