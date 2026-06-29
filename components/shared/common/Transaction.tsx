@@ -43,10 +43,7 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
-import {
-  useInfiniteTransactions,
-  type UseInfiniteTransactionsReturn,
-} from "@/hooks/useInfiniteTransactions";
+import { useInfiniteTransactions, type UseInfiniteTransactionsReturn } from "@/hooks/useInfiniteTransactions";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -73,18 +70,20 @@ export const Transactions = ({
   hideToolbar = false,
   infiniteScroll = false,
   onDataLoad,
-  externalInfiniteState,
-}: TransactionsProps) => {
-  const [internalTransactions, setInternalTransactions] = useState<Transaction[]>([]);
-  const transactions = controlledTransactions ?? internalTransactions;
-  const [totalCount, setTotalCount] = useState(controlledTransactions?.length ?? 0);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"All" | TransactionStatus>("All");
-  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [loading, setLoading] = useState(!controlledTransactions);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  infiniteHook,
+}: TransactionsProps & { infiniteHook?: UseInfiniteTransactionsReturn }) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [localSearch, setLocalSearch] = useState("");
+  const [localStatus, setLocalStatus] = useState<"All" | TransactionStatus>("All");
+  const [localSortBy, setLocalSortBy] = useState<"date" | "amount">("date");
+  const [localSortDir, setLocalSortDir] = useState<"asc" | "desc">("desc");
+  const [loading, setLoading] = useState(true);
+  const [localDateFrom, setLocalDateFrom] = useState("");
+  const [localDateTo, setLocalDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -119,10 +118,10 @@ export const Transactions = ({
     dateTo: dateTo || undefined,
     sortBy,
     sortDir,
-    skip: infiniteScroll && externalInfiniteState !== undefined,
+    enabled: !infiniteHook,
   });
 
-  const infinite = (infiniteScroll && externalInfiniteState) ? externalInfiniteState : internalInfinite;
+  const infinite = infiniteHook || internalInfinite;
 
   useEffect(() => {
     setCurrentPage(1);
