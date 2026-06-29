@@ -75,20 +75,29 @@ export interface SearchBarProps {
    * @default 200
    */
   maxLength?: number;
+  /**
    * Search results data to display in the live-results dropdown.
    * When provided, a dropdown appears below the input showing
    * matching transactions and positions as the user types.
+   */
   results?: SearchResultsData;
 
   /**
    * Callback fired when a result is selected via click or Enter key.
    * Receives the selected SearchResult.
+   */
   onResultSelect?: (result: SearchResult) => void;
+
+  /**
    * Callback fired when a result should navigate to its detail page.
    * Receives the path string (e.g. "/dashboard/transactions/TXN123").
+   */
   onNavigate?: (path: string) => void;
+
+  /**
    * Unique ID for the combobox. Auto-generated if not provided.
    * Used for ARIA attribute linkage between input and results listbox.
+   */
   resultsListId?: string;
 }
 

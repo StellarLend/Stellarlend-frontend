@@ -20,12 +20,14 @@ function getShortAddress(addr: string) {
 }
 
 export const AccountMenu = () => {
-  const { walletAddress, loading, error, connect, disconnect } = useWallet();
+  const { address, status, error, connect, disconnect } = useWallet();
   const [isOpen, setIsOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const loading = status === "connecting";
 
   const closeMenu = useCallback(() => {
     setIsOpen(false);
@@ -67,9 +69,9 @@ export const AccountMenu = () => {
   }, [isOpen, closeMenu]);
 
   const handleCopy = useCallback(async () => {
-    if (!walletAddress) return;
+    if (!address) return;
     setCopyError(null);
-    const result = await copyToClipboard(walletAddress, true);
+    const result = await copyToClipboard(address, true);
     if (result.success) {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 1500);
@@ -80,7 +82,7 @@ export const AccountMenu = () => {
           : "Copy failed",
       );
     }
-  }, [walletAddress]);
+  }, [address]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnect();
@@ -113,7 +115,7 @@ export const AccountMenu = () => {
 
   return (
     <div className="relative flex items-center">
-      {walletAddress ? (
+      {address ? (
         <div className="relative">
           <button
             ref={triggerRef}
@@ -124,7 +126,7 @@ export const AccountMenu = () => {
             onKeyDown={handleKeyDown}
             className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
           >
-            <span>{getShortAddress(walletAddress)}</span>
+            <span>{getShortAddress(address)}</span>
             <ChevronDown
               className={`w-3 h-3 text-white transition-transform ${isOpen ? "rotate-180" : ""}`}
               aria-hidden="true"
@@ -139,7 +141,7 @@ export const AccountMenu = () => {
             >
               <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
                 <p className="text-xs text-gray-500 dark:text-gray-400 break-all font-mono">
-                  {walletAddress}
+                  {address}
                 </p>
               </div>
               <button

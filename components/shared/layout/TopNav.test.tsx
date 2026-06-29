@@ -10,10 +10,6 @@ vi.mock("@/components/shared/layout/NotificationBell", () => ({
 
 import TopNav from "./TopNav";
 
-vi.mock("./NotificationBell", () => ({
-  default: () => <button aria-label="View notifications">Notifications</button>,
-}));
-
 const renderTopNav = () =>
   render(
     <WalletProvider>
@@ -96,6 +92,8 @@ describe("TopNav Accessibility", () => {
 
     const accountButtons = screen.getAllByRole("button", {
       name: /account menu|connect wallet/i,
+    });
+
     const walletButton = screen.getByRole("button", {
       name: /connect wallet/i,
     });

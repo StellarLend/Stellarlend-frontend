@@ -27,8 +27,9 @@ const mockUseWallet = vi.mocked(useWallet);
 const mockCopyToClipboard = vi.mocked(copyToClipboard);
 
 const baseWalletState = {
-  walletAddress: "GABCQZ2Q6YPRB5T2Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5A",
-  loading: false,
+  address: "GABCQZ2Q6YPRB5T2Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5A",
+  network: "TESTNET",
+  status: "connected" as const,
   error: null,
   connect: vi.fn(),
   disconnect: vi.fn(),
@@ -170,7 +171,8 @@ describe("AccountMenu", () => {
   it("shows Connect Wallet button when disconnected", () => {
     mockUseWallet.mockReturnValueOnce({
       ...baseWalletState,
-      walletAddress: null,
+      address: null,
+      status: "disconnected",
     } as any);
 
     render(<AccountMenu />);
@@ -184,7 +186,8 @@ describe("AccountMenu", () => {
     const mockConnect = vi.fn();
     mockUseWallet.mockReturnValueOnce({
       ...baseWalletState,
-      walletAddress: null,
+      address: null,
+      status: "disconnected",
       connect: mockConnect,
     } as any);
 
@@ -199,8 +202,8 @@ describe("AccountMenu", () => {
   it("shows Connecting... text when loading", () => {
     mockUseWallet.mockReturnValueOnce({
       ...baseWalletState,
-      walletAddress: null,
-      loading: true,
+      address: null,
+      status: "connecting",
     } as any);
 
     render(<AccountMenu />);
