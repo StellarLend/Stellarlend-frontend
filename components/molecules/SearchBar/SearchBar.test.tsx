@@ -493,4 +493,91 @@ describe('SearchBar Component', () => {
       expect(input).toHaveFocus();
     });
   });
+
+  describe('Consolidation Guard (#504)', () => {
+    it('legacy Searchbar file must not exist', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const legacy = path.resolve(
+        __dirname,
+        '../../shared/common/Searchbar.tsx',
+      );
+      expect(fs.existsSync(legacy)).toBe(false);
+    });
+
+    it('barrel should not re-export Searchbar from shared/common', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const barrel = path.resolve(
+        __dirname,
+        '../../shared/common/index.ts',
+      );
+      const content = fs.readFileSync(barrel, 'utf-8');
+      expect(content).not.toContain('Searchbar');
+    });
+  });
+
+  describe('Migration Coverage (legacy call-site props)', () => {
+    it('should work with only placeholder prop (TopNav usage pattern)', () => {
+      render(<SearchBar placeholder="Search for token, asset, wallet address" />);
+      const input = screen.getByPlaceholderText('Search for token, asset, wallet address');
+      expect(input).toBeInTheDocument();
+    });
+
+    it('should work with placeholder and onSearch props (legacy pattern)', () => {
+      const onSearch = vi.fn();
+      render(<SearchBar placeholder="Search markets…" onSearch={onSearch} />);
+      const input = screen.getByPlaceholderText('Search markets…');
+
+      fireEvent.change(input, { target: { value: 'XLM' } });
+      vi.advanceTimersByTime(300);
+      expect(onSearch).toHaveBeenCalledWith('XLM');
+    });
+
+    it('should support debounce delay matching legacy debounceMs behavior', () => {
+      const onSearch = vi.fn();
+      render(<SearchBar onSearch={onSearch} debounceDelay={500} />);
+      const input = screen.getByPlaceholderText('Search...');
+
+      fireEvent.change(input, { target: { value: 'stellar' } });
+      vi.advanceTimersByTime(300);
+      expect(onSearch).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(200);
+      expect(onSearch).toHaveBeenCalledWith('stellar');
+    });
+
+    it('should support className prop for styling (legacy pattern)', () => {
+      const { container } = render(
+        <SearchBar className="legacy-search-class" />
+      );
+      expect(container.firstChild).toHaveClass('legacy-search-class');
+    });
+
+    it('should support clear button matching legacy handleClear behavior', () => {
+      const onSearch = vi.fn();
+      render(<SearchBar onSearch={onSearch} initialValue="active query" />);
+      const input = screen.getByPlaceholderText('Search...') as HTMLInputElement;
+      expect(input.value).toBe('active query');
+
+      const clearButton = screen.getByLabelText('Clear search input');
+      fireEvent.click(clearButton);
+
+      vi.advanceTimersByTime(300);
+      expect(onSearch).toHaveBeenCalledWith('');
+      expect(input.value).toBe('');
+    });
+
+    it('should support keyboard Enter matching legacy handleKeyDown behavior', () => {
+      const onSearch = vi.fn();
+      render(<SearchBar onSearch={onSearch} />);
+      const input = screen.getByPlaceholderText('Search...');
+
+      fireEvent.change(input, { target: { value: 'search term' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      vi.advanceTimersByTime(300);
+      expect(onSearch).toHaveBeenCalledWith('search term');
+    });
+  });
 });
