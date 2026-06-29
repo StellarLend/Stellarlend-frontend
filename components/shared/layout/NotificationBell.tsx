@@ -1,53 +1,73 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { IconButton } from '@/components/atoms/IconButton/IconButton';
-import { IconPlaceholder } from '@/components/shared/ui/icons/IconPlaceholder';
-import useNotificationStream from '@/hooks/useNotificationStream';
-import { useNotificationPins } from '@/hooks/useNotificationPins';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+} from "react";
+import dynamic from "next/dynamic";
+import { IconButton } from "@/components/atoms/IconButton/IconButton";
+import { IconPlaceholder } from "@/components/shared/ui/icons/IconPlaceholder";
+import useNotificationStream from "@/hooks/useNotificationStream";
+import { useNotificationPins } from "@/hooks/useNotificationPins";
 import {
   groupNotifications,
   sortGroupedNotifications,
   getDateGroupLabel,
   type DateGroup,
-} from '@/lib/notifications/grouping';
-import type { Notification } from '@/lib/notifications/types';
+} from "@/lib/notifications/grouping";
+import type { Notification } from "@/lib/notifications/types";
 
-const NotificationIcon = dynamic(() => import('@/components/shared/ui/icons/Notification').then(mod => ({ default: mod.Notification })), {
-  loading: () => <IconPlaceholder />,
-  ssr: true,
-});
+const NotificationIcon = dynamic(
+  () =>
+    import("@/components/shared/ui/icons/Notification").then((mod) => ({
+      default: mod.Notification,
+    })),
+  {
+    loading: () => <IconPlaceholder />,
+    ssr: true,
+  },
+);
 
-const dateGroups: DateGroup[] = ['today', 'earlier_this_week', 'older'];
+const dateGroups: DateGroup[] = ["today", "earlier_this_week", "older"];
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diffMs = now - then;
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
+  if (diffMins < 1) return "just now";
   if (diffMins < 60) return `${diffMins}m ago`;
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays === 1) return 'yesterday';
+  if (diffDays === 1) return "yesterday";
   return `${diffDays}d ago`;
 }
 
-function typeIcon(type: Notification['type']): string {
+function typeIcon(type: Notification["type"]): string {
   switch (type) {
-    case 'success': return '●';
-    case 'warning': return '●';
-    case 'error': return '●';
-    default: return '●';
+    case "success":
+      return "●";
+    case "warning":
+      return "●";
+    case "error":
+      return "●";
+    default:
+      return "●";
   }
 }
 
-function typeColor(type: Notification['type']): string {
+function typeColor(type: Notification["type"]): string {
   switch (type) {
-    case 'success': return 'text-green-500';
-    case 'warning': return 'text-amber-500';
-    case 'error': return 'text-red-500';
-    default: return 'text-blue-500';
+    case "success":
+      return "text-green-500";
+    case "warning":
+      return "text-amber-500";
+    case "error":
+      return "text-red-500";
+    default:
+      return "text-blue-500";
   }
 }
 
@@ -58,7 +78,10 @@ const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<DateGroup>>(new Set());
+  const [hasLoadedNotifications, setHasLoadedNotifications] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<DateGroup>>(
+    new Set(),
+  );
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -66,27 +89,32 @@ const NotificationBell = () => {
 
   useEffect(() => {
     isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/notifications');
+      const res = await fetch("/api/notifications");
       if (!res.ok) {
         if (res.status === 401) {
           setNotifications([]);
+          setHasLoadedNotifications(true);
           return;
         }
-        throw new Error('Failed to fetch');
+        throw new Error("Failed to fetch");
       }
       const data = await res.json();
       if (isMountedRef.current) {
         setNotifications(data.notifications ?? []);
+        setHasLoadedNotifications(true);
       }
     } catch {
       if (isMountedRef.current) {
         setNotifications([]);
+        setHasLoadedNotifications(true);
       }
     } finally {
       if (isMountedRef.current) {
@@ -112,7 +140,7 @@ const NotificationBell = () => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         closePanel();
       }
     },
@@ -128,25 +156,24 @@ const NotificationBell = () => {
     }
   }, [isOpen]);
 
-  const handleMarkRead = useCallback(
-    async (id: string) => {
-      try {
-        const res = await fetch(`/api/notifications/${id}`, { method: 'PATCH' });
-        if (res.ok) {
-          setNotifications((prev) =>
-            prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-          );
-        }
-      } catch {
-        // silently fail
+  const handleMarkRead = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/notifications/${id}`, { method: "PATCH" });
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        );
       }
-    },
-    [],
-  );
+    } catch {
+      // silently fail
+    }
+  }, []);
 
   const handleMarkAllRead = useCallback(async () => {
     try {
-      const res = await fetch('/api/notifications/read-all', { method: 'PATCH' });
+      const res = await fetch("/api/notifications/read-all", {
+        method: "PATCH",
+      });
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       }
@@ -154,6 +181,50 @@ const NotificationBell = () => {
       // silently fail
     }
   }, []);
+
+  const handleDismiss = useCallback(
+    async (id: string) => {
+      const previousNotifications = notifications;
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+
+      try {
+        const res = await fetch(`/api/notifications/${id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          throw new Error("Failed to dismiss notification");
+        }
+      } catch {
+        if (isMountedRef.current) {
+          setNotifications(previousNotifications);
+        }
+      }
+    },
+    [notifications],
+  );
+
+  const handleClearAll = useCallback(async () => {
+    const previousNotifications = notifications;
+    if (previousNotifications.length === 0) return;
+
+    setNotifications([]);
+
+    try {
+      const results = await Promise.all(
+        previousNotifications.map((n) =>
+          fetch(`/api/notifications/${n.id}`, { method: "DELETE" }),
+        ),
+      );
+
+      if (results.some((res) => !res.ok)) {
+        throw new Error("Failed to clear notifications");
+      }
+    } catch {
+      if (isMountedRef.current) {
+        setNotifications(previousNotifications);
+      }
+    }
+  }, [notifications]);
 
   const toggleGroup = useCallback((group: DateGroup) => {
     setCollapsedGroups((prev) => {
@@ -173,27 +244,33 @@ const NotificationBell = () => {
   const hasPinned = grouped.pinned.length > 0;
   const hasUnread = notifications.some((n) => !n.read);
   const hasAny = notifications.length > 0;
+  const effectiveUnreadCount = hasLoadedNotifications
+    ? notifications.filter((n) => !n.read).length
+    : unreadCount;
 
   const displayCount = useMemo(
-    () => (unreadCount > 99 ? '99+' : unreadCount.toString()),
-    [unreadCount],
+    () => (effectiveUnreadCount > 99 ? "99+" : effectiveUnreadCount.toString()),
+    [effectiveUnreadCount],
   );
 
-  const showBadge = useMemo(() => unreadCount > 0, [unreadCount]);
+  const showBadge = useMemo(
+    () => effectiveUnreadCount > 0,
+    [effectiveUnreadCount],
+  );
 
   const ariaLabel = useMemo(
     () =>
       showBadge
-        ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
-        : 'No unread notifications',
-    [showBadge, unreadCount],
+        ? `${effectiveUnreadCount} unread notification${effectiveUnreadCount === 1 ? "" : "s"}`
+        : "No unread notifications",
+    [effectiveUnreadCount, showBadge],
   );
 
   return (
     <div className="relative inline-block">
       <IconButton
         ref={triggerRef}
-        aria-label={showBadge ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}` : 'No unread notifications'}
+        aria-label={ariaLabel}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         onClick={handleToggle}
@@ -216,22 +293,40 @@ const NotificationBell = () => {
           className="absolute top-full right-0 mt-2 w-[360px] bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-[480px] flex flex-col"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
-            <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
-            {hasAny && hasUnread && (
-              <button
-                type="button"
-                onClick={handleMarkAllRead}
-                data-testid="mark-all-read"
-                className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
-              >
-                Mark all read
-              </button>
+            <h2 className="text-sm font-semibold text-gray-900">
+              Notifications
+            </h2>
+            {hasAny && (
+              <div className="flex items-center gap-3">
+                {hasUnread && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    data-testid="mark-all-read"
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    Mark all read
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  data-testid="clear-all-notifications"
+                  className="text-xs font-medium text-gray-500 hover:text-red-600 transition-colors"
+                  aria-label="Clear all notifications"
+                >
+                  Clear all
+                </button>
+              </div>
             )}
           </div>
 
           <div className="overflow-y-auto flex-1">
             {loading && (
-              <div className="flex items-center justify-center py-8" data-testid="loading-state">
+              <div
+                className="flex items-center justify-center py-8"
+                data-testid="loading-state"
+              >
                 <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
               </div>
             )}
@@ -262,6 +357,7 @@ const NotificationBell = () => {
                           isPinned={true}
                           onTogglePin={togglePin}
                           onMarkRead={handleMarkRead}
+                          onDismiss={handleDismiss}
                         />
                       ))}
                     </ul>
@@ -286,14 +382,18 @@ const NotificationBell = () => {
                           {getDateGroupLabel(group)}
                         </span>
                         <svg
-                          className={`w-3 h-3 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-180'}`}
+                          className={`w-3 h-3 text-gray-400 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
                           strokeWidth={2}
                           aria-hidden="true"
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 9l-7 7-7-7"
+                          />
                         </svg>
                       </button>
                       {!isCollapsed && (
@@ -305,6 +405,7 @@ const NotificationBell = () => {
                               isPinned={false}
                               onTogglePin={togglePin}
                               onMarkRead={handleMarkRead}
+                              onDismiss={handleDismiss}
                             />
                           ))}
                         </ul>
@@ -326,6 +427,7 @@ interface NotificationItemProps {
   isPinned: boolean;
   onTogglePin: (id: string) => void;
   onMarkRead: (id: string) => void;
+  onDismiss: (id: string) => void;
 }
 
 const NotificationItem = React.memo(function NotificationItem({
@@ -333,11 +435,12 @@ const NotificationItem = React.memo(function NotificationItem({
   isPinned,
   onTogglePin,
   onMarkRead,
+  onDismiss,
 }: NotificationItemProps) {
   return (
     <li
       data-testid={`notification-item-${n.id}`}
-      className={`px-4 py-3 transition-colors ${n.read ? 'bg-white' : 'bg-blue-50/40'}`}
+      className={`px-4 py-3 transition-colors ${n.read ? "bg-white" : "bg-blue-50/40"}`}
     >
       <div className="flex items-start gap-2">
         <span
@@ -348,12 +451,18 @@ const NotificationItem = React.memo(function NotificationItem({
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <p className={`text-sm truncate ${n.read ? 'text-gray-700 font-normal' : 'text-gray-900 font-semibold'}`}>
+            <p
+              className={`text-sm truncate ${n.read ? "text-gray-700 font-normal" : "text-gray-900 font-semibold"}`}
+            >
               {n.title}
             </p>
-            <span className="text-xs text-gray-400 shrink-0">{timeAgo(n.createdAt)}</span>
+            <span className="text-xs text-gray-400 shrink-0">
+              {timeAgo(n.createdAt)}
+            </span>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+            {n.message}
+          </p>
           <div className="flex items-center gap-2 mt-2">
             <button
               type="button"
@@ -361,12 +470,12 @@ const NotificationItem = React.memo(function NotificationItem({
               data-testid={`pin-btn-${n.id}`}
               className={`text-xs transition-colors ${
                 isPinned
-                  ? 'text-blue-600 hover:text-blue-800'
-                  : 'text-gray-400 hover:text-gray-600'
+                  ? "text-blue-600 hover:text-blue-800"
+                  : "text-gray-400 hover:text-gray-600"
               }`}
-              aria-label={isPinned ? 'Unpin notification' : 'Pin notification'}
+              aria-label={isPinned ? "Unpin notification" : "Pin notification"}
             >
-              {isPinned ? 'Unpin' : 'Pin'}
+              {isPinned ? "Unpin" : "Pin"}
             </button>
             {!n.read && (
               <button
@@ -378,6 +487,15 @@ const NotificationItem = React.memo(function NotificationItem({
                 Mark as read
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => onDismiss(n.id)}
+              data-testid={`dismiss-${n.id}`}
+              className="text-xs text-gray-400 hover:text-red-600 transition-colors"
+              aria-label={`Dismiss notification: ${n.title}`}
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       </div>
