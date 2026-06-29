@@ -2,7 +2,16 @@
 
 import React, { useCallback } from "react";
 import Image from "next/image";
-import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
+import { ExternalLink } from "lucide-react";
+import {
+  StatusBadge,
+  transactionStatusToVariant,
+} from "@/components/shared/ui/StatusBadge";
+import { useWallet } from "@/hooks/useWallet";
+import {
+  buildStellarExpertTransactionUrl,
+  getTransactionHash,
+} from "@/lib/utils/explorer";
 import type { Transaction } from "@/types/Transaction";
 
 export const rowRenderCounts = new Map<string, number>();
@@ -45,7 +54,10 @@ export interface TransactionRowProps {
   isFocused: boolean;
   isExpanded: boolean;
   onFocusRow: (index: number) => void;
-  onKeyDownRow: (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => void;
+  onKeyDownRow: (
+    event: React.KeyboardEvent<HTMLTableRowElement>,
+    index: number,
+  ) => void;
   onSelectTxn: (txn: Transaction) => void;
   setRowRef: (index: number, node: HTMLTableRowElement | null) => void;
 }
@@ -65,12 +77,17 @@ export const TransactionRow = React.memo(
       const count = rowRenderCounts.get(txn.id) ?? 0;
       rowRenderCounts.set(txn.id, count + 1);
     }
+    const { network } = useWallet();
+    const transactionHash = getTransactionHash(txn);
+    const explorerUrl = transactionHash
+      ? buildStellarExpertTransactionUrl(transactionHash, network)
+      : null;
 
     const handleRef = useCallback(
       (node: HTMLTableRowElement | null) => {
         setRowRef(actualIndex, node);
       },
-      [actualIndex, setRowRef]
+      [actualIndex, setRowRef],
     );
 
     const handleFocus = useCallback(() => {
@@ -81,7 +98,7 @@ export const TransactionRow = React.memo(
       (event: React.KeyboardEvent<HTMLTableRowElement>) => {
         onKeyDownRow(event, actualIndex);
       },
-      [actualIndex, onKeyDownRow]
+      [actualIndex, onKeyDownRow],
     );
 
     const handleSelect = useCallback(() => {
@@ -115,9 +132,7 @@ export const TransactionRow = React.memo(
           />
           <span className="ml-1 font-medium ">{txn.asset}</span>
         </td>
-        <td className="py-3 px-4 ">
-          {formatDateTime(txn.date, txn.time)}
-        </td>
+        <td className="py-3 px-4 ">{formatDateTime(txn.date, txn.time)}</td>
         <td className="py-3 px-4">
           <StatusBadge
             variant={transactionStatusToVariant(txn.status)}
@@ -125,6 +140,18 @@ export const TransactionRow = React.memo(
           />
         </td>
         <td className="py-3 px-4">
+          {explorerUrl && (
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mr-4 inline-flex items-center gap-1 text-blue-600 hover:underline"
+              aria-label={`View transaction ${txn.id} on Stellar Expert`}
+            >
+              Explorer
+              <ExternalLink aria-hidden="true" size={14} />
+            </a>
+          )}
           <button
             onClick={handleSelect}
             className="text-blue-600 hover:underline"
@@ -136,7 +163,7 @@ export const TransactionRow = React.memo(
         </td>
       </tr>
     );
-  }
+  },
 );
 TransactionRow.displayName = "TransactionRow";
 
@@ -152,6 +179,11 @@ export const TransactionMobileRow = React.memo(
       const count = mobileRowRenderCounts.get(txn.id) ?? 0;
       mobileRowRenderCounts.set(txn.id, count + 1);
     }
+    const { network } = useWallet();
+    const transactionHash = getTransactionHash(txn);
+    const explorerUrl = transactionHash
+      ? buildStellarExpertTransactionUrl(transactionHash, network)
+      : null;
 
     const handleSelect = useCallback(() => {
       onSelectTxn(txn);
@@ -211,17 +243,31 @@ export const TransactionMobileRow = React.memo(
               {formatDateTime(txn.date, txn.time)}
             </div>
           </div>
-          <button
-            onClick={handleSelect}
-            className="mt-2 text-blue-600 hover:underline"
-            aria-expanded={isExpanded}
-            aria-controls="transaction-detail-drawer"
-          >
-            Details
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            {explorerUrl && (
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                aria-label={`View transaction ${txn.id} on Stellar Expert`}
+              >
+                Explorer
+                <ExternalLink aria-hidden="true" size={14} />
+              </a>
+            )}
+            <button
+              onClick={handleSelect}
+              className="text-blue-600 hover:underline"
+              aria-expanded={isExpanded}
+              aria-controls="transaction-detail-drawer"
+            >
+              Details
+            </button>
+          </div>
         </div>
       </div>
     );
-  }
+  },
 );
 TransactionMobileRow.displayName = "TransactionMobileRow";

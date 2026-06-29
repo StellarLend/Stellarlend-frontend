@@ -25,6 +25,12 @@ vi.mock("@headlessui/react", () => ({
   TransitionChild: ({ children }: any) => <>{children}</>,
 }));
 
+const mockWalletNetwork = vi.hoisted(() => ({ current: "TESTNET" }));
+
+vi.mock("@/hooks/useWallet", () => ({
+  useWallet: () => ({ network: mockWalletNetwork.current }),
+}));
+
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
@@ -43,12 +49,48 @@ const makeTxn = (overrides: Partial<Transaction> = {}): Transaction => ({
   ...overrides,
 });
 
-const inflowTxn  = makeTxn({ id: "txn-in",   type: "Deposit",      amount: 250,  asset: "XLM"  });
-const outflowTxn = makeTxn({ id: "txn-out",  type: "Withdrawal",   amount: -80,  asset: "USDC" });
-const zeroTxn    = makeTxn({ id: "txn-zero", type: "Loan Payment", amount: 0,    asset: "ETH"  });
-const processTxn = makeTxn({ id: "txn-proc", type: "Lend Funds",   amount: 500,  asset: "BTC",  status: "Processing" });
-const failedTxn  = makeTxn({ id: "txn-fail", type: "Withdrawal",   amount: -40,  asset: "USDC", status: "Failed" });
-const negTxn     = makeTxn({ id: "txn-neg",  type: "Loan Payment", amount: -999, asset: "ETH",  status: "Completed" });
+const inflowTxn = makeTxn({
+  id: "txn-in",
+  type: "Deposit",
+  amount: 250,
+  asset: "XLM",
+});
+const outflowTxn = makeTxn({
+  id: "txn-out",
+  type: "Withdrawal",
+  amount: -80,
+  asset: "USDC",
+});
+const zeroTxn = makeTxn({
+  id: "txn-zero",
+  type: "Loan Payment",
+  amount: 0,
+  asset: "ETH",
+});
+const processTxn = makeTxn({
+  id: "txn-proc",
+  type: "Lend Funds",
+  amount: 500,
+  asset: "BTC",
+  status: "Processing",
+});
+const failedTxn = makeTxn({
+  id: "txn-fail",
+  type: "Withdrawal",
+  amount: -40,
+  asset: "USDC",
+  status: "Failed",
+});
+const negTxn = makeTxn({
+  id: "txn-neg",
+  type: "Loan Payment",
+  amount: -999,
+  asset: "ETH",
+  status: "Completed",
+});
+
+const txHash =
+  "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6abcd";
 
 function mockApi(transactions: Transaction[], total = transactions.length) {
   mockFetch.mockResolvedValue({
@@ -64,6 +106,7 @@ function mockApi(transactions: Transaction[], total = transactions.length) {
 describe("RecentTransactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWalletNetwork.current = "TESTNET";
     mockApi([]);
   });
 
@@ -76,7 +119,9 @@ describe("RecentTransactions", () => {
 
   it("renders the View All button", () => {
     render(<RecentTransactions />);
-    expect(screen.getByRole("button", { name: /view all/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /view all/i }),
+    ).toBeInTheDocument();
   });
 
   // --- Loading state ---
@@ -125,14 +170,18 @@ describe("RecentTransactions", () => {
     mockApi([inflowTxn]);
     render(<RecentTransactions />);
     await screen.findAllByText("Deposit");
-    expect(screen.getAllByText(`+$${inflowTxn.amount}`).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(`+$${inflowTxn.amount}`).length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("displays outflow amount with leading -", async () => {
     mockApi([outflowTxn]);
     render(<RecentTransactions />);
     await screen.findAllByText("Withdrawal");
-    expect(screen.getAllByText(`-$${Math.abs(outflowTxn.amount)}`).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(`-$${Math.abs(outflowTxn.amount)}`).length,
+    ).toBeGreaterThan(0);
   });
 
   it("displays large negative amount correctly", async () => {
@@ -197,6 +246,39 @@ describe("RecentTransactions", () => {
     render(<RecentTransactions />);
     await screen.findAllByText("Loan Payment");
     expect(screen.getAllByAltText("ETH").length).toBeGreaterThan(0);
+  });
+
+  it("renders Stellar Expert links for real transaction hashes", async () => {
+    mockApi([makeTxn({ id: "TXN-001", txHash })]);
+    render(<RecentTransactions />);
+
+    await screen.findAllByText("Deposit");
+
+    const links = screen.getAllByRole("link", {
+      name: /view transaction TXN-001 on Stellar Expert/i,
+    });
+    expect(links.length).toBeGreaterThan(0);
+    links.forEach((link) => {
+      expect(link).toHaveAttribute(
+        "href",
+        `https://stellar.expert/explorer/testnet/tx/${txHash}`,
+      );
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+  });
+
+  it("does not render explorer links for mock transaction ids", async () => {
+    mockApi([makeTxn({ id: "TXN-001" })]);
+    render(<RecentTransactions />);
+
+    await screen.findAllByText("Deposit");
+
+    expect(
+      screen.queryByRole("link", {
+        name: /view transaction TXN-001 on Stellar Expert/i,
+      }),
+    ).not.toBeInTheDocument();
   });
 
   // --- Wrapped inside Transactions with infiniteScroll — toolbar IS present ---

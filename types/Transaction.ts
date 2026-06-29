@@ -4,6 +4,8 @@ export type { AssetSymbol, TransactionType, TransactionStatus };
 
 export interface Transaction {
   id: string;
+  txHash?: string;
+  hash?: string;
   type: TransactionType;
   amount: number;
   asset: AssetSymbol;
@@ -33,7 +35,7 @@ export type FetchTransactionsResponse = {
 };
 
 export const fetchTransactions = async (
-  params: FetchTransactionsOptions = {}
+  params: FetchTransactionsOptions = {},
 ): Promise<FetchTransactionsResponse> => {
   const searchParams = new URLSearchParams();
 
