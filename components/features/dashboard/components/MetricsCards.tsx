@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Copy } from "lucide-react";
 import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -144,17 +144,101 @@ const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
-export default function MetricsCards() {
-  const [data, setData] = useState<any>(null);
+/** Skeleton placeholder shown while positions are loading. */
+const SkeletonCard: React.FC<{ isPrimary?: boolean }> = ({ isPrimary = false }) => {
+  const cardBg = isPrimary ? "bg-[#0A3D1E]" : "bg-[#097C4C]";
+  const shimmer = "animate-pulse bg-white/10 rounded";
+  return (
+    <div className={`${cardBg} rounded-xl overflow-hidden p-4 w-full border-[#71B48D33] my-6`}>
+      <div className={`${shimmer} h-4 w-32 mb-4`} />
+      <div className={`${shimmer} h-8 w-40 mb-4`} />
+      <div className={`${shimmer} h-14 w-full rounded-xl`} />
+    </div>
+  );
+};
 
-  useEffect(() => {
-    fetch("/api/positions")
-      .then(res => res.json())
-      .then(setData)
-      .catch(console.error);
+interface PositionsData {
+  availableBalance: string;
+  copyAddress: string;
+  borrowedAmount: string;
+  nextDue: string;
+  suppliedFunds: string;
+  earnings: string;
+  healthFactor: number | string;
+}
+
+function usePositionsData(): { data: PositionsData | null; isLoading: boolean; error: Error | null } {
+  const [data, setData] = useState<PositionsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/positions");
+      if (!res.ok) throw new Error(`Failed to fetch positions: ${res.statusText}`);
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  if (!data) return <div className="text-white p-4 text-sm font-medium">Loading metrics...</div>;
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  return { data, isLoading, error };
+}
+
+export default function MetricsCards() {
+  const { data, isLoading, error } = usePositionsData();
+
+  if (isLoading) {
+    return (
+      <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <SkeletonCard isPrimary />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      </ScrollCues>
+    );
+  }
+
+  if (error) {
+    return (
+      <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <MetricCard
+            isPrimary
+            icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
+            label="Available Balance"
+            value="—"
+          />
+          <MetricCard
+            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
+            label="Total Borrowed Amount"
+            value="—"
+          />
+          <MetricCard
+            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
+            label="Total Supplied"
+            value="—"
+          />
+        </div>
+      </ScrollCues>
+    );
+  }
+
+  const availableBalance = data?.availableBalance ?? "$0.00";
+  const copyAddress = data?.copyAddress ?? "";
+  const borrowedAmount = data?.borrowedAmount ?? "$0.00";
+  const nextDue = data?.nextDue ?? "—";
+  const suppliedFunds = data?.suppliedFunds ?? "$0.00";
+  const earnings = data?.earnings ?? "$0.00";
+  const healthFactor = data?.healthFactor != null ? String(data.healthFactor) : "—";
 
   return (
     <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
@@ -163,22 +247,22 @@ export default function MetricsCards() {
           isPrimary
           icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
           label="Available Balance"
-          value={data.availableBalance}
-          copyValue={data.copyAddress}
+          value={availableBalance}
+          copyValue={copyAddress || undefined}
         />
         <MetricCard
           icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
           label="Total Borrowed Amount"
-          value={data.borrowedAmount}
+          value={borrowedAmount}
           subLabel="Next Due Payment"
-          subValue={data.nextDue}
+          subValue={nextDue}
         />
         <MetricCard
           icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
-          label={`Total Supplied (Health Factor: ${data.healthFactor})`}
-          value={data.suppliedFunds}
+          label={`Total Supplied (Health Factor: ${healthFactor})`}
+          value={suppliedFunds}
           subLabel="Earnings from Lending"
-          subValue={data.earnings}
+          subValue={earnings}
         />
       </div>
     </ScrollCues>

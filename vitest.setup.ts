@@ -2,6 +2,14 @@ import "@testing-library/jest-dom";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
+if (typeof window !== "undefined" && !window.ResizeObserver) {
+  window.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 if (typeof window !== "undefined" && !window.matchMedia) {
   window.matchMedia = (query: string): MediaQueryList => ({
     matches: false,
