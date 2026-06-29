@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
@@ -47,17 +49,101 @@ const TopNav = () => {
     disconnect,
   } = useWalletContext();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const walletButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const loading = status === "connecting";
 
+  const closeDropdown = useCallback((restoreFocus = true) => {
+    setIsDropdownOpen(false);
+
+    if (restoreFocus) {
+      requestAnimationFrame(() => walletButtonRef.current?.focus());
+    }
+  }, []);
+
   const handleDisconnect = async () => {
     await disconnect();
-    setIsDropdownOpen(false);
+    closeDropdown(false);
   };
 
   const getShortAddress = (addr: string) => {
     return `${addr.slice(0, 5)}...${addr.slice(-4)}`;
   };
+
+  useEffect(() => {
+    if (!isDropdownOpen) {
+      return;
+    }
+
+    requestAnimationFrame(() => dropdownRef.current?.focus());
+
+    const getFocusableMenuItems = () =>
+      Array.from(
+        dropdownRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter(
+        (element) =>
+          !element.hasAttribute("disabled") && element.tabIndex !== -1,
+      );
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDropdown();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dropdownRef.current) {
+        return;
+      }
+
+      const focusableItems = getFocusableMenuItems();
+      if (focusableItems.length === 0) {
+        event.preventDefault();
+        dropdownRef.current.focus();
+        return;
+      }
+
+      const firstItem = focusableItems[0];
+      const lastItem = focusableItems[focusableItems.length - 1];
+
+      if (document.activeElement === dropdownRef.current) {
+        event.preventDefault();
+        (event.shiftKey ? lastItem : firstItem).focus();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstItem) {
+        event.preventDefault();
+        lastItem.focus();
+      } else if (!event.shiftKey && document.activeElement === lastItem) {
+        event.preventDefault();
+        firstItem.focus();
+      }
+    };
+
+    const handleMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current?.contains(target) ||
+        walletButtonRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      closeDropdown(false);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [closeDropdown, isDropdownOpen]);
 
   return (
     <div className="w-full flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between bg-green-600 px-6 md:px-12 py-4 rounded-md gap-4 sm:gap-0">
@@ -100,9 +186,21 @@ const TopNav = () => {
             {walletAddress ? (
               <div className="relative">
                 <button
+                  ref={walletButtonRef}
                   type="button"
                   aria-label="Connected wallet"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  aria-haspopup="menu"
+                  aria-expanded={isDropdownOpen}
+                  aria-controls={
+                    isDropdownOpen ? "topnav-wallet-menu" : undefined
+                  }
+                  onClick={() => {
+                    if (isDropdownOpen) {
+                      closeDropdown();
+                    } else {
+                      setIsDropdownOpen(true);
+                    }
+                  }}
                   className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
                 >
                   <span>{getShortAddress(walletAddress)}</span>
@@ -119,10 +217,18 @@ const TopNav = () => {
                   </svg>
                 </button>
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700">
+                  <div
+                    id="topnav-wallet-menu"
+                    ref={dropdownRef}
+                    role="menu"
+                    aria-label="Connected wallet actions"
+                    tabIndex={-1}
+                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700 focus:outline-none"
+                  >
                     <button
                       type="button"
-                      onClick={disconnect}
+                      role="menuitem"
+                      onClick={handleDisconnect}
                       className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 text-red-600 font-medium"
                     >
                       Disconnect Wallet
