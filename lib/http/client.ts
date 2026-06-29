@@ -72,6 +72,11 @@ export async function httpGet<T>(url: string, options: RequestOptions = {}): Pro
       const headers = new Headers(fetchOptions.headers);
       headers.set(REQUEST_ID_HEADER, requestId);
       
+      const headers = new Headers(fetchOptions.headers);
+      const activeRequestId = getActiveRequestId();
+      if (activeRequestId && !headers.has(REQUEST_ID_HEADER)) {
+        headers.set(REQUEST_ID_HEADER, activeRequestId);
+      }
       let response: Response;
       try {
         response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
@@ -151,3 +156,62 @@ export async function httpPost<T>(url: string, body: unknown, options: RequestOp
  * @deprecated Use httpGet instead.
  */
 export const httpFetch = httpGet;
+ * Backward-compatible fetch helper. `maxRetries` is interpreted as retries after
+ * the first attempt, while `retries` on httpGet is total attempts.
+ */
+export async function httpFetch<T>(url: string, options: RequestOptions = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  const canRetry = method === 'GET' || method === 'HEAD';
+  const maxRetryCount = canRetry ? (options.maxRetries ?? 3) : 0;
+  const attempts = maxRetryCount + 1;
+  let lastError: HttpError | undefined;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const timeoutMs = options.timeoutMs ?? config.api.timeout;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const { timeoutMs: _t, retries: _r, maxRetries: _mr, backoffMs: _b, retryOnPost: _rp, retryAfterUpperBoundMs: _rao, ...fetchOptions } = options;
+      
+      const headers = new Headers(fetchOptions.headers);
+      const activeRequestId = getActiveRequestId();
+      if (activeRequestId && !headers.has(REQUEST_ID_HEADER)) {
+        headers.set(REQUEST_ID_HEADER, activeRequestId);
+      }
+
+      let response: Response;
+      try {
+        response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
+      } catch (err) {
+        clearTimeout(timer);
+        if ((err as Error).name === 'AbortError') {
+          throw new TimeoutError(url, timeoutMs);
+        }
+        throw new NetworkError(url, err);
+      }
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        throw new UpstreamHttpError(url, response.status);
+      }
+
+      try {
+        return (await response.json()) as T;
+      } catch (err) {
+        throw new HttpError('PARSE_ERROR', `Failed to parse JSON from ${url}`, undefined, err);
+      }
+    } catch (error) {
+      lastError = error instanceof HttpError ? error : new NetworkError(url, error);
+      if (maxRetryCount === 0 || !canRetry || lastError instanceof TimeoutError || lastError instanceof UpstreamHttpError && lastError.status! < 500) {
+        throw lastError;
+      }
+
+      if (attempt < attempts) {
+        await sleep(options.backoffMs ?? 200);
+      }
+    }
+  }
+
+  throw new RetryExhaustedError(url, attempts, lastError!);
+}
+

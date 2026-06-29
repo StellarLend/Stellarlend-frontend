@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LendingData } from "@/app/lending/page";
-import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
@@ -12,6 +11,14 @@ import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
+import {
+  FALLBACK_PRICES,
+  calculateProjectedBorrowHealth,
+  calculateRequiredCollateralAmount,
+  getHealthBand,
+  isProjectedBorrowCollateralized,
+  type PriceMap,
+} from "@/lib/lending/health";
 
 interface BorrowingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -34,6 +41,33 @@ const LOAN_DURATIONS = [
   { days: 180, label: "6 Months" },
 ];
 
+const HEALTH_BAND_STYLES = {
+  healthy: {
+    label: "Healthy",
+    text: "text-emerald-700",
+    border: "border-emerald-200",
+    bg: "bg-emerald-50",
+    helper:
+      "Projected collateral buffer is comfortably above the liquidation threshold.",
+  },
+  "at-risk": {
+    label: "At Risk",
+    text: "text-amber-700",
+    border: "border-amber-200",
+    bg: "bg-amber-50",
+    helper:
+      "Projected position is close to the liquidation threshold. Consider adding collateral.",
+  },
+  critical: {
+    label: "Critical",
+    text: "text-red-700",
+    border: "border-red-200",
+    bg: "bg-red-50",
+    helper:
+      "Projected position is undercollateralised. Add collateral before submitting.",
+  },
+} as const;
+
 /** Inclusive lower bound for a custom loan duration (days). */
 export const CUSTOM_DURATION_MIN_DAYS = 1;
 
@@ -47,12 +81,20 @@ export default function BorrowingForm({
   const [formData, setFormData] = useState<LendingData>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
+  const [priceMap, setPriceMap] = useState<PriceMap>(FALLBACK_PRICES);
+  const [usingFallbackPrices, setUsingFallbackPrices] = useState(false);
+  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+  const lastSuggestedCollateral = useRef<number | null>(null);
 
   // "preset" = one of the LOAN_DURATIONS chips is active
   // "custom" = the Custom chip is active and the numeric input is visible
-  const [durationMode, setDurationMode] = useState<"preset" | "custom">("preset");
+  const [durationMode, setDurationMode] = useState<"preset" | "custom">(
+    "preset",
+  );
   // Raw string so the input can be empty / partially typed without coercion
   const [customDays, setCustomDays] = useState<string>("");
   const [customDaysError, setCustomDaysError] = useState<string>("");
@@ -62,16 +104,104 @@ export default function BorrowingForm({
   const interestRate =
     INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
 
-  // Calculate required collateral (150% of loan amount)
-  const requiredCollateral = formData.amount * 1.5;
+  const collateralAmount = formData.collateralAmount ?? 0;
+  const requiredCollateral = calculateRequiredCollateralAmount({
+    loanAmount: formData.amount,
+    borrowAsset: formData.asset,
+    collateralAsset: formData.collateral ?? "",
+    prices: priceMap,
+  });
+  const projectedHealth = calculateProjectedBorrowHealth({
+    loanAmount: formData.amount,
+    borrowAsset: formData.asset,
+    collateralAmount,
+    collateralAsset: formData.collateral ?? "",
+    prices: priceMap,
+  });
+  const projectedBand = projectedHealth
+    ? getHealthBand(projectedHealth.healthFactor)
+    : null;
+  const projectedBandStyle = projectedBand
+    ? HEALTH_BAND_STYLES[projectedBand]
+    : null;
+  const borrowPrice = priceMap[formData.asset];
+  const collateralPrice = formData.collateral
+    ? priceMap[formData.collateral]
+    : undefined;
+  const borrowPriceAvailable = Boolean(
+    Number.isFinite(borrowPrice) && borrowPrice > 0,
+  );
+  const collateralPriceAvailable = Boolean(
+    Number.isFinite(collateralPrice) && (collateralPrice ?? 0) > 0,
+  );
 
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
       interestRate,
-      collateralAmount: requiredCollateral,
     }));
-  }, [formData.amount, interestRate, requiredCollateral]);
+  }, [interestRate]);
+
+  useEffect(() => {
+    if (requiredCollateral === null) {
+      lastSuggestedCollateral.current = null;
+      return;
+    }
+
+    setFormData((prev) => {
+      const currentAmount = prev.collateralAmount ?? 0;
+      const shouldSuggestMinimum =
+        currentAmount <= 0 || currentAmount === lastSuggestedCollateral.current;
+
+      lastSuggestedCollateral.current = requiredCollateral;
+      return shouldSuggestMinimum
+        ? { ...prev, collateralAmount: requiredCollateral }
+        : prev;
+    });
+  }, [requiredCollateral]);
+
+  useEffect(() => {
+    if (!formData.asset || !formData.collateral) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setIsLoadingPrices(true);
+      try {
+        const assets = `${formData.asset},${formData.collateral}`;
+        const response = await fetch(`/api/prices?assets=${assets}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Price request failed");
+        }
+
+        const data = (await response.json()) as { prices?: PriceMap };
+        if (!data.prices) {
+          throw new Error("Missing prices");
+        }
+
+        setPriceMap(data.prices);
+        setUsingFallbackPrices(false);
+      } catch {
+        if (!controller.signal.aborted) {
+          setPriceMap(FALLBACK_PRICES);
+          setUsingFallbackPrices(true);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingPrices(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [formData.asset, formData.collateral]);
 
   // ---------------------------------------------------------------------------
   // Custom-duration helpers
@@ -152,12 +282,25 @@ export default function BorrowingForm({
       newErrors.collateral = "Please select collateral asset";
     }
 
-    if (
-      collateralAsset &&
-      formData.collateralAmount &&
-      formData.collateralAmount > collateralAsset.balance
-    ) {
+    if (!collateralAmount || collateralAmount <= 0) {
+      newErrors.collateralAmount = "Please enter a collateral amount";
+    } else if (!borrowPriceAvailable || !collateralPriceAvailable) {
+      newErrors.collateralAmount =
+        "A current price is required for both assets before submitting";
+    } else if (collateralAsset && collateralAmount > collateralAsset.balance) {
       newErrors.collateralAmount = "Insufficient collateral balance";
+    } else if (
+      formData.amount > 0 &&
+      !isProjectedBorrowCollateralized({
+        loanAmount: formData.amount,
+        borrowAsset: formData.asset,
+        collateralAmount,
+        collateralAsset: formData.collateral ?? "",
+        prices: priceMap,
+      })
+    ) {
+      newErrors.collateralAmount =
+        "Collateral must be at least 150% of the borrowed value";
     }
 
     setErrors(newErrors);
@@ -204,19 +347,32 @@ export default function BorrowingForm({
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Borrow Asset Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">Asset to Borrow <Tooltip content="The asset you wish to borrow (must be collateralized)."><IconButton aria-label="Help" size="sm" variant="ghost" /></Tooltip></label>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Asset to Borrow{" "}
+            <Tooltip content="The asset you wish to borrow (must be collateralized).">
+              <IconButton aria-label="Help" size="sm" variant="ghost" />
+            </Tooltip>
+          </label>
           <div className="grid grid-cols-2 gap-4">
             <AssetSelector
               assets={ASSETS}
               value={formData.asset}
               label="Asset to Borrow"
               interestRates={INTEREST_RATES}
-              onChange={(asset) =>
+              onChange={(asset) => {
                 setFormData((prev) => ({
                   ...prev,
                   asset,
-                }))
-              }
+                }));
+                if (errors.amount || errors.collateralAmount) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.amount;
+                    delete next.collateralAmount;
+                    return next;
+                  });
+                }
+              }}
             />
           </div>
         </div>
@@ -227,12 +383,12 @@ export default function BorrowingForm({
           type="number"
           step="0.01"
           placeholder="0.00"
-          value={formData.amount || ""}
+          value={formData.amount || 0}
           error={errors.amount}
-          onChange={(e) => {
+          onChange={(amount) => {
             setFormData((prev) => ({
               ...prev,
-              amount: parseFloat(e.target.value) || 0,
+              amount,
             }));
             if (errors.amount) {
               setErrors((prev) => {
@@ -273,7 +429,8 @@ export default function BorrowingForm({
                 }}
                 className={cn(
                   "p-3 rounded-xl border-2 text-center transition-all duration-200",
-                  durationMode === "preset" && formData.duration === duration.days
+                  durationMode === "preset" &&
+                    formData.duration === duration.days
                     ? "border-[#2600FF] bg-blue-50 text-[#2600FF] ring-1 ring-[#2600FF]"
                     : "border-gray-100 hover:border-gray-200 bg-gray-50/30 text-gray-600",
                 )}
@@ -330,7 +487,9 @@ export default function BorrowingForm({
                 onChange={handleCustomDaysChange}
                 placeholder={`${CUSTOM_DURATION_MIN_DAYS}–${CUSTOM_DURATION_MAX_DAYS}`}
                 aria-label="Custom loan duration in days"
-                aria-describedby={customDaysError ? "custom-days-error" : undefined}
+                aria-describedby={
+                  customDaysError ? "custom-days-error" : undefined
+                }
                 aria-invalid={customDaysError ? true : undefined}
                 className={cn(
                   "w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors",
@@ -365,41 +524,22 @@ export default function BorrowingForm({
 
         {/* Collateral Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Collateral Asset
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            {ASSETS.map((asset) => (
-              <button
-                key={asset.symbol}
-                type="button"
-                onClick={() => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    collateral: asset.symbol,
-                  }));
-                  if (errors.collateral) {
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.collateral;
-                      return next;
-                    });
-                  }
-                }}
-                className={cn(
-                  "p-4 rounded-xl border-2 transition-all duration-200 text-left",
-                  formData.collateral === asset.symbol
-                    ? "border-green-500 bg-green-50 ring-1 ring-green-500"
-                    : "border-gray-100 hover:border-gray-200 bg-gray-50/30",
-                )}
-              >
-                <div className="font-bold text-sm mb-1">{asset.symbol}</div>
-                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                  Bal: {asset.balance.toLocaleString()}
-                </div>
-              </button>
-            ))}
-          </div>
+          <AssetSelector
+            assets={ASSETS}
+            value={formData.collateral ?? ""}
+            label="Collateral Asset"
+            onChange={(collateral) => {
+              setFormData((prev) => ({ ...prev, collateral }));
+              if (errors.collateral || errors.collateralAmount) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.collateral;
+                  delete next.collateralAmount;
+                  return next;
+                });
+              }
+            }}
+          />
           {errors.collateral && (
             <p
               className="text-xs text-red-500 font-medium mt-2"
@@ -419,7 +559,16 @@ export default function BorrowingForm({
           placeholder="0.00"
           value={formData.collateralAmount || 0}
           error={errors.collateralAmount}
-          helperText={`Minimum required: ${requiredCollateral.toLocaleString()} ${formData.collateral}`}
+          helperText={
+            requiredCollateral === null
+              ? "A price for both assets is needed to calculate the minimum"
+              : `Minimum required: ${requiredCollateral.toLocaleString(
+                  undefined,
+                  {
+                    maximumFractionDigits: collateralAsset?.precision ?? 2,
+                  },
+                )} ${formData.collateral}`
+          }
           onChange={(collateralAmount) => {
             setFormData((prev) => ({
               ...prev,
@@ -453,7 +602,11 @@ export default function BorrowingForm({
               <div className="flex justify-between text-xs font-medium">
                 <span className="text-amber-700">Required (150%):</span>
                 <span className="font-bold text-[#2600FF]">
-                  {requiredCollateral.toLocaleString()} {formData.collateral}
+                  {requiredCollateral === null
+                    ? "Price unavailable"
+                    : `${requiredCollateral.toLocaleString(undefined, {
+                        maximumFractionDigits: collateralAsset?.precision ?? 2,
+                      })} ${formData.collateral}`}
                 </span>
               </div>
               {collateralAsset && (
@@ -462,7 +615,8 @@ export default function BorrowingForm({
                   <span
                     className={cn(
                       "font-bold",
-                      collateralAsset.balance >= requiredCollateral
+                      requiredCollateral !== null &&
+                        collateralAsset.balance >= requiredCollateral
                         ? "text-green-600"
                         : "text-red-600",
                     )}
@@ -473,17 +627,87 @@ export default function BorrowingForm({
                 </div>
               )}
             </div>
-            {errors.collateralAmount && (
-              <p
-                className="text-xs text-red-500 font-bold"
-                role="alert"
-                aria-live="polite"
+          </div>
+        )}
+
+        {projectedHealth && projectedBandStyle && (
+          <div
+            className={cn(
+              "rounded-xl p-5 border space-y-3",
+              projectedBandStyle.bg,
+              projectedBandStyle.border,
+            )}
+            aria-live="polite"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3
+                  className={cn(
+                    "text-xs font-bold uppercase tracking-wider",
+                    projectedBandStyle.text,
+                  )}
+                >
+                  Projected Health Preview
+                </h3>
+                <p className="text-xs text-gray-600 mt-1">
+                  Compares the borrowed and collateral assets using their USD
+                  prices.
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "text-xs font-bold px-2 py-1 rounded-full bg-white/70",
+                  projectedBandStyle.text,
+                )}
               >
-                {errors.collateralAmount}
+                {projectedBandStyle.label}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs font-medium">
+              <div className="rounded-lg bg-white/70 p-3">
+                <span className="block text-gray-500">Health factor</span>
+                <span
+                  className={cn("text-lg font-bold", projectedBandStyle.text)}
+                >
+                  {projectedHealth.healthFactor.toFixed(2)}x
+                </span>
+              </div>
+              <div className="rounded-lg bg-white/70 p-3">
+                <span className="block text-gray-500">
+                  Collateral liquidation price
+                </span>
+                <span className="text-lg font-bold text-gray-900">
+                  ${projectedHealth.liquidationPrice.toFixed(2)}
+                </span>
+                <span className="block text-gray-500">
+                  per {formData.collateral}
+                </span>
+              </div>
+            </div>
+            <p
+              className={cn("text-xs font-semibold", projectedBandStyle.text)}
+              role={projectedBand === "healthy" ? undefined : "alert"}
+            >
+              {projectedBandStyle.helper}
+            </p>
+            {(usingFallbackPrices || isLoadingPrices) && (
+              <p className="text-[11px] text-gray-500">
+                {isLoadingPrices
+                  ? "Refreshing price data..."
+                  : "Using fallback prices because the live feed is unavailable."}
               </p>
             )}
           </div>
         )}
+
+        {formData.amount > 0 &&
+          collateralAmount > 0 &&
+          (!borrowPriceAvailable || !collateralPriceAvailable) && (
+            <p className="text-xs font-semibold text-red-600" role="alert">
+              A current price is unavailable for this asset pair. Submission is
+              blocked until both prices are available.
+            </p>
+          )}
 
         {/* Terms */}
         <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">

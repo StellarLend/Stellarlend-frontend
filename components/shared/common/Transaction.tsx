@@ -11,13 +11,17 @@ import {
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
-import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
 import dynamic from "next/dynamic";
+import {
+  TransactionRow,
+  TransactionMobileRow,
+  type TransactionRowProps,
+  type TransactionMobileRowProps,
+} from "./TransactionRow";
 
 const TransactionDetail = dynamic(
   () => import("@/components/features/dashboard/components/TransactionDetail"),
@@ -48,13 +52,16 @@ const statusOptions: (TransactionStatus | "All")[] = [
   "Failed",
 ];
 
-interface TransactionsProps {
+export interface TransactionsProps {
   showPagination?: boolean;
   rowHeight?: number;
   viewportHeight?: number;
   hideToolbar?: boolean;
   infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
+  rowComponent?: React.ComponentType<TransactionRowProps>;
+  mobileRowComponent?: React.ComponentType<TransactionMobileRowProps>;
+  transactions?: Transaction[];
 }
 
 export const Transactions = ({
@@ -64,14 +71,18 @@ export const Transactions = ({
   hideToolbar = false,
   infiniteScroll = false,
   onDataLoad,
+  rowComponent: RowComponent = TransactionRow,
+  mobileRowComponent: MobileRowComponent = TransactionMobileRow,
+  transactions: controlledTransactions,
 }: TransactionsProps) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [internalTransactions, setInternalTransactions] = useState<Transaction[]>([]);
+  const transactions = controlledTransactions ?? internalTransactions;
+  const [totalCount, setTotalCount] = useState(controlledTransactions?.length ?? 0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"All" | TransactionStatus>("All");
   const [sortBy, setSortBy] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!controlledTransactions);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -95,11 +106,22 @@ export const Transactions = ({
   const viewportHeight = viewportHeightProp;
   const overscan = 4;
 
+  const transactionsRef = useRef(transactions);
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   useEffect(() => {
+    if (controlledTransactions) {
+      setLoading(false);
+      setTotalCount(controlledTransactions.length);
+      return;
+    }
+
     const loadTransactions = async () => {
       setLoading(true);
 
@@ -115,12 +137,12 @@ export const Transactions = ({
           sortDir,
         });
 
-        setTransactions(payload.transactions);
+        setInternalTransactions(payload.transactions);
         setTotalCount(payload.total);
         onDataLoad?.(payload.total);
       } catch (err) {
         clientLog.error("Failed to load transactions", err);
-        setTransactions([]);
+        setInternalTransactions([]);
         setTotalCount(0);
       } finally {
         setLoading(false);
@@ -186,6 +208,7 @@ export const Transactions = ({
       </span>
     );
   };
+  }, [controlledTransactions, currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
 
   useEffect(() => {
     setScrollTop(0);
@@ -222,7 +245,7 @@ export const Transactions = ({
 
   const focusRow = useCallback(
     (index: number) => {
-      if (index < 0 || index >= transactions.length) return;
+      if (index < 0 || index >= transactionsRef.current.length) return;
 
       setFocusedRowIndex(index);
       const row = rowRefs.current.get(index);
@@ -240,8 +263,12 @@ export const Transactions = ({
         container.scrollTop = Math.min(preferredTop, maxScroll);
       }
     },
-    [transactions.length, rowHeight, viewportHeight]
+    [rowHeight, viewportHeight]
   );
+
+  const handleFocusRow = useCallback((index: number) => {
+    setFocusedRowIndex(index);
+  }, []);
 
   const handleRowKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
@@ -260,14 +287,27 @@ export const Transactions = ({
           break;
         case "End":
           event.preventDefault();
-          focusRow(transactions.length - 1);
+          focusRow(transactionsRef.current.length - 1);
           break;
         default:
           break;
       }
     },
-    [focusRow, transactions.length]
+    [focusRow]
   );
+
+  const handleSelectTxn = useCallback((txn: Transaction) => {
+    setSelectedTxn(txn);
+    setIsDetailOpen(true);
+  }, []);
+
+  const setRowRef = useCallback((index: number, node: HTMLTableRowElement | null) => {
+    if (node) {
+      rowRefs.current.set(index, node);
+    } else {
+      rowRefs.current.delete(index);
+    }
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -564,7 +604,7 @@ export const Transactions = ({
                     {visibleTransactions.map((txn, idx) => {
                       const actualIndex = startIndex + idx;
                       return (
-                        <tr
+                        <RowComponent
                           key={txn.id ?? actualIndex}
                           ref={(node) => {
                             if (node) {
@@ -626,6 +666,15 @@ export const Transactions = ({
                             </button>
                           </td>
                         </tr>
+                          txn={txn}
+                          actualIndex={actualIndex}
+                          isFocused={focusedRowIndex === actualIndex}
+                          isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          onFocusRow={handleFocusRow}
+                          onKeyDownRow={handleRowKeyDown}
+                          onSelectTxn={handleSelectTxn}
+                          setRowRef={setRowRef}
+                        />
                       );
                     })}
                     {shouldVirtualize && bottomSpacerHeight > 0 && (
@@ -727,6 +776,17 @@ export const Transactions = ({
                   </div>
                 </div>
               ))}
+              {visibleTransactions.map((txn, idx) => {
+                const actualIndex = startIndex + idx;
+                return (
+                  <MobileRowComponent
+                    key={txn.id ?? actualIndex}
+                    txn={txn}
+                    isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                    onSelectTxn={handleSelectTxn}
+                  />
+                );
+              })}
 
               {transactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
@@ -754,4 +814,4 @@ export const Transactions = ({
       )}
     </section>
   );
-}
+};

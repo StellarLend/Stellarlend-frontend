@@ -98,6 +98,11 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
         throw new Error("No public key returned from wallet");
       }
 
+      // Validate the resolved address is a 56-char Stellar public key before persisting it
+      if (pubKey.length !== 56 || !pubKey.startsWith("G")) {
+        throw new Error("Invalid Stellar public key");
+      }
+
       // 2. Fetch SEP-10 challenge transaction
       const challengeResponse = await fetch("/api/auth/challenge", {
         method: "POST",

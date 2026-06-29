@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateProjectedBorrowHealth,
+  calculateRequiredCollateralAmount,
   CRITICAL_HEALTH_FACTOR_THRESHOLD,
   getHealthLabel,
   getHealthBand,
   HEALTHY_HEALTH_FACTOR_THRESHOLD,
+  isProjectedBorrowCollateralized,
 } from "@/lib/lending/health";
 
 const prices = {
@@ -31,6 +33,65 @@ describe("lending health preview", () => {
         collateralValueUsd: 300,
       }),
     );
+  });
+
+  it("converts the minimum collateral requirement across asset prices", () => {
+    expect(
+      calculateRequiredCollateralAmount({
+        loanAmount: 100,
+        borrowAsset: "USDC",
+        collateralAsset: "XLM",
+        prices,
+      }),
+    ).toBe(1250);
+
+    expect(
+      calculateRequiredCollateralAmount({
+        loanAmount: 100,
+        borrowAsset: "USDC",
+        collateralAsset: "USDC",
+        prices,
+      }),
+    ).toBe(150);
+  });
+
+  it("returns no collateral requirement for zero loans or missing prices", () => {
+    expect(
+      calculateRequiredCollateralAmount({
+        loanAmount: 0,
+        borrowAsset: "USDC",
+        collateralAsset: "XLM",
+        prices,
+      }),
+    ).toBeNull();
+
+    expect(
+      calculateRequiredCollateralAmount({
+        loanAmount: 100,
+        borrowAsset: "USDC",
+        collateralAsset: "BTC",
+        prices,
+      }),
+    ).toBeNull();
+  });
+
+  it("checks the 150% initial collateral requirement by USD value", () => {
+    const input = {
+      loanAmount: 100,
+      borrowAsset: "USDC",
+      collateralAsset: "XLM",
+      prices,
+    };
+
+    expect(
+      isProjectedBorrowCollateralized({ ...input, collateralAmount: 1250 }),
+    ).toBe(true);
+    expect(
+      isProjectedBorrowCollateralized({ ...input, collateralAmount: 1249 }),
+    ).toBe(false);
+    expect(
+      isProjectedBorrowCollateralized({ ...input, collateralAmount: 0 }),
+    ).toBe(false);
   });
 
   it("returns no preview when inputs or prices are missing", () => {
