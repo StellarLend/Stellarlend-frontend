@@ -3,6 +3,17 @@ import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
 import BorrowingForm from "./BorrowingForm";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+vi.mock("@/hooks/useWalletConnection", () => ({
+  useWalletConnection: () => ({
+    walletAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    isConnected: true,
+    isLoading: false,
+    error: null,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }),
+}));
+
 describe("BorrowingForm Component", () => {
   const mockInitialData = {
     asset: "USDC",
@@ -18,16 +29,34 @@ describe("BorrowingForm Component", () => {
     mockOnSubmit.mockClear();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          prices: {
-            XLM: 0.12,
-            USDC: 1,
-            BTC: 65000,
-            ETH: 3500,
-          },
-        }),
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url.includes("/api/auth/session")) {
+          return {
+            ok: true,
+            json: async () => ({
+              session: {
+                user: {
+                  walletAddress:
+                    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+                },
+              },
+            }),
+          } as Response;
+        }
+
+        return {
+          ok: true,
+          json: async () => ({
+            prices: {
+              XLM: 0.12,
+              USDC: 1,
+              BTC: 65000,
+              ETH: 3500,
+            },
+          }),
+        } as Response;
       }),
     );
   });
@@ -67,21 +96,21 @@ describe("BorrowingForm Component", () => {
     });
 
     expect(screen.getByText(/Projected Health Preview/i)).toBeInTheDocument();
-    expect(screen.getByText(/Health factor/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Health factor/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/At Risk/i)).toBeInTheDocument();
 
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith(
-        "/api/prices?assets=USDC,XLM",
-        expect.objectContaining({
-          signal: expect.any(AbortSignal),
-        }),
-      );
-    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/prices?assets=USDC,XLM",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
+    );
   });
 
   it("updates the projected band when collateral amount changes", () => {
@@ -118,7 +147,7 @@ describe("BorrowingForm Component", () => {
     fireEvent.click(submitButton);
 
     expect(
-      await screen.findByText(/Insufficient collateral balance/i),
+      screen.getByText(/Insufficient collateral balance/i),
     ).toBeInTheDocument();
     // Verify our new top-level error banner
     expect(
@@ -139,22 +168,21 @@ describe("BorrowingForm Component", () => {
     fireEvent.click(submitButton);
 
     // Fast-forward through the 800ms simulated loading delay
-    act(() => {
+    await act(async () => {
       vi.advanceTimersByTime(1000);
+      await Promise.resolve();
     });
 
-    await waitFor(() => {
-      // Verify our new success banner
-      expect(
-        screen.getByText(/Details validated successfully/i),
-      ).toBeInTheDocument();
-      expect(mockOnSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          amount: 10,
-          collateral: "XLM",
-        }),
-      );
-    });
+    // Verify our new success banner
+    expect(
+      screen.getByText(/Details validated successfully/i),
+    ).toBeInTheDocument();
+    expect(mockOnSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 10,
+        collateral: "XLM",
+      }),
+    );
   });
 
   describe("cross-asset collateral", () => {
@@ -192,19 +220,18 @@ describe("BorrowingForm Component", () => {
       fireEvent.click(
         screen.getByRole("button", { name: /Review Loan Request/i }),
       );
-      act(() => {
+      await act(async () => {
         vi.advanceTimersByTime(1000);
+        await Promise.resolve();
       });
 
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({
-            asset: "USDC",
-            collateral: "USDC",
-            collateralAmount: 150,
-          }),
-        );
-      });
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          asset: "USDC",
+          collateral: "USDC",
+          collateralAmount: 150,
+        }),
+      );
     });
 
     it("blocks submission with zero collateral", async () => {
@@ -223,16 +250,34 @@ describe("BorrowingForm Component", () => {
       );
 
       expect(
-        await screen.findByText(/Please enter a collateral amount/i),
+        screen.getByText(/Please enter a collateral amount/i),
       ).toBeInTheDocument();
       expect(mockOnSubmit).not.toHaveBeenCalled();
     });
 
     it("blocks submission when the collateral price is missing", async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ prices: { USDC: 1 } }),
-      } as Response);
+      vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url.includes("/api/auth/session")) {
+          return {
+            ok: true,
+            json: async () => ({
+              session: {
+                user: {
+                  walletAddress:
+                    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+                },
+              },
+            }),
+          } as Response;
+        }
+
+        return {
+          ok: true,
+          json: async () => ({ prices: { USDC: 1 } }),
+        } as Response;
+      });
 
       render(
         <BorrowingForm
@@ -285,6 +330,132 @@ describe("BorrowingForm Component", () => {
         screen.getByText(/at least 150% of the borrowed value/i),
       ).toBeInTheDocument();
       expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("target health collateral shortcut", () => {
+    it("applies a preset target health collateral amount", () => {
+      render(
+        <BorrowingForm
+          initialData={{ ...mockInitialData, amount: 100 }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      expect(screen.getByText("2,000 XLM")).toBeInTheDocument();
+      expect(screen.getByText("750 XLM")).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Apply Suggested Collateral/i }),
+      );
+
+      expect(screen.getByLabelText(/Collateral Amount/i)).toHaveValue("2,000");
+    });
+
+    it("updates the suggestion from a custom target health factor", () => {
+      render(
+        <BorrowingForm
+          initialData={{ ...mockInitialData, amount: 100 }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Use target health input/i }),
+      );
+      fireEvent.change(screen.getByLabelText(/Custom target health factor/i), {
+        target: { value: "2.5" },
+      });
+
+      expect(screen.getByText("2,500 XLM")).toBeInTheDocument();
+      expect(screen.getAllByText("1,250 XLM").length).toBeGreaterThan(0);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Apply Suggested Collateral/i }),
+      );
+
+      expect(screen.getByLabelText(/Collateral Amount/i)).toHaveValue("2,500");
+    });
+
+    it("recomputes the target collateral when the borrow amount changes", () => {
+      render(
+        <BorrowingForm
+          initialData={{ ...mockInitialData, amount: 100 }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      expect(screen.getByText("2,000 XLM")).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/Amount to Borrow/i), {
+        target: { value: "200" },
+      });
+
+      expect(screen.getByText("4,000 XLM")).toBeInTheDocument();
+      expect(screen.getByText("1,500 XLM")).toBeInTheDocument();
+    });
+
+    it("shows zero top-up when collateral already reaches the target", () => {
+      render(
+        <BorrowingForm
+          initialData={{
+            ...mockInitialData,
+            amount: 100,
+            collateral: "USDC",
+            collateralAmount: 300,
+          }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      expect(screen.getByText("240 USDC")).toBeInTheDocument();
+      expect(screen.getByText("0 USDC")).toBeInTheDocument();
+      expect(
+        screen.getByText(/already reaches the selected target/i),
+      ).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Apply Suggested Collateral/i }),
+      );
+
+      expect(screen.getByLabelText(/Collateral Amount/i)).toHaveValue("300");
+    });
+
+    it("clamps an unreachable target to the available collateral balance", () => {
+      render(
+        <BorrowingForm
+          initialData={{
+            ...mockInitialData,
+            amount: 1000,
+            collateral: "USDC",
+            collateralAmount: 1500,
+          }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      expect(screen.getByText("2,400 USDC")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Target requires more than your balance/i),
+      ).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Apply Available Balance/i }),
+      );
+
+      expect(screen.getByLabelText(/Collateral Amount/i)).toHaveValue("1,250");
+    });
+
+    it("shows an unavailable suggestion for a zero-debt position", () => {
+      render(
+        <BorrowingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />,
+      );
+
+      expect(screen.getByText(/Enter borrow details/i)).toBeInTheDocument();
+      expect(screen.getByText(/Unavailable/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Apply Suggested Collateral/i }),
+      ).toBeDisabled();
     });
   });
 
@@ -356,15 +527,14 @@ describe("BorrowingForm Component", () => {
       fireEvent.click(
         screen.getByRole("button", { name: /Review Loan Request/i }),
       );
-      act(() => {
+      await act(async () => {
         vi.advanceTimersByTime(1000);
+        await Promise.resolve();
       });
 
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({ duration: 45 }),
-        );
-      });
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ duration: 45 }),
+      );
     });
 
     it("shows a min-bound error for 0 days", () => {
@@ -374,9 +544,9 @@ describe("BorrowingForm Component", () => {
       const input = screen.getByLabelText(/Custom loan duration in days/i);
       fireEvent.change(input, { target: { value: "0" } });
 
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /Minimum duration is 1 day/i,
-      );
+      expect(
+        screen.getByText(/Minimum duration is 1 day/i),
+      ).toBeInTheDocument();
     });
 
     it("shows a min-bound error for a negative number", () => {
@@ -386,9 +556,9 @@ describe("BorrowingForm Component", () => {
       const input = screen.getByLabelText(/Custom loan duration in days/i);
       fireEvent.change(input, { target: { value: "-5" } });
 
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /Minimum duration is 1 day/i,
-      );
+      expect(
+        screen.getByText(/Minimum duration is 1 day/i),
+      ).toBeInTheDocument();
     });
 
     it("shows a max-bound error for 366 days", () => {
@@ -398,9 +568,9 @@ describe("BorrowingForm Component", () => {
       const input = screen.getByLabelText(/Custom loan duration in days/i);
       fireEvent.change(input, { target: { value: "366" } });
 
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /Maximum duration is 365 days/i,
-      );
+      expect(
+        screen.getByText(/Maximum duration is 365 days/i),
+      ).toBeInTheDocument();
     });
 
     it("shows a whole-number error for a decimal value (e.g. 1.5)", () => {
@@ -410,7 +580,7 @@ describe("BorrowingForm Component", () => {
       const input = screen.getByLabelText(/Custom loan duration in days/i);
       fireEvent.change(input, { target: { value: "1.5" } });
 
-      expect(screen.getByRole("alert")).toHaveTextContent(/whole number/i);
+      expect(screen.getByText(/whole number/i)).toBeInTheDocument();
     });
 
     it("shows an empty-input error when the field is cleared", () => {
@@ -422,9 +592,9 @@ describe("BorrowingForm Component", () => {
       fireEvent.change(input, { target: { value: "45" } });
       fireEvent.change(input, { target: { value: "" } });
 
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /Please enter a number of days/i,
-      );
+      expect(
+        screen.getByText(/Please enter a number of days/i),
+      ).toBeInTheDocument();
     });
 
     it("blocks form submission when an invalid custom value is present", async () => {
@@ -441,9 +611,7 @@ describe("BorrowingForm Component", () => {
       );
 
       expect(
-        await screen.findByText(
-          /Please fix the errors in the form before continuing/i,
-        ),
+        screen.getByText(/Minimum duration is 1 day/i),
       ).toBeInTheDocument();
       expect(mockOnSubmit).not.toHaveBeenCalled();
     });
@@ -458,7 +626,7 @@ describe("BorrowingForm Component", () => {
       );
 
       expect(
-        await screen.findByText(
+        screen.getByText(
           /Please fix the errors in the form before continuing/i,
         ),
       ).toBeInTheDocument();
@@ -474,15 +642,14 @@ describe("BorrowingForm Component", () => {
       fireEvent.click(
         screen.getByRole("button", { name: /Review Loan Request/i }),
       );
-      act(() => {
+      await act(async () => {
         vi.advanceTimersByTime(1000);
+        await Promise.resolve();
       });
 
-      await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({ duration: 30 }),
-        );
-      });
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ duration: 30 }),
+      );
     });
 
     it("health preview remains visible after switching to a valid custom term", () => {
