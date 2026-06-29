@@ -22,6 +22,29 @@ type Severity = {
   className: string;
 };
 
+interface LiquidationNotificationSettings {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  loanAlerts: boolean;
+  marketingEmails: boolean;
+  liquidationAlerts: string[];
+}
+
+interface PreferencesPayload {
+  userId: string;
+  locale: string;
+  displayCurrency: string;
+  notifications: LiquidationNotificationSettings;
+}
+
+const DEFAULT_NOTIFICATION_SETTINGS: LiquidationNotificationSettings = {
+  emailNotifications: true,
+  pushNotifications: true,
+  loanAlerts: true,
+  marketingEmails: false,
+  liquidationAlerts: [],
+};
+
 export function getDistanceToLiquidationPercent(
   position: Pick<LiquidationPosition, "healthFactor">,
 ): number | null {
@@ -89,6 +112,49 @@ function getSeverity(distance: number | null): Severity {
   };
 }
 
+function getLiquidationAlertKey(
+  position: Pick<LiquidationPosition, "asset" | "collateralAsset">,
+): string {
+  return `liquidation:${position.asset}:${position.collateralAsset}`;
+}
+
+function normalizeAlertKeys(alertKeys: unknown): string[] {
+  if (!Array.isArray(alertKeys)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      alertKeys.filter(
+        (alertKey): alertKey is string => typeof alertKey === "string",
+      ),
+    ),
+  ).sort();
+}
+
+function normalizePreferences(
+  raw: unknown,
+  userId: string,
+): PreferencesPayload {
+  const data =
+    raw && typeof raw === "object" ? (raw as Partial<PreferencesPayload>) : {};
+  const notifications =
+    data.notifications && typeof data.notifications === "object"
+      ? data.notifications
+      : DEFAULT_NOTIFICATION_SETTINGS;
+
+  return {
+    userId: data.userId ?? userId,
+    locale: data.locale ?? "en-US",
+    displayCurrency: data.displayCurrency ?? "USD",
+    notifications: {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...notifications,
+      liquidationAlerts: normalizeAlertKeys(notifications.liquidationAlerts),
+    },
+  };
+}
+
 function toSortedRows(positions: LiquidationPosition[]): LiquidationRow[] {
   return positions
     .map((position, originalIndex) => ({
@@ -97,7 +163,10 @@ function toSortedRows(positions: LiquidationPosition[]): LiquidationRow[] {
       originalIndex,
     }))
     .sort((a, b) => {
-      if (a.distanceToLiquidation === null && b.distanceToLiquidation === null) {
+      if (
+        a.distanceToLiquidation === null &&
+        b.distanceToLiquidation === null
+      ) {
         return a.originalIndex - b.originalIndex;
       }
 
@@ -127,6 +196,19 @@ export default function LiquidationsPanel({
   );
   const [isLoading, setIsLoading] = useState(initialPositions === undefined);
   const [error, setError] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<PreferencesPayload | null>(
+    null,
+  );
+  const [alertSubscriptions, setAlertSubscriptions] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [isPreferencesLoading, setIsPreferencesLoading] = useState(
+    Boolean(walletAddress),
+  );
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const [pendingAlertKeys, setPendingAlertKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   useEffect(() => {
     if (initialPositions !== undefined) {
@@ -134,7 +216,9 @@ export default function LiquidationsPanel({
     }
 
     const controller = new AbortController();
-    const query = walletAddress ? `?wallet=${encodeURIComponent(walletAddress)}` : "";
+    const query = walletAddress
+      ? `?wallet=${encodeURIComponent(walletAddress)}`
+      : "";
 
     setIsLoading(true);
     fetcher(`/api/liquidations${query}`, { signal: controller.signal })
@@ -163,7 +247,125 @@ export default function LiquidationsPanel({
     return () => controller.abort();
   }, [fetcher, initialPositions, walletAddress]);
 
+  useEffect(() => {
+    if (!walletAddress) {
+      setPreferences(null);
+      setAlertSubscriptions(new Set());
+      setIsPreferencesLoading(false);
+      setPreferencesError(null);
+      setPendingAlertKeys(new Set());
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setIsPreferencesLoading(true);
+    setPreferencesError(null);
+
+    fetcher(
+      `/api/account/preferences?userId=${encodeURIComponent(walletAddress)}`,
+      {
+        signal: controller.signal,
+      },
+    )
+      .then(async (response) => {
+        if (response.status === 404) {
+          return normalizePreferences(null, walletAddress);
+        }
+
+        if (!response.ok) {
+          throw new Error("Unable to load alert subscriptions");
+        }
+
+        return normalizePreferences(await response.json(), walletAddress);
+      })
+      .then((nextPreferences) => {
+        setPreferences(nextPreferences);
+        setAlertSubscriptions(
+          new Set(nextPreferences.notifications.liquidationAlerts),
+        );
+      })
+      .catch((cause) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") {
+          return;
+        }
+
+        setPreferencesError("Unable to load liquidation alert preferences.");
+      })
+      .finally(() => {
+        setIsPreferencesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [fetcher, walletAddress]);
+
   const rows = useMemo(() => toSortedRows(positions), [positions]);
+
+  async function handleAlertToggle(position: LiquidationRow) {
+    if (!walletAddress) {
+      return;
+    }
+
+    const alertKey = getLiquidationAlertKey(position);
+    const previousSubscriptions = alertSubscriptions;
+    const nextSubscriptions = new Set(previousSubscriptions);
+
+    if (nextSubscriptions.has(alertKey)) {
+      nextSubscriptions.delete(alertKey);
+    } else {
+      nextSubscriptions.add(alertKey);
+    }
+
+    const basePreferences =
+      preferences ?? normalizePreferences(null, walletAddress);
+    const payload: PreferencesPayload = {
+      ...basePreferences,
+      userId: walletAddress,
+      notifications: {
+        ...basePreferences.notifications,
+        liquidationAlerts: Array.from(nextSubscriptions).sort(),
+      },
+    };
+
+    setAlertSubscriptions(nextSubscriptions);
+    setPendingAlertKeys((current) => new Set(current).add(alertKey));
+
+    try {
+      const response = await fetcher("/api/account/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to save alert subscription");
+      }
+
+      let saved: unknown = payload;
+
+      try {
+        saved = await response.json();
+      } catch {
+        saved = payload;
+      }
+
+      const nextPreferences = normalizePreferences(saved, walletAddress);
+      setPreferences(nextPreferences);
+      setAlertSubscriptions(
+        new Set(nextPreferences.notifications.liquidationAlerts),
+      );
+      setPreferencesError(null);
+    } catch {
+      setAlertSubscriptions(new Set(previousSubscriptions));
+      setPreferencesError("Unable to save liquidation alert preference.");
+    } finally {
+      setPendingAlertKeys((current) => {
+        const next = new Set(current);
+        next.delete(alertKey);
+        return next;
+      });
+    }
+  }
 
   if (isLoading) {
     return (
@@ -207,6 +409,18 @@ export default function LiquidationsPanel({
         </div>
       </div>
 
+      {isPreferencesLoading ? (
+        <p role="status" className="mb-3 text-xs font-medium text-[#D4F3E6]">
+          Loading alert subscriptions...
+        </p>
+      ) : null}
+
+      {preferencesError ? (
+        <p role="alert" className="mb-3 text-xs font-medium text-red-200">
+          {preferencesError}
+        </p>
+      ) : null}
+
       {rows.length === 0 ? (
         <p className="rounded-lg border border-[#71B48D33] bg-[#072815] p-4 text-sm text-[#D4F3E6]">
           No liquidation risk positions found.
@@ -237,11 +451,26 @@ export default function LiquidationsPanel({
                 <th scope="col" className="px-3 py-2 font-semibold">
                   Status
                 </th>
+                <th scope="col" className="px-3 py-2 font-semibold">
+                  Alerts
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((position) => {
                 const severity = getSeverity(position.distanceToLiquidation);
+                const alertKey = getLiquidationAlertKey(position);
+                const isSubscribed = alertSubscriptions.has(alertKey);
+                const isPending = pendingAlertKeys.has(alertKey);
+                const isAlertToggleDisabled =
+                  !walletAddress ||
+                  isPreferencesLoading ||
+                  Boolean(walletAddress && !preferences) ||
+                  pendingAlertKeys.size > 0 ||
+                  isPending;
+                const alertLabel = walletAddress
+                  ? `${isSubscribed ? "Disable" : "Enable"} liquidation alerts for ${position.asset} borrowed against ${position.collateralAsset}`
+                  : `Connect a wallet to manage liquidation alerts for ${position.asset} borrowed against ${position.collateralAsset}`;
 
                 return (
                   <tr
@@ -270,12 +499,32 @@ export default function LiquidationsPanel({
                     <td className="px-3 py-3 font-mono">
                       {formatDistance(position.distanceToLiquidation)}
                     </td>
-                    <td className="rounded-r-lg px-3 py-3">
+                    <td className="px-3 py-3">
                       <span
                         className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${severity.className}`}
                       >
                         {severity.label}
                       </span>
+                    </td>
+                    <td className="rounded-r-lg px-3 py-3">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isSubscribed}
+                        aria-label={alertLabel}
+                        title={alertLabel}
+                        disabled={isAlertToggleDisabled}
+                        onClick={() => void handleAlertToggle(position)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full border border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-[#71B48D] focus:ring-offset-2 focus:ring-offset-[#072815] disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isSubscribed ? "bg-[#71B48D]" : "bg-[#1F5A36]"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                            isSubscribed ? "translate-x-5" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
                     </td>
                   </tr>
                 );

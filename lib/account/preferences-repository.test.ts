@@ -107,7 +107,10 @@ describe('PreferencesRepository', () => {
         userId: 'user-upd',
         locale: 'de-DE',
         displayCurrency: 'EUR',
-        notifications: { ...DEFAULT_NOTIFICATION_SETTINGS, marketingEmails: true },
+        notifications: {
+          ...DEFAULT_NOTIFICATION_SETTINGS,
+          marketingEmails: true,
+        },
       });
 
       // Data is updated
@@ -264,6 +267,7 @@ describe('PreferencesRepository', () => {
         pushNotifications: false,
         loanAlerts: true,
         marketingEmails: false,
+        liquidationAlerts: ['liquidation:XLM:USDC'],
       };
 
       const input: UpsertPreferencesInput = {
@@ -285,13 +289,18 @@ describe('PreferencesRepository', () => {
           pushNotifications: false,
           loanAlerts: true,
           marketingEmails: false,
+          liquidationAlerts: ['liquidation:XLM:USDC'],
         },
       });
 
       // Verify the exact keys on the notifications object
-      expect(Object.keys(stored.notifications).sort()).toEqual(
-        ['emailNotifications', 'loanAlerts', 'marketingEmails', 'pushNotifications'],
-      );
+      expect(Object.keys(stored.notifications).sort()).toEqual([
+        'emailNotifications',
+        'liquidationAlerts',
+        'loanAlerts',
+        'marketingEmails',
+        'pushNotifications',
+      ]);
     });
 
     it('stores a defensive copy of the notifications object', () => {
@@ -300,6 +309,7 @@ describe('PreferencesRepository', () => {
         pushNotifications: true,
         loanAlerts: true,
         marketingEmails: false,
+        liquidationAlerts: [],
       };
 
       const input: UpsertPreferencesInput = {
@@ -328,6 +338,7 @@ describe('PreferencesRepository', () => {
         pushNotifications: true,
         loanAlerts: true,
         marketingEmails: false,
+        liquidationAlerts: [],
       });
     });
 

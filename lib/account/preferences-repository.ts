@@ -5,6 +5,7 @@ export interface NotificationSettings {
   pushNotifications: boolean;
   loanAlerts: boolean;
   marketingEmails: boolean;
+  liquidationAlerts: string[];
 }
 
 export interface UserPreferences {
@@ -21,7 +22,7 @@ export type UpsertPreferencesInput = {
   userId: string;
   locale: string;
   displayCurrency: string;
-  notifications: NotificationSettings;
+  notifications?: Partial<NotificationSettings>;
 };
 
 /**
@@ -32,7 +33,24 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   pushNotifications: true,
   loanAlerts: true,
   marketingEmails: false,
+  liquidationAlerts: [],
 };
+
+export function normalizeNotificationSettings(
+  notifications?: Partial<NotificationSettings> | null,
+): NotificationSettings {
+  const liquidationAlerts = Array.isArray(notifications?.liquidationAlerts)
+    ? Array.from(new Set(notifications.liquidationAlerts)).filter(
+        (alertKey): alertKey is string => typeof alertKey === 'string',
+      )
+    : [];
+
+  return {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    ...notifications,
+    liquidationAlerts,
+  };
+}
 
 /**
  * In-memory preferences repository.
@@ -66,7 +84,7 @@ export class PreferencesRepository {
       userId: input.userId,
       locale: input.locale,
       displayCurrency: input.displayCurrency,
-      notifications: { ...input.notifications },
+      notifications: normalizeNotificationSettings(input.notifications),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
