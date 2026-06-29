@@ -1,27 +1,52 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SidebarProvider } from "@/context/SidebarContext";
-import { WalletProvider } from "@/context/WalletContext";
 import { afterEach, beforeEach, vi } from "vitest";
+import { useWallet } from "@/hooks/useWallet";
 
 vi.mock("@/components/shared/layout/NotificationBell", () => ({
   default: () => <button type="button" aria-label="View notifications" />,
+}));
+
+vi.mock("@/components/molecules/SearchBar", () => ({
+  SearchBar: ({ placeholder }: { placeholder: string }) => (
+    <input aria-label={placeholder} placeholder={placeholder} />
+  ),
+}));
+
+vi.mock("@/hooks/useWallet", () => ({
+  useWallet: vi.fn(),
 }));
 
 import TopNav from "./TopNav";
 
 const renderTopNav = () =>
   render(
-    <WalletProvider>
-      <SidebarProvider>
-        <TopNav />
-      </SidebarProvider>
-    </WalletProvider>,
+    <SidebarProvider>
+      <TopNav />
+    </SidebarProvider>,
   );
+
+const mockUseWallet = vi.mocked(useWallet);
+const connectedAddress =
+  "GABCDEFGHIJKLMNOPQRSTUVWXYZ234567890123456789012345678901234";
+
+function setWalletState(overrides: Partial<ReturnType<typeof useWallet>> = {}) {
+  mockUseWallet.mockReturnValue({
+    address: null,
+    network: "TESTNET",
+    status: "disconnected",
+    error: null,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    ...overrides,
+  });
+}
 
 describe("TopNav Accessibility", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    setWalletState();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -33,6 +58,7 @@ describe("TopNav Accessibility", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("renders notification button with proper aria-label", () => {
@@ -133,5 +159,123 @@ describe("TopNav Accessibility", () => {
       expect(btn).toBeInTheDocument();
       expect(btn.tagName).toBe("BUTTON");
     });
+  });
+
+  it("shows a not-connected balance summary without fetching", () => {
+    renderTopNav();
+
+    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
+
+    expect(
+      screen.getByRole("dialog", { name: /wallet balance summary/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Not connected.")).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("loads and renders connected wallet balances with registry decimals", async () => {
+    setWalletState({
+      address: connectedAddress,
+      status: "connected",
+    });
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        balances: [
+          { asset_type: "native", balance: "0.0000000" },
+          {
+            asset_type: "credit_alphanum4",
+            asset_code: "USDC",
+            balance: "1234567.123456",
+          },
+        ],
+      }),
+    } as Response);
+
+    renderTopNav();
+    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading balances...");
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/accounts/${connectedAddress}`),
+    );
+    expect(await screen.findByText("XLM")).toBeInTheDocument();
+    expect(screen.getByText("0.0000000")).toBeInTheDocument();
+    expect(screen.getByText("USDC")).toBeInTheDocument();
+    expect(screen.getByText("1,234,567.123456")).toBeInTheDocument();
+  });
+
+  it("shows unknown asset metadata and grouped large balances", async () => {
+    setWalletState({
+      address: connectedAddress,
+      status: "connected",
+    });
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        balances: [
+          {
+            asset_type: "credit_alphanum4",
+            asset_code: "DOGE",
+            balance: "987654321.1234567",
+          },
+        ],
+      }),
+    } as Response);
+
+    renderTopNav();
+    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
+
+    expect(await screen.findByText("DOGE")).toBeInTheDocument();
+    expect(screen.getByText(/Unknown asset/)).toBeInTheDocument();
+    expect(screen.getByText(/unregistered/)).toBeInTheDocument();
+    expect(screen.getByText("987,654,321.1234567")).toBeInTheDocument();
+  });
+
+  it("shows a non-blocking error state when the balance fetch fails", async () => {
+    setWalletState({
+      address: connectedAddress,
+      status: "connected",
+    });
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({}),
+    } as Response);
+
+    renderTopNav();
+    fireEvent.click(screen.getByRole("button", { name: /wallet balances/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not load balances",
+    );
+    expect(
+      screen.getByRole("button", { name: /connected wallet/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("closes the balance summary with Escape and restores focus", async () => {
+    setWalletState({
+      address: connectedAddress,
+      status: "connected",
+    });
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ balances: [] }),
+    } as Response);
+
+    renderTopNav();
+    const trigger = screen.getByRole("button", { name: /wallet balances/i });
+    fireEvent.click(trigger);
+
+    expect(
+      await screen.findByRole("dialog", { name: /wallet balance summary/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(trigger).toHaveFocus();
   });
 });
