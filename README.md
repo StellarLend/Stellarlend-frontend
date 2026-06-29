@@ -13,6 +13,8 @@ This frontend application provides a modern, responsive web interface for intera
 - [Withdraw supplied liquidity flow](docs/WITHDRAW_FLOW.md)
 - [Environment variables reference](docs/ENVIRONMENT.md)
 - [Client-side data fetching and hooks conventions](docs/data-fetching.md)
+- [Notifications architecture (SSE stream, hub, and store)](docs/notifications.md)
+- [Notifications stream contract reference](docs/notifications-ui.md)
 
 ## ?? Features
 
