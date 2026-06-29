@@ -103,6 +103,7 @@ export default defineConfig({
             "app/api/liquidations/route.test.ts",
             "app/api/notifications/[id]/route.test.ts",
             "app/api/auth/logout/route.test.ts",
+            "app/api/stream/prices/route.test.ts",
             "__tests__/**/*.test.ts",
             "docs/__tests__/**/*.test.ts",
             "lib/streams/**/*.test.ts",
@@ -144,6 +145,7 @@ export default defineConfig({
       include: [
         "app/api/**",
         "lib/**",
+        "hooks/usePriceStream.ts",
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/ui/AmountInput.tsx",
         "components/shared/layout/TopNav.tsx",
@@ -151,6 +153,7 @@ export default defineConfig({
         "components/shared/layout/NavigationMenu.tsx",
         "components/shared/layout/Navbar.tsx",
         "components/shared/layout/SideNav.tsx",
+        "components/shared/common/PriceTicker.tsx",
         "constants/design-tokens.ts",
         "types/enums.ts",
         "app/api/transactions/route.ts",
