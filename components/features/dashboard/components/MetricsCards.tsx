@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Copy } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Copy, Search, X } from "lucide-react";
 import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { Toast } from "@/components/shared/common";
 import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
+import { getAssets, type AssetMetadata } from "@/lib/assets/registry";
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -144,8 +145,76 @@ const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
+// ── Asset filter bar ──────────────────────────────────────────────────────────
+
+interface AssetFilterBarProps {
+  query: string;
+  onChange: (value: string) => void;
+  showing: number;
+  total: number;
+}
+
+function AssetFilterBar({ query, onChange, showing, total }: AssetFilterBarProps) {
+  return (
+    <div className="flex items-center gap-3 mb-4 flex-wrap">
+      <div className="relative flex-1 min-w-[200px]">
+        <label htmlFor="asset-filter" className="sr-only">
+          Filter assets
+        </label>
+        <Search
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71B48D] pointer-events-none"
+          aria-hidden="true"
+        />
+        <input
+          id="asset-filter"
+          type="search"
+          placeholder="Search assets…"
+          value={query}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-[#0A3D1E] border border-[#71B48D33] rounded-lg pl-9 pr-9 py-2 text-sm text-white placeholder-[#71B48D] focus:outline-none focus:ring-2 focus:ring-[#097C4C]"
+        />
+        {query && (
+          <button
+            onClick={() => onChange("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71B48D] hover:text-white"
+            aria-label="Clear filter"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+      <span className="text-[#AAABAB] text-sm whitespace-nowrap" aria-live="polite">
+        Showing {showing} of {total}
+      </span>
+    </div>
+  );
+}
+
+// ── Asset metric card (per-asset breakdown) ───────────────────────────────────
+
+function AssetCard({ asset }: { asset: AssetMetadata }) {
+  const shouldReduceMotion = useReducedMotion();
+  return (
+    <div
+      className={`bg-[#097C4C] rounded-xl p-4 border border-[#71B48D33] ${
+        shouldReduceMotion ? "" : "transform transition-transform hover:scale-[1.02]"
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <img src={asset.logoUrl} alt={`${asset.name} logo`} className="w-6 h-6 rounded-full" />
+        <span className="text-white text-sm font-semibold">{asset.symbol}</span>
+      </div>
+      <p className="text-[#D4F3E6] text-xs">{asset.name}</p>
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 export default function MetricsCards() {
   const [data, setData] = useState<any>(null);
+  const [filterQuery, setFilterQuery] = useState("");
 
   useEffect(() => {
     fetch("/api/positions")
@@ -154,33 +223,84 @@ export default function MetricsCards() {
       .catch(console.error);
   }, []);
 
-  if (!data) return <div className="text-white p-4 text-sm font-medium">Loading metrics...</div>;
+  const allAssets = useMemo(() => {
+    try {
+      return getAssets();
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const filteredAssets = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    if (!q) return allAssets;
+    return allAssets.filter(
+      (a) =>
+        a.symbol.toLowerCase().includes(q) ||
+        a.name.toLowerCase().includes(q),
+    );
+  }, [allAssets, filterQuery]);
+
+  if (!data) return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
 
   return (
-    <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <MetricCard
-          isPrimary
-          icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
-          label="Available Balance"
-          value={data.availableBalance}
-          copyValue={data.copyAddress}
+    <div>
+      <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <MetricCard
+            isPrimary
+            icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
+            label="Available Balance"
+            value={data.availableBalance}
+            copyValue={data.copyAddress}
+          />
+          <MetricCard
+            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
+            label="Total Borrowed Amount"
+            value={data.borrowedAmount}
+            subLabel="Next Due Payment"
+            subValue={data.nextDue}
+          />
+          <MetricCard
+            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
+            label={`Total Supplied (Health Factor: ${data.healthFactor})`}
+            value={data.suppliedFunds}
+            subLabel="Earnings from Lending"
+            subValue={data.earnings}
+          />
+        </div>
+      </ScrollCues>
+
+      {/* Asset filter + breakdown */}
+      <div className="mt-6">
+        <AssetFilterBar
+          query={filterQuery}
+          onChange={setFilterQuery}
+          showing={filteredAssets.length}
+          total={allAssets.length}
         />
-        <MetricCard
-          icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
-          label="Total Borrowed Amount"
-          value={data.borrowedAmount}
-          subLabel="Next Due Payment"
-          subValue={data.nextDue}
-        />
-        <MetricCard
-          icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
-          label={`Total Supplied (Health Factor: ${data.healthFactor})`}
-          value={data.suppliedFunds}
-          subLabel="Earnings from Lending"
-          subValue={data.earnings}
-        />
+
+        {filteredAssets.length === 0 ? (
+          <div
+            role="status"
+            className="text-[#AAABAB] text-sm py-6 text-center"
+          >
+            No assets match &ldquo;{filterQuery}&rdquo;.{" "}
+            <button
+              onClick={() => setFilterQuery("")}
+              className="underline text-[#71B48D] hover:text-white"
+            >
+              Clear filter
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {filteredAssets.map((asset) => (
+              <AssetCard key={asset.symbol} asset={asset} />
+            ))}
+          </div>
+        )}
       </div>
-    </ScrollCues>
+    </div>
   );
 }
