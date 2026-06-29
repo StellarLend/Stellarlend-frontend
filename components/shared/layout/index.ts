@@ -5,5 +5,5 @@ export { default as NavLink } from './NavLink';
 export { NavigationMenu } from './NavigationMenu';
 export { default as DashboardLayout } from './DashboardLayout';
 export { SideNav } from './SideNav';
-export { default as NotificationBell } from './NotificationBell';
-export { default as NotificationCenter } from './NotificationCenter'; 
+export { Breadcrumbs } from './Breadcrumbs';
+export type { BreadcrumbItem, BreadcrumbsProps } from './Breadcrumbs'; 

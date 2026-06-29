@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { navClasses, navTokens } from "@/constants/design-tokens";
 import { IconPlaceholder } from "../ui/icons/IconPlaceholder";
 
@@ -48,19 +49,12 @@ export const NavigationMenu = ({
   onLinkClick,
   isCollapsed = false,
 }: NavigationMenuProps) => {
+  const pathname = usePathname();
   const [activeLink, setActiveLink] = useState("dashboard");
-  const [currentPath, setCurrentPath] = useState("");
 
   useEffect(() => {
     const savedLink = localStorage.getItem("activeLink");
     if (savedLink) setActiveLink(savedLink);
-
-    if (typeof window !== "undefined") {
-      setCurrentPath(window.location.pathname);
-      const handlePopState = () => setCurrentPath(window.location.pathname);
-      window.addEventListener("popstate", handlePopState);
-      return () => window.removeEventListener("popstate", handlePopState);
-    }
   }, []);
 
   const links = [
@@ -122,7 +116,7 @@ export const NavigationMenu = ({
     <nav aria-label="Main navigation">
       <ul className={`space-y-1 ${isCollapsed ? "items-center" : "flex-col"}`}>
         {filteredLinks.map((link) => {
-          const isRouteActive = link.path ? currentPath === link.path : false;
+          const isRouteActive = link.path ? pathname === link.path : false;
           const isActive = link.path
             ? isRouteActive
             : activeLink.toLowerCase() === link.link.toLowerCase();
