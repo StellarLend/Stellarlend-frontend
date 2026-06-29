@@ -40,6 +40,12 @@ export interface SearchResultsProps {
    * Additional CSS classes for the container
    */
   className?: string;
+
+  /**
+   * HTML id attribute for the root container.
+   * Used for ARIA linkage with the combobox input.
+   */
+  id?: string;
 }
 
 /**
@@ -80,6 +86,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
       onClose,
       onNavigate,
       className = '',
+      id,
     },
     ref
   ) => {
@@ -214,6 +221,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
       return (
         <div
           ref={ref}
+          id={id}
           className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 p-4 ${className}`}
         >
           <div className="flex items-center justify-center gap-3 py-6">
@@ -236,6 +244,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
       return (
         <div
           ref={ref}
+          id={id}
           className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 p-4 ${className}`}
         >
           <div className="flex items-start gap-3 py-4">
@@ -260,6 +269,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
       return (
         <div
           ref={ref}
+          id={id}
           className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 p-4 ${className}`}
         >
           <div className="text-center py-6">
@@ -280,6 +290,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
     return (
       <div
         ref={ref}
+        id={id}
         className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 max-h-96 overflow-y-auto ${className}`}
         role="listbox"
         aria-label="Search results"
