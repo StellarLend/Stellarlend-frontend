@@ -110,7 +110,8 @@ export function calculateProjectedBorrowHealth({
   collateralAmount,
   collateralAsset,
   prices,
-}: BorrowHealthInput): BorrowHealthPreview | null {
+  borrowApr = 0,
+}: BorrowHealthInput & { borrowApr?: number }): BorrowHealthPreview | null {
   const borrowPrice = getPositivePrice(prices, borrowAsset);
   const collateralPrice = getPositivePrice(prices, collateralAsset);
 
@@ -123,7 +124,7 @@ export function calculateProjectedBorrowHealth({
     return null;
   }
 
-  const loanValueUsd = loanAmount * borrowPrice;
+  const loanValueUsd = loanAmount * borrowPrice * (1 + borrowApr / 100);
   const collateralValueUsd = collateralAmount * collateralPrice;
 
   if (loanValueUsd <= 0) {

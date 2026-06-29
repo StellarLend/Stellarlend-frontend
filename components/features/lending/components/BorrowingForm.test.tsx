@@ -18,16 +18,45 @@ describe("BorrowingForm Component", () => {
     mockOnSubmit.mockClear();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          prices: {
-            XLM: 0.12,
-            USDC: 1,
-            BTC: 65000,
-            ETH: 3500,
-          },
-        }),
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+
+        if (url.includes("/api/markets")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              markets: [
+                {
+                  asset: "USDC",
+                  supplyApr: 5.5,
+                  borrowApr: 11.25,
+                  utilization: 0.5,
+                  totalSupply: 1000,
+                  totalBorrow: 500,
+                },
+              ],
+              timestamp: "2026-06-29T12:00:00.000Z",
+              source: "test",
+            }),
+          } as Response);
+        }
+
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            prices: {
+              XLM: 0.12,
+              USDC: 1,
+              BTC: 65000,
+              ETH: 3500,
+            },
+          }),
+        } as Response);
       }),
     );
   });
@@ -43,6 +72,62 @@ describe("BorrowingForm Component", () => {
     );
 
     expect(screen.getByText(/Borrow Against Collateral/i)).toBeInTheDocument();
+  });
+
+  it("uses live borrow APR from the markets API when available", async () => {
+    vi.useRealTimers();
+
+    render(
+      <BorrowingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("11.25% APR")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Rates as of/i)).toHaveTextContent(/live/i);
+  });
+
+  it("falls back to the static borrow APR when the market request fails", async () => {
+    vi.useRealTimers();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+
+        if (url.includes("/api/markets")) {
+          return Promise.reject(new Error("network failure"));
+        }
+
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            prices: {
+              XLM: 0.12,
+              USDC: 1,
+              BTC: 65000,
+              ETH: 3500,
+            },
+          }),
+        } as Response);
+      }),
+    );
+
+    render(
+      <BorrowingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("10.5% APR")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Using fallback rates/i)).toBeInTheDocument();
   });
 
   it("calculates required collateral", async () => {

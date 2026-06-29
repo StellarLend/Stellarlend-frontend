@@ -19,6 +19,7 @@ import {
   isProjectedBorrowCollateralized,
   type PriceMap,
 } from "@/lib/lending/health";
+import { useMarketRates } from "@/hooks/useMarketRates";
 
 interface BorrowingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -101,9 +102,28 @@ export default function BorrowingForm({
 
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
   const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
-  const interestRate =
-    INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
-
+  const assetKey = formData.asset?.toUpperCase();
+  const fallbackInterestRate =
+    (assetKey && assetKey in INTEREST_RATES
+      ? INTEREST_RATES[assetKey as keyof typeof INTEREST_RATES]
+      : undefined) ?? 0;
+  const { rate: liveBorrowRate, isLoading: isLoadingMarketRates, error: marketRateError, lastUpdated: marketRateTimestamp } = useMarketRates(assetKey);
+  const resolvedBorrowRate =
+    typeof liveBorrowRate === "number" && Number.isFinite(liveBorrowRate)
+      ? liveBorrowRate
+      : fallbackInterestRate;
+  const isUsingLiveRates =
+    typeof liveBorrowRate === "number" && Number.isFinite(liveBorrowRate);
+  const rateStatusLabel = isLoadingMarketRates
+    ? "Using fallback rates • refreshing"
+    : isUsingLiveRates
+      ? marketRateTimestamp
+        ? `Rates as of ${new Date(marketRateTimestamp).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} • live`
+        : "Rates updated from /api/markets • live"
+      : marketRateError
+        ? "Using fallback rates • live unavailable"
+        : "Using fallback rates • live unavailable";
+  const interestRate = resolvedBorrowRate;
   const collateralAmount = formData.collateralAmount ?? 0;
   const requiredCollateral = calculateRequiredCollateralAmount({
     loanAmount: formData.amount,
@@ -117,6 +137,7 @@ export default function BorrowingForm({
     collateralAmount,
     collateralAsset: formData.collateral ?? "",
     prices: priceMap,
+    borrowApr: resolvedBorrowRate,
   });
   const projectedBand = projectedHealth
     ? getHealthBand(projectedHealth.healthFactor)
@@ -358,7 +379,15 @@ export default function BorrowingForm({
               assets={ASSETS}
               value={formData.asset}
               label="Asset to Borrow"
-              interestRates={INTEREST_RATES}
+              interestRates={Object.fromEntries(
+                ASSETS.map((asset) => [
+                  asset.symbol,
+                  asset.symbol === assetKey
+                    ? resolvedBorrowRate
+                    : INTEREST_RATES[asset.symbol as keyof typeof INTEREST_RATES] ??
+                      0,
+                ]),
+              )}
               onChange={(asset) => {
                 setFormData((prev) => ({
                   ...prev,
@@ -374,6 +403,15 @@ export default function BorrowingForm({
                 }
               }}
             />
+          </div>
+          <div className="mt-2 flex items-start gap-2 text-xs text-gray-500">
+            <span
+              className={cn(
+                "mt-1.5 h-2 w-2 rounded-full shrink-0",
+                isUsingLiveRates ? "bg-emerald-500" : "bg-amber-400",
+              )}
+            />
+            <span>{rateStatusLabel}</span>
           </div>
         </div>
 
