@@ -7,6 +7,9 @@ import useTxStatus from "@/lib/tx/useTxStatus";
 import { Toast } from "@/components/shared/common";
 import LendingForm from "@/components/features/lending/components/LendingForm";
 import TabSelector from "@/components/features/lending/components/TabSelector";
+import TxProgressStepper, {
+  type TxProgressState,
+} from "@/components/features/lending/components/TxProgressStepper";
 import { PageHeader } from "@/components/shared/common";
 import { Skeleton } from "@/components/shared/common/Skeleton";
 import type { LendingActionType } from "@/lib/lending/types";
@@ -139,6 +142,8 @@ export default function LendingPage() {
     useState<CalculationResult | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [txProgressState, setTxProgressState] =
+    useState<TxProgressState | null>(null);
   const [toast, setToast] = useState<{
     variant: "processing" | "success" | "error" | "info";
     title?: string;
@@ -204,6 +209,8 @@ export default function LendingPage() {
 
   const handleConfirm = async () => {
     setShowConfirmModal(false);
+    setTxHash(null);
+    setTxProgressState("building");
 
     const actionData =
       activeTab === "lend"
@@ -229,6 +236,7 @@ export default function LendingPage() {
 
       if (res.status === 429) {
         const json = await res.json().catch(() => ({}));
+        setTxProgressState("failed");
         setToast({
           variant: "error",
           title: "Rate limited",
@@ -241,12 +249,14 @@ export default function LendingPage() {
       const json = await res.json();
       if (res.ok && json?.status === "submitted" && json?.hash) {
         setTxHash(json.hash);
+        setTxProgressState("submitted");
         setToast({
           variant: "processing",
           title: "Transaction submitted",
           description: "Waiting for on-chain settlement...",
         });
       } else {
+        setTxProgressState("failed");
         setToast({
           variant: "error",
           title: "Submission failed",
@@ -254,6 +264,7 @@ export default function LendingPage() {
         });
       }
     } catch (err) {
+      setTxProgressState("failed");
       setToast({
         variant: "error",
         title: "Submission error",
@@ -265,26 +276,28 @@ export default function LendingPage() {
   useEffect(() => {
     if (!txStatus) return;
     if (txStatus.state === "processing") {
+      setTxProgressState("pending");
       setToast({
         variant: "processing",
         title: "Processing",
         description: "Transaction is being processed on-chain",
       });
     } else if (txStatus.state === "completed") {
+      setTxProgressState("confirmed");
       setToast({
         variant: "success",
         title: "Completed",
         description: "Transaction settled on-chain",
       });
-      setTimeout(() => setTxHash(null), 2000);
     } else if (txStatus.state === "failed") {
+      setTxProgressState("failed");
       setToast({
         variant: "error",
         title: "Failed",
         description: "Transaction failed on-chain",
       });
-      setTimeout(() => setTxHash(null), 2000);
     } else if (txStatus.state === "rate_limited") {
+      setTxProgressState("failed");
       setToast({
         variant: "error",
         title: "Rate limited",
@@ -292,6 +305,19 @@ export default function LendingPage() {
       });
     }
   }, [txStatus]);
+
+  useEffect(() => {
+    if (txProgressState !== "confirmed" && txProgressState !== "failed") {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setTxHash(null);
+      setTxProgressState(null);
+    }, 2000);
+
+    return () => window.clearTimeout(timeout);
+  }, [txProgressState]);
 
   const currentData =
     activeTab === "lend"
@@ -347,6 +373,11 @@ export default function LendingPage() {
             ) : (
               <WithdrawForm onSubmit={handleWithdrawSubmit} />
             )}
+            {txProgressState && (
+              <div className="mt-4">
+                <TxProgressStepper state={txProgressState} />
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -381,7 +412,7 @@ export default function LendingPage() {
           onConfirm={handleConfirm}
           data={currentData}
           calculation={calculationResult}
-          type={activeTab === 'repay' ? 'borrow' : activeTab}
+          type={activeTab === "repay" ? "borrow" : activeTab}
         />
         {toast && (
           <Toast
