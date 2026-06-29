@@ -44,6 +44,7 @@ export interface TransactionRowProps {
   actualIndex: number;
   isFocused: boolean;
   isExpanded: boolean;
+  isPending?: boolean;
   onFocusRow: (index: number) => void;
   onKeyDownRow: (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => void;
   onSelectTxn: (txn: Transaction) => void;
@@ -56,6 +57,7 @@ export const TransactionRow = React.memo(
     actualIndex,
     isFocused,
     isExpanded,
+    isPending = false,
     onFocusRow,
     onKeyDownRow,
     onSelectTxn,
@@ -96,7 +98,11 @@ export const TransactionRow = React.memo(
         aria-label={`Transaction ${txn.id}`}
         onFocus={handleFocus}
         onKeyDown={handleKeyDown}
-        className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${isFocused ? "bg-gray-100" : ""}`}
+        className={`border-b whitespace-nowrap last:border-0 transition text-black ${
+          isPending
+            ? "border-dashed border-blue-300 bg-blue-50/50 animate-pulse"
+            : "border-gray-300 hover:bg-gray-50"
+        } ${isFocused && !isPending ? "bg-gray-100" : ""}`}
       >
         <td className="py-3 px-4">
           <div className="font-medium text-black">{txn.type}</div>
@@ -125,14 +131,18 @@ export const TransactionRow = React.memo(
           />
         </td>
         <td className="py-3 px-4">
-          <button
-            onClick={handleSelect}
-            className="text-blue-600 hover:underline"
-            aria-expanded={isExpanded}
-            aria-controls="transaction-detail-drawer"
-          >
-            Details
-          </button>
+          {isPending ? (
+            <span className="text-gray-400 text-sm">Pending…</span>
+          ) : (
+            <button
+              onClick={handleSelect}
+              className="text-blue-600 hover:underline"
+              aria-expanded={isExpanded}
+              aria-controls="transaction-detail-drawer"
+            >
+              Details
+            </button>
+          )}
         </td>
       </tr>
     );
@@ -143,11 +153,12 @@ TransactionRow.displayName = "TransactionRow";
 export interface TransactionMobileRowProps {
   txn: Transaction;
   isExpanded: boolean;
+  isPending?: boolean;
   onSelectTxn: (txn: Transaction) => void;
 }
 
 export const TransactionMobileRow = React.memo(
-  ({ txn, isExpanded, onSelectTxn }: TransactionMobileRowProps) => {
+  ({ txn, isExpanded, isPending = false, onSelectTxn }: TransactionMobileRowProps) => {
     if (txn.id) {
       const count = mobileRowRenderCounts.get(txn.id) ?? 0;
       mobileRowRenderCounts.set(txn.id, count + 1);
@@ -158,7 +169,11 @@ export const TransactionMobileRow = React.memo(
     }, [txn, onSelectTxn]);
 
     return (
-      <div className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+      <div className={`p-4 rounded-xl shadow-sm transition-shadow ${
+        isPending
+          ? "border border-dashed border-blue-300 bg-blue-50/50 animate-pulse"
+          : "border border-gray-200 bg-white hover:shadow-md"
+      }`}>
         <div className="flex justify-between items-start mb-3">
           <div className="flex flex-col">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
@@ -211,14 +226,18 @@ export const TransactionMobileRow = React.memo(
               {formatDateTime(txn.date, txn.time)}
             </div>
           </div>
-          <button
-            onClick={handleSelect}
-            className="mt-2 text-blue-600 hover:underline"
-            aria-expanded={isExpanded}
-            aria-controls="transaction-detail-drawer"
-          >
-            Details
-          </button>
+          {isPending ? (
+            <span className="mt-2 text-gray-400 text-sm">Pending…</span>
+          ) : (
+            <button
+              onClick={handleSelect}
+              className="mt-2 text-blue-600 hover:underline"
+              aria-expanded={isExpanded}
+              aria-controls="transaction-detail-drawer"
+            >
+              Details
+            </button>
+          )}
         </div>
       </div>
     );

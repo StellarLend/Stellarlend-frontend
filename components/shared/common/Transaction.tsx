@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import {
   Search,
   ArrowRight,
@@ -54,6 +54,10 @@ export interface TransactionsProps {
   hideToolbar?: boolean;
   infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
+  rowComponent?: React.ComponentType<TransactionRowProps>;
+  mobileRowComponent?: React.ComponentType<TransactionMobileRowProps>;
+  transactions?: Transaction[];
+  pendingTx?: Transaction;
 }
 
 export const Transactions = ({
@@ -63,6 +67,10 @@ export const Transactions = ({
   hideToolbar = false,
   infiniteScroll = false,
   onDataLoad,
+  rowComponent: RowComponent = TransactionRow,
+  mobileRowComponent: MobileRowComponent = TransactionMobileRow,
+  transactions: controlledTransactions,
+  pendingTx,
 }: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -202,29 +210,41 @@ export const Transactions = ({
     }
   }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
 
-  const shouldVirtualize = transactions.length > 20;
+  const displayTransactions = useMemo(() => {
+    if (!pendingTx) return transactions;
+    const isDuplicate = transactions.some(
+      (t) =>
+        t.type === pendingTx.type &&
+        t.amount === pendingTx.amount &&
+        t.asset === pendingTx.asset
+    );
+    if (isDuplicate) return transactions;
+    return [pendingTx, ...transactions];
+  }, [pendingTx, transactions]);
+
+  const shouldVirtualize = displayTransactions.length > 20;
   const visibleRowCount = shouldVirtualize
-    ? Math.min(transactions.length, Math.max(10, Math.ceil(viewportHeight / rowHeight)))
-    : transactions.length;
-  const virtualizerHeight = shouldVirtualize ? viewportHeight : transactions.length * rowHeight;
+    ? Math.min(displayTransactions.length, Math.max(10, Math.ceil(viewportHeight / rowHeight)))
+    : displayTransactions.length;
+  const virtualizerHeight = shouldVirtualize ? viewportHeight : displayTransactions.length * rowHeight;
 
   const { startIndex, endIndex } = useMemo(() => {
     if (!shouldVirtualize) {
-      return { startIndex: 0, endIndex: transactions.length };
+      return { startIndex: 0, endIndex: displayTransactions.length };
     }
 
     const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
-    const end = Math.min(transactions.length, start + visibleRowCount + overscan * 2);
+    const end = Math.min(displayTransactions.length, start + visibleRowCount + overscan * 2);
     return { startIndex: start, endIndex: end };
-  }, [shouldVirtualize, transactions.length, scrollTop, rowHeight, visibleRowCount]);
+  }, [shouldVirtualize, displayTransactions.length, scrollTop, rowHeight, visibleRowCount]);
 
   const visibleTransactions = useMemo(() => {
-    return transactions.slice(startIndex, endIndex);
-  }, [transactions, startIndex, endIndex]);
+    return displayTransactions.slice(startIndex, endIndex);
+  }, [displayTransactions, startIndex, endIndex]);
 
   const topSpacerHeight = shouldVirtualize ? startIndex * rowHeight : 0;
   const bottomSpacerHeight = shouldVirtualize
-    ? Math.max(0, transactions.length - endIndex) * rowHeight
+    ? Math.max(0, displayTransactions.length - endIndex) * rowHeight
     : 0;
 
   const focusRow = useCallback(
@@ -329,12 +349,7 @@ export const Transactions = ({
   });
   CustomDateInput.displayName = "CustomDateInput";
 
-  // Reconcile and deduplicate pending transactions against indexed transactions
-  const activePendingRows = pendingTxs.filter((ptx) => {
-    return !transactions.some(
-      (tx) => tx.id === ptx.hash || (ptx.hash && tx.id.includes(ptx.hash))
-    );
-  });
+  const isPendingRow = (txn: Transaction) => pendingTx && txn.id === pendingTx.id;
 
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
@@ -382,37 +397,9 @@ export const Transactions = ({
                 <span>Filter</span>
               </div>
 
-              {showFilter && (
-                <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
-                  {statusOptions.map((opt) => (
-                    <button
-                      key={opt}
-                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                        status === opt ? "font-bold text-primary-700" : ""
-                      }`}
-                      onClick={() => {
-                        setStatus(opt);
-                        setShowFilter(false);
-                      }}
-                      type="button"
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="relative" ref={sortRef}>
-              <div
-                className="flex items-center gap-1 cursor-pointer"
-                onClick={() => setShowSort((v) => !v)}
-              >
-                <ChevronsUpDown size={18} />
-                <span>Sort</span>
-              </div>
-
-              {showSort && (
-                <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
+            {showFilter && (
+              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
+                {statusOptions.map((opt) => (
                   <button
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
                       sortBy === "date" ? "font-bold text-primary-700" : ""
@@ -452,54 +439,44 @@ export const Transactions = ({
             </div>
           </div>
 
-          <div className="hidden md:flex gap-2 items-center mt-2 sm:mt-0 text-black/40">
-            <DatePicker
-              selected={dateFromObj}
-              onChange={(date: Date | null) => {
-                setDateFromObj(date);
-                setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
-              }}
-              customInput={
-                <CustomDateInput
-                  value={dateFromObj ? format(dateFromObj, "MM-dd-yyyy") : ""}
-                  placeholder="MM-DD-YYYY"
-                  icon={<CalendarDays size={16} />}
-                  onClick={() => {}}
-                />
-              }
-              dateFormat="MM-dd-yyyy"
-              className="w-[140px] placeholder:text-sm"
-              maxDate={new Date()}
-              isClearable
-              placeholderText="MM-DD-YYYY"
-            />
-            <span className="text-gray-400 text-sm">to</span>
-            <DatePicker
-              selected={dateToObj}
-              onChange={(date: Date | null) => {
-                setDateToObj(date);
-                setDateTo(date ? format(date, "yyyy-MM-dd") : "");
-              }}
-              customInput={
-                <CustomDateInput
-                  value={dateToObj ? format(dateToObj, "MM-dd-yyyy") : ""}
-                  placeholder="MM-DD-YYYY"
-                  icon={<CalendarDays size={16} />}
-                  onClick={() => {}}
-                />
-              }
-              dayClassName={(date) => {
-                if (date < new Date()) {
-                  return "text-gray-400";
-                }
-                return "";
-              }}
-              dateFormat="MM-dd-yyyy"
-              className="w-[140px] placeholder:text-sm"
-              maxDate={new Date()}
-              isClearable
-              placeholderText="MM-DD-YYYY"
-            />
+            {showSort && (
+              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
+                <button
+                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                    sortBy === "date" ? "font-bold text-primary-700" : ""
+                  }`}
+                  onClick={() => {
+                    setSortBy("date");
+                    setShowSort(false);
+                  }}
+                  type="button"
+                >
+                  Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
+                </button>
+                <button
+                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                    sortBy === "amount" ? "font-bold text-primary-700" : ""
+                  }`}
+                  onClick={() => {
+                    setSortBy("amount");
+                    setShowSort(false);
+                  }}
+                  type="button"
+                >
+                  Amount{" "}
+                  {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
+                </button>
+                <button
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  onClick={() => {
+                    setSortDir(sortDir === "asc" ? "desc" : "asc");
+                  }}
+                  type="button"
+                >
+                  Toggle Direction
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -558,7 +535,7 @@ export const Transactions = ({
       <div className="">
         {loading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : transactions.length === 0 && activePendingRows.length === 0 ? (
+        ) : displayTransactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -578,7 +555,7 @@ export const Transactions = ({
                 style={{ maxHeight: `${viewportHeight}px`, height: `${virtualizerHeight}px` }}
                 onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
               >
-                <table className="min-w-full text-sm border" aria-rowcount={transactions.length + 1}>
+                <table className="min-w-full text-sm border" aria-rowcount={displayTransactions.length + 1}>
                   <thead className="sticky top-0 z-10 bg-gray-50">
                     <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
                       <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
@@ -637,73 +614,15 @@ export const Transactions = ({
                     )}
                     {visibleTransactions.map((txn, idx) => {
                       const actualIndex = startIndex + idx;
+                      const isPending = isPendingRow(txn);
                       return (
-                        <tr
-                          key={txn.id ?? actualIndex}
-                          ref={(node) => {
-                            if (node) {
-                              rowRefs.current.set(actualIndex, node);
-                            } else {
-                              rowRefs.current.delete(actualIndex);
-                            }
-                          }}
-                          tabIndex={0}
-                          aria-rowindex={actualIndex + 2}
-                          aria-label={`Transaction ${txn.id}`}
-                          onFocus={() => setFocusedRowIndex(actualIndex)}
-                          onKeyDown={(event) => handleRowKeyDown(event, actualIndex)}
-                          className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
-                        >
-                          <td className="py-3 px-4">
-                            <div className="font-medium text-black">{txn.type}</div>
-                            <div className="text-sm font-normal text-[#667185]">
-                              #{txn.id}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 font-mono">
-                            {txn.amount > 0
-                              ? `+$${txn.amount}`
-                              : `-$${Math.abs(txn.amount)}`}
-                          </td>
-                          <td className="py-6 px-4 flex items-center gap-2">
-                            <Image
-                              src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                              alt={txn.asset}
-                              width={24}
-                              height={24}
-                              className="inline-block"
-                            />
-                            <span className="ml-1 font-medium ">{txn.asset}</span>
-                          </td>
-                          <td className="py-3 px-4 ">
-                            {formatDateTime(txn.date, txn.time)}
-                          </td>
-                          <td className="py-3 px-4">
-                            <StatusBadge
-                              variant={transactionStatusToVariant(txn.status)}
-                              label={txn.status}
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => {
-                                setSelectedTxn(txn);
-                                setIsDetailOpen(true);
-                              }}
-                              className="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-2 py-1 -mx-2 -my-1 transition-colors"
-                              aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
-                              aria-controls="transaction-detail-drawer"
-                              aria-label={`View details for transaction ${txn.id}`}
-                              type="button"
-                            >
-                              Details
-                            </button>
-                          </td>
-                        </tr>
+                        <RowComponent
+                          key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                           txn={txn}
                           actualIndex={actualIndex}
                           isFocused={focusedRowIndex === actualIndex}
                           isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          isPending={isPending}
                           onFocusRow={handleFocusRow}
                           onKeyDownRow={handleRowKeyDown}
                           onSelectTxn={handleSelectTxn}
@@ -717,7 +636,7 @@ export const Transactions = ({
                       </tr>
                     )}
 
-                    {!shouldVirtualize && transactions.length === 0 && !loading && (
+                    {!shouldVirtualize && displayTransactions.length === 0 && !loading && (
                       <tr>
                         <td colSpan={6} className="text-center py-6">
                           No transactions found.
@@ -812,74 +731,19 @@ export const Transactions = ({
               ))}
               {visibleTransactions.map((txn, idx) => {
                 const actualIndex = startIndex + idx;
+                const isPending = isPendingRow(txn);
                 return (
                   <MobileRowComponent
-                    key={txn.id ?? actualIndex}
+                    key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                     txn={txn}
                     isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                    isPending={isPending}
                     onSelectTxn={handleSelectTxn}
                   />
                 );
               })}
 
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
-                    <div>
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                        Asset
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Image
-                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                          alt={txn.asset}
-                          width={20}
-                          height={20}
-                        />
-                        <span className="font-bold text-gray-900">
-                          {txn.asset}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                        Amount
-                      </span>
-                      <div
-                        className={`font-mono font-bold text-base ${
-                          txn.amount > 0 ? "text-green-600" : "text-gray-900"
-                        }`}
-                      >
-                        {txn.amount > 0
-                          ? `+$${txn.amount}`
-                          : `-$${Math.abs(txn.amount)}`}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-                    <div>
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                        Date & Time
-                      </span>
-                      <div className="text-sm text-gray-700">
-                        {formatDateTime(txn.date, txn.time)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedTxn(txn);
-                        setIsDetailOpen(true);
-                      }}
-                      className="mt-2 text-blue-600 hover:underline"
-                      aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
-                      aria-controls="transaction-detail-drawer"
-                    >
-                      Details
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {transactions.length === 0 && activePendingRows.length === 0 && !loading && (
+              {displayTransactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
