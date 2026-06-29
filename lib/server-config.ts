@@ -28,6 +28,10 @@ function normalizeUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
+function normalizeUrl(url: string): string {
+  return url.trim().replace(/\/+$/, '');
+}
+
 function parseHorizonUrls(rawValue?: string): string[] {
   const rawList = rawValue?.trim() || '';
   const urls = rawList

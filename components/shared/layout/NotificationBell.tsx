@@ -174,8 +174,20 @@ const NotificationBell = () => {
   const hasUnread = notifications.some((n) => !n.read);
   const hasAny = notifications.length > 0;
 
-  const displayCount = unreadCount > 99 ? '99+' : unreadCount.toString();
-  const showBadge = unreadCount > 0;
+  const displayCount = useMemo(
+    () => (unreadCount > 99 ? '99+' : unreadCount.toString()),
+    [unreadCount],
+  );
+
+  const showBadge = useMemo(() => unreadCount > 0, [unreadCount]);
+
+  const ariaLabel = useMemo(
+    () =>
+      showBadge
+        ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
+        : 'No unread notifications',
+    [showBadge, unreadCount],
+  );
 
   return (
     <div className="relative inline-block">

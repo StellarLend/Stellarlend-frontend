@@ -127,6 +127,10 @@ The component reorganization is complete and ready for:
 2. Development of feature-specific hooks and services
 3. Addition of new components following the established pattern
 
+## 📚 References & Guides
+
+- [Wallet Context and Hook Integration Guide](docs/wallet-integration.md) — Reference guide for using `WalletContext` and freighter connections in component hierarchies.
+
 ## 📝 Notes
 
 - All TypeScript compilation errors are related to missing type declarations for external libraries (next/image, lucide-react, etc.) and are not related to the reorganization

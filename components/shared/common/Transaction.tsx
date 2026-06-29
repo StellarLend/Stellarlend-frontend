@@ -11,13 +11,17 @@ import {
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
-import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
 import dynamic from "next/dynamic";
+import {
+  TransactionRow,
+  TransactionMobileRow,
+  type TransactionRowProps,
+  type TransactionMobileRowProps,
+} from "./TransactionRow";
 
 const TransactionDetail = dynamic(
   () => import("@/components/features/dashboard/components/TransactionDetail"),
@@ -48,13 +52,16 @@ const statusOptions: (TransactionStatus | "All")[] = [
   "Failed",
 ];
 
-interface TransactionsProps {
+export interface TransactionsProps {
   showPagination?: boolean;
   rowHeight?: number;
   viewportHeight?: number;
   hideToolbar?: boolean;
   infiniteScroll?: boolean;
   onDataLoad?: (totalCount: number) => void;
+  rowComponent?: React.ComponentType<TransactionRowProps>;
+  mobileRowComponent?: React.ComponentType<TransactionMobileRowProps>;
+  transactions?: Transaction[];
 }
 
 export const Transactions = ({
@@ -64,14 +71,18 @@ export const Transactions = ({
   hideToolbar = false,
   infiniteScroll = false,
   onDataLoad,
+  rowComponent: RowComponent = TransactionRow,
+  mobileRowComponent: MobileRowComponent = TransactionMobileRow,
+  transactions: controlledTransactions,
 }: TransactionsProps) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [internalTransactions, setInternalTransactions] = useState<Transaction[]>([]);
+  const transactions = controlledTransactions ?? internalTransactions;
+  const [totalCount, setTotalCount] = useState(controlledTransactions?.length ?? 0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"All" | TransactionStatus>("All");
   const [sortBy, setSortBy] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!controlledTransactions);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -95,11 +106,22 @@ export const Transactions = ({
   const viewportHeight = viewportHeightProp;
   const overscan = 4;
 
+  const transactionsRef = useRef(transactions);
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   useEffect(() => {
+    if (controlledTransactions) {
+      setLoading(false);
+      setTotalCount(controlledTransactions.length);
+      return;
+    }
+
     const loadTransactions = async () => {
       setLoading(true);
 
@@ -115,12 +137,12 @@ export const Transactions = ({
           sortDir,
         });
 
-        setTransactions(payload.transactions);
+        setInternalTransactions(payload.transactions);
         setTotalCount(payload.total);
         onDataLoad?.(payload.total);
       } catch (err) {
         clientLog.error("Failed to load transactions", err);
-        setTransactions([]);
+        setInternalTransactions([]);
         setTotalCount(0);
       } finally {
         setLoading(false);
@@ -128,38 +150,7 @@ export const Transactions = ({
     };
 
     loadTransactions();
-  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
-
-  const formatDateTime = (date: string, time: string) => {
-    let fixedTime = time.replace(/(AM|PM)$/i, " $1");
-    const d = new Date(date + " " + fixedTime);
-
-    //  date for month
-    const options: Intl.DateTimeFormatOptions = {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-    };
-
-    // date for hours and minites
-    const dateStr = d.toLocaleDateString("en-US", options);
-    let [h, m] = [d.getHours(), d.getMinutes()];
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12;
-    h = h ? h : 12;
-
-    // time
-    const timeStr = `${h.toString().padStart(2, "0")}:${m
-      .toString()
-      .padStart(2, "0")}${ampm}`;
-    return (
-      <span className="flex items-center gap-2">
-        <span>{dateStr}</span>
-        <span className="w-px h-4 bg-gray-300 mx-1 inline-block" />
-        <span>{timeStr}</span>
-      </span>
-    );
-  };
+  }, [controlledTransactions, currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
 
   useEffect(() => {
     setScrollTop(0);
@@ -196,7 +187,7 @@ export const Transactions = ({
 
   const focusRow = useCallback(
     (index: number) => {
-      if (index < 0 || index >= transactions.length) return;
+      if (index < 0 || index >= transactionsRef.current.length) return;
 
       setFocusedRowIndex(index);
       const row = rowRefs.current.get(index);
@@ -214,8 +205,12 @@ export const Transactions = ({
         container.scrollTop = Math.min(preferredTop, maxScroll);
       }
     },
-    [transactions.length, rowHeight, viewportHeight]
+    [rowHeight, viewportHeight]
   );
+
+  const handleFocusRow = useCallback((index: number) => {
+    setFocusedRowIndex(index);
+  }, []);
 
   const handleRowKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
@@ -234,14 +229,27 @@ export const Transactions = ({
           break;
         case "End":
           event.preventDefault();
-          focusRow(transactions.length - 1);
+          focusRow(transactionsRef.current.length - 1);
           break;
         default:
           break;
       }
     },
-    [focusRow, transactions.length]
+    [focusRow]
   );
+
+  const handleSelectTxn = useCallback((txn: Transaction) => {
+    setSelectedTxn(txn);
+    setIsDetailOpen(true);
+  }, []);
+
+  const setRowRef = useCallback((index: number, node: HTMLTableRowElement | null) => {
+    if (node) {
+      rowRefs.current.set(index, node);
+    } else {
+      rowRefs.current.delete(index);
+    }
+  }, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -500,66 +508,17 @@ export const Transactions = ({
                     {visibleTransactions.map((txn, idx) => {
                       const actualIndex = startIndex + idx;
                       return (
-                        <tr
+                        <RowComponent
                           key={txn.id ?? actualIndex}
-                          ref={(node) => {
-                            if (node) {
-                              rowRefs.current.set(actualIndex, node);
-                            } else {
-                              rowRefs.current.delete(actualIndex);
-                            }
-                          }}
-                          tabIndex={0}
-                          aria-rowindex={actualIndex + 2}
-                          aria-label={`Transaction ${txn.id}`}
-                          onFocus={() => setFocusedRowIndex(actualIndex)}
-                          onKeyDown={(event) => handleRowKeyDown(event, actualIndex)}
-                          className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${focusedRowIndex === actualIndex ? "bg-gray-100" : ""}`}
-                        >
-                          <td className="py-3 px-4">
-                            <div className="font-medium text-black">{txn.type}</div>
-                            <div className="text-sm font-normal text-[#667185]">
-                              #{txn.id}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 font-mono">
-                            {txn.amount > 0
-                              ? `+$${txn.amount}`
-                              : `-$${Math.abs(txn.amount)}`}
-                          </td>
-                          <td className="py-6 px-4 flex items-center gap-2">
-                            <Image
-                              src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                              alt={txn.asset}
-                              width={24}
-                              height={24}
-                              className="inline-block"
-                            />
-                            <span className="ml-1 font-medium ">{txn.asset}</span>
-                          </td>
-                          <td className="py-3 px-4 ">
-                            {formatDateTime(txn.date, txn.time)}
-                          </td>
-                          <td className="py-3 px-4">
-                            <StatusBadge
-                              variant={transactionStatusToVariant(txn.status)}
-                              label={txn.status}
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => {
-                                setSelectedTxn(txn);
-                                setIsDetailOpen(true);
-                              }}
-                              className="text-blue-600 hover:underline"
-                              aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
-                              aria-controls="transaction-detail-drawer"
-                            >
-                              Details
-                            </button>
-                          </td>
-                        </tr>
+                          txn={txn}
+                          actualIndex={actualIndex}
+                          isFocused={focusedRowIndex === actualIndex}
+                          isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          onFocusRow={handleFocusRow}
+                          onKeyDownRow={handleRowKeyDown}
+                          onSelectTxn={handleSelectTxn}
+                          setRowRef={setRowRef}
+                        />
                       );
                     })}
                     {shouldVirtualize && bottomSpacerHeight > 0 && (
@@ -582,83 +541,17 @@ export const Transactions = ({
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {visibleTransactions.map((txn, idx) => (
-                <div
-                  key={txn.id ?? startIndex + idx}
-                  className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                        Type
-                      </span>
-                      <div className="font-bold text-gray-900">{txn.type}</div>
-                      <div className="text-xs text-gray-500 font-mono">
-                        #{txn.id}
-                      </div>
-                    </div>
-                    <StatusBadge
-                      variant={transactionStatusToVariant(txn.status)}
-                      label={txn.status}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
-                    <div>
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                        Asset
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Image
-                          src={`/icons/${txn.asset.toLowerCase()}.svg`}
-                          alt={txn.asset}
-                          width={20}
-                          height={20}
-                        />
-                        <span className="font-bold text-gray-900">
-                          {txn.asset}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                        Amount
-                      </span>
-                      <div
-                        className={`font-mono font-bold text-base ${
-                          txn.amount > 0 ? "text-green-600" : "text-gray-900"
-                        }`}
-                      >
-                        {txn.amount > 0
-                          ? `+$${txn.amount}`
-                          : `-$${Math.abs(txn.amount)}`}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-                    <div>
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1">
-                        Date & Time
-                      </span>
-                      <div className="text-sm text-gray-700">
-                        {formatDateTime(txn.date, txn.time)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSelectedTxn(txn);
-                        setIsDetailOpen(true);
-                      }}
-                      className="mt-2 text-blue-600 hover:underline"
-                      aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
-                      aria-controls="transaction-detail-drawer"
-                    >
-                      Details
-                    </button>
-                  </div>
-                </div>
-              ))}
+              {visibleTransactions.map((txn, idx) => {
+                const actualIndex = startIndex + idx;
+                return (
+                  <MobileRowComponent
+                    key={txn.id ?? actualIndex}
+                    txn={txn}
+                    isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                    onSelectTxn={handleSelectTxn}
+                  />
+                );
+              })}
 
               {transactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
@@ -686,4 +579,4 @@ export const Transactions = ({
       )}
     </section>
   );
-}
+};
