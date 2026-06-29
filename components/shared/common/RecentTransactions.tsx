@@ -2,46 +2,44 @@
 
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
-import React, { useMemo } from "react";
-import { Transactions, type TransactionsProps } from "./Transaction";
-import { TransactionRow, TransactionMobileRow } from "./TransactionRow";
-import useTxStatus from "@/lib/tx/useTxStatus";
-import { TX_HOOK_STATE } from "@/lib/tx/constants";
-import type { InFlightTx, Transaction } from "@/types/Transaction";
+import React, { useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Transactions } from "./Transaction";
+import type { TransactionSortKey, TransactionSortOrder } from "@/lib/transactions/sort";
 
-export interface RecentTransactionsProps extends Partial<TransactionsProps> {
-  inFlightTx?: InFlightTx;
-}
+export const RecentTransactions = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-export const RecentTransactions = ({ inFlightTx, ...props }: RecentTransactionsProps) => {
-  const txStatus = useTxStatus(inFlightTx?.hash ?? null);
+  const [sortKey, setSortKey] = useState<TransactionSortKey>("date");
+  const [sortOrder, setSortOrder] = useState<TransactionSortOrder>("desc");
 
-  const pendingTx: Transaction | undefined = useMemo(() => {
-    if (!inFlightTx || !txStatus) return undefined;
+  useEffect(() => {
+    const fromQuery = searchParams.get("sort");
+    const order = searchParams.get("order");
 
-    if (txStatus.state === TX_HOOK_STATE.COMPLETED) return undefined;
+    if (fromQuery === "amount" || fromQuery === "status") {
+      setSortKey(fromQuery);
+    }
 
-    const now = new Date();
-    const date = now.toISOString().slice(0, 10);
-    const hours = now.getHours();
-    const minutes = now.getMinutes().toString().padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    const h = hours % 12 || 12;
-    const time = `${h.toString().padStart(2, "0")}:${minutes}${ampm}`;
+    if (order === "asc" || order === "desc") {
+      setSortOrder(order);
+    }
+  }, [searchParams]);
 
-    const status =
-      txStatus.state === TX_HOOK_STATE.FAILED ? "Failed" : "Processing";
-
-    return {
-      id: inFlightTx.hash.slice(0, 8),
-      type: inFlightTx.type,
-      amount: inFlightTx.amount,
-      asset: inFlightTx.asset,
-      date,
-      time,
-      status: status as "Processing" | "Failed",
-    };
-  }, [inFlightTx, txStatus]);
+  const updateSort = useCallback(
+    (nextKey: TransactionSortKey, nextOrder?: TransactionSortOrder) => {
+      const resolvedOrder = nextOrder ?? (sortKey === nextKey && sortOrder === "asc" ? "desc" : "asc");
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("sort", nextKey);
+      params.set("order", resolvedOrder);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      setSortKey(nextKey);
+      setSortOrder(resolvedOrder);
+    },
+    [pathname, router, searchParams, sortKey, sortOrder],
+  );
 
   return (
     <section className="bg-white rounded-xl shadow h-full flex flex-col">
@@ -54,10 +52,9 @@ export const RecentTransactions = ({ inFlightTx, ...props }: RecentTransactionsP
       <Transactions
         showPagination={false}
         infiniteScroll
-        rowComponent={TransactionRow}
-        mobileRowComponent={TransactionMobileRow}
-        pendingTx={pendingTx}
-        {...props}
+        sortKey={sortKey}
+        sortOrder={sortOrder}
+        onSortChange={updateSort}
       />
     </section>
   );
