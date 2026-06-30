@@ -92,6 +92,14 @@ Cache keys follow the convention `<domain>:<dimension>:<value>`:
 | `/api/markets` | `markets:assets:BTC,ETH` | 30 s / 60 s |
 | `/api/positions` | `positions:public` | 10 s / 20 s |
 
+### lib/rate-limit.ts and lib/rate-limit/account-bucket.ts
+
+Anonymous API requests are limited in `middleware.ts` through the fixed-window
+`rateLimit` utility. Authenticated transaction and account-deletion challenge
+routes use the token-bucket `accountBucketRateLimit` utility. The current
+strategy, headers, response shapes, and tuning knobs are documented in
+[docs/rate-limiting.md](./rate-limiting.md).
+
 ### lib/http/client.ts — HTTP client
 
 `httpGet<T>(url, options?)` — GET with exponential-backoff retry (3 attempts).
