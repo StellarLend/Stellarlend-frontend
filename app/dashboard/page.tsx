@@ -1,6 +1,5 @@
 "use client";
 import Image from "next/image";
-import { useEffect, useState } from "react";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
 import LiquidationsPanel from "@/components/features/dashboard/components/LiquidationsPanel";

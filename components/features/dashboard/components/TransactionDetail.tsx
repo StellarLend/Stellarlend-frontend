@@ -70,32 +70,6 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
       setToast({ title: "Copy failed", description: "Failed to copy transaction ID", variant: "error" });
     }
     setTimeout(() => setToast(null), 3000);
-
-    if (result.success) {
-      setToast({
-        variant: "success",
-        title: "Copied!",
-        description: "Transaction ID copied to clipboard.",
-      });
-    } else {
-      const messages: Record<CopyFailureReason, { title: string; description: string }> = {
-        clipboard_error: {
-          title: "Copy Failed",
-          description: "Clipboard access is unavailable. Try copying the ID manually.",
-        },
-        invalid_address: {
-          title: "Copy Failed",
-          description: "Could not copy the transaction ID.",
-        },
-      };
-
-      setToast({
-        variant: "error",
-        ...messages[result.reason!],
-      });
-    }
-
-    setTimeout(() => setToast(null), 4000);
   };
 
   const formatDateTime = (dateStr: string, timeStr: string) => {

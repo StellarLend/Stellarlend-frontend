@@ -71,6 +71,7 @@ export default defineConfig({
 
           include: [
             "app/lending/**/*.test.tsx",
+            "app/account/sessions/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/atoms/Button/Button.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
@@ -78,6 +79,7 @@ export default defineConfig({
             "components/shared/common/**/*.test.tsx",
             "components/shared/ui/**/*.test.tsx",
             "components/features/dashboard/**/*.test.tsx",
+            "components/features/account/**/*.test.tsx",
             "lib/utils/clipboard.test.ts",
             "lib/search/**/*.test.ts",
             "components/features/lending/**/*.test.tsx",
@@ -101,21 +103,34 @@ export default defineConfig({
             "app/api/liquidations/route.test.ts",
             "app/api/notifications/[id]/route.test.ts",
             "app/api/auth/logout/route.test.ts",
+            "app/api/stream/prices/route.test.ts",
             "__tests__/**/*.test.ts",
+            "docs/__tests__/**/*.test.ts",
             "lib/streams/**/*.test.ts",
             "lib/security/**/*.test.ts",
             "lib/utils/**/*.test.ts",
-            "lib/**/*.test.ts",
           ],
+            include: [
+                "types/enums.test.ts",
+                "app/api/markets/route.test.ts",
+                "app/api/transactions/route.test.ts",
+                "app/api/liquidations/route.test.ts",
+                "app/api/notifications/[id]/route.test.ts",
+                "__tests__/**/*.test.ts",
+                "lib/**/*.test.ts",
+            ],
         },
       },
       {
+        extends: true,
         test: {
           name: "server",
           environment: "node",
+          globals: true,
+          setupFiles: "./vitest.setup.ts",
           include: [
             "test/server/**/*.test.ts",
-            "app/api/markets/route.test.ts",
+            "app/api/**/*.test.ts",
           ],
           alias: {
             "@": path.resolve(dirname, "."),
@@ -130,6 +145,7 @@ export default defineConfig({
       include: [
         "app/api/**",
         "lib/**",
+        "components/atoms/Tooltip/Tooltip.tsx",
         "components/atoms/IconButton/IconButton.tsx",
         "components/shared/ui/AmountInput.tsx",
         "components/shared/layout/TopNav.tsx",
@@ -137,6 +153,7 @@ export default defineConfig({
         "components/shared/layout/NavigationMenu.tsx",
         "components/shared/layout/Navbar.tsx",
         "components/shared/layout/SideNav.tsx",
+        "components/shared/common/PriceTicker.tsx",
         "constants/design-tokens.ts",
         "types/enums.ts",
         "app/api/transactions/route.ts",

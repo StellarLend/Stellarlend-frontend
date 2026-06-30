@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import serverConfig from '@/lib/server-config';
 
 export function initSentry() {
-  if (!serverConfig.sentry.dsn) {
+  if (!serverConfig.sentry?.dsn) {
     return;
   }
 

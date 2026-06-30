@@ -2,8 +2,10 @@
 
 import { useMemo } from "react";
 import { AlertCircle, TrendingUp } from "lucide-react";
+import SupplyApyChart from "./SupplyApyChart";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { CollateralBreakdown } from "./CollateralBreakdown";
+import CollateralRatioHistoryChart from "./CollateralRatioHistoryChart";
 import { useCollateralShares } from "@/hooks/usePositions";
 
 interface PositionData {
@@ -274,6 +276,12 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
         </div>
       </div>
 
+      <div className="mt-6">
+        <SupplyApyChart className="w-full" />
+      </div>
+      <div className="mt-6">
+        <CollateralRatioHistoryChart className="w-full" />
+      </div>
       {/* Collateral Breakdown */}
       <CollateralBreakdown shares={shares} isLoading={sharesLoading} />
 

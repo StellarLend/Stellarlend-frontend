@@ -10,6 +10,7 @@ import {
 export interface UseInfiniteTransactionsOptions
   extends Omit<FetchTransactionsOptions, "cursor" | "limit" | "page" | "pageSize"> {
   limit?: number;
+  enabled?: boolean;
 }
 
 export interface UseInfiniteTransactionsReturn {
@@ -26,11 +27,11 @@ export interface UseInfiniteTransactionsReturn {
 export function useInfiniteTransactions(
   options: UseInfiniteTransactionsOptions = {},
 ): UseInfiniteTransactionsReturn {
-  const { limit = 6, ...filters } = options;
+  const { limit = 6, enabled = true, ...filters } = options;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!skip);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -79,11 +80,12 @@ export function useInfiniteTransactions(
   );
 
   useEffect(() => {
+    if (!enabled) return;
     if (!initialLoadRef.current) {
       initialLoadRef.current = true;
       fetchPage(null, false);
     }
-  }, [fetchPage]);
+  }, [fetchPage, enabled]);
 
   const loadMore = useCallback(() => {
     if (nextCursor && !loadingRef.current) {

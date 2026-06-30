@@ -29,6 +29,14 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning={true}>
+      <head>
+        {/*
+         * Strict referrer policy: browsers will only send the origin (no path/query)
+         * when navigating cross-origin, and the full URL for same-origin requests.
+         * This prevents sensitive URL parameters from leaking to third parties.
+         */}
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
+      </head>
       <body className={`${inter.variable} antialiased`}>
         {/* Top progress bar */}
         <NextTopLoader
@@ -43,10 +51,13 @@ export default async function RootLayout({
           shadow="0 0 10px #15a350, 0 0 5px #15a350"
           zIndex={9999}
         />
-        {/* Example inline script that uses the CSP nonce */}
+        {/* Inline script that exposes the CSP nonce for client-side use.
+             referrerPolicy is set on this element as belt-and-suspenders even
+             though <script> elements without src do not generate HTTP requests. */}
         {nonce && (
           <script
             nonce={nonce}
+            referrerPolicy="strict-origin-when-cross-origin"
             dangerouslySetInnerHTML={{
               __html: `window.CSP_NONCE = "${nonce}";`,
             }}

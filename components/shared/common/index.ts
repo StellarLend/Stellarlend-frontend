@@ -19,3 +19,6 @@ export type {
 } from "./NotificationToastBridge";
 export { FeatureGate } from "./FeatureGate";
 export type { FeatureGateProps } from "./FeatureGate";
+export { PriceTicker } from "./PriceTicker";
+export type { PriceTickerProps } from "./PriceTicker";
+export type { PriceDirection } from "@/hooks/usePriceStream";

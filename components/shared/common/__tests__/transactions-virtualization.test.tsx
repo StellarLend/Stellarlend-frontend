@@ -11,14 +11,18 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/dynamic", () => ({
   __esModule: true,
   default: () => {
-    const DynamicComponent = (props: React.HTMLAttributes<HTMLDivElement>) => <div {...props} />;
+    const DynamicComponent = (props: React.HTMLAttributes<HTMLDivElement>) => (
+      <div {...props} />
+    );
     return DynamicComponent;
   },
 }));
 
 vi.mock("next/image", () => ({
   __esModule: true,
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />,
+  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
+    <img {...props} />
+  ),
 }));
 
 vi.mock("react-datepicker", () => ({
@@ -26,8 +30,14 @@ vi.mock("react-datepicker", () => ({
   default: () => <div />,
 }));
 
+vi.mock("@/hooks/useWallet", () => ({
+  useWallet: () => ({ network: "TESTNET" }),
+}));
+
 vi.mock("@/types/Transaction", async () => {
-  const actual = await vi.importActual<typeof import("@/types/Transaction")>("@/types/Transaction");
+  const actual = await vi.importActual<typeof import("@/types/Transaction")>(
+    "@/types/Transaction",
+  );
   return {
     ...actual,
     fetchTransactions: vi.fn(),
@@ -55,52 +65,85 @@ describe("Transactions virtualization", () => {
 
   it("renders the full list when the history is small", async () => {
     mockedFetchTransactions.mockResolvedValue({
-      transactions: Array.from({ length: 4 }, (_, index) => makeTransaction(index + 1)),
+      transactions: Array.from({ length: 4 }, (_, index) =>
+        makeTransaction(index + 1),
+      ),
       total: 4,
     });
 
     render(<Transactions showPagination={false} />);
 
-    await waitFor(() => expect(screen.getAllByText("#tx-4").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByText("#tx-4").length).toBeGreaterThan(0),
+    );
 
-    expect(screen.queryByTestId("transactions-virtualizer")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("transactions-virtualizer"),
+    ).not.toBeInTheDocument();
   });
 
   it("only mounts visible rows for large histories", async () => {
-    const transactions = Array.from({ length: 200 }, (_, index) => makeTransaction(index + 1));
-    mockedFetchTransactions.mockResolvedValue({ transactions, total: transactions.length });
+    const transactions = Array.from({ length: 200 }, (_, index) =>
+      makeTransaction(index + 1),
+    );
+    mockedFetchTransactions.mockResolvedValue({
+      transactions,
+      total: transactions.length,
+    });
 
     render(<Transactions showPagination={false} />);
 
-    await waitFor(() => expect(screen.getAllByText("#tx-1").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByText("#tx-1").length).toBeGreaterThan(0),
+    );
 
     expect(screen.queryAllByText("#tx-150")).toHaveLength(0);
     expect(screen.getByTestId("transactions-virtualizer")).toBeInTheDocument();
   });
 
   it("supports keyboard navigation across the visible window", async () => {
-    const transactions = Array.from({ length: 20 }, (_, index) => makeTransaction(index + 1));
-    mockedFetchTransactions.mockResolvedValue({ transactions, total: transactions.length });
+    const transactions = Array.from({ length: 20 }, (_, index) =>
+      makeTransaction(index + 1),
+    );
+    mockedFetchTransactions.mockResolvedValue({
+      transactions,
+      total: transactions.length,
+    });
 
     render(<Transactions showPagination={false} rowHeight={40} />);
 
-    await waitFor(() => expect(screen.getAllByText("#tx-1").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByText("#tx-1").length).toBeGreaterThan(0),
+    );
 
-    const firstRow = screen.getAllByRole("row", { name: /transaction tx-1/i })[0];
+    const firstRow = screen.getAllByRole("row", {
+      name: /transaction tx-1/i,
+    })[0];
     firstRow.focus();
 
     fireEvent.keyDown(firstRow, { key: "ArrowDown" });
 
-    await waitFor(() => expect(screen.getAllByRole("row", { name: /transaction tx-2/i })[0]).toHaveFocus());
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("row", { name: /transaction tx-2/i })[0],
+      ).toHaveFocus(),
+    );
   });
 
   it("uses the provided row height for the virtualized window", async () => {
-    const transactions = Array.from({ length: 50 }, (_, index) => makeTransaction(index + 1));
-    mockedFetchTransactions.mockResolvedValue({ transactions, total: transactions.length });
+    const transactions = Array.from({ length: 50 }, (_, index) =>
+      makeTransaction(index + 1),
+    );
+    mockedFetchTransactions.mockResolvedValue({
+      transactions,
+      total: transactions.length,
+    });
 
     render(<Transactions showPagination={false} rowHeight={44} />);
 
-    await waitFor(() => expect(screen.getAllByText("#tx-1").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByText("#tx-1").length).toBeGreaterThan(0),
+    );
 
     const virtualizer = screen.getByTestId("transactions-virtualizer");
     expect(virtualizer).toHaveStyle({ height: "560px" });

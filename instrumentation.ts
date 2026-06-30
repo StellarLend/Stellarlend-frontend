@@ -1,6 +1,6 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { initSentry } = await import('@/lib/telemetry/sentry');
-    initSentry();
+    try { initSentry(); } catch { /* Sentry DSN not configured */ }
   }
 }

@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Image from "next/image";
 import { useWalletContext } from "@/context/WalletContext";
 import NotificationCenter from "@/components/features/notifications/NotificationCenter";
 
-const focusClasses =
-  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+const focusClasses = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 const Header: React.FC = () => {
   const { address, status, error, connect, disconnect } = useWalletContext();
