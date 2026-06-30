@@ -18,6 +18,7 @@ This frontend application provides a modern, responsive web interface for intera
 - [Wallet context and Freighter integration guide](docs/wallet-integration.md)
 - [Feature flags authoring and rollout guide](docs/feature-flags.md)
 - [Background jobs and workers architecture](docs/jobs.md)
+- [Database schema and Drizzle migration workflow](docs/database-schema.md)
 
 ## ?? Features
 

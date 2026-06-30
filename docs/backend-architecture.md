@@ -32,6 +32,12 @@ app/api/
 
 ## lib/ Server Modules
 
+### lib/db/ — Database schema and migrations
+
+The PostgreSQL table modules, migration runner, Drizzle migration files, and
+schema-change checklist are documented in
+[Database Schema and Migration Workflow](./database-schema.md).
+
 ### lib/config.ts — Public configuration
 
 Reads `NEXT_PUBLIC_*` env vars and exposes a typed `Config` object.
