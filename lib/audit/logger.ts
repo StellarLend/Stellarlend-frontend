@@ -21,7 +21,18 @@ export function hashIp(ip?: string | null): string | null {
 }
 
 export function redactAuditPayload<T extends Record<string, unknown>>(payload: T): Partial<T> {
-  const blocked = new Set(['password', 'token', 'secret', 'transaction', 'signedEnvelopeXdr']);
+  const blocked = new Set([
+    'actorWallet',
+    'password',
+    'privateKey',
+    'publicKey',
+    'secret',
+    'seed',
+    'signedEnvelopeXdr',
+    'token',
+    'transaction',
+    'walletAddress',
+  ]);
 
   return Object.fromEntries(
     Object.entries(payload).filter(([key]) => !blocked.has(key)),
@@ -83,4 +94,4 @@ export function auditAdminUsersRead(
   queryParams: Record<string, unknown>,
 ): void {
   emitAuditEvent('admin.users.read', actorId, { queryParams });
-}
+}
