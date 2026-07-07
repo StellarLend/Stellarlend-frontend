@@ -93,7 +93,18 @@ describe('POST /api/tx/build', () => {
 
     expect(response.status).toBe(200);
     const json = await response.json();
-    expect(json).toEqual({ unsignedXdr: 'unsigned-xdr' });
+    expect(json).toEqual({
+      unsignedXdr: 'unsigned-xdr',
+      simulation: {
+        transactionDataXdr: 'AAAAAgAAAAE=',
+        minResourceFee: '3210',
+        footprint: {
+          readOnly: ['AAAAAQ=='],
+          readWrite: ['AAAAAg=='],
+        },
+        auth: ['AAAAAw==', 'AAAABA=='],
+      },
+    });
     expect(mockFetch).toHaveBeenCalledWith(
       'https://private-rpc.test',
       expect.objectContaining({ method: 'POST' }),
