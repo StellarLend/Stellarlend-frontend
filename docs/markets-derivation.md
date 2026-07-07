@@ -74,11 +74,23 @@ Key functions:
 - `calculateSupplyRate(borrowApr, utilization, reserveFactor)`
 - `deriveMarketRates(params)` — combines all three
 
+## Rounding
+
+All derived rate values are rounded to **4 decimal places** using `toFixed(4)` + `parseFloat` before being returned. This applies to:
+
+- `borrowApr` from `calculateBorrowRate`
+- `supplyApr` from `calculateSupplyRate`
+- `utilization` from `deriveMarketRates`
+
+Because `supplyApr` is derived from the already-rounded `borrowApr`, rounding propagates downstream: a `borrowApr` of `8.5337` produces a different `supplyApr` than the unrounded `8.53369...`. Tests account for this by asserting against the rounded intermediate values.
+
+Negative `baseRate` and `rateSlope` inputs are clamped to `0` before computation, ensuring malformed upstream values cannot produce negative APRs.
+
 ## Testing
 
 See `lib/lending/markets.test.ts` for comprehensive unit tests covering:
 - Normal operating ranges
 - Boundary conditions (zero supply, zero borrow, fully utilized)
 - Over-utilization clamping
-- Negative input handling
-- Numeric precision and rounding stability
+- Negative input handling (including negative `baseRate`/`rateSlope`)
+- Numeric precision and rounding stability (using inputs that produce >4 decimal places)

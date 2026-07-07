@@ -66,8 +66,19 @@ describe("calculateBorrowRate", () => {
     expect(calculateBorrowRate(0.5, 0, 0)).toBe(0);
   });
 
+  it("clamps negative base rate and slope to 0", () => {
+    // Negative baseRate clamped to 0, negative rateSlope clamped to 0
+    expect(calculateBorrowRate(0.5, -2, -10)).toBe(0);
+    // Negative baseRate clamped to 0, valid rateSlope retained
+    expect(calculateBorrowRate(0.5, -2, 10)).toBe(5);
+    // Valid baseRate retained, negative rateSlope clamped to 0
+    expect(calculateBorrowRate(0.5, 2, -10)).toBe(2);
+  });
+
   it("rounds to 4 decimal places", () => {
-    expect(calculateBorrowRate(0.3333, 2, 10)).toBe(5.333);
+    // 0 + 0.33333*2 = 0.66666 → 5 decimals unrounded, rounds to 0.6667
+    // If rounding is removed, raw 0.66666 ≠ 0.6667, so this catches regressions
+    expect(calculateBorrowRate(0.33333, 0, 2)).toBe(0.6667);
   });
 });
 
@@ -113,7 +124,9 @@ describe("calculateSupplyRate", () => {
   });
 
   it("rounds to 4 decimal places", () => {
-    expect(calculateSupplyRate(10, 0.3333, 0.1)).toBeCloseTo(2.9997, 4);
+    // 1 * 0.33333 * 0.85 = 0.28333050 → 7 decimals unrounded, rounds to 0.2833
+    // If rounding is removed, raw 0.28333... ≠ 0.2833, so this catches regressions
+    expect(calculateSupplyRate(1, 0.33333, 0.15)).toBe(0.2833);
   });
 });
 

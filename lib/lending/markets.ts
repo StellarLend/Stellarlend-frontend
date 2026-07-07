@@ -38,10 +38,16 @@ export function calculateUtilization(totalSupply: number, totalBorrow: number): 
 /**
  * Calculate borrow APR from utilization using a linear model.
  * borrowApr = baseRate + (utilization × rateSlope)
+ *
+ * `utilization` is clamped to [0, 1]. `baseRate` and `rateSlope` are
+ * clamped to [0, ∞) so that malformed negative inputs cannot produce
+ * negative APRs. The result is rounded to 4 decimal places.
  */
 export function calculateBorrowRate(utilization: number, baseRate: number, rateSlope: number): number {
   const clampedUtilization = Math.min(1, Math.max(0, utilization));
-  const rate = baseRate + clampedUtilization * rateSlope;
+  const clampedBaseRate = Math.max(0, baseRate);
+  const clampedRateSlope = Math.max(0, rateSlope);
+  const rate = clampedBaseRate + clampedUtilization * clampedRateSlope;
   return parseFloat(rate.toFixed(4));
 }
 
