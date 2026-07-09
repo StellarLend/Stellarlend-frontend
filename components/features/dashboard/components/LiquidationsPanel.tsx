@@ -1,5 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FC,
+} from "react";
 import { UtilizationBar } from "@/components/atoms/UtilizationBar/UtilizationBar";
 import type {
   LiquidationPosition,
@@ -136,6 +143,86 @@ function getLiquidationAlertId(position: LiquidationRow): string {
   ].join(":");
 }
 
+/**
+ * Stable per-row component. React.memo skips a re-render when the row's
+ * derived inputs (the LiquidationRow object) and the two Sets the row
+ * needs to read (`alertSubscriptions`, `pendingAlertIds`) are referentially
+ * equal to the previous render.
+ *
+ * `onToggle` is wrapped in useCallback at the parent so this equality
+ * check stays cheap. The `key` on the parent <tr> is the position id,
+ * which is stable across re-renders as long as the underlying
+ * LiquidationPosition is stable.
+ */
+interface LiquidationRowViewProps {
+  position: LiquidationRow;
+  isSubscribed: boolean;
+  isPending: boolean;
+  onToggle: (alertId: string, enabled: boolean) => void;
+}
+
+const LiquidationRowView = memo(function LiquidationRowView({
+  position,
+  isSubscribed,
+  isPending,
+  onToggle,
+}: LiquidationRowViewProps) {
+  const severity = getSeverity(position.distanceToLiquidation);
+  const alertId = getLiquidationAlertId(position);
+
+  return (
+    <tr
+      key={`${position.asset}-${position.collateralAsset}-${position.originalIndex}`}
+      className="bg-[#072815]"
+    >
+      <td className="rounded-l-lg px-3 py-3 font-semibold">
+        {formatAmount(position.borrowedAmount, position.asset)}
+      </td>
+      <td className="px-3 py-3">
+        {formatAmount(position.collateralAmount, position.collateralAsset)}
+      </td>
+      <td className="px-3 py-3">
+        <UtilizationBar asset={position.asset} />
+      </td>
+      <td className="px-3 py-3 font-mono">
+        {Number.isFinite(position.healthFactor)
+          ? `${position.healthFactor.toFixed(2)}x`
+          : "N/A"}
+      </td>
+      <td className="px-3 py-3 font-mono">
+        {formatLiquidationPriceFactor(position.liquidationPriceFactor)}
+      </td>
+      <td className="px-3 py-3 font-mono">
+        {formatDistance(position.distanceToLiquidation)}
+      </td>
+      <td className="px-3 py-3">
+        <span
+          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${severity.className}`}
+        >
+          {severity.label}
+        </span>
+      </td>
+      <td className="rounded-r-lg px-3 py-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isSubscribed}
+          aria-label={`${isSubscribed ? "Disable" : "Enable"} liquidation alerts for ${position.asset} borrowed against ${position.collateralAsset}`}
+          disabled={isPending}
+          onClick={() => onToggle(alertId, !isSubscribed)}
+          className={`inline-flex min-w-20 items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${
+            isSubscribed
+              ? "border-emerald-500 bg-emerald-950 text-emerald-100"
+              : "border-[#71B48D66] bg-[#0A3D1E] text-[#D4F3E6]"
+          }`}
+        >
+          {isSubscribed ? "On" : "Off"}
+        </button>
+      </td>
+    </tr>
+  );
+});
+
 export default function LiquidationsPanel({
   initialPositions,
   fetcher = fetch,
@@ -191,6 +278,10 @@ export default function LiquidationsPanel({
     return () => controller.abort();
   }, [fetcher, initialPositions, walletAddress]);
 
+  // Memoise the derived row list and the alert id list so the second
+  // memo (and the row components) only recompute when positions actually
+  // change. `toSortedRows` is pure, so reference equality on the input is
+  // enough to bail out via useMemo.
   const rows = useMemo(() => toSortedRows(positions), [positions]);
   const rowAlertIds = useMemo(
     () => rows.map((position) => getLiquidationAlertId(position)),
@@ -241,55 +332,67 @@ export default function LiquidationsPanel({
     return () => controller.abort();
   }, [fetcher, rowAlertIds]);
 
-  async function toggleLiquidationAlert(alertId: string, enabled: boolean) {
-    setAlertError(null);
-    setPendingAlertIds((current) => new Set(current).add(alertId));
-    setAlertSubscriptions((current) => {
-      const next = new Set(current);
-      if (enabled) {
+  // Stable callback so the memoized <LiquidationRowView> can rely on
+  // reference equality of onToggle to skip a re-render. The Sets are
+  // updated via the functional setter so we don't need to add them as
+  // dependencies (and so the callback identity is stable across the
+  // alert subscription changes themselves).
+  const toggleLiquidationAlert = useCallback(
+    async (alertId: string, enabled: boolean) => {
+      setAlertError(null);
+      setPendingAlertIds((current) => {
+        const next = new Set(current);
         next.add(alertId);
-      } else {
-        next.delete(alertId);
-      }
-      return next;
-    });
-
-    try {
-      const response = await fetcher("/api/account/notification-preferences", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          eventType: LIQUIDATION_ALERT_EVENT,
-          positionId: alertId,
-          enabled,
-        }),
+        return next;
       });
-
-      if (!response.ok) {
-        throw new Error("Unable to save alert preference");
-      }
-    } catch {
       setAlertSubscriptions((current) => {
         const next = new Set(current);
         if (enabled) {
-          next.delete(alertId);
-        } else {
           next.add(alertId);
+        } else {
+          next.delete(alertId);
         }
         return next;
       });
-      setAlertError("Unable to save alert preference");
-    } finally {
-      setPendingAlertIds((current) => {
-        const next = new Set(current);
-        next.delete(alertId);
-        return next;
-      });
-    }
-  }
+
+      try {
+        const response = await fetcher("/api/account/notification-preferences", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            eventType: LIQUIDATION_ALERT_EVENT,
+            positionId: alertId,
+            enabled,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to save alert preference");
+        }
+      } catch {
+        setAlertSubscriptions((current) => {
+          const next = new Set(current);
+          if (enabled) {
+            next.delete(alertId);
+          } else {
+            next.add(alertId);
+          }
+          return next;
+        });
+        setAlertError("Unable to save alert preference");
+      } finally {
+        setPendingAlertIds((current) => {
+          const next = new Set(current);
+          next.delete(alertId);
+          return next;
+        });
+      }
+    },
+    [fetcher],
+  );
 
   if (isLoading) {
     return (
@@ -373,68 +476,15 @@ export default function LiquidationsPanel({
             </thead>
             <tbody>
               {rows.map((position) => {
-                const severity = getSeverity(position.distanceToLiquidation);
                 const alertId = getLiquidationAlertId(position);
-                const isSubscribed = alertSubscriptions.has(alertId);
-                const isPending = pendingAlertIds.has(alertId);
-
                 return (
-                  <tr
-                    key={`${position.asset}-${position.collateralAsset}-${position.originalIndex}`}
-                    className="bg-[#072815]"
-                  >
-                    <td className="rounded-l-lg px-3 py-3 font-semibold">
-                      {formatAmount(position.borrowedAmount, position.asset)}
-                    </td>
-                    <td className="px-3 py-3">
-                      {formatAmount(
-                        position.collateralAmount,
-                        position.collateralAsset,
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <UtilizationBar asset={position.asset} />
-                    </td>
-                    <td className="px-3 py-3 font-mono">
-                      {Number.isFinite(position.healthFactor)
-                        ? `${position.healthFactor.toFixed(2)}x`
-                        : "N/A"}
-                    </td>
-                    <td className="px-3 py-3 font-mono">
-                      {formatLiquidationPriceFactor(
-                        position.liquidationPriceFactor,
-                      )}
-                    </td>
-                    <td className="px-3 py-3 font-mono">
-                      {formatDistance(position.distanceToLiquidation)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${severity.className}`}
-                      >
-                        {severity.label}
-                      </span>
-                    </td>
-                    <td className="rounded-r-lg px-3 py-3">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={isSubscribed}
-                        aria-label={`${isSubscribed ? "Disable" : "Enable"} liquidation alerts for ${position.asset} borrowed against ${position.collateralAsset}`}
-                        disabled={isPending}
-                        onClick={() =>
-                          toggleLiquidationAlert(alertId, !isSubscribed)
-                        }
-                        className={`inline-flex min-w-20 items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${
-                          isSubscribed
-                            ? "border-emerald-500 bg-emerald-950 text-emerald-100"
-                            : "border-[#71B48D66] bg-[#0A3D1E] text-[#D4F3E6]"
-                        }`}
-                      >
-                        {isSubscribed ? "On" : "Off"}
-                      </button>
-                    </td>
-                  </tr>
+                  <LiquidationRowView
+                    key={alertId}
+                    position={position}
+                    isSubscribed={alertSubscriptions.has(alertId)}
+                    isPending={pendingAlertIds.has(alertId)}
+                    onToggle={toggleLiquidationAlert}
+                  />
                 );
               })}
             </tbody>

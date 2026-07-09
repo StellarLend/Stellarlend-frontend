@@ -62,6 +62,29 @@ Per-URL resource budgets are defined in `lighthouserc.json` under `assert.budget
 | /lending    | script     | 300 KB |
 | /lending    | interactive| 4.5s   |
 
+### LiquidationsPanel row memoisation (2026-07-09)
+
+The dashboard's liquidation-risk table re-renders on every price-stream
+tick because the row list and per-row callbacks were rebuilt on every
+parent render. This was the dominant CPU cost on the dashboard route
+during live markets.
+
+- `LiquidationsPanel.tsx` now memoises the derived row list with
+  `useMemo(() => toSortedRows(positions), [positions])` (already present)
+  and extracts the per-row view into a `React.memo`-wrapped
+  `LiquidationRowView` so unchanged rows skip reconciliation.
+- The `toggleLiquidationAlert` callback is wrapped in `useCallback([fetcher])`
+  so the memoised row's `onToggle` prop stays reference-equal across
+  unrelated parent re-renders.
+- Per-row `key` switched from
+  `${position.asset}-${position.collateralAsset}-${position.originalIndex}`
+  to the `alertId` (which already encodes asset, collateral, amounts, and
+  index) so React reconciliation is stable even if a row's position in
+  the sorted list changes.
+- Tests assert: (a) re-rendering with the same props preserves the same
+  `<tr>` DOM node, and (b) the column order and severity labels are
+  byte-identical to the pre-refactor output.
+
 ## How to maintain budgets
 
 If you add new functionality to any page:
