@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@/test/test-utils';
+import { render, screen, within } from '@/test/test-utils';
 import { describe, it, expect } from 'vitest';
 import TransactionSummary from './TransactionSummary';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
@@ -108,6 +108,24 @@ describe('TransactionSummary — lend/borrow unchanged', () => {
     expect(screen.getByText('LEND')).toBeTruthy();
   });
 
+  it('renders lend breakdown rows, signed earnings, and total return', () => {
+    render(
+      <TransactionSummary data={baseLendData} calculation={baseCalculation} type="lend" />,
+    );
+
+    expect(screen.getByText('Lending')).toBeInTheDocument();
+    expect(screen.getByText('Asset')).toBeInTheDocument();
+    expect(screen.getByText('XLM')).toBeInTheDocument();
+    expect(screen.getByText('Interest Rate')).toBeInTheDocument();
+    expect(screen.getByText('8.5% APY')).toBeInTheDocument();
+    expect(screen.getByText('Daily Earnings')).toBeInTheDocument();
+    expect(screen.getByText('+0.7000 USD')).toBeInTheDocument();
+    expect(screen.getByText('Total Earnings')).toBeInTheDocument();
+    expect(screen.getByText('+21.0000 USD')).toBeInTheDocument();
+    expect(screen.getByText('Total Return')).toBeInTheDocument();
+    expect(screen.getByText('1,021.0000 USD')).toBeInTheDocument();
+  });
+
   it('renders borrow summary with repayment details', () => {
     render(
       <TransactionSummary
@@ -119,6 +137,48 @@ describe('TransactionSummary — lend/borrow unchanged', () => {
     expect(screen.getByText('Repayment Details')).toBeTruthy();
     expect(screen.getByText('Total Interest')).toBeTruthy();
     expect(screen.getByText('BORROW')).toBeTruthy();
+  });
+
+  it('renders borrow collateral, repayment rows, and repayment table totals', () => {
+    const borrowData: LendingData = {
+      asset: 'USDC',
+      amount: 2500,
+      interestRate: 10.5,
+      duration: 45,
+      collateral: 'XLM',
+      collateralAmount: 5000,
+    };
+    const borrowCalculation: CalculationResult = {
+      dailyEarnings: 0,
+      totalEarnings: 125.55,
+      monthlyPayment: 875.18,
+      totalRepayment: 2625.55,
+    };
+
+    render(
+      <TransactionSummary
+        data={borrowData}
+        calculation={borrowCalculation}
+        type="borrow"
+      />,
+    );
+
+    expect(screen.getByText('Borrowing')).toBeInTheDocument();
+    expect(screen.getByText('10.5% APR')).toBeInTheDocument();
+    expect(screen.getByText('Duration')).toBeInTheDocument();
+    expect(screen.getByText('45 days')).toBeInTheDocument();
+    expect(screen.getByText('Collateral')).toBeInTheDocument();
+    expect(screen.getAllByText('XLM').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Monthly Payment')).toBeInTheDocument();
+    expect(screen.getByText('875.1800 USD')).toBeInTheDocument();
+    expect(screen.getAllByText('Total Interest').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('125.5500 USD').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Total Repayment').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('2,625.5500 USD').length).toBeGreaterThanOrEqual(1);
+
+    const table = screen.getByRole('table', { name: /repayment breakdown table/i });
+    expect(within(table).getByText('Principal')).toBeInTheDocument();
+    expect(within(table).getByText('2,500.0000 USD')).toBeInTheDocument();
   });
 });
 

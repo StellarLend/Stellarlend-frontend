@@ -1,4 +1,8 @@
+import { useState } from 'react';
+import { Copy } from 'lucide-react';
+import Toast, { type ToastVariant } from '@/components/shared/common/Toast';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { copyToClipboard } from '@/lib/utils/clipboard';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -11,6 +15,12 @@ import { formatCurrency } from '@/lib/utils/format';
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
   const { currency } = useCurrencyPreference();
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [toast, setToast] = useState<{
+    variant: ToastVariant;
+    title: string;
+    description: string;
+  } | null>(null);
 
   const formatValue = (amount: number) => {
     return formatCurrency(amount, 4, currency);
