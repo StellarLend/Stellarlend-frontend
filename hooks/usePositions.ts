@@ -57,6 +57,8 @@ export interface UsePositionsResult {
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
+  isStale: boolean;
+  isOffline: boolean;
 }
 
 function parseAmountValue(value: unknown): number {
@@ -242,9 +244,14 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
   const [supplyPositions, setSupplyPositions] = useState<SupplyPosition[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const [isStale, setIsStale] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const hasLoadedOnceRef = useRef(false);
 
-  const fetchPositions = useCallback(async () => {
+  const fetchPositions = useCallback(async (
+    abortSignal?: AbortSignal,
+    attempts = 0,
+  ): Promise<void> => {
     if (!hasLoadedOnceRef.current) {
       setIsLoading(true);
     }
@@ -259,6 +266,8 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
       const mappedSupply = mapSupplyPositionsResponse(data);
       setPositions(mapped);
       setSupplyPositions(mappedSupply);
+      setIsStale(false);
+      setIsOffline(false);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         return; // Aborted
@@ -266,13 +275,15 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
 
       setIsStale(true);
       const errorObj = err instanceof Error ? err : new Error(String(err));
-      
-      if (!navigator.onLine) {
+
+      const isCurrentlyOffline =
+        typeof navigator !== "undefined" && !navigator.onLine;
+      if (isCurrentlyOffline) {
         setIsOffline(true);
       }
 
       const maxAttempts = 5;
-      if (attempts < maxAttempts && navigator.onLine) {
+      if (attempts < maxAttempts && !isCurrentlyOffline) {
         const backoff = Math.min(1000 * (2 ** attempts), 10000);
         const jitter = Math.random() * 500;
         setTimeout(() => {
@@ -304,7 +315,7 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
     error,
     refetch: () => fetchPositions(),
     isStale,
-    isOffline
+    isOffline,
   };
 }
 
