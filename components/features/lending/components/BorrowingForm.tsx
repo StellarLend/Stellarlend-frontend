@@ -111,13 +111,6 @@ export default function BorrowingForm({
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
-  // "preset" = one of the LOAN_DURATIONS chips is active
-  // "custom" = the Custom chip is active and the numeric input is visible
-  const [durationMode, setDurationMode] = useState<"preset" | "custom">("preset");
-  // Raw string so the input can be empty / partially typed without coercion
-  const [customDays, setCustomDays] = useState<string>("");
-  const [customDaysError, setCustomDaysError] = useState<string>("");
-
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
   const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
   const assetKey = formData.asset?.toUpperCase();
@@ -125,7 +118,12 @@ export default function BorrowingForm({
     (assetKey && assetKey in INTEREST_RATES
       ? INTEREST_RATES[assetKey as keyof typeof INTEREST_RATES]
       : undefined) ?? 0;
-  const { rate: liveBorrowRate, isLoading: isLoadingMarketRates, error: marketRateError, lastUpdated: marketRateTimestamp } = useMarketRates(assetKey);
+  const {
+    rate: liveBorrowRate,
+    isLoading: isLoadingMarketRates,
+    error: marketRateError,
+    lastUpdated: marketRateTimestamp,
+  } = useMarketRates(assetKey);
   const resolvedBorrowRate =
     typeof liveBorrowRate === "number" && Number.isFinite(liveBorrowRate)
       ? liveBorrowRate
@@ -133,14 +131,19 @@ export default function BorrowingForm({
   const isUsingLiveRates =
     typeof liveBorrowRate === "number" && Number.isFinite(liveBorrowRate);
   const rateStatusLabel = isLoadingMarketRates
-    ? "Using fallback rates • refreshing"
+    ? "Using fallback rates - refreshing"
     : isUsingLiveRates
       ? marketRateTimestamp
-        ? `Rates as of ${new Date(marketRateTimestamp).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} • live`
-        : "Rates updated from /api/markets • live"
+        ? `Rates as of ${new Date(marketRateTimestamp).toLocaleString([], {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })} - live`
+        : "Rates updated from /api/markets - live"
       : marketRateError
-        ? "Using fallback rates • live unavailable"
-        : "Using fallback rates • live unavailable";
+        ? "Using fallback rates - live unavailable"
+        : "Using fallback rates - live unavailable";
   const interestRate = resolvedBorrowRate;
   const collateralAmount = formData.collateralAmount ?? 0;
   const requiredCollateral = calculateRequiredCollateralAmount({
