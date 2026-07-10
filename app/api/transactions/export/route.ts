@@ -23,8 +23,8 @@ function parseFilters(searchParams: URLSearchParams): TransactionFilters {
   return {
     search: searchParams.get('search') ?? undefined,
     status: normalizedStatus,
-    dateFrom: parsed.filter.fromDate,
-    dateTo: parsed.filter.toDate,
+    dateFrom: parsed.filter.from ?? parsed.filter.fromDate,
+    dateTo: parsed.filter.to ?? parsed.filter.toDate,
   };
 }
 

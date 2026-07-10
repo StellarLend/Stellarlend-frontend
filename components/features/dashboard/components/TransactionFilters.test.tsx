@@ -28,7 +28,7 @@ describe('TransactionFilters', () => {
   it('renders correctly with default state', () => {
     render(<TransactionFilters totalCount={0} />);
     
-    expect(screen.getByText('Showing')).toBeInTheDocument();
+    expect(screen.getByText(/Showing/i)).toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
     
     expect(screen.getByLabelText(/Asset/i)).toHaveValue('');
@@ -41,7 +41,7 @@ describe('TransactionFilters', () => {
   });
 
   it('restores state from URL params on load', () => {
-    (useSearchParams as any).mockReturnValue(new URLSearchParams('?asset=XLM&type=lend&status=Completed&search=123&fromDate=2023-01-01&toDate=2023-12-31'));
+    (useSearchParams as any).mockReturnValue(new URLSearchParams('?asset=XLM&type=lend&status=Completed&search=123&from=2023-01-01&to=2023-12-31'));
     
     render(<TransactionFilters totalCount={5} />);
     
@@ -53,6 +53,11 @@ describe('TransactionFilters', () => {
     // Date pickers restore state
     expect(screen.getByPlaceholderText('From Date')).toHaveValue('01-01-2023');
     expect(screen.getByPlaceholderText('To Date')).toHaveValue('12-31-2023');
+    expect(screen.getByLabelText('Start date')).toHaveValue('01-01-2023');
+    expect(screen.getByLabelText('End date')).toHaveValue('12-31-2023');
+    expect(screen.getByText(/Selected date range:/i)).toHaveTextContent(
+      'Selected date range: January 1, 2023 to December 31, 2023',
+    );
     
     // Clear all should be visible
     expect(screen.getByText('Clear All')).toBeInTheDocument();
@@ -96,6 +101,7 @@ describe('TransactionFilters', () => {
 
   it('debounces or updates search on blur', () => {
     render(<TransactionFilters totalCount={10} />);
+    mockReplace.mockClear();
     
     const searchInput = screen.getByPlaceholderText('Search IDs or amounts...');
     fireEvent.change(searchInput, { target: { value: 'TXN123' } });
@@ -111,6 +117,7 @@ describe('TransactionFilters', () => {
     
     const searchInput = screen.getByPlaceholderText('Search IDs or amounts...');
     fireEvent.change(searchInput, { target: { value: 'TXN123' } });
+    mockReplace.mockClear();
     
     // Pressing a non-enter key does not trigger replace
     fireEvent.keyDown(searchInput, { key: 'a', code: 'KeyA' });
@@ -131,6 +138,16 @@ describe('TransactionFilters', () => {
     
     // page param should be removed
     expect(mockReplace).toHaveBeenCalledWith('/dashboard/transactions?asset=XLM&type=repay', { scroll: false });
+  });
+
+  it('round-trips legacy date params into the new from/to URL params', () => {
+    (useSearchParams as any).mockReturnValue(new URLSearchParams('?fromDate=2023-01-01&toDate=2023-01-31&page=3'));
+
+    render(<TransactionFilters totalCount={4} />);
+
+    expect(screen.getByLabelText('Start date')).toHaveValue('01-01-2023');
+    expect(screen.getByLabelText('End date')).toHaveValue('01-31-2023');
+    expect(mockReplace).toHaveBeenCalledWith('/dashboard/transactions?from=2023-01-01&to=2023-01-31', { scroll: false });
   });
 
 });

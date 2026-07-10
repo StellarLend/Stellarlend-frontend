@@ -3,10 +3,11 @@
 The `TransactionFilters` component provides an accessible, URL-driven filtering interface for the dashboard's Transactions page.
 
 ## Key Features
-- **URL Synchronization**: All filter states (Asset, Type, Status, Date Range, Search) are directly serialized into the browser's URL query string. This enables users to bookmark, share, and refresh specific views of their transaction history without losing context.
+- **URL Synchronization**: All filter states (Asset, Type, Status, Date Range, Search) are directly serialized into the browser's URL query string. Date range selections use `from` and `to` query parameters, with legacy `fromDate` and `toDate` still accepted by the parser.
 - **Server-Side Integration**: The `/api/transactions` endpoint parses these query parameters (via `parseTransactionFilter` from `lib/transactions/filters.ts`) to drive database-level filtering.
 - **Responsive Layout**: Designed to stack elegantly on mobile while utilizing a horizontal flex layout on desktop.
 - **Accessibility**: Native `select` elements are used alongside proper labels to ensure screen-reader compatibility. The component also features an `aria-live="polite"` region to announce the live count of loaded transactions.
+- **Date Range**: The range picker uses the existing themed `react-datepicker` controls, constrains inverted selections, and announces the selected range through a polite screen-reader live region.
 
 ## Architecture
 
@@ -44,3 +45,13 @@ To add a new filter:
 2. Add it to `TransactionFilters` in `lib/transactions/types.ts`.
 3. Add UI controls in `TransactionFilters.tsx` and sync it via `useSearchParams()`.
 4. Extract the param in `Transactions.tsx` and pass it to the `fetchTransactions` payload.
+
+## Date Range Parameters
+
+Use `from` and `to` as ISO date strings:
+
+```text
+/dashboard/transactions?from=2025-01-01&to=2025-01-31
+```
+
+The parser accepts full UTC datetimes for API clients and rejects inverted ranges where `from` is later than `to`. Extremely early or far-future values are clamped into the supported range before filtering.

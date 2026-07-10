@@ -12,6 +12,7 @@ import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
 import { withIdempotency } from '@/lib/api/idempotency';
 import { fetchTransactionRecords, filterTransactions, paginateTransactionsByCursor } from '@/lib/transactions/repository';
+import { parseTransactionFilter } from '@/lib/transactions/filters';
 
 export const runtime = 'nodejs';
 
@@ -51,19 +52,24 @@ function sortTransactions(transactions: Transaction[], sortBy: 'date' | 'amount'
 }
 
 /** GET /api/transactions
- *  Optional query params: page, pageSize, asset, type, status, search, dateFrom, dateTo,
+ *  Optional query params: page, pageSize, asset, type, status, search, from, to,
  *  sortBy, sortDir
  *  Returns typed transaction pages with total count.
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
+  const parsedFilters = parseTransactionFilter(searchParams);
+
+  if (!parsedFilters.valid) {
+    return NextResponse.json({ error: parsedFilters.error }, { status: 400 });
+  }
 
   const asset = searchParams.get('asset');
   const type = searchParams.get('type');
-  const status = searchParams.get('status');
+  const status = parsedFilters.filter.status ?? searchParams.get('status');
   const search = searchParams.get('search');
-  const dateFrom = searchParams.get('dateFrom');
-  const dateTo = searchParams.get('dateTo');
+  const dateFrom = parsedFilters.filter.from ?? parsedFilters.filter.fromDate;
+  const dateTo = parsedFilters.filter.to ?? parsedFilters.filter.toDate;
   const sortBy = parseSortBy(searchParams.get('sortBy'));
   const sortDir = parseSortDir(searchParams.get('sortDir'));
   const page = parsePageParam(searchParams.get('page'), DEFAULT_PAGE);
@@ -83,7 +89,7 @@ async function handleGetTransactions(req: NextRequest) {
     );
   }
 
-  if (status !== null && !isTransactionStatus(status)) {
+  if (status !== null && status !== undefined && !isTransactionStatus(status)) {
     return NextResponse.json(
       { error: `Unknown status "${status}". Supported: ${TRANSACTION_STATUSES.join(', ')}` },
       { status: 400 },
@@ -105,8 +111,8 @@ async function handleGetTransactions(req: NextRequest) {
   let transactions = filterTransactions(allTransactions as Transaction[], {
     search: search ?? undefined,
     status: status ?? undefined,
-    dateFrom: dateFrom ?? undefined,
-    dateTo: dateTo ?? undefined,
+    dateFrom,
+    dateTo,
   });
 
   if (asset) {

@@ -12,13 +12,17 @@ export interface TransactionFilter {
   type?: string;
   status?: TransactionStatus;
   asset?: TransactionAsset | string;
+  from?: string;
+  to?: string;
   fromDate?: string;
   toDate?: string;
 }
 
 const ALLOWED_TYPES = new Set<string>(TRANSACTION_TYPES);
-const ALLOWED_STATUSES = new Set(['completed', 'pending', 'failed']);
+const ALLOWED_STATUSES = new Set(['all', 'completed', 'processing', 'pending', 'failed']);
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$/;
+const MIN_RANGE_DATE = '1970-01-01';
+const MAX_RANGE_DATE = '2100-12-31';
 
 export interface FilterValidationResult {
   valid: boolean;
@@ -32,10 +36,42 @@ export function serializeTransactionFilters(filters: TransactionFilter): URLSear
   if (filters.type) params.set('type', filters.type);
   if (filters.status) params.set('status', filters.status);
   if (filters.asset) params.set('asset', filters.asset);
-  if (filters.fromDate) params.set('fromDate', filters.fromDate);
-  if (filters.toDate) params.set('toDate', filters.toDate);
+  if (filters.from ?? filters.fromDate) params.set('from', filters.from ?? filters.fromDate ?? '');
+  if (filters.to ?? filters.toDate) params.set('to', filters.to ?? filters.toDate ?? '');
 
   return params;
+}
+
+function asDate(value: string): Date {
+  return new Date(value.length === 10 ? `${value}T00:00:00Z` : value);
+}
+
+function clampDate(value: string): string {
+  const dateOnly = value.slice(0, 10);
+  if (dateOnly < MIN_RANGE_DATE) return MIN_RANGE_DATE;
+  if (dateOnly > MAX_RANGE_DATE) return MAX_RANGE_DATE;
+  return value;
+}
+
+function parseRangeDate(
+  params: URLSearchParams,
+  primaryName: 'from' | 'to',
+  legacyName: 'fromDate' | 'toDate',
+): { value?: string; error?: string } {
+  const usedName = params.has(primaryName) ? primaryName : legacyName;
+  const value = params.get(primaryName) ?? params.get(legacyName);
+  if (!value) return {};
+
+  if (!ISO_DATE_RE.test(value)) {
+    return { error: `Invalid ${usedName}: ${value}` };
+  }
+
+  const date = asDate(value);
+  if (Number.isNaN(date.getTime())) {
+    return { error: `Invalid ${usedName}: ${value}` };
+  }
+
+  return { value: clampDate(value) };
 }
 
 /**
@@ -60,15 +96,10 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
       return { valid: false, filter, error: `Invalid status: ${status}` };
     }
 
-    if (normalizedStatus === 'all') {
-      filter.status = 'All';
-    } else if (normalizedStatus === 'completed') {
-      filter.status = 'Completed';
-    } else if (normalizedStatus === 'processing') {
-      filter.status = 'Processing';
-    } else {
-      filter.status = 'Failed';
-    }
+    if (normalizedStatus === 'all') filter.status = 'All';
+    else if (normalizedStatus === 'completed') filter.status = 'Completed';
+    else if (normalizedStatus === 'processing' || normalizedStatus === 'pending') filter.status = 'Processing';
+    else filter.status = 'Failed';
   }
 
   const asset = params.get('asset');
@@ -79,20 +110,28 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
     filter.asset = asset.toUpperCase();
   }
 
-  const fromDate = params.get('fromDate');
-  if (fromDate) {
-    if (!ISO_DATE_RE.test(fromDate)) {
-      return { valid: false, filter, error: `Invalid fromDate: ${fromDate}` };
-    }
-    filter.fromDate = fromDate;
+  const fromDate = parseRangeDate(params, 'from', 'fromDate');
+  if (fromDate.error) {
+    return { valid: false, filter, error: fromDate.error };
   }
 
-  const toDate = params.get('toDate');
-  if (toDate) {
-    if (!ISO_DATE_RE.test(toDate)) {
-      return { valid: false, filter, error: `Invalid toDate: ${toDate}` };
-    }
-    filter.toDate = toDate;
+  const toDate = parseRangeDate(params, 'to', 'toDate');
+  if (toDate.error) {
+    return { valid: false, filter, error: toDate.error };
+  }
+
+  if (fromDate.value) {
+    filter.from = fromDate.value;
+    filter.fromDate = fromDate.value;
+  }
+
+  if (toDate.value) {
+    filter.to = toDate.value;
+    filter.toDate = toDate.value;
+  }
+
+  if (fromDate.value && toDate.value && asDate(fromDate.value) > asDate(toDate.value)) {
+    return { valid: false, filter, error: 'Invalid date range: from must be before or equal to to' };
   }
 
   return { valid: true, filter };

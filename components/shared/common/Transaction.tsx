@@ -11,7 +11,7 @@ import {
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
@@ -96,6 +96,7 @@ export const Transactions = ({
   const itemsPerPage = 6;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const liveRef = useRef<HTMLParagraphElement>(null);
+  const searchParams = useSearchParams();
 
   const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
   const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
@@ -103,8 +104,8 @@ export const Transactions = ({
   const effectiveSortOrder = sortOrder ?? (hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir);
   const sortBy = effectiveSortKey === "status" ? "date" : effectiveSortKey;
   const sortDir = effectiveSortOrder;
-  const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
-  const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
+  const dateFrom = hideToolbar ? searchParams.get("from") ?? searchParams.get("fromDate") ?? "" : localDateFrom;
+  const dateTo = hideToolbar ? searchParams.get("to") ?? searchParams.get("toDate") ?? "" : localDateTo;
   const asset = hideToolbar ? searchParams.get("asset") || "" : "";
   const type = hideToolbar ? searchParams.get("type") || "" : "";
 
