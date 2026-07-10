@@ -27,7 +27,7 @@ describe('parseTransactionFilter', () => {
   it('parses valid status param', () => {
     const { valid, filter } = parseTransactionFilter(params({ status: 'completed' }));
     expect(valid).toBe(true);
-    expect(filter.status).toBe('completed');
+    expect(filter.status).toBe('Completed');
   });
 
   it('rejects invalid status param', () => {
@@ -48,11 +48,21 @@ describe('parseTransactionFilter', () => {
 
   it('parses valid ISO date range', () => {
     const { valid, filter } = parseTransactionFilter(
-      params({ fromDate: '2025-01-01', toDate: '2025-12-31' })
+      params({ from: '2025-01-01', to: '2025-12-31' })
     );
     expect(valid).toBe(true);
+    expect(filter.from).toBe('2025-01-01');
+    expect(filter.to).toBe('2025-12-31');
     expect(filter.fromDate).toBe('2025-01-01');
     expect(filter.toDate).toBe('2025-12-31');
+  });
+
+  it('rejects inverted date ranges', () => {
+    const { valid, error } = parseTransactionFilter(
+      params({ from: '2025-12-31', to: '2025-01-01' })
+    );
+    expect(valid).toBe(false);
+    expect(error).toContain('from must be before');
   });
 
   it('rejects non-ISO date', () => {

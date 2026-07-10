@@ -70,8 +70,8 @@ describe("TransactionExportButton", () => {
     expect(url).toContain("type=lend");
     expect(url).toContain("status=Completed");
     expect(url).toContain("search=hello");
-    expect(url).toContain("fromDate=2025-01-01");
-    expect(url).toContain("toDate=2025-02-01");
+    expect(url).toContain("from=2025-01-01");
+    expect(url).toContain("to=2025-02-01");
     expect(options).toEqual({ method: "GET" });
     expect(createObjectURLMock).toHaveBeenCalledTimes(1);
   });

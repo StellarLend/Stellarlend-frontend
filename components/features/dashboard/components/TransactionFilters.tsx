@@ -18,8 +18,9 @@ const CustomDateInput = forwardRef<
     onClick: () => void;
     placeholder: string;
     icon: React.ReactNode;
+    ariaLabel: string;
   }
->(({ value, onClick, placeholder, icon }, ref) => {
+>(({ value, onClick, placeholder, icon, ariaLabel }, ref) => {
   return (
     <div className="relative">
       <span className="absolute left-2 top-1.5 text-gray-400 pointer-events-none mt-[2px]">
@@ -31,6 +32,7 @@ const CustomDateInput = forwardRef<
         className="pl-8 pr-2 py-1.5 rounded-lg text-sm bg-white border border-gray-300 focus:border-gray-400 focus:outline-none focus:ring-0 w-full md:w-[140px]"
         value={value}
         placeholder={placeholder}
+        aria-label={ariaLabel}
         onClick={onClick}
         readOnly
       />
@@ -38,6 +40,14 @@ const CustomDateInput = forwardRef<
   );
 });
 CustomDateInput.displayName = "CustomDateInput";
+
+function parseLocalDate(value: string | null): Date | null {
+  if (!value) return null;
+  const dateOnly = value.slice(0, 10);
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
 
 export default function TransactionFilters({ totalCount }: TransactionFiltersProps) {
   const router = useRouter();
@@ -50,15 +60,11 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
   const [status, setStatus] = useState(searchParams.get("status") || "");
   const [search, setSearch] = useState(searchParams.get("search") || "");
   
-  const fromDateStr = searchParams.get("fromDate");
-  const toDateStr = searchParams.get("toDate");
+  const fromDateStr = searchParams.get("from") ?? searchParams.get("fromDate");
+  const toDateStr = searchParams.get("to") ?? searchParams.get("toDate");
   
-  const [dateFromObj, setDateFromObj] = useState<Date | null>(
-    fromDateStr ? new Date(fromDateStr) : null
-  );
-  const [dateToObj, setDateToObj] = useState<Date | null>(
-    toDateStr ? new Date(toDateStr) : null
-  );
+  const [dateFromObj, setDateFromObj] = useState<Date | null>(parseLocalDate(fromDateStr));
+  const [dateToObj, setDateToObj] = useState<Date | null>(parseLocalDate(toDateStr));
 
   // Sync back to URL when local state changes
   // Debounce search slightly
@@ -74,11 +80,13 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
     if (status) params.set("status", status);
     else params.delete("status");
 
-    if (dateFromObj) params.set("fromDate", format(dateFromObj, "yyyy-MM-dd"));
-    else params.delete("fromDate");
+    if (dateFromObj) params.set("from", format(dateFromObj, "yyyy-MM-dd"));
+    else params.delete("from");
+    params.delete("fromDate");
 
-    if (dateToObj) params.set("toDate", format(dateToObj, "yyyy-MM-dd"));
-    else params.delete("toDate");
+    if (dateToObj) params.set("to", format(dateToObj, "yyyy-MM-dd"));
+    else params.delete("to");
+    params.delete("toDate");
 
     // We reset page to 1 on filter changes if there's a page param, but page might be managed separately.
     // For now just update the URL.
@@ -116,6 +124,12 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
   };
 
   const hasFilters = asset || type || status || dateFromObj || dateToObj || search;
+  const rangeAnnouncement =
+    dateFromObj || dateToObj
+      ? `Selected date range: ${dateFromObj ? format(dateFromObj, "MMMM d, yyyy") : "start"} to ${
+          dateToObj ? format(dateToObj, "MMMM d, yyyy") : "today"
+        }`
+      : "No date range selected";
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col gap-4">
@@ -173,39 +187,55 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
             <div className="flex items-center gap-2">
               <DatePicker
                 selected={dateFromObj}
-                onChange={(date: Date | null) => setDateFromObj(date)}
+                onChange={(date: Date | null) => {
+                  setDateFromObj(date);
+                  if (date && dateToObj && date > dateToObj) {
+                    setDateToObj(date);
+                  }
+                }}
                 customInput={
                   <CustomDateInput
                     value={dateFromObj ? format(dateFromObj, "MM-dd-yyyy") : ""}
                     placeholder="From Date"
                     icon={<CalendarDays size={16} />}
+                    ariaLabel="Start date"
                     onClick={() => {}}
                   />
                 }
                 dateFormat="MM-dd-yyyy"
-                maxDate={new Date()}
+                maxDate={dateToObj ?? new Date()}
                 isClearable
                 placeholderText="From Date"
               />
               <span className="text-gray-400 text-sm">-</span>
               <DatePicker
                 selected={dateToObj}
-                onChange={(date: Date | null) => setDateToObj(date)}
+                onChange={(date: Date | null) => {
+                  setDateToObj(date);
+                  if (date && dateFromObj && date < dateFromObj) {
+                    setDateFromObj(date);
+                  }
+                }}
                 customInput={
                   <CustomDateInput
                     value={dateToObj ? format(dateToObj, "MM-dd-yyyy") : ""}
                     placeholder="To Date"
                     icon={<CalendarDays size={16} />}
+                    ariaLabel="End date"
                     onClick={() => {}}
                   />
                 }
                 dayClassName={(date) => (date < new Date() ? "text-gray-400" : "")}
                 dateFormat="MM-dd-yyyy"
+                minDate={dateFromObj ?? undefined}
                 maxDate={new Date()}
                 isClearable
                 placeholderText="To Date"
               />
             </div>
+            <span className="sr-only" aria-live="polite">
+              {rangeAnnouncement}
+            </span>
           </div>
         </div>
 
