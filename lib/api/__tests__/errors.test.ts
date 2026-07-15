@@ -1,3 +1,4 @@
+// issue-675: see PR body for the full rationale
 import { ValidationError, AuthError, UpstreamError } from '../errors';
 
 describe('API error classes', () => {
