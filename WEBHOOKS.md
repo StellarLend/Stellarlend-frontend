@@ -45,7 +45,20 @@ WEBHOOK_SECRET=your-secret-key-here
 | Header | Required | Description |
 |---|---|---|
 | `Content-Type` | Yes | Must be `application/json` |
+| `Content-Length` | Recommended | If present, must be no larger than 64 KiB. Oversized requests are rejected before signature verification. |
 | `x-webhook-signature` | Yes | `sha256=<hex-digest>` HMAC signature |
+
+### Request Limits
+
+Transaction webhooks are capped at **64 KiB**. Requests with a declared
+`Content-Length` above that limit are rejected before the body is read. Requests
+without `Content-Length` are checked immediately after the raw body is read and
+before signature verification, so oversized or streamed payloads cannot scale the
+HMAC verification work.
+
+Only `application/json` requests are accepted. Parameters such as
+`application/json; charset=utf-8` are allowed, but other content types are
+rejected before signature verification.
 
 ### Body
 
@@ -88,6 +101,8 @@ Two mechanisms prevent replay attacks:
 | `403` | Forbidden | Timestamp outside ±5 minute tolerance window |
 | `404` | Not Found | `transaction_id` does not exist |
 | `409` | Conflict | Duplicate `nonce` (event already processed) |
+| `413` | Payload Too Large | Body exceeds the 64 KiB webhook payload limit |
+| `415` | Unsupported Media Type | `Content-Type` is not `application/json` |
 | `500` | Internal Server Error | `WEBHOOK_SECRET` environment variable not configured |
 
 ### Success Response
@@ -173,6 +188,9 @@ npx vitest run --project unit --coverage
 
 - **No new dependencies** — uses Node.js built-in `crypto` module.
 - **Signing secret is server-only** — never exposed to the browser (no `NEXT_PUBLIC_` prefix).
+- **Pre-verification guards** — the handler rejects unsupported content types
+  and oversized bodies before signature verification so invalid traffic is
+  discarded cheaply.
 - **Constant-time verification** — signature comparison uses `crypto.timingSafeEqual` with buffer padding to prevent timing side-channel attacks. All signature verification paths (missing, wrong-length, wrong-value) return 401 with indistinguishable timing.
 - **In-memory nonce store** — nonces are stored in a `Set` with automatic pruning. For multi-instance deployments, consider using a shared store (e.g. Redis).
 

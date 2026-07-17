@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { NextRequest } from "next/server";
-import { POST } from "@/app/api/webhooks/transactions/route";
+import {
+  POST,
+  TRANSACTION_WEBHOOK_MAX_BYTES,
+} from "@/app/api/webhooks/transactions/route";
 import { signPayload } from "@/lib/webhooks/verify";
 import { SIGNATURE_HEADER } from "@/lib/webhooks/types";
 import { resetStore, getTransaction } from "@/lib/transactions/store";
@@ -45,6 +48,33 @@ function makeSignedRequest(
   const body = JSON.stringify(payload);
   const signature = signPayload(body, secret);
   return makeWebhookRequest(body, { [SIGNATURE_HEADER]: signature });
+}
+
+function getByteLength(value: string) {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function makeSizedSignedRequest(
+  targetBytes: number,
+  payload: Record<string, unknown> = makePayload(),
+) {
+  let paddingLength = Math.max(0, targetBytes - getByteLength(JSON.stringify(payload)));
+  let body = "";
+
+  while (paddingLength >= 0) {
+    body = JSON.stringify({ ...payload, padding: "x".repeat(paddingLength) });
+    const bodyBytes = getByteLength(body);
+    if (bodyBytes === targetBytes) {
+      const signature = signPayload(body, TEST_SECRET);
+      return makeWebhookRequest(body, {
+        [SIGNATURE_HEADER]: signature,
+        "content-length": String(bodyBytes),
+      });
+    }
+    paddingLength += targetBytes - bodyBytes;
+  }
+
+  throw new Error(`Unable to create ${targetBytes}-byte webhook payload`);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +259,50 @@ describe("POST /api/webhooks/transactions – replay protection", () => {
 // Payload validation errors (400)
 // ---------------------------------------------------------------------------
 
+describe("POST /api/webhooks/transactions – pre-verification guards", () => {
+  it("returns 415 for non-JSON content before signature verification", async () => {
+    const req = makeWebhookRequest("not-json", {
+      "Content-Type": "text/plain",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(415);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/content type/i);
+  });
+
+  it("returns 413 when declared content-length exceeds the webhook limit", async () => {
+    const req = makeWebhookRequest("{}", {
+      "content-length": String(TRANSACTION_WEBHOOK_MAX_BYTES + 1),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(413);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/maximum allowed size/i);
+  });
+
+  it("returns 413 when the actual body exceeds the webhook limit without content-length", async () => {
+    const rawBody = "x".repeat(TRANSACTION_WEBHOOK_MAX_BYTES + 1);
+    const req = makeWebhookRequest(rawBody, {
+      [SIGNATURE_HEADER]: "sha256=not-checked-for-oversized-body",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(413);
+  });
+
+  it("accepts a signed JSON webhook exactly at the payload-size limit", async () => {
+    const req = makeSizedSignedRequest(
+      TRANSACTION_WEBHOOK_MAX_BYTES,
+      makePayload({
+        data: { transaction_id: "TXN12346", status: "Completed" },
+      }),
+    );
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("POST /api/webhooks/transactions – payload validation", () => {
   it("returns 400 for malformed JSON", async () => {
     const body = "not-json{{{";
@@ -325,6 +399,9 @@ describe("POST /api/webhooks/transactions – body read error", () => {
   it("returns 400 when reading request body fails", async () => {
     const req = new NextRequest("http://localhost/api/webhooks/transactions", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
     vi.spyOn(req, "text").mockRejectedValue(new Error("Simulated stream read error"));
     const res = await POST(req);

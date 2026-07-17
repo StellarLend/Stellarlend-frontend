@@ -7,13 +7,45 @@ import {
 } from "@/lib/webhooks/verify";
 import { SIGNATURE_HEADER } from "@/lib/webhooks/types";
 import type { WebhookPayload } from "@/lib/webhooks/types";
-import { updateTransactionStatus } from "@/lib/transactions/store";
+import {
+  getTransaction,
+  updateTransactionStatus,
+} from "@/lib/transactions/store";
 import { enqueueNotificationInBackground } from "@/lib/notifications/repository";
+import {
+  isStrictModeEnabled,
+  resolveAccountByMemo,
+  validateMemo,
+  type MemoType,
+} from "@/lib/stellar/memo";
 
 export const runtime = "nodejs";
+export const TRANSACTION_WEBHOOK_MAX_BYTES = 64 * 1024;
 
 /** Module-level nonce store for replay protection. */
 const nonceStore = new NonceStore();
+
+function isJsonContentType(contentType: string | null): boolean {
+  return contentType?.toLowerCase().split(";")[0]?.trim() === "application/json";
+}
+
+function byteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function rejectUnsupportedContentType() {
+  return NextResponse.json(
+    { error: "Unsupported content type" },
+    { status: 415 },
+  );
+}
+
+function rejectPayloadTooLarge() {
+  return NextResponse.json(
+    { error: "Webhook payload exceeds the maximum allowed size" },
+    { status: 413 },
+  );
+}
 
 /**
  * POST /api/webhooks/transactions
@@ -36,7 +68,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 2. Read raw body (required for HMAC verification) ───────────────────
+  // ── 2. Reject unexpected content before reading/verifying the body ──────
+  if (!isJsonContentType(req.headers.get("content-type"))) {
+    return rejectUnsupportedContentType();
+  }
+
+  const contentLength = req.headers.get("content-length");
+  if (contentLength) {
+    const declaredLength = Number(contentLength);
+    if (
+      !Number.isFinite(declaredLength) ||
+      declaredLength < 0 ||
+      declaredLength > TRANSACTION_WEBHOOK_MAX_BYTES
+    ) {
+      return rejectPayloadTooLarge();
+    }
+  }
+
+  // ── 3. Read raw body (required for HMAC verification) ───────────────────
   let rawBody: string;
   try {
     rawBody = await req.text();
@@ -47,7 +96,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 3. Verify signature ─────────────────────────────────────────────────
+  if (byteLength(rawBody) > TRANSACTION_WEBHOOK_MAX_BYTES) {
+    return rejectPayloadTooLarge();
+  }
+
+  // ── 4. Verify signature ─────────────────────────────────────────────────
   const signature = req.headers.get(SIGNATURE_HEADER) || "";
   if (!verifyWebhookSignature(rawBody, signature, secret)) {
     return NextResponse.json(
@@ -56,7 +109,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 4. Parse & validate payload ─────────────────────────────────────────
+  // ── 5. Parse & validate payload ─────────────────────────────────────────
   let payload: WebhookPayload;
   try {
     payload = JSON.parse(rawBody);
@@ -92,7 +145,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 5. Validate timestamp ───────────────────────────────────────────────
+  // ── 6. Validate timestamp ───────────────────────────────────────────────
   if (!validateTimestamp(payload.timestamp)) {
     return NextResponse.json(
       { error: "Timestamp outside tolerance window" },
@@ -100,7 +153,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 6. Check nonce for replay ───────────────────────────────────────────
+  // ── 7. Check nonce for replay ───────────────────────────────────────────
   if (nonceStore.has(payload.nonce)) {
     return NextResponse.json(
       { error: "Event already processed" },
@@ -109,7 +162,7 @@ export async function POST(req: NextRequest) {
   }
   nonceStore.add(payload.nonce, payload.timestamp);
 
-  // ── 7. Validate status ──────────────────────────────────────────────────
+  // ── 8. Validate status ──────────────────────────────────────────────────
   if (!isTransactionStatus(payload.data.status)) {
     return NextResponse.json(
       {
@@ -125,7 +178,7 @@ export async function POST(req: NextRequest) {
   const memoType = rawData.memo_type;
 
   if (memo || memoType) {
-    const type = (memoType || 'MEMO_TEXT') as any;
+    const type = (memoType || 'MEMO_TEXT') as MemoType;
     const value = memo || '';
 
     // Validate format
@@ -155,7 +208,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── 8. Update transaction ───────────────────────────────────────────────
+  // ── 9. Update transaction ───────────────────────────────────────────────
   const updated = await updateTransactionStatus(
     payload.data.transaction_id,
     payload.data.status,
