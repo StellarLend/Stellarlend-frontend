@@ -9,11 +9,12 @@ export const runtime = 'nodejs';
 async function checkSorobanRpc(): Promise<'healthy' | 'degraded'> {
   try {
     const rpcUrl =
+      config.stellar?.sorobanRpcUrl ||
       process.env.SOROBAN_RPC_URL ||
       process.env.STELLAR_SOROBAN_RPC_URL ||
-      config.stellar?.sorobanRpcUrl ||
       'https://private-rpc.test';
-    await httpGet(`${rpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    const cleanUrl = rpcUrl.replace(/\/$/, '');
+    await httpGet(`${cleanUrl}/health`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch {
     return 'degraded';
@@ -23,11 +24,12 @@ async function checkSorobanRpc(): Promise<'healthy' | 'degraded'> {
 async function checkHorizon(): Promise<'healthy' | 'degraded'> {
   try {
     const horizonUrl =
+      config.stellar?.horizonUrl ||
       process.env.STELLAR_HORIZON_URL ||
       process.env.HORIZON_URL ||
-      config.stellar?.horizonUrl ||
       'https://horizon-testnet.stellar.org';
-    await httpGet(horizonUrl, { timeoutMs: 5000, retries: 1 });
+    const cleanUrl = horizonUrl.endsWith('/') ? horizonUrl : `${horizonUrl}/`;
+    await httpGet(cleanUrl, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch {
     return 'degraded';
@@ -36,7 +38,7 @@ async function checkHorizon(): Promise<'healthy' | 'degraded'> {
 
 async function checkApi(): Promise<'healthy' | 'degraded'> {
   try {
-    const baseUrl = process.env.API_BASE_URL || config.api?.baseUrl || 'http://localhost:3001';
+    const baseUrl = config.api?.baseUrl || process.env.API_BASE_URL || 'http://localhost:3001';
     await httpGet(`${baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch {
@@ -46,7 +48,7 @@ async function checkApi(): Promise<'healthy' | 'degraded'> {
 
 async function checkDatabase(): Promise<'healthy' | 'degraded'> {
   try {
-    const baseUrl = process.env.API_BASE_URL || config.api?.baseUrl || 'http://localhost:3001';
+    const baseUrl = config.api?.baseUrl || process.env.API_BASE_URL || 'http://localhost:3001';
     await httpGet(`${baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch {

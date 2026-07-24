@@ -1,6 +1,6 @@
 export interface CacheOptions {
-  ttl: number; // Time-to-Live in milliseconds
-  swr: number; // Stale-While-Revalidate window in milliseconds
+  ttl: number;
+  swr: number;
 }
 
 export interface CacheEntry<T> {

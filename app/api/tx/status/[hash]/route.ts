@@ -5,7 +5,7 @@ import { buildSorobanRpcError } from '@/lib/soroban/tx';
 
 export const runtime = 'nodejs';
 
-const cache = new SimpleCache<{ status: string; raw?: unknown }>();
+export const cache = new SimpleCache<{ status: string; raw?: unknown }>();
 
 function badRequest() {
   return NextResponse.json(

@@ -6,15 +6,12 @@ vi.mock('@/lib/config', () => ({
   },
 }));
 
-import { GET } from './route';
-import { SimpleCache } from '@/lib/cache';
+import { GET, cache } from './route';
 
 describe('GET /api/tx/status/[hash]', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    // clear internal cache between tests
-    const cacheModule = require('@/lib/cache');
-    if (cacheModule && cacheModule.default) cacheModule.default.prototype.clear?.call(cacheModule.default.prototype);
+    cache.clear();
   });
 
   afterEach(() => {

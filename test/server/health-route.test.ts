@@ -27,7 +27,7 @@ describe('GET /api/health', () => {
   });
 
   it('returns degraded status when stellar is unreachable', async () => {
-    const { httpGet } = await import('@/lib/http/client');
+    const { httpGet } = await import('@/lib/http');
     (httpGet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TimeoutError('url', 5000));
 
     const response = await GET();
