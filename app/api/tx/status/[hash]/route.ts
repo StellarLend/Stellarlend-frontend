@@ -5,7 +5,7 @@ import { buildSorobanRpcError } from '@/lib/soroban/tx';
 
 export const runtime = 'nodejs';
 
-export const cache = new SimpleCache<{ status: string; raw?: unknown }>();
+const cache = new SimpleCache<{ status: string; raw?: unknown }>();
 
 function badRequest() {
   return NextResponse.json(
@@ -14,8 +14,8 @@ function badRequest() {
   );
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { hash?: string } }) {
-  const hash = params?.hash ?? '';
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ hash?: string }> }) {
+  const { hash = '' } = await params;
 
   // Reject non-hex inputs
   if (!hash || !/^[0-9a-fA-F]+$/.test(hash)) return badRequest();
@@ -43,5 +43,3 @@ export async function GET(_req: NextRequest, { params }: { params: { hash?: stri
     return NextResponse.json({ error: buildSorobanRpcError(err) }, { status: 502 });
   }
 }
-
-export default GET;

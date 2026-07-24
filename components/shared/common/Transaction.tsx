@@ -44,6 +44,7 @@ import {
 } from "@/types/Transaction";
 import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
 import { sortTransactions, type TransactionSortKey, type TransactionSortOrder } from "@/lib/transactions/sort";
+import { TransactionRow, TransactionMobileRow } from "./TransactionRow";
 
 
 const statusOptions: (TransactionStatus | "All")[] = [
@@ -548,11 +549,14 @@ export const Transactions = ({
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
                     <th className="py-3 px-4 text-left font-semibold">Transaction Type</th>
-                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                    <th
+                      className="py-3 px-4 text-left font-semibold"
+                      scope="col"
+                      aria-sort={sortKey === "amount" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                    >
                       <button
                         type="button"
                         className="flex items-center gap-1 text-left font-semibold"
-                        aria-sort={sortKey === "amount" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
                         aria-label="Sort by amount"
                         onClick={() => handleHeaderClick("amount")}
                         onKeyDown={(event) => handleHeaderKeyDown(event, "amount")}
@@ -562,11 +566,14 @@ export const Transactions = ({
                       </button>
                     </th>
                     <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                    <th
+                      className="py-3 px-4 text-left font-semibold"
+                      scope="col"
+                      aria-sort={sortKey === "date" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                    >
                       <button
                         type="button"
                         className="flex items-center gap-1 text-left font-semibold"
-                        aria-sort={sortKey === "date" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
                         aria-label="Sort by date"
                         onClick={() => handleHeaderClick("date")}
                         onKeyDown={(event) => handleHeaderKeyDown(event, "date")}
@@ -575,11 +582,14 @@ export const Transactions = ({
                         {sortKey === "date" ? (sortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
                       </button>
                     </th>
-                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                    <th
+                      className="py-3 px-4 text-left font-semibold"
+                      scope="col"
+                      aria-sort={sortKey === "status" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                    >
                       <button
                         type="button"
                         className="flex items-center gap-1 text-left font-semibold"
-                        aria-sort={sortKey === "status" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
                         aria-label="Sort by status"
                         onClick={() => handleHeaderClick("status")}
                         onKeyDown={(event) => handleHeaderKeyDown(event, "status")}
@@ -638,7 +648,7 @@ export const Transactions = ({
                     const actualIndex = startIndex + idx;
                     const isPending = isPendingRow(txn);
                     return (
-                      <RowRenderCounts
+                      <TransactionRow
                         key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                         txn={txn}
                         actualIndex={actualIndex}
@@ -753,7 +763,7 @@ export const Transactions = ({
                 const actualIndex = startIndex + idx;
                 const isPending = isPendingRow(txn);
                 return (
-                  <MobileRowRenderCounts
+                  <TransactionMobileRow
                     key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                     txn={txn}
                     isExpanded={isDetailOpen && selectedTxn?.id === txn.id}

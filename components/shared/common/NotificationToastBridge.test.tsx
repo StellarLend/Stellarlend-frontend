@@ -19,9 +19,9 @@ vi.mock("@/hooks/useNotificationStream", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
 
   return {
-    default: (options?: {
+    default: function useNotificationStreamMock(options?: {
       onNotification?: (notification: Notification) => void;
-    }) => {
+    }) {
       streamFn(options);
 
       (ReactActual.useEffect(() => {

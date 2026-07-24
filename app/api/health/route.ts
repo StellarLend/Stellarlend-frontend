@@ -56,7 +56,7 @@ async function checkDatabase(): Promise<'healthy' | 'degraded'> {
   }
 }
 
-async function handleHealth(request?: NextRequest) {
+async function handleHealth(request: NextRequest) {
   try {
     const sorobanStatus = await checkSorobanRpc();
     const horizonStatus = await checkHorizon();

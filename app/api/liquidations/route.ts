@@ -4,7 +4,7 @@ import { walletAddressSchema } from '@/lib/positions/queryParams';
 import { withRequestLogging } from '@/lib/api/handler';
 import { computeLiquidations, generateMockPositions } from '@/lib/positions/liquidation';
 
-async function handleLiquidations(request?: NextRequest) {
+async function handleLiquidations(request: NextRequest) {
   const user = await getUser();
 
   if (!user) {

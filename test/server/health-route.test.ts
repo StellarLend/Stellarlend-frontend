@@ -19,7 +19,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 
 describe('GET /api/health', () => {
   it('returns 200 with healthy status', async () => {
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/health') as any);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe('healthy');
@@ -30,7 +30,7 @@ describe('GET /api/health', () => {
     const { httpGet } = await import('@/lib/http');
     (httpGet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TimeoutError('url', 5000));
 
-    const response = await GET();
+    const response = await GET(new Request('http://localhost/api/health') as any);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.status).toBe('degraded');

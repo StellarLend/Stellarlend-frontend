@@ -46,7 +46,7 @@ async function putHandler(request: NextRequest) {
   try {
     const authResult = await requireAuth(request);
     if (authResult instanceof Response) {
-      return authResult;
+      return authResult as unknown as NextResponse;
     }
     user = authResult;
     if (!user || !user.id) {

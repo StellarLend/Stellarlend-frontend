@@ -26,7 +26,7 @@ function makeRequest(sessionId: string, confirm?: string): NextRequest {
 }
 
 function makeContext(id: string) {
-  return { params: { id } };
+  return { params: Promise.resolve({ id }) };
 }
 
 function makeStoredSession(id: string, userId: string) {

@@ -21,7 +21,7 @@ vi.mock("next/dynamic", () => ({
 vi.mock("next/image", () => ({
   __esModule: true,
   default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
-    <img {...props} />
+    <img alt="" {...props} />
   ),
 }));
 

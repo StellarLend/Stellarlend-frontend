@@ -1,9 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { processAccountExport } from '@/lib/account/export-bundle'; 
+import { processAccountExport, exportThrottleStore } from '@/lib/account/export-bundle'; 
 import { withCsrfProtection } from '@/lib/api/handler';
 
-// Simple in-memory mock store tracking timestamps for the 24-hour rate limit throttle
-const exportThrottleStore = new Map<string, number>();
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const postHandler = async (request: NextRequest) => {
@@ -61,8 +59,3 @@ const postHandler = async (request: NextRequest) => {
 };
 
 export const POST = withCsrfProtection(postHandler);
-
-// Helper utility exposed to clear mock states during testing execution runs
-export function resetThrottleRegistry() {
-  exportThrottleStore.clear();
-}
