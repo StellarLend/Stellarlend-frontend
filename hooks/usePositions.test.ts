@@ -131,12 +131,18 @@ describe("usePositions Hook", () => {
       nextDue: "$250.00 in 4 days",
     });
     expect(result.current.error).toBeNull();
+    expect(result.current.isStale).toBe(false);
+    expect(result.current.isOffline).toBe(false);
   });
 
   it("should handle fetch failure and call onError callback", async () => {
     const mockError = new Error("Network error");
     vi.mocked(global.fetch).mockRejectedValueOnce(mockError);
     const mockOnError = vi.fn();
+
+    // Force offline so the hook reports the failure immediately instead of
+    // entering its retry/backoff loop (covered separately in usePositions.retry.test.ts).
+    const onLineSpy = vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
 
     const { result } = renderHook(() => usePositions(mockOnError));
 
@@ -146,7 +152,11 @@ describe("usePositions Hook", () => {
 
     expect(result.current.positions).toEqual([]);
     expect(result.current.error).toEqual(mockError);
+    expect(result.current.isStale).toBe(true);
+    expect(result.current.isOffline).toBe(true);
     expect(mockOnError).toHaveBeenCalledWith(mockError);
+
+    onLineSpy.mockRestore();
   });
 
   it("should return empty array for only-lend positions", async () => {
