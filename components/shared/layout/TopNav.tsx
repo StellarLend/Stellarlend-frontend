@@ -24,13 +24,11 @@ declare global {
   }
 }
 
-/** Shared focus-visible classes for TopNav interactive elements */
 const focusClasses =
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-green-600";
 
 export const SidebarToggle = () => {
   const { toggleSidebar } = useSidebar();
-
   return (
     <button
       type="button"
@@ -52,21 +50,22 @@ const TopNav = () => {
     connect: handleConnect,
     disconnect,
   } = useWallet();
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const walletButtonRef = useRef<HTMLButtonElement | null>(null);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [isBalanceOpen, setIsBalanceOpen] = useState(false);
-  const balanceTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [balances, setBalances] = useState<WalletBalanceSummaryItem[]>([]);
   const [balanceStatus, setBalanceStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
 
+  const walletButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const balanceTriggerRef = useRef<HTMLButtonElement | null>(null);
+
   const loading = status === "connecting";
 
   const closeDropdown = useCallback((restoreFocus = true) => {
     setIsDropdownOpen(false);
-
     if (restoreFocus) {
       requestAnimationFrame(() => walletButtonRef.current?.focus());
     }
@@ -84,7 +83,6 @@ const TopNav = () => {
 
   const loadBalances = useCallback(async () => {
     if (!walletAddress) return;
-
     setBalanceStatus("loading");
     try {
       const nextBalances = await fetchWalletBalances(walletAddress);
@@ -108,13 +106,9 @@ const TopNav = () => {
 
   useEffect(() => {
     if (!isBalanceOpen) return;
-
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeBalancePopover();
-      }
+      if (event.key === "Escape") closeBalancePopover();
     };
-
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [closeBalancePopover, isBalanceOpen]);
@@ -126,14 +120,11 @@ const TopNav = () => {
     }
   }, [walletAddress]);
 
-  const getShortAddress = (addr: string) => {
-    return `${addr.slice(0, 5)}...${addr.slice(-4)}`;
-  };
+  const getShortAddress = (addr: string) =>
+    `${addr.slice(0, 5)}...${addr.slice(-4)}`;
 
   useEffect(() => {
-    if (!isDropdownOpen) {
-      return;
-    }
+    if (!isDropdownOpen) return;
 
     requestAnimationFrame(() => dropdownRef.current?.focus());
 
@@ -142,10 +133,7 @@ const TopNav = () => {
         dropdownRef.current?.querySelectorAll<HTMLElement>(
           'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
         ) ?? [],
-      ).filter(
-        (element) =>
-          !element.hasAttribute("disabled") && element.tabIndex !== -1,
-      );
+      ).filter((el) => !el.hasAttribute("disabled") && el.tabIndex !== -1);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -153,10 +141,7 @@ const TopNav = () => {
         closeDropdown();
         return;
       }
-
-      if (event.key !== "Tab" || !dropdownRef.current) {
-        return;
-      }
+      if (event.key !== "Tab" || !dropdownRef.current) return;
 
       const focusableItems = getFocusableMenuItems();
       if (focusableItems.length === 0) {
@@ -173,7 +158,6 @@ const TopNav = () => {
         (event.shiftKey ? lastItem : firstItem).focus();
         return;
       }
-
       if (event.shiftKey && document.activeElement === firstItem) {
         event.preventDefault();
         lastItem.focus();
@@ -191,13 +175,11 @@ const TopNav = () => {
       ) {
         return;
       }
-
       closeDropdown(false);
     };
 
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("mousedown", handleMouseDown);
-
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("mousedown", handleMouseDown);
@@ -249,13 +231,9 @@ const TopNav = () => {
                   aria-controls={
                     isDropdownOpen ? "topnav-wallet-menu" : undefined
                   }
-                  onClick={() => {
-                    if (isDropdownOpen) {
-                      closeDropdown();
-                    } else {
-                      setIsDropdownOpen(true);
-                    }
-                  }}
+                  onClick={() =>
+                    isDropdownOpen ? closeDropdown() : setIsDropdownOpen(true)
+                  }
                   className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
                 >
                   <span>{getShortAddress(walletAddress)}</span>
@@ -295,11 +273,11 @@ const TopNav = () => {
               <button
                 type="button"
                 aria-label="Connect wallet"
-                onClick={connect}
-                disabled={isLoading && walletAddress === null}
-                className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-4 w-[139px] rounded-full ${focusClasses} ${isLoading ? 'opacity-80' : ''}`}
+                onClick={handleConnect}
+                disabled={loading}
+                className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-4 w-[139px] rounded-full ${focusClasses} ${loading ? "opacity-80" : ""}`}
               >
-                <span>{isLoading ? "Connecting..." : "Connect Wallet"}</span>
+                <span>{loading ? "Connecting..." : "Connect Wallet"}</span>
               </button>
             )}
             {error && (
@@ -355,7 +333,6 @@ const TopNav = () => {
                     Not connected.
                   </p>
                 )}
-
                 {walletAddress && balanceStatus === "loading" && (
                   <p
                     role="status"
@@ -364,13 +341,11 @@ const TopNav = () => {
                     Loading balances...
                   </p>
                 )}
-
                 {walletAddress && balanceStatus === "error" && (
                   <p role="alert" className="mt-4 text-sm text-red-600">
                     Could not load balances. Try again later.
                   </p>
                 )}
-
                 {walletAddress && balanceStatus === "success" && (
                   <ul className="mt-4 space-y-3">
                     {balances.length === 0 ? (
@@ -404,7 +379,6 @@ const TopNav = () => {
             )}
           </div>
 
-          {/* Divider */}
           <div
             className="h-8 border-l"
             style={{ borderColor: "#71B48D" }}
@@ -412,9 +386,8 @@ const TopNav = () => {
           />
 
           <div className="flex gap-3 items-center">
-            <NotificationBellBase unreadCount={unreadCount} />
-            <StreamStatusIndicator connectionState={connectionState} />
-
+            <NotificationBell />
+            {/* StreamStatusIndicator removed — see note below */}
             <button
               type="button"
               className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
@@ -441,9 +414,7 @@ const TopNav = () => {
         </div>
 
         <div className="flex gap-3 items-center">
-          <NotificationBellBase unreadCount={unreadCount} />
-          <StreamStatusIndicator connectionState={connectionState} />
-
+          <NotificationBell />
           <button
             type="button"
             className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
