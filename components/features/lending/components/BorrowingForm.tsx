@@ -111,13 +111,6 @@ export default function BorrowingForm({
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
-  // "preset" = one of the LOAN_DURATIONS chips is active
-  // "custom" = the Custom chip is active and the numeric input is visible
-  const [durationMode, setDurationMode] = useState<"preset" | "custom">("preset");
-  // Raw string so the input can be empty / partially typed without coercion
-  const [customDays, setCustomDays] = useState<string>("");
-  const [customDaysError, setCustomDaysError] = useState<string>("");
-
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
   const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
   const assetKey = formData.asset?.toUpperCase();
