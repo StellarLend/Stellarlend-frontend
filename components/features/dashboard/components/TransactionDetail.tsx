@@ -236,14 +236,6 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
                   <span>Print Receipt</span>
                 </button>
               </div>
-
-              {toast && (
-                <Toast
-                  variant={toast.variant}
-                  title={toast.title}
-                  description={toast.description}
-                />
-              )}
             </Dialog.Panel>
           </Transition.Child>
           </div>

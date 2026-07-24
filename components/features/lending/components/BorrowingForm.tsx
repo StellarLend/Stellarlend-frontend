@@ -359,14 +359,6 @@ export default function BorrowingForm({
   // Form validation / submission
   // ---------------------------------------------------------------------------
 
-  // ---------------------------------------------------------------------------
-  // Custom-duration helpers
-  // ---------------------------------------------------------------------------
-
-  // ---------------------------------------------------------------------------
-  // Form validation / submission
-  // ---------------------------------------------------------------------------
-
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -940,7 +932,7 @@ export default function BorrowingForm({
             </div>
             <p
               className={cn("text-xs font-semibold", projectedBandStyle.text)}
-              role={projectedBand === "healthy" ? undefined : "alert"}
+              role="status"
             >
               {projectedBandStyle.helper}
             </p>
