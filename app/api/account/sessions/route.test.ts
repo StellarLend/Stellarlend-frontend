@@ -4,9 +4,11 @@ import { GET } from './route';
 
 // ── mocks ──────────────────────────────────────────────────────────────────
 
-const mockGetSession = vi.fn();
-const mockListStoredSessions = vi.fn();
-const mockTouchStoredSession = vi.fn();
+const { mockGetSession, mockListStoredSessions, mockTouchStoredSession } = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockListStoredSessions: vi.fn(),
+  mockTouchStoredSession: vi.fn(),
+}));
 
 vi.mock('@/lib/auth', () => ({ getSession: mockGetSession }));
 vi.mock('@/lib/auth/session-store', () => ({

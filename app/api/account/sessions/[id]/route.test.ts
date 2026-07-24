@@ -4,9 +4,11 @@ import { DELETE } from './route';
 
 // ── mocks ──────────────────────────────────────────────────────────────────
 
-const mockGetSession = vi.fn();
-const mockGetStoredSession = vi.fn();
-const mockRevokeStoredSession = vi.fn();
+const { mockGetSession, mockGetStoredSession, mockRevokeStoredSession } = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockGetStoredSession: vi.fn(),
+  mockRevokeStoredSession: vi.fn(),
+}));
 
 vi.mock('@/lib/auth', () => ({ getSession: mockGetSession }));
 vi.mock('@/lib/auth/session-store', () => ({

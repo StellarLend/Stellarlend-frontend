@@ -73,9 +73,6 @@ export async function httpGet<T>(url: string, options: RequestOptions = {}): Pro
       const headers = new Headers(fetchOptions.headers);
       headers.set(REQUEST_ID_HEADER, requestId);
       
-      const headers = new Headers(fetchOptions.headers);
-      headers.set(REQUEST_ID_HEADER, requestId);
-      
       let response: Response;
       try {
         response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal });
@@ -161,9 +158,4 @@ export async function httpPost<T>(url: string, body: unknown, options: RequestOp
   });
 }
 
-/**
- * Generic fetch wrapper that propagates the active x-request-id from async context.
- * Alias for httpGet, exported separately to satisfy callers that import httpFetch by name.
- */
-export const httpFetch = httpGet;
 

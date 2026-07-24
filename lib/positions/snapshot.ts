@@ -48,12 +48,14 @@ export interface SnapshotHistoryResponse {
  */
 export const PositionHistoryParamsSchema = z.object({
   from: z
+    .coerce
     .number()
     .int()
     .positive()
     .optional()
     .describe('Start timestamp in milliseconds (default: 90 days ago)'),
   to: z
+    .coerce
     .number()
     .int()
     .positive()

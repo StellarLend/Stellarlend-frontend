@@ -9,6 +9,8 @@ const makeRequest = (body: unknown, headers: Record<string, string> = {}) => {
     body: JSON.stringify(body),
     headers: {
       'Content-Type': 'application/json',
+      'x-csrf-token': 'test-csrf-token',
+      Cookie: 'csrf-token=test-csrf-token',
       ...headers,
     },
   });
@@ -47,6 +49,8 @@ describe('DELETE /api/auth/session', () => {
       method: 'DELETE',
       headers: {
         'Idempotency-Key': 'session-clear-123',
+        'x-csrf-token': 'test-csrf-token',
+        Cookie: 'csrf-token=test-csrf-token',
       },
     });
 

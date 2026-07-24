@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
@@ -7,7 +8,7 @@ export const runtime = 'nodejs';
 
 async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(`${config.stellar?.horizonUrl || 'https://horizon-testnet.stellar.org'}/`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -18,7 +19,8 @@ async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
 
 async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.stellar.sorobanRpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    const rpcUrl = config.stellar?.sorobanRpcUrl || 'https://private-rpc.test';
+    await httpGet(`${rpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -29,7 +31,7 @@ async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> 
 
 async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(`${config.api?.baseUrl || 'http://localhost:3001'}/health`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -40,7 +42,7 @@ async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
 
 async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
+    await httpGet(`${config.api?.baseUrl || 'http://localhost:3001'}/health/db`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
   } catch (err) {
     if (err instanceof TimeoutError) return 'degraded';
@@ -49,7 +51,7 @@ async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
   }
 }
 
-async function handleHealth() {
+async function handleHealth(request?: NextRequest) {
   try {
     const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
       checkHorizon(),
@@ -74,8 +76,8 @@ async function handleHealth() {
     const healthData = {
       status: overallStatus,
       timestamp: new Date().toISOString(),
-      environment: config.app.environment,
-      version: config.app.version,
+      environment: config.app?.environment ?? 'development',
+      version: config.app?.version ?? '1.0.0',
       checks: {
         database: dbStatus,
         api: apiStatus,
@@ -83,8 +85,26 @@ async function handleHealth() {
       },
     };
 
+    const contentStr = JSON.stringify(healthData);
+    const etag = `"${crypto.createHash('md5').update(contentStr).digest('hex')}"`;
+    const ifNoneMatch = request?.headers?.get('if-none-match');
+
+    const headers = new Headers({
+      'Cache-Control': 'public, max-age=30',
+      'ETag': etag,
+      'Vary': 'Accept-Encoding',
+      'Content-Type': 'application/json',
+    });
+
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      return new NextResponse(null, { status: 304, headers });
+    }
+
     const httpStatus = healthData.status === 'unhealthy' ? 503 : 200;
-    return NextResponse.json(healthData, { status: httpStatus });
+    return new NextResponse(contentStr, {
+      status: httpStatus,
+      headers,
+    });
   } catch {
     return NextResponse.json(
       {
