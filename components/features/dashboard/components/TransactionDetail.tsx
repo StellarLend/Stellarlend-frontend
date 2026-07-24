@@ -22,11 +22,7 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
-  const [toast, setToast] = useState<{
-    variant: "success" | "error";
-    title: string;
-    description: string;
-  } | null>(null);
+  const [toast, setToast] = useState<{ title?: string; description?: string; variant?: "success" | "error" } | null>(null);
 
   const id = transaction?.id || "";
 
@@ -236,14 +232,6 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
                   <span>Print Receipt</span>
                 </button>
               </div>
-
-              {toast && (
-                <Toast
-                  variant={toast.variant}
-                  title={toast.title}
-                  description={toast.description}
-                />
-              )}
             </Dialog.Panel>
           </Transition.Child>
           </div>

@@ -106,8 +106,6 @@ export default defineConfig({
             "app/api/stream/prices/route.test.ts",
             "__tests__/**/*.test.ts",
             "docs/__tests__/**/*.test.ts",
-            "lib/security/**/*.test.ts",
-            "lib/utils/**/*.test.ts",
             "lib/**/*.test.ts",
           ],
         },

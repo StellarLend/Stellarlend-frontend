@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Copy, Search, X } from "lucide-react";
 import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -227,21 +227,26 @@ function AssetCard({ asset }: { asset: AssetMetadata }) {
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Positions data types and hook ─────────────────────────────────────────────
 
-export default function MetricsCards() {
-  const [data, setData] = useState<any>(null);
-  const [filterQuery, setFilterQuery] = useState("");
+interface PositionsData {
+  availableBalance: string;
+  copyAddress: string;
+  borrowedAmount: string;
+  nextDue: string;
+  suppliedFunds: string;
+  earnings: string;
+  healthFactor: number | string;
+}
 
-  interface PositionsData {
-    availableBalance: string;
-    copyAddress: string;
-    borrowedAmount: string;
-    nextDue: string;
-    suppliedFunds: string;
-    earnings: string;
-    healthFactor: number | string;
-  }
+function usePositionsData(): {
+  data: PositionsData | null;
+  isLoading: boolean;
+  error: Error | null;
+} {
+  const [data, setData] = useState<PositionsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   function usePositionsData(): {
     data: PositionsData | null;
@@ -252,21 +257,26 @@ export default function MetricsCards() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
-    const fetchData = useCallback(async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/positions");
-        if (!res.ok)
-          throw new Error(`Failed to fetch positions: ${res.statusText}`);
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        setIsLoading(false);
-      }
-    }, []);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, isLoading, error };
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function MetricsCards() {
+  const { data, isLoading, error } = usePositionsData();
+  const [filterQuery, setFilterQuery] = useState("");
+
+  const allAssets = useMemo(() => {
+    try {
+      return getAssets();
+    } catch {
+      return [];
+    }
+  }, []);
 
     const allAssets = useMemo(() => {
       try {
@@ -276,15 +286,17 @@ export default function MetricsCards() {
       }
     }, []);
 
-    const filteredAssets = useMemo(() => {
-      const q = filterQuery.trim().toLowerCase();
-      if (!q) return allAssets;
-      return allAssets.filter(
-        (a) =>
-          a.symbol.toLowerCase().includes(q) ||
-          a.name.toLowerCase().includes(q),
-      );
-    }, [allAssets, filterQuery]);
+  if (isLoading || !data) {
+    return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-400 p-4 text-sm font-medium">
+        Failed to load metrics: {error.message}
+      </div>
+    );
+  }
 
     if (!data)
       return (

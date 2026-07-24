@@ -103,14 +103,6 @@ export default function BorrowingForm({
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
-  // "preset" = one of the LOAN_DURATIONS chips is active
-  // "custom" = the Custom chip is active and the numeric input is visible
-  const [durationMode, setDurationMode] = useState<"preset" | "custom">(
-    "preset",
-  );
-  // Raw string so the input can be empty / partially typed without coercion
-  const [customDays, setCustomDays] = useState<string>("");
-  const [customDaysError, setCustomDaysError] = useState<string>("");
 
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
   const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
@@ -320,64 +312,7 @@ export default function BorrowingForm({
   // ---------------------------------------------------------------------------
   // Form validation / submission
   // ---------------------------------------------------------------------------
-
   // ---------------------------------------------------------------------------
-  // Custom-duration helpers
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Validates the raw string coming from the custom-days input.
-   *
-   * Returns an error message string on failure, or `""` on success.
-   * When valid, it also calls the `onValid` callback with the parsed integer.
-   */
-  const validateCustomDays = (
-    raw: string,
-    onValid?: (days: number) => void,
-  ): string => {
-    if (raw.trim() === "" || isNaN(Number(raw))) {
-      return "Please enter a number of days";
-    }
-
-    const parsed = Number(raw);
-
-    if (!Number.isInteger(parsed)) {
-      return "Duration must be a whole number of days";
-    }
-
-    if (parsed < CUSTOM_DURATION_MIN_DAYS) {
-      return `Minimum duration is ${CUSTOM_DURATION_MIN_DAYS} day`;
-    }
-
-    if (parsed > CUSTOM_DURATION_MAX_DAYS) {
-      return `Maximum duration is ${CUSTOM_DURATION_MAX_DAYS} days`;
-    }
-
-    onValid?.(parsed);
-    return "";
-  };
-
-  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setCustomDays(raw);
-
-    const errorMsg = validateCustomDays(raw, (days) => {
-      setFormData((prev) => ({ ...prev, duration: days }));
-      // Clear the duration field error if the user fixes it
-      if (errors.duration) {
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next.duration;
-          return next;
-        });
-      }
-    });
-
-    setCustomDaysError(errorMsg);
-  };
-
-  // ---------------------------------------------------------------------------
-  // Form validation / submission
   // ---------------------------------------------------------------------------
 
   const validateForm = (): boolean => {
@@ -957,7 +892,7 @@ export default function BorrowingForm({
             </div>
             <p
               className={cn("text-xs font-semibold", projectedBandStyle.text)}
-              role={projectedBand === "healthy" ? undefined : "alert"}
+              role="status"
             >
               {projectedBandStyle.helper}
             </p>

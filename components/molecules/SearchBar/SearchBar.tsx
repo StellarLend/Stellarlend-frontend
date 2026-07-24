@@ -5,6 +5,7 @@ import { X, Search } from 'lucide-react';
 import { sanitiseString } from '@/lib/security/input-sanitizer';
 import type { SearchResultsData, SearchResult } from '@/lib/search';
 import SearchResults from '@/components/features/dashboard/components/SearchResults';
+import type { SearchResultsHandle } from '@/components/features/dashboard/components/SearchResults';
 
 export interface SearchBarProps {
   /**
@@ -157,9 +158,10 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     ref
   ) => {
     const [value, setValue] = useState(initialValue);
+    const [activeDescendantId, setActiveDescendantId] = useState<string | undefined>(undefined);
     const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const inputRef = useRef<HTMLInputElement | null>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<SearchResultsHandle>(null);
     const generatedId = useId();
     const listId = resultsListId || `search-results-${generatedId}`;
 
@@ -246,14 +248,16 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
 
         if (e.key === 'ArrowDown') {
           e.preventDefault();
-          const listbox = document.getElementById(listId);
-          if (listbox) {
-            const firstOption = listbox.querySelector('[role="option"]') as HTMLElement | null;
-            firstOption?.focus();
-          }
+          dropdownRef.current?.moveActiveIndex(1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          dropdownRef.current?.moveActiveIndex(-1);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          dropdownRef.current?.selectActive();
         }
       },
-      [resultsOpen, listId]
+      [resultsOpen]
     );
 
     // Handle closing results on Escape
@@ -262,6 +266,8 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
 
       const handleEscape = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
+          setActiveDescendantId(undefined);
+          dropdownRef.current?.clearActiveIndex();
           inputRef.current?.focus();
         }
       };
@@ -277,7 +283,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       const handleClickOutside = (e: MouseEvent) => {
         if (
           dropdownRef.current &&
-          !dropdownRef.current.contains(e.target as Node) &&
+          !dropdownRef.current.listbox?.contains(e.target as Node) &&
           inputRef.current &&
           !inputRef.current.contains(e.target as Node)
         ) {
@@ -328,7 +334,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             role={results ? 'combobox' : undefined}
             aria-expanded={results ? resultsOpen : undefined}
             aria-controls={results ? listId : undefined}
-            aria-activedescendant={resultsOpen ? undefined : undefined}
+            aria-activedescendant={resultsOpen ? activeDescendantId : undefined}
             aria-haspopup={results ? 'listbox' : undefined}
             aria-autocomplete="list"
             className={`
@@ -429,6 +435,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               onNavigate={onNavigate}
               onClose={() => onSearch?.('')}
               id={listId}
+              onActiveIndexChange={setActiveDescendantId}
             />
           )}
         </div>

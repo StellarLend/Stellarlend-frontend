@@ -159,6 +159,17 @@ describe("useInfiniteTransactions", () => {
     expect(result.current.isLoading).toBe(true);
   });
 
+  it("starts with isLoading false and does not fetch when enabled is false", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useInfiniteTransactions({ enabled: false }));
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.transactions).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("stops at final cursor and does not fetch again", async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url.includes("cursor=cursor-page-2")) {

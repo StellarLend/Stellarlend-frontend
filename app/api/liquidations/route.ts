@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
-import { walletAddressSchema } from '@/lib/positions/queryParams';
+import { walletAddressSchema } from '@/lib/positions/walletAddressSchema';
 import { withRequestLogging } from '@/lib/api/handler';
 import { computeLiquidations, generateMockPositions } from '@/lib/positions/liquidation';
 
