@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
+import { sqlite } from '@/lib/db/client';
 
 export const runtime = 'nodejs';
 
@@ -27,36 +28,22 @@ async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> 
   }
 }
 
-async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+function checkDatabase(): 'healthy' | 'unhealthy' {
   try {
-    await httpGet(`${config.api.baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    sqlite.prepare('SELECT 1').get();
     return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
-  }
-}
-
-async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
-  try {
-    await httpGet(`${config.api.baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
-    return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
+  } catch {
     return 'unhealthy';
   }
 }
 
 async function handleHealth() {
   try {
-    const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
+    const [horizonStatus, sorobanStatus] = await Promise.all([
       checkHorizon(),
       checkSorobanRpc(),
-      checkApi(),
-      checkDatabase(),
     ]);
+    const dbStatus = checkDatabase();
 
     const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy' 
       ? 'unhealthy' 
@@ -65,9 +52,9 @@ async function handleHealth() {
       : 'healthy';
 
     const overallStatus = 
-      stellarStatus === 'unhealthy' || apiStatus === 'unhealthy' || dbStatus === 'unhealthy'
+      stellarStatus === 'unhealthy' || dbStatus === 'unhealthy'
         ? 'unhealthy'
-        : stellarStatus === 'degraded' || apiStatus === 'degraded' || dbStatus === 'degraded'
+        : stellarStatus === 'degraded'
         ? 'degraded'
         : 'healthy';
 
@@ -78,7 +65,6 @@ async function handleHealth() {
       version: config.app.version,
       checks: {
         database: dbStatus,
-        api: apiStatus,
         stellar: stellarStatus,
       },
     };

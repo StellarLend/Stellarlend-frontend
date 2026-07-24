@@ -53,10 +53,15 @@ describe('GET /api/health', () => {
     expect(body.environment).toBe('test');
     expect(body.version).toBe('1.0.0');
     expect(body.checks).toEqual({
-      api: 'healthy',
       database: 'healthy',
       stellar: 'healthy',
     });
+  });
+  it('reports database as healthy when the DB responds', async () => {
+    const res = await GET(makeRequest());
+    const body = await res.json();
+    expect(body.checks.database).toBe('healthy');
+    expect(body.status).not.toBe('unhealthy');
   });
 
   it('checks the server-only Soroban RPC health endpoint', async () => {
