@@ -55,6 +55,12 @@ const TopNav = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const walletButtonRef = useRef<HTMLButtonElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [isBalanceOpen, setIsBalanceOpen] = useState(false);
+  const balanceTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [balances, setBalances] = useState<WalletBalanceSummaryItem[]>([]);
+  const [balanceStatus, setBalanceStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
 
   const loading = status === "connecting";
 
