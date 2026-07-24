@@ -6,6 +6,7 @@ import { SideNav } from "./SideNav";
 import { SidebarProvider } from "@/context/SidebarContext";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
+import { clientLog } from "@/lib/utils/client-log";
 
 const mockPathname = vi.fn().mockReturnValue("/");
 
@@ -30,7 +31,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("marks active when pathname matches href", () => {
-    mockUsePathname.mockReturnValue("/dashboard");
+    mockPathname.mockReturnValue("/dashboard");
     render(<NavLink href="/dashboard">Dashboard</NavLink>);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("aria-current", "page");
   });
@@ -45,7 +46,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("isActive prop overrides pathname detection", () => {
-    mockUsePathname.mockReturnValue("/other");
+    mockPathname.mockReturnValue("/other");
     render(<NavLink href="/dashboard" isActive>Dashboard</NavLink>);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("aria-current", "page");
   });
@@ -63,7 +64,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("returns null and warns when href is empty", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(clientLog, "warn").mockImplementation(() => {});
     // @ts-expect-error intentional bad prop
     const { container } = render(<NavLink href="">Bad</NavLink>);
     expect(container.firstChild).toBeNull();

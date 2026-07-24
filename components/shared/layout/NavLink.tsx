@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navClasses } from "@/constants/design-tokens";
+import { clientLog } from "@/lib/utils/client-log";
 
 interface NavLinkProps {
   href: string;
