@@ -406,7 +406,7 @@ const TopNav = () => {
           />
 
           <div className="flex gap-3 items-center">
-            <NotificationBellBase unreadCount={unreadCount} />
+            <NotificationBell />
             <StreamStatusIndicator connectionState={connectionState} />
 
             <button
@@ -435,7 +435,7 @@ const TopNav = () => {
         </div>
 
         <div className="flex gap-3 items-center">
-          <NotificationBellBase unreadCount={unreadCount} />
+          <NotificationBell />
           <StreamStatusIndicator connectionState={connectionState} />
 
           <button
