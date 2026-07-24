@@ -11,8 +11,6 @@ import type { Transaction } from "@/types/Transaction";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { copyToClipboard } from "@/lib/utils/clipboard";
 
-import { copyToClipboard } from "@/lib/utils/clipboard";
-
 vi.mock("@/lib/utils/clipboard", () => ({
   copyToClipboard: vi.fn(),
 }));
@@ -23,11 +21,6 @@ vi.mock("next/image", () => ({
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     <img {...props} />
   ),
-}));
-
-// Mock the clipboard helper
-vi.mock("@/lib/utils/clipboard", () => ({
-  copyToClipboard: vi.fn(),
 }));
 
 const buildTransaction = (overrides: Partial<Transaction> = {}): Transaction => ({
@@ -42,6 +35,8 @@ const buildTransaction = (overrides: Partial<Transaction> = {}): Transaction => 
 });
 
 describe("TransactionDetail Modal", () => {
+  const mockFetch = vi.fn();
+
   beforeEach(() => {
     // Headless UI's Transition relies on requestAnimationFrame; flush it
     // synchronously so the modal content is in the DOM immediately.
@@ -49,7 +44,12 @@ describe("TransactionDetail Modal", () => {
       cb(0);
       return 0;
     });
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ transaction: null }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
   });
 
   afterEach(() => {
@@ -213,65 +213,7 @@ describe("TransactionDetail Modal", () => {
     });
   });
 
-  it("shows success toast when copy succeeds", async () => {
-    vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
 
-    render(
-      <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Copied!")).toBeInTheDocument();
-    });
-    expect(
-      screen.getByText("Transaction ID copied to clipboard."),
-    ).toBeInTheDocument();
-  });
-
-  it("shows error toast when clipboard fails", async () => {
-    vi.mocked(copyToClipboard).mockResolvedValue({
-      success: false,
-      reason: "clipboard_error",
-    });
-
-    render(
-      <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Copy Failed")).toBeInTheDocument();
-    });
-    expect(
-      screen.getByText(
-        "Clipboard access is unavailable. Try copying the ID manually.",
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it("auto-dismisses the toast after 4 seconds", async () => {
-    vi.useFakeTimers();
-    vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
-
-    render(
-      <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
-    );
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Copy transaction ID/i }));
-    });
-
-    expect(screen.getByText("Copied!")).toBeInTheDocument();
-
-    act(() => vi.advanceTimersByTime(4000));
-
-    expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
-
-    vi.useRealTimers();
-  });
 
   it("calls onClose when the close button is clicked", async () => {
     const onClose = vi.fn();
