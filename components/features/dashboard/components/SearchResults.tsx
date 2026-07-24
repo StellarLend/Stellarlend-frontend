@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
 import { ChevronRight, Loader, AlertCircle } from 'lucide-react';
 import type {
   SearchResultsData,
@@ -40,6 +40,20 @@ export interface SearchResultsProps {
    * Additional CSS classes for the container
    */
   className?: string;
+
+  /**
+   * The id applied to the listbox root element.
+   * Must match the aria-controls value on the combobox input.
+   */
+  id?: string;
+
+  /**
+   * Called whenever the keyboard-highlighted option changes.
+   * Receives the id of the newly active option element, or undefined
+   * when no option is highlighted (e.g. after results close or reset).
+   * Used by the parent combobox to update aria-activedescendant.
+   */
+  onActiveIndexChange?: (activeOptionId: string | undefined) => void;
 }
 
 /**
@@ -71,7 +85,23 @@ export interface SearchResultsProps {
  * );
  * ```
  */
-const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
+/**
+ * Imperative handle exposed by SearchResults via ref.
+ * Allows a parent combobox to drive keyboard navigation while
+ * keeping focus on the input element (standard ARIA combobox pattern).
+ */
+export interface SearchResultsHandle {
+  /** The underlying listbox DOM element */
+  listbox: HTMLDivElement | null;
+  /** Move the highlighted option by delta (+1 for ArrowDown, -1 for ArrowUp) */
+  moveActiveIndex: (delta: number) => void;
+  /** Clear the highlighted option (e.g. when the dropdown closes) */
+  clearActiveIndex: () => void;
+  /** Confirm the currently highlighted option (e.g. Enter key from the input) */
+  selectActive: () => void;
+}
+
+const SearchResults = React.forwardRef<SearchResultsHandle, SearchResultsProps>(
   (
     {
       results,
@@ -80,15 +110,70 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
       onClose,
       onNavigate,
       className = '',
+      id,
+      onActiveIndexChange,
     },
     ref
   ) => {
     const [activeIndex, setActiveIndex] = useState(-1);
+    const listboxRef = useRef<HTMLDivElement>(null);
     const resultsContainerRef = useRef<HTMLDivElement>(null);
     const resultItemsRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
     const flattened = flattenSearchResults(results.results);
     const resultCount = getResultsCount(results.results);
+
+    /**
+     * Build a stable DOM id for a given option index.
+     * ResultItem elements receive this as their id attribute so that
+     * aria-activedescendant on the combobox input can reference them.
+     */
+    const getOptionId = useCallback(
+      (index: number) => (id ? `${id}-option-${index}` : undefined),
+      [id]
+    );
+
+    /**
+     * Notify parent of the active option id whenever activeIndex changes.
+     * This lets the combobox input keep aria-activedescendant in sync.
+     */
+    useEffect(() => {
+      if (!onActiveIndexChange) return;
+      onActiveIndexChange(activeIndex >= 0 ? getOptionId(activeIndex) : undefined);
+    }, [activeIndex, getOptionId, onActiveIndexChange]);
+
+    /**
+     * Expose imperative methods so the parent combobox input can drive
+     * keyboard navigation without moving browser focus off the input.
+     */
+    useImperativeHandle(ref, () => ({
+      get listbox() {
+        return listboxRef.current;
+      },
+      moveActiveIndex(delta: number) {
+        if (resultCount === 0) return;
+        setActiveIndex((prev) => {
+          const next =
+            delta > 0
+              ? prev < resultCount - 1 ? prev + 1 : 0
+              : prev > 0 ? prev - 1 : resultCount - 1;
+          scrollToResult(next);
+          return next;
+        });
+      },
+      clearActiveIndex() {
+        setActiveIndex(-1);
+      },
+      selectActive() {
+        setActiveIndex((prev) => {
+          if (prev >= 0 && prev < resultCount) {
+            const result = flattened[prev];
+            if (result) handleSelectResult(result);
+          }
+          return prev;
+        });
+      },
+    }));
 
     /**
      * Navigate to transaction or position detail page
@@ -213,7 +298,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
     if (results.state === 'loading') {
       return (
         <div
-          ref={ref}
+          ref={listboxRef}
           className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 p-4 ${className}`}
         >
           <div className="flex items-center justify-center gap-3 py-6">
@@ -235,7 +320,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
     if (results.state === 'error' && results.error) {
       return (
         <div
-          ref={ref}
+          ref={listboxRef}
           className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 p-4 ${className}`}
         >
           <div className="flex items-start gap-3 py-4">
@@ -259,7 +344,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
     if (results.state === 'success' && resultCount === 0) {
       return (
         <div
-          ref={ref}
+          ref={listboxRef}
           className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 p-4 ${className}`}
         >
           <div className="text-center py-6">
@@ -279,7 +364,8 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
      */
     return (
       <div
-        ref={ref}
+        ref={listboxRef}
+        id={id}
         className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 max-h-96 overflow-y-auto ${className}`}
         role="listbox"
         aria-label="Search results"
@@ -311,6 +397,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
                     }}
                     ariaIndex={globalIndex}
                     ariaSetSize={resultCount}
+                    optionId={getOptionId(globalIndex)}
                   />
                 );
               })}
@@ -345,6 +432,7 @@ const SearchResults = React.forwardRef<HTMLDivElement, SearchResultsProps>(
                     }}
                     ariaIndex={globalIndex}
                     ariaSetSize={resultCount}
+                    optionId={getOptionId(globalIndex)}
                   />
                 );
               })}
@@ -368,13 +456,19 @@ interface ResultItemProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
   ariaIndex: number;
   ariaSetSize: number;
+  /**
+   * DOM id for this option element.
+   * Referenced by aria-activedescendant on the parent combobox input.
+   */
+  optionId?: string;
 }
 
 const ResultItem = React.forwardRef<HTMLDivElement, ResultItemProps>(
-  ({ result, isActive, onSelect, onKeyDown, ariaIndex, ariaSetSize }, ref) => {
+  ({ result, isActive, onSelect, onKeyDown, ariaIndex, ariaSetSize, optionId }, ref) => {
     return (
       <div
         ref={ref}
+        id={optionId}
         role="option"
         aria-selected={isActive}
         aria-posinset={ariaIndex + 1}
