@@ -407,7 +407,7 @@ const TopNav = () => {
 
           <div className="flex gap-3 items-center">
             <NotificationBell />
-            <StreamStatusIndicator connectionState={connectionState} />
+            {/* StreamStatusIndicator removed — see note below */}
 
             <button
               type="button"
@@ -436,7 +436,7 @@ const TopNav = () => {
 
         <div className="flex gap-3 items-center">
           <NotificationBell />
-          <StreamStatusIndicator connectionState={connectionState} />
+          {/* StreamStatusIndicator removed — see note below */}
 
           <button
             type="button"
