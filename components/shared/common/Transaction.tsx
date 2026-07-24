@@ -5,6 +5,7 @@ import {
   Search,
   ArrowRight,
   ChevronsUpDown,
+  ArrowUpDown,
   ListFilter,
   CalendarDays,
 } from "lucide-react";
@@ -181,11 +182,6 @@ export const Transactions = ({
     }
   }, [handleSort]);
 
-  const displayTransactions = infiniteScroll
-    ? sortTransactions(infinite.transactions, effectiveSortKey, effectiveSortOrder)
-    : sortTransactions(transactions, effectiveSortKey, effectiveSortOrder);
-  const displayLoading = infiniteScroll ? infinite.isLoading : loading;
-
   const handleHeaderClick = (nextKey: TransactionSortKey) => {
     if (!onSortChange) {
       return;
@@ -194,14 +190,6 @@ export const Transactions = ({
     const nextOrder = sortKey === nextKey && sortOrder === "asc" ? "desc" : "asc";
     onSortChange(nextKey, nextOrder);
   };
-
-  const handleHeaderKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, nextKey: TransactionSortKey) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      handleHeaderClick(nextKey);
-    }
-  };
-
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
     const d = new Date(date + " " + fixedTime);
@@ -232,7 +220,6 @@ export const Transactions = ({
       </span>
     );
   };
-  }, [controlledTransactions, currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
 
   useEffect(() => {
     setScrollTop(0);
@@ -386,26 +373,15 @@ export const Transactions = ({
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
       {!hideToolbar && (
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
-        <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
-            <div
-              className="flex items-center gap-1 cursor-pointer"
-              onClick={() => setShowSearch((v) => !v)}
-            >
-              <Search size={18} />
-              <span>Search</span>
-            </div>
-            {showSearch && (
-              <div className="absolute left-0 mt-2 z-10 bg-white border rounded shadow p-2">
-                <input
-                  type="text"
-                  placeholder="Search by type, amount, asset, id"
-                  className=" rounded p-1  text-sm w-48 focus:outline-none"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  autoFocus
-                />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
+          <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
+            <div className="relative" ref={searchRef} id="transaction-detail-drawer">
+              <div
+                className="flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowSearch((v) => !v)}
+              >
+                <Search size={18} />
+                <span>Search</span>
               </div>
               {showSearch && (
                 <div className="absolute left-0 mt-2 z-10 bg-white border rounded shadow p-2">
@@ -428,10 +404,36 @@ export const Transactions = ({
                 <ListFilter size={18} />
                 <span>Filter</span>
               </div>
-
-            {showFilter && (
-              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
-                {statusOptions.map((opt) => (
+              {showFilter && (
+                <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
+                  {statusOptions.map((opt) => (
+                    <button
+                      key={opt}
+                      className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                        status === opt ? "font-bold text-primary-700" : ""
+                      }`}
+                      onClick={() => {
+                        setStatus(opt);
+                        setShowFilter(false);
+                      }}
+                      type="button"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={sortRef}>
+              <div
+                className="flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowSort((v) => !v)}
+              >
+                <ArrowUpDown size={18} />
+                <span>Sort</span>
+              </div>
+              {showSort && (
+                <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                   <button
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
                       sortBy === "date" ? "font-bold text-primary-700" : ""
@@ -470,98 +472,56 @@ export const Transactions = ({
               )}
             </div>
           </div>
-
-            {showSort && (
-              <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
-                <button
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    sortBy === "date" ? "font-bold text-primary-700" : ""
-                  }`}
-                  onClick={() => {
-                    setSortBy("date");
-                    setShowSort(false);
-                  }}
-                  type="button"
-                >
-                  Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
-                </button>
-                <button
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                    sortBy === "amount" ? "font-bold text-primary-700" : ""
-                  }`}
-                  onClick={() => {
-                    setSortBy("amount");
-                    setShowSort(false);
-                  }}
-                  type="button"
-                >
-                  Amount{" "}
-                  {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
-                </button>
-                <button
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                  onClick={() => {
-                    setSortDir(sortDir === "asc" ? "desc" : "asc");
-                  }}
-                  type="button"
-                >
-                  Toggle Direction
-                </button>
-              </div>
-            )}
+          <div className="hidden md:flex gap-2 items-center mt-2 sm:mt-0 text-black/40">
+            <DatePicker
+              selected={dateFromObj}
+              onChange={(date: Date | null) => {
+                setDateFromObj(date);
+                setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
+              }}
+              customInput={
+                <CustomDateInput
+                  value={dateFromObj ? format(dateFromObj, "MM-dd-yyyy") : ""}
+                  placeholder="MM-DD-YYYY"
+                  icon={<CalendarDays size={16} />}
+                  onClick={() => {}}
+                />
+              }
+              dateFormat="MM-dd-yyyy"
+              className="w-[140px] placeholder:text-sm"
+              maxDate={new Date()}
+              isClearable
+              placeholderText="MM-DD-YYYY"
+            />
+            <span className="text-gray-400 text-sm">to</span>
+            <DatePicker
+              selected={dateToObj}
+              onChange={(date: Date | null) => {
+                setDateToObj(date);
+                setDateTo(date ? format(date, "yyyy-MM-dd") : "");
+              }}
+              customInput={
+                <CustomDateInput
+                  value={dateToObj ? format(dateToObj, "MM-dd-yyyy") : ""}
+                  placeholder="MM-DD-YYYY"
+                  icon={<CalendarDays size={16} />}
+                  onClick={() => {}}
+                />
+              }
+              dayClassName={(date) => {
+                if (date < new Date()) {
+                  return "text-gray-400";
+                }
+                return "";
+              }}
+              dateFormat="MM-dd-yyyy"
+              className="w-[140px] placeholder:text-sm"
+              maxDate={new Date()}
+              isClearable
+              placeholderText="MM-DD-YYYY"
+            />
           </div>
         </div>
-
-        <div className="hidden md:flex gap-2 items-center mt-2 sm:mt-0 text-black/40">
-          <DatePicker
-            selected={dateFromObj}
-            onChange={(date: Date | null) => {
-              setDateFromObj(date);
-              setDateFrom(date ? format(date, "yyyy-MM-dd") : "");
-            }}
-            customInput={
-              <CustomDateInput
-                value={dateFromObj ? format(dateFromObj, "MM-dd-yyyy") : ""}
-                placeholder="MM-DD-YYYY"
-                icon={<CalendarDays size={16} />}
-                onClick={() => {}}
-              />
-            }
-            dateFormat="MM-dd-yyyy"
-            className="w-[140px] placeholder:text-sm"
-            maxDate={new Date()}
-            isClearable
-            placeholderText="MM-DD-YYYY"
-          />
-          <span className="text-gray-400 text-sm">to</span>
-          <DatePicker
-            selected={dateToObj}
-            onChange={(date: Date | null) => {
-              setDateToObj(date);
-              setDateTo(date ? format(date, "yyyy-MM-dd") : "");
-            }}
-            customInput={
-              <CustomDateInput
-                value={dateToObj ? format(dateToObj, "MM-dd-yyyy") : ""}
-                placeholder="MM-DD-YYYY"
-                icon={<CalendarDays size={16} />}
-                onClick={() => {}}
-              />
-            }
-            dayClassName={(date) => {
-              if (date < new Date()) {
-                return "text-gray-400";
-              }
-              return "";
-            }}
-            dateFormat="MM-dd-yyyy"
-            className="w-[140px] placeholder:text-sm"
-            maxDate={new Date()}
-            isClearable
-            placeholderText="MM-DD-YYYY"
-          />
-        </div>
-      </div>
       )}
 
       <div className="">
@@ -663,89 +623,46 @@ export const Transactions = ({
                           label={txn.status}
                         />
                       </td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => handleSort("amount")}
-                          onKeyDown={(e) => handleHeaderKeyDown(e, "amount")}
-                          className="flex items-center gap-2 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors"
-                          aria-label={`Sort by Amount ${sortBy === "amount" ? (sortDir === "asc" ? "ascending" : "descending") : ""}`}
-                          type="button"
-                        >
-                          <span>Amount</span>
-                          {sortBy === "amount" && (
-                            <span aria-hidden="true">{sortDir === "asc" ? "↑" : "↓"}</span>
-                          )}
-                        </button>
-                      </th>
-                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
-                        Asset
-                      </th>
-                      <th 
-                        className="py-3 px-4 text-left font-semibold" 
-                        aria-sort={getAriaSortValue("date")}
-                      >
-                        <button
-                          onClick={() => handleSort("date")}
-                          onKeyDown={(e) => handleHeaderKeyDown(e, "date")}
-                          className="flex items-center gap-2 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors"
-                          aria-label={`Sort by Date ${sortBy === "date" ? (sortDir === "asc" ? "ascending" : "descending") : ""}`}
-                          type="button"
-                        >
-                          <span>Date</span>
-                          {sortBy === "date" && (
-                            <span aria-hidden="true">{sortDir === "asc" ? "↑" : "↓"}</span>
-                          )}
-                        </button>
-                      </th>
-                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
-                        Status
-                      </th>
-                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
-                        Actions
-                      </th>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {shouldVirtualize && topSpacerHeight > 0 && (
-                      <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
-                        <td colSpan={6} />
-                      </tr>
-                    )}
-                    {visibleTransactions.map((txn, idx) => {
-                      const actualIndex = startIndex + idx;
-                      const isPending = isPendingRow(txn);
-                      return (
-                        <RowComponent
-                          key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
-                          txn={txn}
-                          actualIndex={actualIndex}
-                          isFocused={focusedRowIndex === actualIndex}
-                          isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
-                          isPending={isPending}
-                          onFocusRow={handleFocusRow}
-                          onKeyDownRow={handleRowKeyDown}
-                          onSelectTxn={handleSelectTxn}
-                          setRowRef={setRowRef}
-                        />
-                      );
-                    })}
-                    {shouldVirtualize && bottomSpacerHeight > 0 && (
-                      <tr aria-hidden="true" style={{ height: `${bottomSpacerHeight}px` }}>
-                        <td colSpan={6} />
-                      </tr>
-                    )}
-
-                    {!shouldVirtualize && displayTransactions.length === 0 && !loading && (
-                      <tr>
-                        <td colSpan={6} className="text-center py-6">
-                          No transactions found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                  ))}
+                  {shouldVirtualize && topSpacerHeight > 0 && (
+                    <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
+                      <td colSpan={6} />
+                    </tr>
+                  )}
+                  {visibleTransactions.map((txn, idx) => {
+                    const actualIndex = startIndex + idx;
+                    const isPending = isPendingRow(txn);
+                    return (
+                      <RowComponent
+                        key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
+                        txn={txn}
+                        actualIndex={actualIndex}
+                        isFocused={focusedRowIndex === actualIndex}
+                        isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                        isPending={isPending}
+                        onFocusRow={handleFocusRow}
+                        onKeyDownRow={handleRowKeyDown}
+                        onSelectTxn={handleSelectTxn}
+                        setRowRef={setRowRef}
+                      />
+                    );
+                  })}
+                  {shouldVirtualize && bottomSpacerHeight > 0 && (
+                    <tr aria-hidden="true" style={{ height: `${bottomSpacerHeight}px` }}>
+                      <td colSpan={6} />
+                    </tr>
+                  )}
+                  {!shouldVirtualize && displayTransactions.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-6">
+                        No transactions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
               </div>
-            </div>
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
