@@ -79,6 +79,11 @@ function scanFile(filePath: string, patterns: SecretPattern[]): SecretMatch[] {
       regex.lastIndex = 0;
       
       while ((match = regex.exec(content)) !== null) {
+        // Skip false positives for AWS Secret Access Key (e.g. 40-char hex build/commit hashes)
+        if (pattern.name === 'AWS Secret Access Key' && /^[0-9a-fA-F]{40}$/.test(match[0])) {
+          continue;
+        }
+
         // Find line and column
         const matchStart = match.index;
         const matchEnd = match.index + match[0].length;

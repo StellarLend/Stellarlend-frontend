@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import useTxStatus from "@/lib/tx/useTxStatus";
 import { Toast } from "@/components/shared/common";
 import LendingForm from "@/components/features/lending/components/LendingForm";
+import { usePositions } from "@/hooks/usePositions";
 import TabSelector from "@/components/features/lending/components/TabSelector";
+import TxProgressStepper, {
+  type TxProgressState,
+} from "@/components/features/lending/components/TxProgressStepper";
 import { PageHeader } from "@/components/shared/common";
 import { Skeleton } from "@/components/shared/common/Skeleton";
 import type { LendingActionType } from "@/lib/lending/types";
@@ -67,8 +72,36 @@ const ConfirmModal = dynamic(
   () => import("@/components/features/lending/components/ConfirmModal"),
 );
 
+const VALID_TABS: LendingActionType[] = ["lend", "borrow", "repay", "withdraw"];
+
+function parseTab(value: string | null): LendingActionType {
+  return VALID_TABS.includes(value as LendingActionType)
+    ? (value as LendingActionType)
+    : "lend";
+}
+
 export default function LendingPage() {
-  const [activeTab, setActiveTab] = useState<LendingActionType>("lend");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<LendingActionType>(() =>
+    parseTab(searchParams.get("tab")),
+  );
+
+  const handleTabChange = useCallback(
+    (tab: LendingActionType) => {
+      setActiveTab(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tab);
+      router.replace(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  // Sync tab when the user navigates back/forward
+  useEffect(() => {
+    const tab = parseTab(searchParams.get("tab"));
+    setActiveTab(tab);
+  }, [searchParams]);
   const [lendingData, setLendingData] = useState<LendingData>({
     asset: "XLM",
     amount: 0,
@@ -110,6 +143,8 @@ export default function LendingPage() {
     useState<CalculationResult | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const { supplyPositions, isLoading: isPositionsLoading, error: positionsError } =
+    usePositions();
   const [toast, setToast] = useState<{
     variant: "processing" | "success" | "error" | "info";
     title?: string;
@@ -175,6 +210,8 @@ export default function LendingPage() {
 
   const handleConfirm = async () => {
     setShowConfirmModal(false);
+    setTxHash(null);
+    setTxProgressState("building");
 
     const actionData =
       activeTab === "lend"
@@ -200,6 +237,7 @@ export default function LendingPage() {
 
       if (res.status === 429) {
         const json = await res.json().catch(() => ({}));
+        setTxProgressState("failed");
         setToast({
           variant: "error",
           title: "Rate limited",
@@ -212,12 +250,14 @@ export default function LendingPage() {
       const json = await res.json();
       if (res.ok && json?.status === "submitted" && json?.hash) {
         setTxHash(json.hash);
+        setTxProgressState("submitted");
         setToast({
           variant: "processing",
           title: "Transaction submitted",
           description: "Waiting for on-chain settlement...",
         });
       } else {
+        setTxProgressState("failed");
         setToast({
           variant: "error",
           title: "Submission failed",
@@ -225,6 +265,7 @@ export default function LendingPage() {
         });
       }
     } catch (err) {
+      setTxProgressState("failed");
       setToast({
         variant: "error",
         title: "Submission error",
@@ -236,26 +277,28 @@ export default function LendingPage() {
   useEffect(() => {
     if (!txStatus) return;
     if (txStatus.state === "processing") {
+      setTxProgressState("pending");
       setToast({
         variant: "processing",
         title: "Processing",
         description: "Transaction is being processed on-chain",
       });
     } else if (txStatus.state === "completed") {
+      setTxProgressState("confirmed");
       setToast({
         variant: "success",
         title: "Completed",
         description: "Transaction settled on-chain",
       });
-      setTimeout(() => setTxHash(null), 2000);
     } else if (txStatus.state === "failed") {
+      setTxProgressState("failed");
       setToast({
         variant: "error",
         title: "Failed",
         description: "Transaction failed on-chain",
       });
-      setTimeout(() => setTxHash(null), 2000);
     } else if (txStatus.state === "rate_limited") {
+      setTxProgressState("failed");
       setToast({
         variant: "error",
         title: "Rate limited",
@@ -263,6 +306,19 @@ export default function LendingPage() {
       });
     }
   }, [txStatus]);
+
+  useEffect(() => {
+    if (txProgressState !== "confirmed" && txProgressState !== "failed") {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setTxHash(null);
+      setTxProgressState(null);
+    }, 2000);
+
+    return () => window.clearTimeout(timeout);
+  }, [txProgressState]);
 
   const currentData =
     activeTab === "lend"
@@ -294,11 +350,14 @@ export default function LendingPage() {
               description="Earn interest, borrow against collateral, repay open debt positions, or withdraw supplied liquidity."
               className="mb-0"
             />
+            <div className="mt-4">
+              <PriceTicker />
+            </div>
           </div>
         </section>
 
         <section className="rounded-[28px] border border-slate-200 bg-white/90 p-3 shadow-sm backdrop-blur">
-          <TabSelector activeTab={activeTab} onTabChange={setActiveTab} />
+          <TabSelector activeTab={activeTab} onTabChange={handleTabChange} />
         </section>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
@@ -316,24 +375,27 @@ export default function LendingPage() {
             ) : activeTab === "repay" ? (
               <RepayForm onSubmit={handleRepaySubmit} />
             ) : (
-              <WithdrawForm onSubmit={handleWithdrawSubmit} />
+              <WithdrawForm
+                onSubmit={handleWithdrawSubmit}
+                positions={supplyPositions}
+                isLoading={isPositionsLoading}
+                error={positionsError}
+              />
+            )}
+            {txProgressState && (
+              <div className="mt-4">
+                <TxProgressStepper state={txProgressState} />
+              </div>
             )}
           </div>
 
           <div className="space-y-6">
             {activeTab === "repay" || activeTab === "withdraw" ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-2 text-lg font-semibold text-gray-900">
-                  {activeTab === "repay"
-                    ? "Repayment Status"
-                    : "Withdrawal Status"}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {activeTab === "repay"
-                    ? "Submit a repayment preview to open the confirmation step and review quote details before signing."
-                    : "Submit a withdrawal preview to open the confirmation step before signing."}
-                </p>
-              </div>
+              <TransactionSummary
+                data={activeTab === "repay" ? repayData : withdrawData}
+                calculation={activeTab === "repay" ? calculationResult : null}
+                type={activeTab}
+              />
             ) : (
               <>
                 <InterestCalculator
@@ -359,7 +421,7 @@ export default function LendingPage() {
           onConfirm={handleConfirm}
           data={currentData}
           calculation={calculationResult}
-          type={activeTab === 'repay' ? 'borrow' : activeTab}
+          type={activeTab === "repay" ? "borrow" : activeTab}
         />
         {toast && (
           <Toast

@@ -26,7 +26,6 @@ export default defineConfig({
     name: 'server',
     environment: 'node',
     globals: true,
-    setupFiles: ['./vitest.setup.ts'],
     include: [
       'lib/**/*.test.ts',
       'app/api/**/*.test.ts',

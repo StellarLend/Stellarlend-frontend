@@ -1,8 +1,9 @@
 import { cn } from "./cn";
 
-export function formatCurrency(value: number, precision: number = 2): string {
+export function formatCurrency(value: number, precision: number = 2, currency?: string): string {
   if (isNaN(value)) return '';
   const parts = value.toFixed(precision).split('.');
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return parts.join('.');
+  const formatted = parts.join('.');
+  return currency ? `${formatted} ${currency}` : formatted;
 }

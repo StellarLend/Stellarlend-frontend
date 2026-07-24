@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, forwardRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, forwardRef } from "react";
 import {
   Search,
   ArrowRight,
@@ -11,14 +11,26 @@ import {
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
-import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
-import TransactionDetail from "@/components/features/dashboard/components/TransactionDetail";
-import { Dialog } from "@headlessui/react";
+import dynamic from "next/dynamic";
+import { usePendingTransactions } from "@/hooks/usePendingTransactions";
+
+const TransactionDetail = dynamic(
+  () => import("@/components/features/dashboard/components/TransactionDetail"),
+  {
+    loading: () => (
+      <div className="fixed inset-0 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 text-center text-sm text-gray-400">
+          Loading…
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 import {
   fetchTransactions,
@@ -26,6 +38,8 @@ import {
   type TransactionStatus,
   type FetchTransactionsResponse,
 } from "@/types/Transaction";
+import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
+import { sortTransactions, type TransactionSortKey, type TransactionSortOrder } from "@/lib/transactions/sort";
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -34,20 +48,38 @@ const statusOptions: (TransactionStatus | "All")[] = [
   "Failed",
 ];
 
-interface TransactionsProps {
+export interface TransactionsProps {
   showPagination?: boolean;
+  rowHeight?: number;
+  viewportHeight?: number;
+  hideToolbar?: boolean;
+  infiniteScroll?: boolean;
+  onDataLoad?: (totalCount: number) => void;
+  sortKey?: TransactionSortKey;
+  sortOrder?: TransactionSortOrder;
+  onSortChange?: (nextKey: TransactionSortKey, nextOrder?: TransactionSortOrder) => void;
 }
 
-export const Transactions = ({ showPagination = true }: TransactionsProps) => {
+export const Transactions = ({
+  showPagination = true,
+  rowHeight: rowHeightProp = 72,
+  viewportHeight: viewportHeightProp = 560,
+  hideToolbar = false,
+  infiniteScroll = false,
+  onDataLoad,
+  sortKey,
+  sortOrder,
+  onSortChange,
+}: TransactionsProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<"All" | TransactionStatus>("All");
-  const [sortBy, setSortBy] = useState<"date" | "amount">("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [localSearch, setLocalSearch] = useState("");
+  const [localStatus, setLocalStatus] = useState<"All" | TransactionStatus>("All");
+  const [localSortBy, setLocalSortBy] = useState<"date" | "amount">("date");
+  const [localSortDir, setLocalSortDir] = useState<"asc" | "desc">("desc");
   const [loading, setLoading] = useState(true);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [localDateFrom, setLocalDateFrom] = useState("");
+  const [localDateTo, setLocalDateTo] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -59,14 +91,44 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   const [dateFromObj, setDateFromObj] = useState<Date | null>(null);
   const [dateToObj, setDateToObj] = useState<Date | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [focusedRowIndex, setFocusedRowIndex] = useState<number | null>(null);
   const itemsPerPage = 6;
-  const router = useRouter();
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const liveRef = useRef<HTMLParagraphElement>(null);
+
+  const search = hideToolbar ? searchParams.get("search") || "" : localSearch;
+  const status = hideToolbar ? (searchParams.get("status") as any || "All") : localStatus;
+  const effectiveSortKey = sortKey ?? (hideToolbar ? (searchParams.get("sortBy") as any || "date") : localSortBy);
+  const effectiveSortOrder = sortOrder ?? (hideToolbar ? (searchParams.get("sortDir") as any || "desc") : localSortDir);
+  const sortBy = effectiveSortKey === "status" ? "date" : effectiveSortKey;
+  const sortDir = effectiveSortOrder;
+  const dateFrom = hideToolbar ? searchParams.get("fromDate") || "" : localDateFrom;
+  const dateTo = hideToolbar ? searchParams.get("toDate") || "" : localDateTo;
+  const asset = hideToolbar ? searchParams.get("asset") || "" : "";
+  const type = hideToolbar ? searchParams.get("type") || "" : "";
+
+  const infinite = useInfiniteTransactions({
+    limit: itemsPerPage,
+    search: search || undefined,
+    status: status === "All" ? undefined : status,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    sortBy,
+    sortDir,
+  });
 
   useEffect(() => {
     setCurrentPage(1);
   }, [search, status, sortBy, sortDir, dateFrom, dateTo]);
 
   useEffect(() => {
+    if (controlledTransactions) {
+      setLoading(false);
+      setTotalCount(controlledTransactions.length);
+      return;
+    }
+
     const loadTransactions = async () => {
       setLoading(true);
 
@@ -82,12 +144,14 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
           sortDir,
         });
 
-        setTransactions(payload.transactions);
+        setInternalTransactions(payload.transactions);
         setTotalCount(payload.total);
+        onDataLoad?.(payload.total);
       } catch (err) {
-        console.error(err);
+        clientLog.error("Failed to load transactions", err);
         setTransactions([]);
         setTotalCount(0);
+        onDataLoad?.(0);
       } finally {
         setLoading(false);
       }
@@ -95,6 +159,48 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
 
     loadTransactions();
   }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
+
+  const handleSort = useCallback((field: "date" | "amount") => {
+    if (sortBy === field) {
+      // Toggle direction if already sorting by this field
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      // Switch to new field with descending as default
+      setSortBy(field);
+      setSortDir("desc");
+    }
+  }, [sortBy]);
+
+  const handleHeaderKeyDown = useCallback((
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    field: "date" | "amount"
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleSort(field);
+    }
+  }, [handleSort]);
+
+  const displayTransactions = infiniteScroll
+    ? sortTransactions(infinite.transactions, effectiveSortKey, effectiveSortOrder)
+    : sortTransactions(transactions, effectiveSortKey, effectiveSortOrder);
+  const displayLoading = infiniteScroll ? infinite.isLoading : loading;
+
+  const handleHeaderClick = (nextKey: TransactionSortKey) => {
+    if (!onSortChange) {
+      return;
+    }
+
+    const nextOrder = sortKey === nextKey && sortOrder === "asc" ? "desc" : "asc";
+    onSortChange(nextKey, nextOrder);
+  };
+
+  const handleHeaderKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, nextKey: TransactionSortKey) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleHeaderClick(nextKey);
+    }
+  };
 
   const formatDateTime = (date: string, time: string) => {
     let fixedTime = time.replace(/(AM|PM)$/i, " $1");
@@ -126,6 +232,101 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       </span>
     );
   };
+  }, [controlledTransactions, currentPage, search, status, sortBy, sortDir, dateFrom, dateTo, onDataLoad]);
+
+  useEffect(() => {
+    setScrollTop(0);
+    setFocusedRowIndex(null);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [currentPage, search, status, sortBy, sortDir, dateFrom, dateTo]);
+
+  const displayTransactions = useMemo(() => {
+    if (!pendingTx) return transactions;
+    const isDuplicate = transactions.some(
+      (t) =>
+        t.type === pendingTx.type &&
+        t.amount === pendingTx.amount &&
+        t.asset === pendingTx.asset
+    );
+    if (isDuplicate) return transactions;
+    return [pendingTx, ...transactions];
+  }, [pendingTx, transactions]);
+
+  const shouldVirtualize = displayTransactions.length > 20;
+  const visibleRowCount = shouldVirtualize
+    ? Math.min(displayTransactions.length, Math.max(10, Math.ceil(viewportHeight / rowHeight)))
+    : displayTransactions.length;
+  const virtualizerHeight = shouldVirtualize ? viewportHeight : displayTransactions.length * rowHeight;
+
+  const { startIndex, endIndex } = useMemo(() => {
+    if (!shouldVirtualize) {
+      return { startIndex: 0, endIndex: displayTransactions.length };
+    }
+
+    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+    const end = Math.min(displayTransactions.length, start + visibleRowCount + overscan * 2);
+    return { startIndex: start, endIndex: end };
+  }, [shouldVirtualize, displayTransactions.length, scrollTop, rowHeight, visibleRowCount]);
+
+  const visibleTransactions = useMemo(() => {
+    return displayTransactions.slice(startIndex, endIndex);
+  }, [displayTransactions, startIndex, endIndex]);
+
+  const topSpacerHeight = shouldVirtualize ? startIndex * rowHeight : 0;
+  const bottomSpacerHeight = shouldVirtualize
+    ? Math.max(0, displayTransactions.length - endIndex) * rowHeight
+    : 0;
+
+  const focusRow = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= transactions.length) return;
+
+      setFocusedRowIndex(index);
+      const row = rowRefs.current.get(index);
+      row?.focus();
+
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const targetTop = index * rowHeight;
+      const preferredTop = Math.max(0, targetTop - Math.floor(viewportHeight / 2) + rowHeight);
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      if (typeof container.scrollTo === "function") {
+        container.scrollTo({ top: Math.min(preferredTop, maxScroll) });
+      } else {
+        container.scrollTop = Math.min(preferredTop, maxScroll);
+      }
+    },
+    [transactions.length, rowHeight, viewportHeight]
+  );
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
+      switch (event.key) {
+        case "ArrowDown":
+          event.preventDefault();
+          focusRow(index + 1);
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          focusRow(index - 1);
+          break;
+        case "Home":
+          event.preventDefault();
+          focusRow(0);
+          break;
+        case "End":
+          event.preventDefault();
+          focusRow(transactions.length - 1);
+          break;
+        default:
+          break;
+      }
+    },
+    [focusRow, transactions.length]
+  );
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -180,11 +381,14 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
   });
   CustomDateInput.displayName = "CustomDateInput";
 
+  const isPendingRow = (txn: Transaction) => pendingTx && txn.id === pendingTx.id;
+
   return (
     <section className="h-full bg-white rounded-t-xl shadow md:p-8 p-6">
+      {!hideToolbar && (
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 border pb-2 gap-2">
         <div className="flex gap-6 items-center flex-wrap text-gray-400 font-normal text-base select-none">
-          <Dialog as="div" className="relative z-50" onClose={() => {}} id="transaction-detail-drawer">
+          <div className="relative" ref={searchRef} id="transaction-detail-drawer">
             <div
               className="flex items-center gap-1 cursor-pointer"
               onClick={() => setShowSearch((v) => !v)}
@@ -203,48 +407,70 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                   autoFocus
                 />
               </div>
-            )}
-          </Dialog>
-          <div className="relative" ref={filterRef}>
-            <div
-              className="flex items-center gap-1 cursor-pointer"
-              onClick={() => setShowFilter((v) => !v)}
-            >
-              <ListFilter size={18} />
-              <span>Filter</span>
+              {showSearch && (
+                <div className="absolute left-0 mt-2 z-10 bg-white border rounded shadow p-2">
+                  <input
+                    type="text"
+                    placeholder="Search by type, amount, asset, id"
+                    className=" rounded p-1  text-sm w-48 focus:outline-none"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              )}
             </div>
+            <div className="relative" ref={filterRef}>
+              <div
+                className="flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowFilter((v) => !v)}
+              >
+                <ListFilter size={18} />
+                <span>Filter</span>
+              </div>
 
-            {/*  */}
             {showFilter && (
               <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 {statusOptions.map((opt) => (
                   <button
-                    key={opt}
                     className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                      status === opt ? "font-bold text-primary-700" : ""
+                      sortBy === "date" ? "font-bold text-primary-700" : ""
                     }`}
                     onClick={() => {
-                      setStatus(opt);
-                      setShowFilter(false);
+                      setSortBy("date");
+                      setShowSort(false);
                     }}
                     type="button"
                   >
-                    {opt}
+                    Date {sortBy === "date" && (sortDir === "asc" ? "↑" : "↓")}
                   </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="relative" ref={sortRef}>
-            <div
-              className="flex items-center gap-1 cursor-pointer"
-              onClick={() => setShowSort((v) => !v)}
-            >
-              <ChevronsUpDown size={18} />
-              <span>Sort</span>
+                  <button
+                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                      sortBy === "amount" ? "font-bold text-primary-700" : ""
+                    }`}
+                    onClick={() => {
+                      setSortBy("amount");
+                      setShowSort(false);
+                    }}
+                    type="button"
+                  >
+                    Amount{" "}
+                    {sortBy === "amount" && (sortDir === "asc" ? "↑" : "↓")}
+                  </button>
+                  <button
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                    onClick={() => {
+                      setSortDir(sortDir === "asc" ? "desc" : "asc");
+                    }}
+                    type="button"
+                  >
+                    Toggle Direction
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
 
-            {/*  */}
             {showSort && (
               <div className="absolute left-0 mt-2 w-38 rounded-md bg-white shadow z-10">
                 <button
@@ -336,11 +562,12 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
           />
         </div>
       </div>
+      )}
 
       <div className="">
         {loading ? (
           <TransactionsSkeleton count={itemsPerPage} />
-        ) : transactions.length === 0 ? (
+        ) : displayTransactions.length === 0 ? (
           <div className="px-6 py-16">
             <EmptyState
               title="No transactions yet"
@@ -356,18 +583,52 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
               <table className="min-w-full text-sm border">
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
-                    <th className="py-3 px-4 text-left font-semibold">
-                      Transaction Type
+                    <th className="py-3 px-4 text-left font-semibold">Transaction Type</th>
+                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-left font-semibold"
+                        aria-sort={sortKey === "amount" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                        aria-label="Sort by amount"
+                        onClick={() => handleHeaderClick("amount")}
+                        onKeyDown={(event) => handleHeaderKeyDown(event, "amount")}
+                      >
+                        <span>Amount</span>
+                        {sortKey === "amount" ? (sortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
+                      </button>
                     </th>
-                    <th className="py-3 px-4 text-left font-semibold">Amount</th>
                     <th className="py-3 px-4 text-left font-semibold">Asset</th>
-                    <th className="py-3 px-4 text-left font-semibold">Date</th>
-                    <th className="py-3 px-4 text-left font-semibold">Status</th>
+                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-left font-semibold"
+                        aria-sort={sortKey === "date" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                        aria-label="Sort by date"
+                        onClick={() => handleHeaderClick("date")}
+                        onKeyDown={(event) => handleHeaderKeyDown(event, "date")}
+                      >
+                        <span>Date</span>
+                        {sortKey === "date" ? (sortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
+                      </button>
+                    </th>
+                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-left font-semibold"
+                        aria-sort={sortKey === "status" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                        aria-label="Sort by status"
+                        onClick={() => handleHeaderClick("status")}
+                        onKeyDown={(event) => handleHeaderKeyDown(event, "status")}
+                      >
+                        <span>Status</span>
+                        {sortKey === "status" ? (sortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
+                      </button>
+                    </th>
                     <th className="py-3 px-4 text-left font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((txn, idx) => (
+                  {displayTransactions.map((txn, idx) => (
                     <tr
                       key={idx}
                       className="border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black"
@@ -404,36 +665,93 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                       </td>
                       <td className="py-3 px-4">
                         <button
-                          onClick={() => {
-                            setSelectedTxn(txn);
-                            setIsDetailOpen(true);
-                          }}
-                          className="text-blue-600 hover:underline"
-                          aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
-                          aria-controls="transaction-detail-drawer"
+                          onClick={() => handleSort("amount")}
+                          onKeyDown={(e) => handleHeaderKeyDown(e, "amount")}
+                          className="flex items-center gap-2 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors"
+                          aria-label={`Sort by Amount ${sortBy === "amount" ? (sortDir === "asc" ? "ascending" : "descending") : ""}`}
+                          type="button"
                         >
-                          Details
+                          <span>Amount</span>
+                          {sortBy === "amount" && (
+                            <span aria-hidden="true">{sortDir === "asc" ? "↑" : "↓"}</span>
+                          )}
                         </button>
-                      </td>
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
+                        Asset
+                      </th>
+                      <th 
+                        className="py-3 px-4 text-left font-semibold" 
+                        aria-sort={getAriaSortValue("date")}
+                      >
+                        <button
+                          onClick={() => handleSort("date")}
+                          onKeyDown={(e) => handleHeaderKeyDown(e, "date")}
+                          className="flex items-center gap-2 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors"
+                          aria-label={`Sort by Date ${sortBy === "date" ? (sortDir === "asc" ? "ascending" : "descending") : ""}`}
+                          type="button"
+                        >
+                          <span>Date</span>
+                          {sortBy === "date" && (
+                            <span aria-hidden="true">{sortDir === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </button>
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
+                        Status
+                      </th>
+                      <th className="py-3 px-4 text-left font-semibold" aria-sort="none">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
+                  </thead>
+                  <tbody>
+                    {shouldVirtualize && topSpacerHeight > 0 && (
+                      <tr aria-hidden="true" style={{ height: `${topSpacerHeight}px` }}>
+                        <td colSpan={6} />
+                      </tr>
+                    )}
+                    {visibleTransactions.map((txn, idx) => {
+                      const actualIndex = startIndex + idx;
+                      const isPending = isPendingRow(txn);
+                      return (
+                        <RowComponent
+                          key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
+                          txn={txn}
+                          actualIndex={actualIndex}
+                          isFocused={focusedRowIndex === actualIndex}
+                          isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                          isPending={isPending}
+                          onFocusRow={handleFocusRow}
+                          onKeyDownRow={handleRowKeyDown}
+                          onSelectTxn={handleSelectTxn}
+                          setRowRef={setRowRef}
+                        />
+                      );
+                    })}
+                    {shouldVirtualize && bottomSpacerHeight > 0 && (
+                      <tr aria-hidden="true" style={{ height: `${bottomSpacerHeight}px` }}>
+                        <td colSpan={6} />
+                      </tr>
+                    )}
 
-                  {transactions.length === 0 && !loading && (
-                    <tr>
-                      <td colSpan={6} className="text-center py-6">
-                        No transactions found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    {!shouldVirtualize && displayTransactions.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-6">
+                          No transactions found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {transactions.map((txn, idx) => (
+              {visibleTransactions.map((txn, idx) => (
                 <div
-                  key={idx}
+                  key={txn.id ?? startIndex + idx}
                   className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div className="flex justify-between items-start mb-3">
@@ -499,17 +817,32 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
                         setSelectedTxn(txn);
                         setIsDetailOpen(true);
                       }}
-                      className="mt-2 text-blue-600 hover:underline"
+                      className="mt-2 text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded px-2 py-1 transition-colors"
                       aria-expanded={isDetailOpen && selectedTxn?.id === txn.id}
                       aria-controls="transaction-detail-drawer"
+                      aria-label={`View details for transaction ${txn.id}`}
+                      type="button"
                     >
                       Details
                     </button>
                   </div>
                 </div>
               ))}
+              {visibleTransactions.map((txn, idx) => {
+                const actualIndex = startIndex + idx;
+                const isPending = isPendingRow(txn);
+                return (
+                  <MobileRowComponent
+                    key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
+                    txn={txn}
+                    isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
+                    isPending={isPending}
+                    onSelectTxn={handleSelectTxn}
+                  />
+                );
+              })}
 
-              {transactions.length === 0 && !loading && (
+              {displayTransactions.length === 0 && !loading && (
                 <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                   <p className="text-gray-500">No transactions found.</p>
                 </div>
@@ -517,7 +850,6 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
             </div>
           </>
         )}
-
 
         <div className="">
           {showPagination && totalCount > 0 && (
@@ -535,4 +867,4 @@ export const Transactions = ({ showPagination = true }: TransactionsProps) => {
       )}
     </section>
   );
-}
+};

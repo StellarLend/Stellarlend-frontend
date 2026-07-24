@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
+import Button from "@/components/atoms/Button";
 import Toast, { ToastVariant } from "@/components/shared/common/Toast";
 
 interface DataExportButtonProps {
@@ -10,6 +11,7 @@ interface DataExportButtonProps {
 
 export default function DataExportButton({ className = "" }: DataExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const [hasFailed, setHasFailed] = useState(false);
   const [toast, setToast] = useState<{
     variant: ToastVariant;
     title: string;
@@ -25,6 +27,7 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
     if (isExporting) return;
 
     setIsExporting(true);
+    setHasFailed(false);
     showToast("processing", "Preparing your data export...", "This may take a moment.");
 
     try {
@@ -51,10 +54,10 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
             data.error || "An error occurred while preparing your export."
           );
         }
+        setHasFailed(true);
         return;
       }
 
-      // Trigger download if downloadUrl is provided
       if (data.downloadUrl) {
         const link = document.createElement("a");
         link.href = data.downloadUrl;
@@ -69,6 +72,7 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
           "Your data export has been downloaded successfully."
         );
       } else {
+        setHasFailed(true);
         showToast(
           "error",
           "Export incomplete",
@@ -76,6 +80,7 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
         );
       }
     } catch (error) {
+      setHasFailed(true);
       showToast(
         "error",
         "Export failed",
@@ -86,28 +91,23 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
     }
   };
 
+  const buttonLabel = isExporting ? "Preparing..." : hasFailed ? "Try Again" : "Export My Data";
+
   return (
     <>
-      <button
+      <Button
         onClick={handleExport}
         disabled={isExporting}
-        className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors ${className}`}
-        aria-busy={isExporting}
+        variant="primary"
+        className={`bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed ${className}`.trim()}
+        aria-busy={isExporting || undefined}
         aria-describedby={isExporting ? "export-status" : undefined}
+        isLoading={isExporting}
+        leftIcon={!isExporting ? <Download className="w-4 h-4" aria-hidden="true" /> : undefined}
       >
-        {isExporting ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-            <span>Preparing...</span>
-          </>
-        ) : (
-          <>
-            <Download className="w-4 h-4" aria-hidden="true" />
-            <span>Export My Data</span>
-          </>
-        )}
-      </button>
-      
+        {buttonLabel}
+      </Button>
+
       {isExporting && (
         <span id="export-status" className="sr-only">
           Your data export is being prepared. Please wait.

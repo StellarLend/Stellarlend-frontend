@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useId } from 'react';
 import { X, Search } from 'lucide-react';
+import { sanitiseString } from '@/lib/security/input-sanitizer';
+import type { SearchResultsData, SearchResult } from '@/lib/search';
+import SearchResults from '@/components/features/dashboard/components/SearchResults';
 
 export interface SearchBarProps {
   /**
@@ -66,6 +69,37 @@ export interface SearchBarProps {
    * @default "Search input"
    */
   ariaLabel?: string;
+
+  /**
+   * Maximum allowed input length
+   * @default 200
+   */
+  maxLength?: number;
+
+  /**
+   * Search results data to display in the live-results dropdown.
+   * When provided, a dropdown appears below the input showing
+   * matching transactions and positions as the user types.
+   */
+  results?: SearchResultsData;
+
+  /**
+   * Callback fired when a result is selected via click or Enter key.
+   * Receives the selected SearchResult.
+   */
+  onResultSelect?: (result: SearchResult) => void;
+
+  /**
+   * Callback fired when a result should navigate to its detail page.
+   * Receives the path string (e.g. "/dashboard/transactions/TXN123").
+   */
+  onNavigate?: (path: string) => void;
+
+  /**
+   * Unique ID for the combobox. Auto-generated if not provided.
+   * Used for ARIA attribute linkage between input and results listbox.
+   */
+  resultsListId?: string;
 }
 
 const maxWidthClasses = {
@@ -114,12 +148,22 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       maxWidth = 'md',
       initialValue = '',
       ariaLabel = 'Search input',
+      maxLength = 200,
+      results,
+      onResultSelect,
+      onNavigate,
+      resultsListId,
     },
     ref
   ) => {
     const [value, setValue] = useState(initialValue);
     const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const generatedId = useId();
+    const listId = resultsListId || `search-results-${generatedId}`;
+
+    const resultsOpen = results && results.state !== 'idle';
 
     // Merge refs
     useEffect(() => {
@@ -130,27 +174,30 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       }
     }, [ref]);
 
-    // Debounced search callback
+    // Debounced search callback with sanitization
     const handleValueChange = useCallback(
       (newValue: string) => {
-        setValue(newValue);
+        // Sanitize input
+        const sanitized = sanitiseString(newValue);
+        // Truncate if exceeds max length
+        const truncated = sanitized.slice(0, maxLength);
+        setValue(truncated);
 
         if (debounceTimeoutRef.current) {
           clearTimeout(debounceTimeoutRef.current);
         }
 
         debounceTimeoutRef.current = setTimeout(() => {
-          onSearch?.(newValue);
+          onSearch?.(truncated);
         }, debounceDelay);
       },
-      [onSearch, debounceDelay]
+      [onSearch, debounceDelay, maxLength]
     );
 
     // Handle clear button click
     const handleClear = useCallback(() => {
       setValue('');
       onClear?.();
-      // Trigger search callback with empty string
       onSearch?.('');
       inputRef.current?.focus();
     }, [onClear, onSearch]);
@@ -168,7 +215,6 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       if (!enableSlashShortcut) return;
 
       const handleKeyDown = (e: KeyboardEvent) => {
-        // Check if user is already typing in an input (but not this one)
         const target = e.target as HTMLElement;
         const isInOtherInput =
           (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') &&
@@ -176,7 +222,6 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
 
         if (isInOtherInput) return;
 
-        // Check for '/' key (without modifiers like Ctrl, Cmd, Alt)
         if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
           e.preventDefault();
           inputRef.current?.focus();
@@ -187,6 +232,63 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       return () => window.removeEventListener('keydown', handleKeyDown);
     }, [enableSlashShortcut]);
 
+    // Re-trigger search on focus if input has value but results are idle
+    const handleInputFocus = useCallback(() => {
+      if (value.trim() && results && results.state === 'idle') {
+        onSearch?.(value);
+      }
+    }, [value, results, onSearch]);
+
+    // Handle keyboard navigation between input and results dropdown
+    const handleInputKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!resultsOpen) return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const listbox = document.getElementById(listId);
+          if (listbox) {
+            const firstOption = listbox.querySelector('[role="option"]') as HTMLElement | null;
+            firstOption?.focus();
+          }
+        }
+      },
+      [resultsOpen, listId]
+    );
+
+    // Handle closing results on Escape
+    useEffect(() => {
+      if (!resultsOpen) return;
+
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          inputRef.current?.focus();
+        }
+      };
+
+      window.addEventListener('keydown', handleEscape);
+      return () => window.removeEventListener('keydown', handleEscape);
+    }, [resultsOpen]);
+
+    // Handle outside clicks to close results dropdown
+    useEffect(() => {
+      if (!resultsOpen) return;
+
+      const handleClickOutside = (e: MouseEvent) => {
+        if (
+          dropdownRef.current &&
+          !dropdownRef.current.contains(e.target as Node) &&
+          inputRef.current &&
+          !inputRef.current.contains(e.target as Node)
+        ) {
+          onSearch?.('');
+        }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [resultsOpen, onSearch]);
+
     // Cleanup debounce timeout on unmount
     useEffect(() => {
       return () => {
@@ -195,6 +297,9 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
         }
       };
     }, []);
+
+    const isNearMaxLength = value.length >= maxLength * 0.9;
+    const isAtMaxLength = value.length >= maxLength;
 
     return (
       <div className={`w-full ${maxWidthClasses[maxWidth]} ${className}`}>
@@ -217,11 +322,19 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             placeholder={placeholder}
             value={value}
             onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
+            onFocus={handleInputFocus}
             aria-label={ariaLabel}
+            role={results ? 'combobox' : undefined}
+            aria-expanded={results ? resultsOpen : undefined}
+            aria-controls={results ? listId : undefined}
+            aria-activedescendant={resultsOpen ? undefined : undefined}
+            aria-haspopup={results ? 'listbox' : undefined}
+            aria-autocomplete="list"
             className={`
               w-full
               ${showSearchIcon ? 'pl-10' : 'pl-4'}
-              ${showClearButton && value ? 'pr-10' : 'pr-4'}
+              ${showClearButton && value ? 'pr-20' : 'pr-10'}
               py-3
               rounded-xl
               font-semibold
@@ -234,14 +347,15 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               placeholder-gray-500
               dark:placeholder-gray-400
               border
-              border-[var(--New-outline,rgb(113,180,141))]
+              ${isAtMaxLength ? 'border-red-500' : 'border-[var(--New-outline,rgb(113,180,141))]'}
               focus:outline-none
               focus:ring-2
-              focus:ring-[var(--New-outline,rgb(113,180,141))]
+              ${isAtMaxLength ? 'focus:ring-red-500' : 'focus:ring-[var(--New-outline,rgb(113,180,141))]'}
               focus:ring-opacity-50
-              hover:border-[var(--New-outline,rgb(113,180,141))]
+              ${isAtMaxLength ? 'hover:border-red-500' : 'hover:border-[var(--New-outline,rgb(113,180,141))]'}
               transition-colors
               duration-200
+              ${resultsOpen ? 'rounded-b-none rounded-t-xl' : 'rounded-xl'}
             `}
           />
 
@@ -253,7 +367,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               aria-label="Clear search input"
               className={`
                 absolute
-                right-3
+                ${isAtMaxLength ? 'right-12' : 'right-3'}
                 top-1/2
                 -translate-y-1/2
                 text-gray-400
@@ -280,13 +394,42 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
             </button>
           )}
 
+          {/* Length Hint */}
+          <div className={`
+            absolute
+            right-3
+            top-1/2
+            -translate-y-1/2
+            text-xs
+            font-medium
+            ${isAtMaxLength ? 'text-red-500' : isNearMaxLength ? 'text-amber-500' : 'text-gray-400'}
+            pointer-events-none
+            hidden
+            sm:block
+          `}>
+            {value.length}/{maxLength}
+          </div>
+
           {/* Keyboard shortcut hint - only show when empty and slash shortcut enabled */}
-          {enableSlashShortcut && !value && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none hidden sm:block">
+          {enableSlashShortcut && !value && !isNearMaxLength && (
+            <div className="absolute right-12 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none hidden sm:block">
               <kbd className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
                 /
               </kbd>
             </div>
+          )}
+
+          {/* Live results dropdown */}
+          {results && (
+            <SearchResults
+              ref={dropdownRef}
+              results={results}
+              isOpen={resultsOpen}
+              onResultSelect={onResultSelect}
+              onNavigate={onNavigate}
+              onClose={() => onSearch?.('')}
+              id={listId}
+            />
           )}
         </div>
       </div>

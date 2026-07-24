@@ -15,6 +15,26 @@ const AUTH_CONFIG = {
 
 const JWT_SECRET = process.env.JWT_SECRET || AUTH_CONFIG.sessionSecret;
 
+/**
+ * Shared cookie + expiry configuration. Auth routes (session, refresh,
+ * logout) read this helper so the cookie name and expiry window stay in
+ * lockstep across the codebase. The signing secret stays internal to
+ * lib/auth.ts — only this module signs tokens.
+ */
+export interface AuthCookieConfig {
+  sessionCookieName: string;
+  sessionExpiryHours: number;
+  sessionExpirySeconds: number;
+}
+
+export function getAuthCookieConfig(): AuthCookieConfig {
+  return {
+    sessionCookieName: AUTH_CONFIG.sessionCookieName,
+    sessionExpiryHours: AUTH_CONFIG.sessionExpiryHours,
+    sessionExpirySeconds: AUTH_CONFIG.sessionExpiryHours * 60 * 60,
+  };
+}
+
 import { SignJWT, jwtVerify } from "jose";
 
 /**

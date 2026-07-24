@@ -26,7 +26,7 @@ const NavLink = ({ href, children, className = "", isActive: isActiveProp }: Nav
   const pathname = usePathname();
 
   if (!href) {
-    console.warn("NavLink requires a valid href prop.");
+    clientLog.warn("NavLink requires a valid href prop.");
     return null;
   }
 

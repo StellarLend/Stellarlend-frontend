@@ -2,10 +2,17 @@ import React from "react";
 import { render, screen, fireEvent, waitFor, within } from "@/test/test-utils";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import WithdrawForm, {
   SupplyPosition,
   computeWithdrawHealthFactor,
 } from "./WithdrawForm";
+
+vi.mock("@/hooks/useWalletConnection", () => ({
+  useWalletConnection: vi.fn(),
+}));
+
+const mockedUseWalletConnection = vi.mocked(useWalletConnection);
 
 const positions: SupplyPosition[] = [
   {
@@ -53,6 +60,14 @@ describe("WithdrawForm", () => {
 
   beforeEach(() => {
     onSubmit.mockReset();
+    mockedUseWalletConnection.mockReturnValue({
+      walletAddress: "GBTESTWALLET",
+      isConnected: true,
+      isLoading: false,
+      error: null,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    } as ReturnType<typeof useWalletConnection>);
   });
 
   describe("rendering", () => {
@@ -182,6 +197,34 @@ describe("WithdrawForm", () => {
       ).toBeInTheDocument();
       expect(onSubmit).not.toHaveBeenCalled();
     });
+
+    it("shows a loading state while live positions are being fetched", () => {
+      render(<WithdrawForm onSubmit={onSubmit} isLoading={true} />);
+
+      expect(
+        screen.getAllByText(/Loading your supply positions/i).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("shows an empty state when no live supply positions are available", () => {
+      render(<WithdrawForm onSubmit={onSubmit} positions={[]} />);
+
+      expect(screen.getByText(/No withdrawable supply positions found/i)).toBeInTheDocument();
+    });
+
+    it("shows an error state when live positions fail to load", () => {
+      render(
+        <WithdrawForm
+          onSubmit={onSubmit}
+          positions={[]}
+          error={new Error("Unable to load positions")}
+        />,
+      );
+
+      expect(
+        screen.getAllByText(/Unable to load your supply positions/i).length,
+      ).toBeGreaterThan(0);
+    });
   });
 
   describe("MAX button", () => {
@@ -194,7 +237,7 @@ describe("WithdrawForm", () => {
         /Withdrawal amount/i,
       ) as HTMLInputElement;
       // MAX = 5000 - 2250 = 2750
-      expect(Number(input.value)).toBe(2750);
+      expect(input.value.replace(/,/g, "")).toBe("2750");
     });
 
     it("clears amount errors after MAX is clicked", async () => {

@@ -23,7 +23,7 @@ export const envSchema = z.object({
     ? z.string().url({ message: 'STELLAR_HORIZON_URL must be a valid URL' })
     : z.string().url({ message: 'STELLAR_HORIZON_URL must be a valid URL' }).default('https://horizon-testnet.stellar.org'),
   NEXT_PUBLIC_SOROBAN_RPC_URL: isProd
-    ? z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' })
+    ? z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' }).optional()
     : z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' }).default('https://soroban-testnet.stellar.org'),
   // Optional analytics ids
   NEXT_PUBLIC_GA_TRACKING_ID: z.string().optional(),

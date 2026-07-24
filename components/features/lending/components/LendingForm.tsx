@@ -1,8 +1,4 @@
 "use client";
-import { AmountInput } from '@/components/shared/ui/AmountInput';
-import { Tooltip } from '@/components/atoms/Tooltip';
-import { IconButton } from '@/components/atoms/IconButton';
-
 import { useState, useEffect, useRef } from "react";
 import { LendingData } from "@/app/lending/page";
 import type { CalculationResult } from "@/lib/lending/types";
@@ -12,10 +8,12 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -150,7 +148,7 @@ export default function LendingForm({
         setIsSubmitting(false);
       }
     } else {
-      setSubmitStatus("error");
+      setStatus("error");
       setSubmitMessage("Please fix the errors in the form before continuing.");
     }
   };
@@ -212,18 +210,17 @@ export default function LendingForm({
             type="number"
             step="0.01"
             placeholder="0.00"
-            value={formData.amount || ""}
+            value={formData.amount || 0}
             error={errors.amount}
             helperText={
               selectedAsset
                 ? `Available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`
                 : undefined
             }
-            onChange={(eOrValue) => {
-              const value = typeof eOrValue === 'object' && eOrValue !== null && 'target' in eOrValue && eOrValue.target?.value !== undefined ? eOrValue.target.value : eOrValue;
+            onChange={(amount) => {
               setFormData((prev) => ({
                 ...prev,
-                amount: parseFloat(value as string) || 0,
+                amount,
               }));
               if (errors.amount) {
                 setErrors((prev) => {
@@ -235,6 +232,7 @@ export default function LendingForm({
             }}
             precision={selectedAsset?.precision ?? 2}
             onMax={handleMaxAmount}
+            max={selectedAsset?.balance ?? 0}
           />
         </div>
 
@@ -360,15 +358,17 @@ export default function LendingForm({
         )}
 
         {/* Submit Button */}
-        <Button
-          type="submit"
-          variant="success"
-          size="lg"
-          fullWidth
-          isLoading={isSubmitting}
-        >
-          Review Lending Offer
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review offer">
+          <Button
+            type="submit"
+            variant="success"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+          >
+            Review Lending Offer
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

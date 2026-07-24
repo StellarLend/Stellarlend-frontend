@@ -9,6 +9,7 @@ export interface AmountInputProps extends Omit<InputProps, 'value' | 'onChange'>
   unit?: string;
   max?: number;
   onMax?: () => void;
+  onQuickFill?: (percentage: number, value: number) => void;
 }
 
 /**
@@ -32,6 +33,7 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
       unit,
       max,
       onMax,
+      onQuickFill,
       className,
       containerClassName,
       label,
@@ -185,6 +187,28 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
           >
             MAX
           </button>
+        )}
+        {max !== undefined && (
+          <div className="flex gap-2 mt-2" role="group" aria-label="Quick fill amount">
+            {[25, 50, 75, 100].map((percent) => (
+              <button
+                key={percent}
+                type="button"
+                onClick={() => {
+                  const factor = Math.pow(10, precision);
+                  const calculatedValue = Math.floor((max * percent) / 100 * factor) / factor;
+                  if (onQuickFill) {
+                    onQuickFill(percent, calculatedValue);
+                  }
+                  onChange(calculatedValue);
+                }}
+                className="text-xs font-medium text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2600FF]"
+                aria-label={percent === 100 ? 'Fill maximum amount' : `Fill ${percent} percent`}
+              >
+                {percent === 100 ? 'Max' : `${percent}%`}
+              </button>
+            ))}
+          </div>
         )}
       </div>
     );

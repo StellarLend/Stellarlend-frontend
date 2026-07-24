@@ -34,6 +34,8 @@ This reference keeps `.env.example`, client bundle safety checks, and server-onl
 | `WEBHOOK_SECRET` | Yes for webhooks | placeholder secret | HMAC secret for transaction webhooks. Do not prefix with `NEXT_PUBLIC_`. |
 | `STELLAR_SIGNING_SECRET` | Wallet auth deployments | placeholder secret | Server-side Stellar signing secret. |
 | `DATABASE_URL` | Yes for persistence | local Postgres URL | Postgres connection for Drizzle-backed data. |
+| `DATABASE_SSL_INSECURE` | No | `false` | Set to `true` to disable TLS certificate verification for the database connection. **Insecure — opt-in only.** A warning is logged whenever this is enabled. |
+| `DATABASE_CA_CERT` | No | — | PEM-encoded CA certificate to verify the database server's TLS certificate. Use this to satisfy verification with a private CA instead of disabling verification. |
 | `REDIS_URL` | Background jobs | local Redis URL | BullMQ/job cache connection string. |
 | `REDIS_HOST` / `REDIS_PORT` | Background workers | `localhost` / `6379` | Host/port fallback for worker Redis connections. |
 | `CSRF_COOKIE_NAME` | No | `csrf-token` | CSRF cookie name. |
