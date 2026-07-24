@@ -363,57 +363,6 @@ export default function BorrowingForm({
   // Custom-duration helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Validates the raw string coming from the custom-days input.
-   *
-   * Returns an error message string on failure, or `""` on success.
-   * When valid, it also calls the `onValid` callback with the parsed integer.
-   */
-  const validateCustomDays = (
-    raw: string,
-    onValid?: (days: number) => void,
-  ): string => {
-    if (raw.trim() === "" || isNaN(Number(raw))) {
-      return "Please enter a number of days";
-    }
-
-    const parsed = Number(raw);
-
-    if (!Number.isInteger(parsed)) {
-      return "Duration must be a whole number of days";
-    }
-
-    if (parsed < CUSTOM_DURATION_MIN_DAYS) {
-      return `Minimum duration is ${CUSTOM_DURATION_MIN_DAYS} day`;
-    }
-
-    if (parsed > CUSTOM_DURATION_MAX_DAYS) {
-      return `Maximum duration is ${CUSTOM_DURATION_MAX_DAYS} days`;
-    }
-
-    onValid?.(parsed);
-    return "";
-  };
-
-  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setCustomDays(raw);
-
-    const errorMsg = validateCustomDays(raw, (days) => {
-      setFormData((prev) => ({ ...prev, duration: days }));
-      // Clear the duration field error if the user fixes it
-      if (errors.duration) {
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next.duration;
-          return next;
-        });
-      }
-    });
-
-    setCustomDaysError(errorMsg);
-  };
-
   // ---------------------------------------------------------------------------
   // Form validation / submission
   // ---------------------------------------------------------------------------
