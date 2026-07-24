@@ -36,19 +36,49 @@ export const Pagination = ({
 
         {/* Page Buttons */}
         <div className="flex items-center gap-1">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`w-8 h-8 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                currentPage === page
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "hover:bg-gray-100 text-gray-700 border border-gray-200"
-              }`}
-            >
-              {page}
-            </button>
-          ))}
+          {(() => {
+            const getPageNumbers = () => {
+              if (totalPages <= 7) {
+                return Array.from({ length: totalPages }, (_, i) => i + 1);
+              }
+
+              if (currentPage <= 4) {
+                return [1, 2, 3, 4, 5, "...", totalPages];
+              }
+
+              if (currentPage >= totalPages - 3) {
+                return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+              }
+
+              return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+            };
+
+            return getPageNumbers().map((page, index) => {
+              if (page === "...") {
+                return (
+                  <span key={`ellipsis-${index}`} className="w-8 text-center text-gray-500">
+                    ...
+                  </span>
+                );
+              }
+
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page as number)}
+                  aria-current={currentPage === page ? "page" : undefined}
+                  aria-label={`Page ${page}`}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                    currentPage === page
+                      ? "bg-green-600 text-white shadow-sm"
+                      : "hover:bg-gray-100 text-gray-700 border border-gray-200"
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            });
+          })()}
         </div>
 
         {/* Next Button */}
