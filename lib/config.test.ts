@@ -55,6 +55,7 @@ describe('config modules', () => {
     process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.stellarlend.com';
     process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
     process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID = 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
 
     const { envSchema } = await import('./configValidation');
     const result = envSchema.safeParse(process.env);
@@ -88,6 +89,7 @@ describe('config modules', () => {
     process.env.NEXT_PUBLIC_API_BASE_URL = 'not-a-url';
     process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
     process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID = 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
 
     await expect(import('./configValidation')).rejects.toThrow();
   });
@@ -149,6 +151,7 @@ describe('config modules', () => {
     expect(configModule.publicConfig.stellar).toEqual({
       network: 'public',
       horizonUrl: 'https://horizon.test.com',
+      sorobanContractId: 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     });
   });
 
