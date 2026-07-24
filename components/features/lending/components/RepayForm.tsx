@@ -7,7 +7,6 @@ import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
-import { WalletGate } from "@/components/shared/ui/WalletGate";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import { cn } from "@/lib/utils/cn";
 import StatusAnnouncer from '@/components/shared/common/StatusAnnouncer';
