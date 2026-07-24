@@ -88,7 +88,7 @@ export function getIntervalDuration(interval: Interval): number {
  */
 export function validateAndNormalizeParams(
   params: Record<string, unknown>
-): PositionHistoryParams {
+): { from: number; to: number; interval: Interval } {
   const now = Date.now();
   const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
 

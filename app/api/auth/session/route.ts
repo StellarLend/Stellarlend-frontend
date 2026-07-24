@@ -178,8 +178,8 @@ export async function GET(request: NextRequest) {
  * Usage:
  * await fetch("/api/auth/session", { method: "DELETE" });
  */
-const deleteHandler = async (request: NextRequest) => {
-  return withIdempotency(request, async () => {
+const deleteHandler = async (request: NextRequest): Promise<NextResponse> => {
+  const res = await withIdempotency(request, async () => {
     try {
       const response = NextResponse.json({
         success: true,
@@ -203,6 +203,7 @@ const deleteHandler = async (request: NextRequest) => {
       );
     }
   });
+  return res as NextResponse;
 };
 
 export const DELETE = withCsrfProtection(deleteHandler);

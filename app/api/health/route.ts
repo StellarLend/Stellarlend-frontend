@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 async function checkSorobanRpc(): Promise<'healthy' | 'degraded'> {
   try {
     const rpcUrl =
-      config.stellar?.sorobanRpcUrl ||
+      (config.stellar as any)?.sorobanRpcUrl ||
       process.env.SOROBAN_RPC_URL ||
       process.env.STELLAR_SOROBAN_RPC_URL ||
       'https://private-rpc.test';
