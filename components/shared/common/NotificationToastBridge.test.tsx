@@ -24,7 +24,7 @@ vi.mock("@/hooks/useNotificationStream", async () => {
     }) => {
       streamFn(options);
 
-      ReactActual.useEffect(() => {
+      (ReactActual.useEffect(() => {
         if (!options?.onNotification) {
           return;
         }
@@ -33,7 +33,7 @@ vi.mock("@/hooks/useNotificationStream", async () => {
         return () => {
           streamSubscribers.delete(options.onNotification);
         };
-      }, [options?.onNotification]);
+      }, [options?.onNotification]));
 
       return { unreadCount: 0 };
     },

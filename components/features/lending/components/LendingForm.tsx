@@ -13,7 +13,7 @@ import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
-import { WalletGate } from "@/components/shared/ui/WalletGate";
+
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;

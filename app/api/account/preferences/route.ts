@@ -4,40 +4,55 @@ import { validatePreferences } from "@/lib/account/preferences-validation";
 import { preferencesRepository } from "@/lib/account/preferences-repository";
 import { withCsrfProtection } from "@/lib/api/handler";
 
+export const runtime = "nodejs";
+
 /**
  * GET /api/account/preferences
- *
- * Returns stored preferences for authenticated user, or default preferences.
  */
 export async function GET(request: NextRequest) {
-  const user = requireAuth(request);
-  if (!user) {
+  let user: any;
+  try {
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+    user = authResult;
+    if (!user || !user.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const prefs = await preferencesRepository.getByUserId(user.id);
+  const prefs = preferencesRepository.getByUserId(user.id);
   if (!prefs) {
     return NextResponse.json({
       userId: user.id,
-      email: user.email,
       locale: "en-US",
       displayCurrency: "USD",
       notifications: { email: true, push: true, sms: false, inApp: true },
       updatedAt: null,
-    });
+    }, { status: 200 });
   }
 
-  return NextResponse.json({ email: user.email, ...prefs });
+  return NextResponse.json(prefs, { status: 200 });
 }
 
 /**
  * PUT /api/account/preferences
- *
- * Upserts preferences for authenticated user.
  */
 async function putHandler(request: NextRequest) {
-  const user = requireAuth(request);
-  if (!user) {
+  let user: any;
+  try {
+    const authResult = await requireAuth(request);
+    if (authResult instanceof Response) {
+      return authResult;
+    }
+    user = authResult;
+    if (!user || !user.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -53,8 +68,8 @@ async function putHandler(request: NextRequest) {
     return NextResponse.json({ errors: validation.errors }, { status: 422 });
   }
 
-  const record = await preferencesRepository.upsert(user.id, validation.data);
-  return NextResponse.json(record);
+  const record = preferencesRepository.upsert(user.id, validation.data);
+  return NextResponse.json(record, { status: 200 });
 }
 
 export const PUT = withCsrfProtection(putHandler);

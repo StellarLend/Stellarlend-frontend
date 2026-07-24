@@ -1,4 +1,6 @@
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { Copy } from 'lucide-react';
+import { Toast } from '@/components/shared/common';
 
 interface TransactionSummaryProps {
   data: LendingData;

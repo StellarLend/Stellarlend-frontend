@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { fetchTransactions, filterTransactions } from '@/lib/transactions/repository';
-import type { Transaction, TransactionFilters } from '@/lib/transactions/types';
+import type { Transaction } from '@/lib/transactions/types';
 
 export function useTransactionSummary() {
   const searchParams = useSearchParams();
@@ -11,38 +10,40 @@ export function useTransactionSummary() {
   useEffect(() => {
     async function calculateSummary() {
       setIsLoading(true);
-      const allTransactions = await fetchTransactions();
-      
-      // Filter transactions
-      const filters: TransactionFilters = {
-          search: searchParams.get('search') || '',
-          status: (searchParams.get('status') as any) || 'All',
-          dateFrom: searchParams.get('fromDate') || undefined,
-          dateTo: searchParams.get('toDate') || undefined,
-      };
+      try {
+        const query = searchParams.toString();
+        const response = await fetch(`/api/transactions${query ? `?${query}` : ''}`);
 
-      const filtered = filterTransactions(allTransactions as any, filters);
-
-      // Compute totals
-      let inflow = 0;
-      let outflow = 0;
-      
-      filtered.forEach(txn => {
-        if (txn.amount > 0) {
-          inflow += txn.amount;
-        } else {
-          outflow += Math.abs(txn.amount);
+        if (!response.ok) {
+          throw new Error('Failed to fetch transactions');
         }
-      });
-      
-      setSummary({
-        inflow,
-        outflow,
-        net: inflow - outflow,
-      });
-      setIsLoading(false);
+
+        const data = await response.json();
+        const transactions: Transaction[] = data.transactions || data;
+
+        let inflow = 0;
+        let outflow = 0;
+
+        transactions.forEach((txn) => {
+          if (txn.amount > 0) {
+            inflow += txn.amount;
+          } else {
+            outflow += Math.abs(txn.amount);
+          }
+        });
+
+        setSummary({
+          inflow,
+          outflow,
+          net: inflow - outflow,
+        });
+      } catch (error) {
+        console.error('Error fetching transaction summary:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
-    
+
     calculateSummary();
   }, [searchParams]);
 

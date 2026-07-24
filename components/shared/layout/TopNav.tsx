@@ -6,6 +6,7 @@ import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu, WalletCards } from "lucide-react";
 import NotificationBell from "@/components/shared/layout/NotificationBell";
+import StreamStatusIndicator from "./StreamStatusIndicator";
 import { useWallet } from "@/hooks/useWallet";
 import {
   fetchWalletBalances,
@@ -406,7 +407,7 @@ const TopNav = () => {
           />
 
           <div className="flex gap-3 items-center">
-            <NotificationBellBase unreadCount={unreadCount} />
+            <NotificationBell unreadCount={unreadCount} />
             <StreamStatusIndicator connectionState={connectionState} />
 
             <button
@@ -435,7 +436,7 @@ const TopNav = () => {
         </div>
 
         <div className="flex gap-3 items-center">
-          <NotificationBellBase unreadCount={unreadCount} />
+          <NotificationBell unreadCount={unreadCount} />
           <StreamStatusIndicator connectionState={connectionState} />
 
           <button

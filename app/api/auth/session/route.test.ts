@@ -26,7 +26,6 @@ describe('POST /api/auth/session', () => {
       userId: 'user-123',
       email: 'user@example.com',
       name: 'Jane Doe',
-      walletAddress: 'G123',
     };
 
     const first = await POST(makeRequest(body, { 'Idempotency-Key': 'session-123' }));

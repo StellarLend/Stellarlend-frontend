@@ -97,14 +97,6 @@ export default function BorrowingForm({
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const lastSuggestedCollateral = useRef<number | null>(null);
 
-  // "preset" = one of the LOAN_DURATIONS chips is active
-  // "custom" = the Custom chip is active and the numeric input is visible
-  const [durationMode, setDurationMode] = useState<"preset" | "custom">(
-    "preset",
-  );
-  // Raw string so the input can be empty / partially typed without coercion
-  const [customDays, setCustomDays] = useState<string>("");
-  const [customDaysError, setCustomDaysError] = useState<string>("");
   const [targetHealthMode, setTargetHealthMode] = useState<"preset" | "custom">(
     "preset",
   );
@@ -113,7 +105,9 @@ export default function BorrowingForm({
 
   // "preset" = one of the LOAN_DURATIONS chips is active
   // "custom" = the Custom chip is active and the numeric input is visible
-  const [durationMode, setDurationMode] = useState<"preset" | "custom">("preset");
+  const [durationMode, setDurationMode] = useState<"preset" | "custom">(
+    "preset",
+  );
   // Raw string so the input can be empty / partially typed without coercion
   const [customDays, setCustomDays] = useState<string>("");
   const [customDaysError, setCustomDaysError] = useState<string>("");
@@ -125,7 +119,12 @@ export default function BorrowingForm({
     (assetKey && assetKey in INTEREST_RATES
       ? INTEREST_RATES[assetKey as keyof typeof INTEREST_RATES]
       : undefined) ?? 0;
-  const { rate: liveBorrowRate, isLoading: isLoadingMarketRates, error: marketRateError, lastUpdated: marketRateTimestamp } = useMarketRates(assetKey);
+  const {
+    rate: liveBorrowRate,
+    isLoading: isLoadingMarketRates,
+    error: marketRateError,
+    lastUpdated: marketRateTimestamp,
+  } = useMarketRates(assetKey);
   const resolvedBorrowRate =
     typeof liveBorrowRate === "number" && Number.isFinite(liveBorrowRate)
       ? liveBorrowRate
@@ -276,50 +275,6 @@ export default function BorrowingForm({
    * Returns an error message string on failure, or `""` on success.
    * When valid, it also calls the `onValid` callback with the parsed integer.
    */
-  const validateCustomDays = (
-    raw: string,
-    onValid?: (days: number) => void,
-  ): string => {
-    if (raw.trim() === "" || isNaN(Number(raw))) {
-      return "Please enter a number of days";
-    }
-
-    const parsed = Number(raw);
-
-    if (!Number.isInteger(parsed)) {
-      return "Duration must be a whole number of days";
-    }
-
-    if (parsed < CUSTOM_DURATION_MIN_DAYS) {
-      return `Minimum duration is ${CUSTOM_DURATION_MIN_DAYS} day`;
-    }
-
-    if (parsed > CUSTOM_DURATION_MAX_DAYS) {
-      return `Maximum duration is ${CUSTOM_DURATION_MAX_DAYS} days`;
-    }
-
-    onValid?.(parsed);
-    return "";
-  };
-
-  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setCustomDays(raw);
-
-    const errorMsg = validateCustomDays(raw, (days) => {
-      setFormData((prev) => ({ ...prev, duration: days }));
-      // Clear the duration field error if the user fixes it
-      if (errors.duration) {
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next.duration;
-          return next;
-        });
-      }
-    });
-
-    setCustomDaysError(errorMsg);
-  };
 
   const formatCollateralUnits = (amount: number): string =>
     amount.toLocaleString(undefined, {
@@ -530,8 +485,9 @@ export default function BorrowingForm({
                   asset.symbol,
                   asset.symbol === assetKey
                     ? resolvedBorrowRate
-                    : INTEREST_RATES[asset.symbol as keyof typeof INTEREST_RATES] ??
-                      0,
+                    : (INTEREST_RATES[
+                        asset.symbol as keyof typeof INTEREST_RATES
+                      ] ?? 0),
                 ]),
               )}
               onChange={(asset) => {
@@ -613,7 +569,8 @@ export default function BorrowingForm({
                 }}
                 className={cn(
                   "p-3 rounded-xl border-2 text-center transition-all duration-200",
-                  durationMode === "preset" && formData.duration === duration.days
+                  durationMode === "preset" &&
+                    formData.duration === duration.days
                     ? "border-[#2600FF] bg-blue-50 text-[#2600FF] ring-1 ring-[#2600FF]"
                     : "border-gray-100 hover:border-gray-200 bg-gray-50/30 text-gray-600",
                 )}
@@ -670,7 +627,9 @@ export default function BorrowingForm({
                 onChange={handleCustomDaysChange}
                 placeholder={`${CUSTOM_DURATION_MIN_DAYS}–${CUSTOM_DURATION_MAX_DAYS}`}
                 aria-label="Custom loan duration in days"
-                aria-describedby={customDaysError ? "custom-days-error" : undefined}
+                aria-describedby={
+                  customDaysError ? "custom-days-error" : undefined
+                }
                 aria-invalid={customDaysError ? true : undefined}
                 className={cn(
                   "w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors",

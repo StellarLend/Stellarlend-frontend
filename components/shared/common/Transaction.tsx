@@ -9,6 +9,8 @@ import {
   ListFilter,
   CalendarDays,
 } from "lucide-react";
+import Image from "next/image";
+import { StatusBadge } from "../ui";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
@@ -17,6 +19,7 @@ import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
 import dynamic from "next/dynamic";
+
 import { usePendingTransactions } from "@/hooks/usePendingTransactions";
 
 const TransactionDetail = dynamic(
@@ -41,6 +44,7 @@ import {
 } from "@/types/Transaction";
 import { useInfiniteTransactions } from "@/hooks/useInfiniteTransactions";
 import { sortTransactions, type TransactionSortKey, type TransactionSortOrder } from "@/lib/transactions/sort";
+
 
 const statusOptions: (TransactionStatus | "All")[] = [
   "All",
@@ -634,7 +638,7 @@ export const Transactions = ({
                     const actualIndex = startIndex + idx;
                     const isPending = isPendingRow(txn);
                     return (
-                      <RowComponent
+                      <RowRenderCounts
                         key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                         txn={txn}
                         actualIndex={actualIndex}
@@ -749,7 +753,7 @@ export const Transactions = ({
                 const actualIndex = startIndex + idx;
                 const isPending = isPendingRow(txn);
                 return (
-                  <MobileRowComponent
+                  <MobileRowRenderCounts
                     key={isPending ? `pending-${txn.id}` : (txn.id ?? actualIndex)}
                     txn={txn}
                     isExpanded={isDetailOpen && selectedTxn?.id === txn.id}
