@@ -386,4 +386,38 @@ describe("useNotificationStream", () => {
 
     expect(MockEventSource.instances).toHaveLength(2);
   });
+
+  it("simulates an onerror event and asserts the hook reconnects with backoff", () => {
+    renderHook(() => useNotificationStream());
+
+    // First error: should reconnect after 1000ms
+    act(() => {
+      MockEventSource.instances[0].triggerError();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(MockEventSource.instances).toHaveLength(2);
+
+    // Second error: should reconnect with backoff after 2000ms (1000 * 2)
+    act(() => {
+      MockEventSource.instances[1].triggerError();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1999);
+    });
+    expect(MockEventSource.instances).toHaveLength(2);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(MockEventSource.instances).toHaveLength(3);
+  });
 });
