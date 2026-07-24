@@ -11,7 +11,7 @@ import { Transactions } from "../Transaction";
 
 // ── Hoisted mock data ──────────────────────────────────────────────────────
 
-const mockTransactions = [
+const mockTransactions = vi.hoisted(() => [
   {
     id: "TXN001",
     type: "Lend",
@@ -39,7 +39,7 @@ const mockTransactions = [
     time: "09:15 AM",
     status: "Failed" as const,
   },
-];
+]);
 
 const mockFetchTransactions = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
@@ -81,6 +81,10 @@ vi.mock("@/types/Transaction", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/types/Transaction")>();
   return { ...original, fetchTransactions: mockFetchTransactions };
 });
+
+vi.mock("@/hooks/useWallet", () => ({
+  useWallet: () => ({ network: "TESTNET" }),
+}));
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
