@@ -30,7 +30,7 @@ interface ServerConfig {
 }
 
 function normalizeUrl(url: string): string {
-  return url.replace(/\/+$/, "");
+  return url.trim().replace(/\/+$/, "");
 }
 
 function parseHorizonUrls(rawValue?: string): string[] {

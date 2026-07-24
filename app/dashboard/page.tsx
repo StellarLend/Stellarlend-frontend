@@ -4,6 +4,7 @@ import Image from "next/image";
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
 import LiquidationsPanel from "@/components/features/dashboard/components/LiquidationsPanel";
 import NextPaymentDue from "@/components/features/dashboard/components/NextPaymentDue";
+import NetWorthTrend from "@/components/features/dashboard/components/NetWorthTrend";
 import { DashboardLayout } from "@/components";
 import { AlertBanner, PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
@@ -152,18 +153,19 @@ export default function Dashboard() {
             }
           />
 
-          {alertData ? (
-            <div className="mb-6">
-              <AlertBanner
-                title={alertData.title}
-                message={alertData.message}
-                severity={alertData.severity}
-                dismissKey={alertData.dismissKey}
-              />
-            </div>
-          ) : null}
+{alertData ? (
+             <div className="mb-6">
+               <AlertBanner
+                 title={alertData.title}
+                 message={alertData.message}
+                 severity={alertData.severity}
+                 dismissKey={alertData.dismissKey}
+               />
+             </div>
+           ) : null}
 
-          <MetricsCards />
+           <NetWorthTrend />
+           <MetricsCards />
           <NextPaymentDue />
           <div className="mt-6">
             <LiquidationsPanel />

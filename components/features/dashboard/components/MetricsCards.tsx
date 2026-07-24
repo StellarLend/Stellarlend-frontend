@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Copy, Search, X } from "lucide-react";
 import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -210,11 +210,7 @@ function AssetCard({ asset }: { asset: AssetMetadata }) {
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
-
-export default function MetricsCards() {
-  const [data, setData] = useState<any>(null);
-  const [filterQuery, setFilterQuery] = useState("");
+// ── Positions data types and hook ─────────────────────────────────────────────
 
 interface PositionsData {
   availableBalance: string;
@@ -226,7 +222,11 @@ interface PositionsData {
   healthFactor: number | string;
 }
 
-function usePositionsData(): { data: PositionsData | null; isLoading: boolean; error: Error | null } {
+function usePositionsData(): {
+  data: PositionsData | null;
+  isLoading: boolean;
+  error: Error | null;
+} {
   const [data, setData] = useState<PositionsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -246,6 +246,19 @@ function usePositionsData(): { data: PositionsData | null; isLoading: boolean; e
     }
   }, []);
 
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, isLoading, error };
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function MetricsCards() {
+  const { data, isLoading, error } = usePositionsData();
+  const [filterQuery, setFilterQuery] = useState("");
+
   const allAssets = useMemo(() => {
     try {
       return getAssets();
@@ -264,7 +277,17 @@ function usePositionsData(): { data: PositionsData | null; isLoading: boolean; e
     );
   }, [allAssets, filterQuery]);
 
-  if (!data) return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
+  if (isLoading || !data) {
+    return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-400 p-4 text-sm font-medium">
+        Failed to load metrics: {error.message}
+      </div>
+    );
+  }
 
   return (
     <div>
