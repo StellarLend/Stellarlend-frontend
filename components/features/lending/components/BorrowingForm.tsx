@@ -103,7 +103,6 @@ export default function BorrowingForm({
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
-
   const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
   const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
   const assetKey = formData.asset?.toUpperCase();
@@ -311,8 +310,6 @@ export default function BorrowingForm({
 
   // ---------------------------------------------------------------------------
   // Form validation / submission
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
   // ---------------------------------------------------------------------------
 
   const validateForm = (): boolean => {
