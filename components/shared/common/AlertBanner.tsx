@@ -64,14 +64,27 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
       return;
     }
 
-    const dismissed = window.localStorage.getItem(dismissKey) === "dismissed";
-    setIsDismissed(dismissed);
+    try {
+      const dismissed = window.localStorage.getItem(dismissKey) === "dismissed";
+      setIsDismissed(dismissed);
+    } catch (error) {
+      // Storage is blocked (e.g. private browsing in older Safari, enterprise
+      // policies, or embedded webviews). Default to not-dismissed so the banner
+      // is still visible rather than silently hidden.
+      console.warn("AlertBanner: localStorage.getItem failed, defaulting to not dismissed:", error);
+    }
     setIsReady(true);
   }, [dismissKey]);
 
   const handleDismiss = () => {
     if (dismissKey) {
-      window.localStorage.setItem(dismissKey, "dismissed");
+      try {
+        window.localStorage.setItem(dismissKey, "dismissed");
+      } catch (error) {
+        // Persist failure is non-fatal: the banner will still dismiss for this
+        // session even if the preference cannot be saved across reloads.
+        console.warn("AlertBanner: localStorage.setItem failed, dismissal will not persist:", error);
+      }
     }
     setIsDismissed(true);
     onDismiss?.();
