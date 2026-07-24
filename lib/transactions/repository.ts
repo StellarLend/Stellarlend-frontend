@@ -4,7 +4,7 @@ export { paginateTransactionsByCursor } from './cursor-pagination';
 export type { CursorPaginatedTransactions, CursorPaginationOptions } from './cursor-pagination';
 import { indexAccountTransactions } from '@/lib/indexer';
 import { logger } from '@/lib/logger';
-import { db } from '../db';
+import { db } from '../db/client';
 import { transactions as transactionsTable } from '../db/schema/transactions';
 import { getTransaction } from './store';
 import config from '@/lib/config';
