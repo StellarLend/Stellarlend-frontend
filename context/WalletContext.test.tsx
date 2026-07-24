@@ -215,6 +215,30 @@ describe("WalletProvider", () => {
       expect(screen.getByTestId("address").textContent).toBe("");
     });
 
+    it("sets status to error when public key has invalid length/prefix", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce(mockResponse(false));
+      (window as any).stellar = {
+        getPublicKey: vi.fn().mockResolvedValue("not-a-valid-key"),
+        signTransaction: vi.fn(),
+      };
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status").textContent).toBe("disconnected");
+      });
+
+      await act(async () => {
+        screen.getByTestId("connect-btn").click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status").textContent).toBe("error");
+      });
+      expect(screen.getByTestId("error").textContent).toBe("Invalid Stellar public key");
+      expect(screen.getByTestId("address").textContent).toBe("");
+    });
+
     it("sets status to error when no public key returned", async () => {
       vi.mocked(fetch).mockResolvedValueOnce(mockResponse(false));
       (window as any).stellar = {

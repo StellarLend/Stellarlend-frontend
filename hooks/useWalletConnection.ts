@@ -2,18 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import config from '@/lib/config';
 import { safeRedirectPath } from '@/lib/security/safe-redirect';
-
-declare global {
-  interface Window {
-    stellar?: {
-      getPublicKey: () => Promise<string>;
-      signTransaction: (xdr: string, opts?: { network: string }) => Promise<string>;
-    };
-  }
-}
+import { connectWallet, type StellarNetwork } from '@/lib/wallet/connectHandshake';
 
 export type WalletStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
-export type StellarNetwork = 'PUBLIC' | 'TESTNET';
+export type { StellarNetwork };
 
 export const useWalletConnection = () => {
   const [address, setAddress] = useState<string | null>(null);
@@ -76,54 +68,7 @@ export const useWalletConnection = () => {
     setError(null);
 
     try {
-      const stellar = window.stellar;
-      if (!stellar) {
-        throw new Error('Stellar wallet provider (Freighter) not detected');
-      }
-
-      // 1. Get client public key
-      const pubKey = await stellar.getPublicKey();
-      if (!pubKey) {
-        throw new Error('No public key returned from wallet');
-      }
-
-      // Validate the resolved address is a 56-char Stellar public key before persisting it
-      if (pubKey.length !== 56 || !pubKey.startsWith('G')) {
-        throw new Error('Invalid Stellar public key');
-      }
-
-      // 2. Fetch SEP-10 challenge transaction
-      const challengeResponse = await fetch('/api/auth/challenge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: pubKey }),
-      });
-
-      if (!challengeResponse.ok) {
-        const errData = await challengeResponse.json();
-        throw new Error(errData.error || 'Failed to generate challenge');
-      }
-
-      const { transaction } = await challengeResponse.json();
-
-      // 3. Sign transaction
-      const signedTransaction = await stellar.signTransaction(transaction, {
-        network,
-      });
-
-      // 4. Verify transaction signature and establish session
-      const verifyResponse = await fetch('/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction: signedTransaction }),
-      });
-
-      if (!verifyResponse.ok) {
-        const errData = await verifyResponse.json();
-        throw new Error(errData.error || 'Verification failed');
-      }
-
-      const { walletAddress: verifiedAddress } = await verifyResponse.json();
+      const verifiedAddress = await connectWallet(network);
       setAddress(verifiedAddress);
       setStatus('connected');
       sessionStorage.setItem('walletAddress', verifiedAddress);
