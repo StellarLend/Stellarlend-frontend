@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fetchTransactions, filterTransactions, getTransactionDetail } from './repository';
 
+vi.mock('server-only', () => ({}));
+
 vi.mock('@/lib/db', () => {
   const mockSelect = vi.fn(() => ({
     from: vi.fn(async () => [
