@@ -24,6 +24,18 @@ export const marketsRegistry: Record<string, Market> = {
     asset: 'USDC',
     name: 'USDC Coin',
     feeSchedule: { lendFeeBps: 15, borrowFeeBps: 25, repayFeeBps: 10, minFeeAmount: 0.5 }
+  },
+  btc: {
+    id: 'btc',
+    asset: 'BTC',
+    name: 'Bitcoin',
+    feeSchedule: { lendFeeBps: 8, borrowFeeBps: 15, repayFeeBps: 5, minFeeAmount: 0.0001 }
+  },
+  eth: {
+    id: 'eth',
+    asset: 'ETH',
+    name: 'Ethereum',
+    feeSchedule: { lendFeeBps: 8, borrowFeeBps: 15, repayFeeBps: 5, minFeeAmount: 0.001 }
   }
 };
 

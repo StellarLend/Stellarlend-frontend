@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ASSET_SYMBOLS } from '@/types/enums';
 import { calculateProtocolFee } from './fee-calculator';
 
 describe('fee-calculator', () => {
@@ -38,5 +39,29 @@ describe('fee-calculator', () => {
     for (let i = 1; i < amounts.length; i++) {
       expect(calculateProtocolFee('usdc', 'repay', amounts[i]).feeAmount).toBeGreaterThanOrEqual(calculateProtocolFee('usdc', 'repay', amounts[i - 1]).feeAmount);
     }
+  });
+
+  it.each([...ASSET_SYMBOLS])('calculates lend fee for %s', (symbol) => {
+    const marketId = symbol.toLowerCase();
+    const result = calculateProtocolFee(marketId, 'lend', 1000);
+    expect(result.feeAmount).toBeGreaterThanOrEqual(0);
+    expect(result.marketId).toBe(marketId);
+    expect(result.action).toBe('lend');
+  });
+
+  it.each([...ASSET_SYMBOLS])('calculates borrow fee for %s', (symbol) => {
+    const marketId = symbol.toLowerCase();
+    const result = calculateProtocolFee(marketId, 'borrow', 1000);
+    expect(result.feeAmount).toBeGreaterThanOrEqual(0);
+    expect(result.marketId).toBe(marketId);
+    expect(result.action).toBe('borrow');
+  });
+
+  it.each([...ASSET_SYMBOLS])('calculates repay fee for %s', (symbol) => {
+    const marketId = symbol.toLowerCase();
+    const result = calculateProtocolFee(marketId, 'repay', 1000);
+    expect(result.feeAmount).toBeGreaterThanOrEqual(0);
+    expect(result.marketId).toBe(marketId);
+    expect(result.action).toBe('repay');
   });
 });
