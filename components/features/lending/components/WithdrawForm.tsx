@@ -8,7 +8,6 @@ import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
-import { WalletGate } from "@/components/shared/ui/WalletGate";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import {
   CRITICAL_HEALTH_FACTOR_THRESHOLD,
@@ -16,6 +15,7 @@ import {
 } from "@/lib/lending/health";
 import { cn } from "@/lib/utils/cn";
 import ConfirmModal from "./ConfirmModal";
+import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
 
 export interface SupplyPosition extends HookSupplyPosition {}
 
@@ -82,7 +82,7 @@ export default function WithdrawForm({
   const [amount, setAmount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "success" | "error"
+    "idle" | "submitting" | "success" | "error"
   >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -278,6 +278,8 @@ export default function WithdrawForm({
           open borrows cannot be withdrawn.
         </p>
       </div>
+
+      <StatusAnnouncer status={submitStatus} type="withdraw" message={submitMessage} />
 
       {submitMessage && (
         <div

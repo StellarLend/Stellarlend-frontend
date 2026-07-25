@@ -4,22 +4,15 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import serverConfig from '../../../../lib/server-config';
 import { listSourceMigrations, fetchAppliedMigrations, compareMigrationLists } from '../../../../lib/db/migration-state';
+import pool from '../../../../lib/db/pool';
 
 async function queryWithPg(): Promise<string[]> {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL not configured');
   }
 
-  // dynamic import so missing pg doesn't break environments that don't use DB
-  const { Client } = await import('pg');
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
-  try {
-    const res = await fetchAppliedMigrations((sql: string) => client.query(sql));
-    return res;
-  } finally {
-    await client.end();
-  }
+  const res = await fetchAppliedMigrations((sql: string) => pool.query(sql));
+  return res;
 }
 
 export async function GET(request: Request) {

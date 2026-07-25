@@ -1,41 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
-import { validatePreferences } from "@/lib/account/preferences-validation";
-import { preferencesRepository } from "@/lib/account/preferences-repository";
-import { withCsrfProtection } from "@/lib/api/handler";
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  PreferencesRepository,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  type UpsertPreferencesInput,
+} from '@/lib/account/preferences-repository';
+
+// Singleton repository instance (will be replaced by a database-backed impl later)
+const repo = new PreferencesRepository();
 
 /**
- * GET /api/account/preferences
+ * GET /api/account/preferences?userId=<id>
  *
- * Returns the stored preferences for the logged-in user, or default preferences if none exist.
+ * Returns the stored preferences for the given user, or 404 if none exist.
  */
 export async function GET(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    if (user instanceof NextResponse) return user;
+  const userId = request.nextUrl.searchParams.get('userId');
 
-    const prefs = await preferencesRepository.getByUserId(user.id);
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Missing required query parameter: userId' },
+      { status: 400 },
+    );
+  }
 
-    if (prefs) {
-      return NextResponse.json({
-        email: user.email,
-        ...prefs,
-      });
-    }
+  const prefs = repo.getByUserId(userId);
 
-    return NextResponse.json({
-      userId: user.id,
-      email: user.email,
-      locale: "en-US",
-      displayCurrency: "USD",
-      notifications: { email: true, push: true, sms: false, inApp: true },
-      updatedAt: null,
-    });
-  } catch (error) {
-    if (error instanceof NextResponse) {
-      return error;
-    }
-    throw error;
+  if (!prefs) {
+    return NextResponse.json(
+      { error: 'Preferences not found for the specified user' },
+      { status: 404 },
+    );
   }
 }
 
@@ -73,5 +67,3 @@ async function putHandler(request: NextRequest) {
     throw error;
   }
 }
-
-export const PUT = withCsrfProtection(putHandler);

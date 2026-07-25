@@ -1,9 +1,11 @@
 "use client";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
 import LiquidationsPanel from "@/components/features/dashboard/components/LiquidationsPanel";
 import NextPaymentDue from "@/components/features/dashboard/components/NextPaymentDue";
+import NetWorthTrend from "@/components/features/dashboard/components/NetWorthTrend";
 import { DashboardLayout } from "@/components";
 import { AlertBanner, PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
@@ -105,10 +107,16 @@ const getDashboardAlertData = (position: PositionMetrics): DashboardAlertData | 
 
 export default function Dashboard() {
   const [alertData, setAlertData] = useState<DashboardAlertData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/positions")
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch positions");
+        }
+        return response.json();
+      })
       .then((data) => {
         const alert = getDashboardAlertData({
           nextDue: data.nextDue,
@@ -117,7 +125,10 @@ export default function Dashboard() {
 
         setAlertData(alert);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load positions data. Please try again later.");
+      });
   }, []);
 
   return (
@@ -152,7 +163,15 @@ export default function Dashboard() {
             }
           />
 
-          {alertData ? (
+          {error ? (
+            <div className="mb-6">
+              <AlertBanner
+                title="Error"
+                message={error}
+                severity="error"
+              />
+            </div>
+          ) : alertData ? (
             <div className="mb-6">
               <AlertBanner
                 title={alertData.title}
@@ -163,7 +182,8 @@ export default function Dashboard() {
             </div>
           ) : null}
 
-          <MetricsCards />
+           <NetWorthTrend />
+           <MetricsCards />
           <NextPaymentDue />
           <div className="mt-6">
             <LiquidationsPanel />

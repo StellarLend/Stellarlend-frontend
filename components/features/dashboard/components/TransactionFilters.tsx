@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, forwardRef, useCallback } from "react";
+import React, { useState, useEffect, forwardRef, useRef } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -60,8 +60,35 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
     toDateStr ? new Date(toDateStr) : null
   );
 
-  // Sync back to URL when local state changes
-  // Debounce search slightly
+  // Tracks the last URL params string we wrote so the URL→state effect
+  // can distinguish our own router.replace calls from external navigation
+  // (browser back/forward, links from other pages).
+  const prevParamsRef = useRef(searchParams.toString());
+
+  // ── Effect 1: URL → local state ─────────────────────────────────────
+  // Re-syncs local filter state when searchParams change externally.
+  useEffect(() => {
+    const currentParams = searchParams.toString();
+    if (currentParams === prevParamsRef.current) {
+      return; // Our own change — local state is already correct
+    }
+    prevParamsRef.current = currentParams;
+
+    // External change detected — re-derive all local state from URL
+    setAsset(searchParams.get("asset") || "");
+    setType(searchParams.get("type") || "");
+    setStatus(searchParams.get("status") || "");
+    setSearch(searchParams.get("search") || "");
+
+    const fromDate = searchParams.get("fromDate");
+    setDateFromObj(fromDate ? new Date(fromDate) : null);
+
+    const toDate = searchParams.get("toDate");
+    setDateToObj(toDate ? new Date(toDate) : null);
+  }, [searchParams]);
+
+  // ── Effect 2: local state → URL ─────────────────────────────────────
+  // Pushes current local state into the URL whenever a filter value changes.
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
 
@@ -86,8 +113,12 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
     
     // Create query string
     const query = params.toString();
+
+    // Record the URL we're about to push so Effect 1 knows it's our own change
+    prevParamsRef.current = query;
+
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
-  }, [asset, type, status, dateFromObj, dateToObj, pathname, router, searchParams]);
+  }, [asset, type, status, dateFromObj, dateToObj, pathname, router]);
 
   // Handle Search separately with debounce or on Enter
   const handleSearchBlur = () => {
@@ -96,6 +127,7 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
     else params.delete("search");
     params.delete("page");
     const query = params.toString();
+    prevParamsRef.current = query;
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
   };
   
@@ -112,6 +144,7 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
     setSearch("");
     setDateFromObj(null);
     setDateToObj(null);
+    prevParamsRef.current = "";
     router.replace(pathname, { scroll: false });
   };
 

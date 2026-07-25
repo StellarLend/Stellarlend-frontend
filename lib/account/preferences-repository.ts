@@ -108,5 +108,4 @@ export class PreferencesRepository {
   }
 }
 
-// Export a default singleton instance as used by some API endpoints
 export const preferencesRepository = new PreferencesRepository();
