@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
 import { walletAddressSchema } from '@/lib/positions/walletAddressSchema';
 import { withRequestLogging } from '@/lib/api/handler';
-import { computeLiquidations, generateMockPositions } from '@/lib/positions/liquidation';
+import { computeLiquidations } from '@/lib/positions/liquidation';
+import { fetchUserPositions } from '@/lib/positions/fetchPositions';
 
 async function handleLiquidations(request?: NextRequest) {
   const user = await getUser();
@@ -25,7 +26,7 @@ async function handleLiquidations(request?: NextRequest) {
 
   const walletAddress = walletParam || user.walletAddress || 'GA-mock-address';
 
-  const positions = generateMockPositions(walletAddress);
+  const positions = await fetchUserPositions(walletAddress);
   const computed = computeLiquidations(positions);
   const totalRiskScore = computed.length > 0
     ? Math.max(...computed.map((p) => p.riskScore))

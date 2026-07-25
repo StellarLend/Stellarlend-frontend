@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { getCollateralFactor } from '@/lib/markets/registry';
 import type { AssetSymbol } from '@/types/enums';
 
@@ -86,31 +87,34 @@ export function computeLiquidations(positions: RawPosition[]): LiquidationPositi
   return computed;
 }
 
+const POOL_ASSETS: AssetSymbol[] = ['XLM', 'USDC', 'BTC', 'ETH'];
+
 export function generateMockPositions(walletAddress: string): RawPosition[] {
-  return [
-    {
-      asset: 'XLM',
-      borrowedAmount: 1500,
-      collateralAsset: 'XLM',
-      collateralAmount: 5000,
-    },
-    {
-      asset: 'USDC',
-      borrowedAmount: 5000,
-      collateralAsset: 'ETH',
-      collateralAmount: 8000,
-    },
-    {
-      asset: 'BTC',
-      borrowedAmount: 0,
-      collateralAsset: 'BTC',
-      collateralAmount: 2000,
-    },
-    {
-      asset: 'ETH',
-      borrowedAmount: 3000,
-      collateralAsset: 'ETH',
-      collateralAmount: 3200,
-    },
-  ];
+  const seed = createHash('sha256').update(walletAddress).digest();
+
+  const readUint16 = (offset: number) =>
+    (seed[offset]! << 8) | seed[offset + 1]!;
+
+  const pickAsset = (offset: number): AssetSymbol =>
+    POOL_ASSETS[readUint16(offset) % POOL_ASSETS.length]!;
+
+  const pickAmount = (offset: number, min: number, max: number): number => {
+    const ratio = readUint16(offset) / 0xffff;
+    return Math.round((min + ratio * (max - min)) * 100) / 100;
+  };
+
+  const numPositions = 1 + (seed[32]! % 3);
+  const positions: RawPosition[] = [];
+
+  for (let i = 0; i < numPositions; i++) {
+    const offset = 33 + i * 6;
+    positions.push({
+      asset: pickAsset(offset),
+      collateralAsset: pickAsset(offset + 2),
+      borrowedAmount: pickAmount(offset + 4, 100, 10_000),
+      collateralAmount: pickAmount(offset + 4, 500, 20_000),
+    });
+  }
+
+  return positions;
 }
