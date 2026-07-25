@@ -92,6 +92,18 @@ describe('config modules', () => {
     await expect(import('./configValidation')).rejects.toThrow();
   });
 
+  it('rejects production config missing AUTH_SECRET', async () => {
+    process.env.NEXT_PUBLIC_APP_NAME = 'Stellarlend Prod';
+    process.env.NEXT_PUBLIC_APP_VERSION = '2.0.0';
+    process.env.NEXT_PUBLIC_APP_ENV = 'production';
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.stellarlend.com';
+    process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
+    process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+    delete process.env.AUTH_SECRET;
+
+    await expect(import('./configValidation')).rejects.toThrow();
+  });
+
   it('keeps public config sanitized for client use', async () => {
     process.env.NEXT_PUBLIC_APP_ENV = 'development';
 
