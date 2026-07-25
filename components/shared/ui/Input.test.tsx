@@ -25,6 +25,28 @@ describe("Input Component", () => {
     expect(screen.getByText("Must be 8 characters")).toBeInTheDocument();
   });
 
+  it("wires aria-describedby and aria-invalid for error text", () => {
+    render(<Input label="Email" error="Invalid email" />);
+
+    const input = screen.getByLabelText("Email");
+    const error = screen.getByText("Invalid email");
+
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input).toHaveAttribute("aria-describedby", "email-error");
+    expect(error).toHaveAttribute("id", "email-error");
+  });
+
+  it("wires aria-describedby for helper text", () => {
+    render(<Input label="Password" helperText="Must be 8 characters" />);
+
+    const input = screen.getByLabelText("Password");
+    const helperText = screen.getByText("Must be 8 characters");
+
+    expect(input).toHaveAttribute("aria-describedby", "password-helper");
+    expect(helperText).toHaveAttribute("id", "password-helper");
+    expect(input).toHaveAttribute("aria-invalid", "false");
+  });
+
   it("renders as a textarea when multiline is true", () => {
     render(<Input label="Bio" multiline placeholder="Tell us about yourself" />);
     

@@ -37,6 +37,8 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, In
     } = props;
 
     const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    const describedBy = error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined;
+    const ariaInvalid = error ? 'true' : 'false';
 
     const baseInputStyles = cn(
       'w-full px-4 py-2.5 rounded-lg border transition-all duration-200 outline-none text-sm',
@@ -66,6 +68,8 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, In
             ref={ref as React.ForwardedRef<HTMLTextAreaElement>}
             className={cn(baseInputStyles, 'resize-none')}
             required={required}
+            aria-invalid={ariaInvalid}
+            aria-describedby={describedBy}
             {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
           />
         ) : (
@@ -74,6 +78,8 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, In
             ref={ref as React.ForwardedRef<HTMLInputElement>}
             className={baseInputStyles}
             required={required}
+            aria-invalid={ariaInvalid}
+            aria-describedby={describedBy}
             {...(rest as InputHTMLAttributes<HTMLInputElement>)}
           />
         )}
