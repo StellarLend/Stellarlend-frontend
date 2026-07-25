@@ -12,6 +12,7 @@ import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
 import { withIdempotency } from '@/lib/api/idempotency';
 import { fetchTransactionRecords, filterTransactions, paginateTransactionsByCursor } from '@/lib/transactions/repository';
+import { parseTransactionParams } from '@/lib/transactions/validator';
 
 export const runtime = 'nodejs';
 
@@ -57,17 +58,19 @@ function sortTransactions(transactions: Transaction[], sortBy: 'date' | 'amount'
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
+  const { params: validatedParams } = parseTransactionParams(searchParams);
 
   const asset = searchParams.get('asset');
   const type = searchParams.get('type');
   const status = searchParams.get('status');
   const search = searchParams.get('search');
-  const dateFrom = searchParams.get('dateFrom');
-  const dateTo = searchParams.get('dateTo');
+  const dateFrom = searchParams.get('dateFrom') ?? validatedParams.startDate;
+  const dateTo = searchParams.get('dateTo') ?? validatedParams.endDate;
   const sortBy = parseSortBy(searchParams.get('sortBy'));
   const sortDir = parseSortDir(searchParams.get('sortDir'));
-  const page = parsePageParam(searchParams.get('page'), DEFAULT_PAGE);
-  const pageSize = parsePageSizeParam(searchParams.get('pageSize'), DEFAULT_PAGE_SIZE);
+  const page = searchParams.has('page') ? validatedParams.page : DEFAULT_PAGE;
+  const pageSize = searchParams.has('pageSize') ? validatedParams.pageSize : DEFAULT_PAGE_SIZE;
+
 
   if (asset !== null && !isAssetSymbol(asset)) {
     return NextResponse.json(
