@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "db:migrate": "ts-node lib/db/migrate.ts",
-    "dev": "next dev",
+    "dev": "node init && next dev",
     "check-secrets": "node scripts/check-client-secrets.js",
     "check-bundle-secrets": "ts-node scripts/check-bundle-secrets.ts",
-    "build": "npm run check-secrets && next build && npm run check-bundle-secrets",
-    "start": "next start",
+    "build": "node init && npm run check-secrets && next build && npm run check-bundle-secrets",
+    "start": "node init && next start",
     "lint": "next lint && npm run check-secrets",
     "type-check": "tsc --noEmit",
     "test": "vitest",
@@ -20,7 +20,7 @@
     "svg": "node scripts/svgToComponent.js",
     "generate-component": "plop",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
+    "build-storybook": "node init && storybook build",
     "create-pr": "node scripts/create-pr.js",
     "test:contract": "bash scripts/run-contract-tests.sh"
   },
