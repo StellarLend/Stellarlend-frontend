@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from "@/test/test-utils";
-import { AmountInput } from "./AmountInput";
+import { AmountInput, formatWithCommas } from "./AmountInput";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 describe("AmountInput Component", () => {
@@ -198,6 +198,17 @@ describe("AmountInput Component", () => {
       
       fireEvent.click(screen.getByRole("button", { name: "Fill 50 percent" }));
       expect(onChange).toHaveBeenCalledWith(0);
+    });
+  });
+
+  describe("formatWithCommas", () => {
+    it("pads single-decimal-digit input correctly when decimalPlaces is specified", () => {
+      expect(formatWithCommas(12.5, 2)).toBe("12.50");
+      expect(formatWithCommas(12.5, 4)).toBe("12.5000");
+    });
+
+    it("pads integer input correctly when decimalPlaces is specified", () => {
+      expect(formatWithCommas(12, 2)).toBe("12.00");
     });
   });
 });
