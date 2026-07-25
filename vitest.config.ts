@@ -87,6 +87,8 @@ export default defineConfig({
             "components/features/lending/**/*.test.tsx",
             "context/**/*.test.{ts,tsx}",
             "hooks/**/*.test.{ts,tsx}",
+            "components/marketing/**/*.test.tsx",
+            "app/security/**/*.test.tsx",
           ],
         },
       },
