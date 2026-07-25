@@ -13,6 +13,18 @@ export interface AmountInputProps extends Omit<InputProps, 'value' | 'onChange'>
 }
 
 /**
+ * Formats a number with thousands separators and optional decimal padding.
+ */
+export const formatWithCommas = (val: number, decimalPlaces?: number): string => {
+  const parts = val.toString().split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (decimalPlaces !== undefined) {
+    return decimalPlaces === 0 ? parts[0] : `${parts[0]}.${(parts[1] ?? '').padEnd(decimalPlaces, '0')}`;
+  }
+  return parts.join('.');
+};
+
+/**
  * AmountInput component handles formatting and validation for monetary inputs.
  * 
  * Behaviours handled:
@@ -55,20 +67,10 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
       }
     }, [ref]);
 
-    // Format number to string with commas
-    const formatWithCommas = useCallback((val: number, decimalPlaces?: number) => {
-      const parts = val.toString().split('.');
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      if (decimalPlaces !== undefined) {
-        return decimalPlaces === 0 ? parts[0] : `${parts[0]}.${parts[1] || ''.padEnd(decimalPlaces, '0')}`;
-      }
-      return parts.join('.');
-    }, []);
-
     // Update display value when external value changes
     useEffect(() => {
       setDisplayValue(value === 0 ? '' : formatWithCommas(value));
-    }, [value, formatWithCommas]);
+    }, [value]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const input = e.target;
