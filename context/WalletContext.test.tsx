@@ -3,11 +3,22 @@ import { renderHook, act, waitFor, render, screen } from "@testing-library/react
 import { WalletProvider, useWalletContext } from "./WalletContext";
 import { FC, ReactNode, createElement } from "react";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
 function wrapper({ children }: { children: ReactNode }) {
   return createElement(WalletProvider, null, children);
 }
 
-const TEST_ADDRESS = "GABCDEF1234567890";
+const TEST_ADDRESS = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ";
 
 function mockResponse(ok: boolean, body: any = {}, status = ok ? 200 : 500) {
   return {

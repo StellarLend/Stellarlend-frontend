@@ -3,10 +3,14 @@ import { NextRequest } from 'next/server';
 import { GET } from './route';
 
 // ── mocks ──────────────────────────────────────────────────────────────────
+// vi.mock factories are hoisted before variable declarations, so we must use
+// vi.hoisted to ensure the mock functions exist when the factories run.
 
-const mockGetSession = vi.fn();
-const mockListStoredSessions = vi.fn();
-const mockTouchStoredSession = vi.fn();
+const { mockGetSession, mockListStoredSessions, mockTouchStoredSession } = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockListStoredSessions: vi.fn(),
+  mockTouchStoredSession: vi.fn(),
+}));
 
 vi.mock('@/lib/auth', () => ({ getSession: mockGetSession }));
 vi.mock('@/lib/auth/session-store', () => ({

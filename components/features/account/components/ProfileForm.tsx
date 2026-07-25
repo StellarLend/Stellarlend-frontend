@@ -1,8 +1,13 @@
-import React, { useMemo, useState, ChangeEvent, MouseEvent } from "react";
+"use client";
+
+import React, { useCallback, useMemo, useState, ChangeEvent } from "react";
 import Image, { StaticImageData } from "next/image";
+import { Save } from "lucide-react";
 import profile from "@/public/images/p-Picture.jpg";
-import Camera from "@/public/camera-ai-fill.svg"; 
-import { EmptyState } from "@/components/shared/common/EmptyState";
+import Camera from "@/public/camera-ai-fill.svg";
+import Toast from "@/components/shared/common/Toast";
+import type { ToastVariant } from "@/components/shared/common/Toast";
+import { Button } from "@/components/shared/ui";
 
 const formFields = [
   { id: "firstName", label: "First Name", placeholder: "e.g. John", type: "text", group: "personal", helpText: "Please enter your legal first name." },
@@ -28,10 +33,22 @@ const initialFormData: Record<string, string> = {
 const ProfileForm: React.FC = () => {
   const [avatar, setAvatar] = useState<string | StaticImageData>(profile);
   const [gender, setGender] = useState<"male" | "female" | "">("");
-  const [formData, setFormData] = useState<Record<string, string>>({
-    address: ""
-  });
+  const [formData, setFormData] = useState<Record<string, string>>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{
+    variant: ToastVariant;
+    title: string;
+    description?: string;
+  } | null>(null);
+
+  const showToast = useCallback(
+    (variant: ToastVariant, title: string, description?: string) => {
+      setToast({ variant, title, description });
+      setTimeout(() => setToast(null), 5000);
+    },
+    []
+  );
 
   // fn to handle profile image manipulations
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -59,38 +76,63 @@ const ProfileForm: React.FC = () => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.firstName?.trim()) newErrors.firstName = "First name is required.";
     if (!formData.lastName?.trim()) newErrors.lastName = "Last name is required.";
-    
+
     if (!formData.email?.trim()) {
       newErrors.email = "Email is required.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address.";
     }
-    
+
     if (!formData.phone?.trim()) {
       newErrors.phone = "Phone number is required.";
     } else if (!/^\+?[\d\s\-()]{7,}$/.test(formData.phone)) {
       newErrors.phone = "Please enter a valid phone number.";
     }
-    
+
     if (!formData.id?.trim()) newErrors.id = "ID number is required.";
     if (!formData.taxId?.trim()) newErrors.taxId = "Tax verification number is required.";
     if (!formData.country?.trim()) newErrors.country = "Identification country is required.";
     if (!formData.address?.trim()) newErrors.address = "Address is required.";
-    
+
     if (!gender) newErrors.gender = "Gender is required.";
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // fn to submit form data 
-  const handleSubmit = (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (validateForm()) {
-      console.log({ avatar, gender, ...formData });
+  // fn to submit form data to the profile API
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setSaving(true);
+    setErrors({});
+
+    try {
+      const res = await fetch("/api/account/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gender, ...formData }),
+      });
+
+      if (res.status === 422 || res.status === 400) {
+        const body = await res.json();
+        if (body.errors) setErrors(body.errors);
+        showToast("error", "Validation failed", "Please fix the highlighted fields.");
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error("Failed to update profile");
+      }
+
+      showToast("success", "Profile saved", "Your profile has been updated successfully.");
+    } catch {
+      showToast("error", "Save failed", "An error occurred while saving your profile.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -175,15 +217,15 @@ const ProfileForm: React.FC = () => {
       </div>
 
       {/* Input Fields organized by section */}
-      <form className="space-y-8">
+      <form className="space-y-8" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
         {/* Section 1: Personal Info */}
         <div className="bg-white border border-gray-100 rounded-lg p-4 sm:p-6 shadow-sm">
           <h3 className="text-base font-semibold text-gray-900 mb-1">Personal Information</h3>
           <p className="text-xs text-gray-500 mb-6">Enter your basic identification details.</p>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {formFields.filter(f => f.group === 'personal').map(renderInputField)}
-            
+
             {/* Gender */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -192,8 +234,8 @@ const ProfileForm: React.FC = () => {
               <div className="flex items-center gap-4 mt-2">
                 {["male", "female"].map((g) => (
                   <label key={g} className={`flex items-center gap-3 border px-4 py-2.5 rounded-lg cursor-pointer transition-all duration-200 flex-1 sm:flex-initial ${
-                    gender === g 
-                      ? 'border-[#2600FF] bg-[#2600FF]/5 text-[#2600FF]' 
+                    gender === g
+                      ? 'border-[#2600FF] bg-[#2600FF]/5 text-[#2600FF]'
                       : 'border-gray-200 hover:border-gray-300 text-gray-700'
                   }`}>
                     <input
@@ -223,9 +265,6 @@ const ProfileForm: React.FC = () => {
                 <p className="mt-1 text-xs text-gray-400" id="gender-help">Select your gender.</p>
               )}
             </div>
-            {errors.gender && (
-              <p className="text-xs text-red-500 mt-1.5">{errors.gender}</p>
-            )}
           </div>
         </div>
 
@@ -233,12 +272,12 @@ const ProfileForm: React.FC = () => {
         <div className="bg-white border border-gray-100 rounded-lg p-4 sm:p-6 shadow-sm">
           <h3 className="text-base font-semibold text-gray-900 mb-1">Contact Details</h3>
           <p className="text-xs text-gray-500 mb-6">How we can reach you.</p>
-          
+
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {formFields.filter(f => f.group === 'contact').map(renderInputField)}
             </div>
-            
+
             {/* Address */}
             <div>
               <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
@@ -267,7 +306,7 @@ const ProfileForm: React.FC = () => {
         <div className="bg-white border border-gray-100 rounded-lg p-4 sm:p-6 shadow-sm">
           <h3 className="text-base font-semibold text-gray-900 mb-1">Identity Verification</h3>
           <p className="text-xs text-gray-500 mb-6">Financial and legal identification information.</p>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {formFields.filter(f => f.group === 'verification').map(renderInputField)}
           </div>
@@ -275,13 +314,15 @@ const ProfileForm: React.FC = () => {
 
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
-          <button
-            onClick={handleSubmit}
-            type="button"
-            className="sm:px-12 py-2.5 text-sm cursor-pointer bg-[#2600FF] hover:bg-[#1a00cc] text-white rounded-md font-medium shadow-md transition-colors duration-200 text-center order-1 sm:order-none"
+          <Button
+            type="submit"
+            isLoading={saving}
+            leftIcon={<Save className="w-4 h-4" aria-hidden="true" />}
+            className="sm:px-12 py-2.5 text-sm bg-[#2600FF] hover:bg-[#1a00cc] text-white rounded-md font-medium shadow-md transition-colors duration-200"
+            data-testid="save-profile-btn"
           >
             Save Changes
-          </button>
+          </Button>
 
           <button
             type="button"
@@ -291,9 +332,16 @@ const ProfileForm: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {toast && (
+        <Toast
+          title={toast.title}
+          description={toast.description}
+          variant={toast.variant}
+        />
+      )}
     </div>
   );
 };
 
 export default ProfileForm;
-
