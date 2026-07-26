@@ -82,7 +82,7 @@ export default defineConfig({
             "components/features/dashboard/**/*.test.tsx",
             "components/features/account/**/*.test.tsx",
             "components/features/notifications/**/*.test.tsx",
-            "lib/utils/clipboard.test.ts",
+            "lib/utils/**/*.test.{ts,tsx}",
             "lib/search/**/*.test.ts",
             "components/features/lending/**/*.test.tsx",
             "context/**/*.test.{ts,tsx}",

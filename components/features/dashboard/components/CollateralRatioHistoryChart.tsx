@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { SnapshotHistoryResponse } from "@/lib/positions/snapshot";
+import { buildSvgPath } from "@/lib/utils/svg";
 
 interface CollateralRatioPoint {
   timestamp: number;
@@ -34,22 +35,7 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
-function buildPath(points: Array<{ x: number; y: number }>): string {
-  if (points.length === 0) {
-    return "";
-  }
 
-  if (points.length === 1) {
-    return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-  }
-
-  return points
-    .map((point, index) => {
-      const command = index === 0 ? "M" : "L";
-      return `${command} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
-    })
-    .join(" ");
-}
 
 function toCollateralRatioPoints(
   snapshots: SnapshotHistoryResponse["snapshots"],
@@ -158,7 +144,7 @@ export function CollateralRatioHistoryChart({
     const latestPoint = points[points.length - 1];
 
     return {
-      linePath: buildPath(mappedPoints),
+      linePath: buildSvgPath(mappedPoints),
       thresholdY: yForRatio(liquidationThreshold),
       latestPoint,
       latestSvgPoint: mappedPoints[mappedPoints.length - 1],
