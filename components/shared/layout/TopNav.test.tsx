@@ -226,16 +226,28 @@ describe("TopNav Accessibility", () => {
     const menu = await screen.findByRole("menu", {
       name: /connected wallet actions/i,
     });
+    const copyItem = within(menu).getByRole("menuitem", {
+      name: /copy address/i,
+    });
+    const settingsItem = within(menu).getByRole("menuitem", {
+      name: /account settings/i,
+    });
     const disconnectItem = within(menu).getByRole("menuitem", {
       name: /disconnect wallet/i,
     });
     await waitFor(() => expect(menu).toHaveFocus());
 
     await user.tab();
-    expect(disconnectItem).toHaveFocus();
+    expect(copyItem).toHaveFocus();
+
+    await user.tab();
+    expect(settingsItem).toHaveFocus();
 
     await user.tab();
     expect(disconnectItem).toHaveFocus();
+
+    await user.tab();
+    expect(copyItem).toHaveFocus();
 
     await user.tab({ shift: true });
     expect(disconnectItem).toHaveFocus();
