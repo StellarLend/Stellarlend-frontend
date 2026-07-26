@@ -91,6 +91,31 @@ describe("mapSupplyPositionsResponse", () => {
       },
     ]);
   });
+
+  it("handles mapping a position without outstanding debt (Health N/A)", () => {
+    const mockData = {
+      positions: [
+        {
+          asset: "XLM",
+          suppliedFunds: "$1,000.00 XLM",
+          availableBalance: "$1,000.00 XLM",
+          outstandingDebt: "$0.00 XLM",
+          healthFactor: null,
+        },
+      ],
+    };
+
+    const supplyPositions = mapSupplyPositionsResponse(mockData);
+    expect(supplyPositions).toHaveLength(1);
+    expect(supplyPositions[0]).toEqual({
+      id: "supply-XLM-0",
+      asset: "XLM",
+      suppliedAmount: 1000,
+      lockedCollateral: 0,
+      outstandingDebt: 0,
+      healthFactor: undefined,
+    });
+  });
 });
 
 describe("usePositions Hook", () => {
