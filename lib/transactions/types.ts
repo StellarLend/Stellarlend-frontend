@@ -1,5 +1,5 @@
 export type TransactionStatus = 'Completed' | 'Processing' | 'Failed';
-export type TransactionAsset = 'XLM' | 'BTC' | 'STRK';
+export type TransactionAsset = 'XLM' | 'USDC' | 'BTC' | 'ETH';
 
 export interface Transaction {
   id: string;

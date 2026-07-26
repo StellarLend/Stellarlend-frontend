@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fetchTransactions, filterTransactions, getTransactionDetail } from './repository';
+import { ASSET_SYMBOLS } from '@/types/enums';
 
 vi.mock('server-only', () => ({}));
 
@@ -8,10 +9,10 @@ vi.mock('@/lib/db/client', () => {
     from: vi.fn(async () => [
       { id: 'TXN12345', type: 'Deposit',      amount:  2000,    asset: 'XLM',  date: '2025-04-12', time: '09:32AM', status: 'Completed'  },
       { id: 'TXN12346', type: 'Loan Payment', amount:  -250,    asset: 'BTC',  date: '2025-03-10', time: '11:15AM', status: 'Processing' },
-      { id: 'TXN12347', type: 'Withdrawal',   amount:  -7500,   asset: 'STRK', date: '2025-02-28', time: '04:45PM', status: 'Completed'  },
+      { id: 'TXN12347', type: 'Withdrawal',   amount:  -7500,   asset: 'USDC', date: '2025-02-28', time: '04:45PM', status: 'Completed'  },
       { id: 'TXN12348', type: 'Lend Funds',   amount:  -1500,   asset: 'XLM',  date: '2025-01-05', time: '08:00AM', status: 'Completed'  },
       { id: 'TXN12349', type: 'Lend Funds',   amount:  -607.87, asset: 'BTC',  date: '2024-12-20', time: '10:20PM', status: 'Failed'     },
-      { id: 'TXN12350', type: 'Deposit',      amount:  20000,   asset: 'STRK', date: '2024-11-15', time: '01:05PM', status: 'Completed'  },
+      { id: 'TXN12350', type: 'Deposit',      amount:  20000,   asset: 'ETH',  date: '2024-11-15', time: '01:05PM', status: 'Completed'  },
     ]),
   }));
 
@@ -54,6 +55,14 @@ describe('fetchTransactions', () => {
     expect(txns.length).toBeGreaterThan(0);
   });
 
+  it('seed data only contains canonical ASSET_SYMBOLS', async () => {
+    const txns = await fetchTransactions();
+    const uniqueAssets = [...new Set(txns.map((t) => t.asset))];
+    for (const asset of uniqueAssets) {
+      expect(ASSET_SYMBOLS).toContain(asset);
+    }
+  });
+
   it('returns transactions with required fields', async () => {
     const txns = await fetchTransactions();
     for (const txn of txns) {
@@ -72,7 +81,7 @@ describe('filterTransactions', () => {
   const txns = [
     { id: 'TXN001', type: 'Deposit',    amount: 1000,  asset: 'XLM'  as const, date: '2025-04-01', time: '10:00AM', status: 'Completed'  as const },
     { id: 'TXN002', type: 'Withdrawal', amount: -500,  asset: 'BTC'  as const, date: '2025-03-15', time: '11:00AM', status: 'Processing' as const },
-    { id: 'TXN003', type: 'Deposit',    amount: 2000,  asset: 'STRK' as const, date: '2025-02-10', time: '09:00AM', status: 'Failed'     as const },
+    { id: 'TXN003', type: 'Deposit',    amount: 2000,  asset: 'USDC' as const, date: '2025-02-10', time: '09:00AM', status: 'Failed'     as const },
     { id: 'TXN004', type: 'Loan Pay',   amount: -100,  asset: 'XLM'  as const, date: '2025-01-20', time: '08:00AM', status: 'Completed'  as const },
   ];
 
