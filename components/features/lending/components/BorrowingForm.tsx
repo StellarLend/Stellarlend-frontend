@@ -11,19 +11,19 @@ import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
-import {
-  FALLBACK_PRICES,
-  MAX_TARGET_HEALTH_FACTOR,
-  MIN_TARGET_HEALTH_FACTOR,
-  calculateCollateralForTargetHealth,
-  clampTargetHealthFactor,
-  calculateProjectedBorrowHealth,
+import { calculateProjectedBorrowHealth,
   calculateRequiredCollateralAmount,
+  clampTargetHealthFactor,
+  calculateCollateralForTargetHealth,
   getHealthBand,
   isProjectedBorrowCollateralized,
+  MAX_TARGET_HEALTH_FACTOR,
+  MIN_TARGET_HEALTH_FACTOR,
+  FALLBACK_PRICES,
   type PriceMap,
 } from "@/lib/lending/health";
 import { useMarketRates } from "@/hooks/useMarketRates";
+import { LeverageSlider } from "./LeverageSlider";
 
 interface BorrowingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -518,6 +518,29 @@ export default function BorrowingForm({
           }}
           precision={selectedAsset?.precision ?? 2}
           max={selectedAsset?.balance ?? 0}
+        />
+
+        {/* Leverage Slider */}
+        <LeverageSlider
+          value={formData.amount || 0}
+          onChange={(amount) => {
+            setFormData((prev) => ({
+              ...prev,
+              amount,
+            }));
+            if (errors.amount) {
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.amount;
+                return next;
+              });
+            }
+          }}
+          collateralAmount={collateralAmount}
+          collateralAsset={formData.collateral ?? ""}
+          borrowAsset={formData.asset ?? ""}
+          borrowApr={resolvedBorrowRate}
+          prices={priceMap}
         />
 
         {/* Loan Duration */}
