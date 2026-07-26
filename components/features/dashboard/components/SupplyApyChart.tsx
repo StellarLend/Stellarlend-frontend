@@ -26,6 +26,42 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+function formatDate(timestamp: number): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(timestamp));
+}
+
+function getDateRangeText(firstTimestamp: number, lastTimestamp: number): string {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const elapsedDays = Math.round((lastTimestamp - firstTimestamp) / msPerDay);
+
+  if (elapsedDays <= 0) {
+    return `as of ${formatDate(lastTimestamp)}`;
+  }
+
+  if (elapsedDays === 1) {
+    return "over the last day";
+  }
+
+  return `over the last ${elapsedDays} days`;
+}
+
+function formatTrendSummary(
+  latestApy: number,
+  firstApy: number,
+  firstTimestamp: number,
+  lastTimestamp: number,
+): string {
+  const change = latestApy - firstApy;
+  const direction = change > 0 ? "up" : change < 0 ? "down" : "unchanged";
+  const changeText = change === 0 ? "unchanged" : `trending ${direction} ${Math.abs(change).toFixed(2)}%`;
+  const rangeText = getDateRangeText(firstTimestamp, lastTimestamp);
+
+  return `Supply APY is ${latestApy.toFixed(2)}%, ${changeText} ${rangeText}.`;
+}
+
 function buildPath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) {
     return "";
@@ -163,6 +199,15 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
       firstPoint: mappedPoints[0],
       latestApy: points[points.length - 1].supplyApy,
       latestNetValue: points[points.length - 1].netValue,
+      firstApy: points[0].supplyApy,
+      firstTimestamp: points[0].timestamp,
+      latestTimestamp: points[points.length - 1].timestamp,
+      summary: formatTrendSummary(
+        points[points.length - 1].supplyApy,
+        points[0].supplyApy,
+        points[0].timestamp,
+        points[points.length - 1].timestamp,
+      ),
     };
   }, [points]);
 
@@ -209,6 +254,8 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
           <p className="text-xs text-[#AAABAB]">{formatCurrency(chart.latestNetValue)}</p>
         </div>
       </div>
+
+      <div className="sr-only">{chart.summary}</div>
 
       <svg
         viewBox={`0 0 ${chart.width} ${chart.height}`}
