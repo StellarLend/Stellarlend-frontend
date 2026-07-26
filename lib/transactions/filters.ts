@@ -17,7 +17,7 @@ export interface TransactionFilter {
 }
 
 const ALLOWED_TYPES = new Set<string>(TRANSACTION_TYPES);
-const ALLOWED_STATUSES = new Set(['completed', 'pending', 'failed']);
+const ALLOWED_STATUSES = new Set(['completed', 'pending', 'processing', 'failed']);
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$/;
 
 export interface FilterValidationResult {
@@ -62,9 +62,9 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
 
     if (normalizedStatus === 'all') {
       filter.status = 'All';
-    } else if (normalizedStatus === 'completed') {
+    } else     if (normalizedStatus === 'completed') {
       filter.status = 'Completed';
-    } else if (normalizedStatus === 'processing') {
+    } else if (normalizedStatus === 'pending' || normalizedStatus === 'processing') {
       filter.status = 'Processing';
     } else {
       filter.status = 'Failed';

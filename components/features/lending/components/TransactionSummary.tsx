@@ -1,4 +1,11 @@
+"use client";
+
+import { useState } from 'react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { useCurrencyPreference } from '@/context/CurrencyContext';
+import { formatCurrency } from '@/lib/utils/format';
+import { Copy } from 'lucide-react';
+import { Toast } from '@/components/shared/common/Toast';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -6,13 +13,19 @@ interface TransactionSummaryProps {
   type: 'lend' | 'borrow' | 'repay' | 'withdraw';
 }
 
-import { useCurrencyPreference } from '@/context/CurrencyContext';
-import { formatCurrency } from '@/lib/utils/format';
-import { Copy } from 'lucide-react';
-import { Toast } from '@/components/shared/common/Toast';
+async function copyToClipboard(text: string): Promise<{ success: boolean }> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+}
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
   const { currency } = useCurrencyPreference();
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [toast, setToast] = useState<{ variant: string; title: string; description: string } | null>(null);
 
   const formatValue = (amount: number) => {
     return formatCurrency(amount, 4, currency);

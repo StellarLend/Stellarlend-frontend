@@ -27,12 +27,16 @@ describe('parseTransactionFilter', () => {
       },
     );
 
-    it.each(['completed', 'pending', 'failed'])(
-      'accepts valid status: %s',
-      (status) => {
-        const result = parse(`status=${status}`);
+    it.each([
+      ['completed', 'Completed'],
+      ['pending', 'Processing'],
+      ['failed', 'Failed'],
+    ])(
+      'accepts valid status: %s → %s',
+      (input, expected) => {
+        const result = parse(`status=${input}`);
         expect(result.valid).toBe(true);
-        expect(result.filter.status).toBe(status);
+        expect(result.filter.status).toBe(expected);
       },
     );
 
@@ -73,7 +77,7 @@ describe('parseTransactionFilter', () => {
       expect(result.valid).toBe(true);
       expect(result.filter).toStrictEqual({
         type: 'lend',
-        status: 'completed',
+        status: 'Completed',
         asset: 'XLM',
         fromDate: '2026-01-01',
         toDate: '2026-06-30',
