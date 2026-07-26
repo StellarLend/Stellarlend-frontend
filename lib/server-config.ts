@@ -1,9 +1,9 @@
 import "server-only";
 
-if (typeof window !== "undefined") {
-  throw new Error(
-    "Internal Error: server-config.ts cannot be imported on the client side.",
-  );
+import { DEFAULT_SOROBAN_TRANSACTION_FEE } from '@/lib/soroban/tx';
+
+if (typeof window !== 'undefined') {
+  throw new Error('Internal Error: server-config.ts cannot be imported on the client side.');
 }
 
 interface ServerConfig {
@@ -23,6 +23,7 @@ interface ServerConfig {
   };
   stellar: {
     sorobanRpcUrl: string;
+    transactionFee: number;
   };
   db: {
     url: string;
@@ -49,9 +50,37 @@ function parseHorizonUrls(rawValue?: string): string[] {
     : ["https://horizon-testnet.stellar.org"];
 }
 
+function parsePositiveNumber(
+  rawValue: string | undefined,
+  envVarName: string,
+  fallback: number,
+): number {
+  if (rawValue === undefined || rawValue.trim() === '') return fallback;
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[server-config] ${envVarName} is set to "${rawValue}" but is not a non-negative finite number; falling back to ${fallback}.`,
+    );
+    return fallback;
+  }
+  return parsed;
+}
+
 const horizonUrls = parseHorizonUrls(
   process.env.STELLAR_HORIZON_URLS ||
     process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL,
+);
+
+const sorobanRpcUrl =
+  process.env.SOROBAN_RPC_URL && process.env.SOROBAN_RPC_URL.trim().length > 0
+    ? normalizeUrl(process.env.SOROBAN_RPC_URL)
+    : 'https://soroban-testnet.stellar.org';
+
+const transactionFee = parsePositiveNumber(
+  process.env.SOROBAN_TRANSACTION_FEE,
+  'SOROBAN_TRANSACTION_FEE',
+  DEFAULT_SOROBAN_TRANSACTION_FEE,
 );
 
 const serverConfig: ServerConfig = {
@@ -74,6 +103,10 @@ const serverConfig: ServerConfig = {
       process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ||
       process.env.SOROBAN_RPC_URL ||
       "https://soroban-testnet.stellar.org",
+  },
+  stellar: {
+    sorobanRpcUrl,
+    transactionFee,
   },
   db: {
     url: process.env.DATABASE_URL || "postgres://localhost:5432/stellarlend",

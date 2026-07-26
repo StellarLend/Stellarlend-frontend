@@ -14,7 +14,6 @@ import {
   buildSorobanTransactionRpcRequest,
   extractUnsignedXdr,
   isTxBuildRequest,
-  TxBuildRequest,
 } from '@/lib/soroban/tx';
 
 export const runtime = 'nodejs';
@@ -90,9 +89,10 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = buildSorobanTransactionRpcRequest(
-    body as TxBuildRequest,
+    body,
     config.stellar.sorobanContractId,
     config.stellar.network,
+    { fee: body.fee ?? serverConfig.stellar.transactionFee },
   );
 
   try {
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const simulation = await simulateSorobanTransaction(
-        config.stellar.sorobanRpcUrl,
+        serverConfig.stellar.sorobanRpcUrl,
         unsignedXdr,
       );
 
