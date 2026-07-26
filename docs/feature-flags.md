@@ -1,5 +1,47 @@
 # Feature Flags & Rollout Workflow Guide
 
+## Status
+
+> **The feature-flag infrastructure is fully built and tested, but no real features are currently gated behind flags.**
+>
+> The placeholder flags (`a`, `b`) in the config file are scaffolding examples that exist solely to demonstrate the system works end-to-end. This is intentional — flags should only be added to the config when a real feature needs gradual rollout or conditional gating. Do not add flags "just in case."
+
+### Adding your first real flag
+
+When the first flag-gated feature ships, add a real flag to `config/feature-flags.json`:
+
+```json
+{
+  "_scaffolding": true,
+  "new-dashboard": {
+    "enabled": true,
+    "rollout": 25
+  },
+  "example-flag": {
+    "enabled": false,
+    "_note": "Placeholder flag demonstrating the feature-flag system. Replace with real feature keys when the first flag-gated feature ships."
+  }
+}
+```
+
+Then gate it in your component:
+
+```tsx
+<FeatureGate flag="new-dashboard" fallback={<OldDashboard />}>
+  <NewDashboard />
+</FeatureGate>
+```
+
+Or on the server:
+
+```typescript
+requireFlag("new-dashboard", user.id);
+```
+
+Remove the `_scaffolding` and `example-flag` entries once a real flag is in place.
+
+---
+
 This guide describes how to author, evaluate, roll out, and retire feature flags in the Stellarlend frontend. Feature flags allow us to safely deploy code, perform canary rollouts, and gate unfinished features without branching.
 
 ---

@@ -1,8 +1,7 @@
 {
-  "a": {
-    "enabled": true
-  },
-  "b": {
-    "enabled": false
+  "_scaffolding": true,
+  "example-flag": {
+    "enabled": false,
+    "_note": "Placeholder flag demonstrating the feature-flag system. Replace with real feature keys when the first flag-gated feature ships."
   }
 }
