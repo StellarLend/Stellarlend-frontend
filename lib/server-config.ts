@@ -99,12 +99,6 @@ const serverConfig: ServerConfig = {
     primaryUrl: horizonUrls[0] || "https://horizon-testnet.stellar.org",
   },
   stellar: {
-    sorobanRpcUrl:
-      process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ||
-      process.env.SOROBAN_RPC_URL ||
-      "https://soroban-testnet.stellar.org",
-  },
-  stellar: {
     sorobanRpcUrl,
     transactionFee,
   },
