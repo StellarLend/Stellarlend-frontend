@@ -74,4 +74,4 @@ export class PreferencesRepository {
   }
 }
 
-export const preferencesRepository: PreferencesRepository = new PreferencesRepository();
+export const preferencesRepository = new PreferencesRepository();

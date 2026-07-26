@@ -1,7 +1,8 @@
 import React from "react";
-import { render, screen, afterEach, waitFor } from "@/test/test-utils";
+import { render, screen, fireEvent, afterEach, waitFor } from "@/test/test-utils";
 import Sidebar from "./Sidebar";
 import NavLink from "./NavLink";
+import { NavigationMenu } from "./NavigationMenu";
 import { SideNav } from "./SideNav";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { NavigationMenu } from "./NavigationMenu";
@@ -31,7 +32,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("marks active when pathname matches href", () => {
-    mockUsePathname.mockReturnValue("/dashboard");
+    mockPathname.mockReturnValue("/dashboard");
     render(<NavLink href="/dashboard">Dashboard</NavLink>);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("aria-current", "page");
   });
@@ -46,7 +47,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("isActive prop overrides pathname detection", () => {
-    mockUsePathname.mockReturnValue("/other");
+    mockPathname.mockReturnValue("/other");
     render(<NavLink href="/dashboard" isActive>Dashboard</NavLink>);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("aria-current", "page");
   });
@@ -100,6 +101,14 @@ describe("NavigationMenu", () => {
     render(<NavigationMenu visibleLinks={["Dashboard"]} />);
     expect(getItem).toHaveBeenCalledWith("activeLink");
     getItem.mockRestore();
+  });
+
+  it("writes localStorage on link click", () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} />);
+    fireEvent.click(screen.getByText("Settings").closest("a")!);
+    expect(setItem).toHaveBeenCalledWith("activeLink", "Settings");
+    setItem.mockRestore();
   });
 
   it("calls onLinkClick when a link is clicked", () => {

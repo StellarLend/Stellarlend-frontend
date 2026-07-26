@@ -72,6 +72,7 @@ export default defineConfig({
           include: [
             "app/lending/**/*.test.tsx",
             "app/account/sessions/**/*.test.tsx",
+            "app/account/profile/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/atoms/Button/Button.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
@@ -80,6 +81,7 @@ export default defineConfig({
             "components/shared/ui/**/*.test.tsx",
             "components/features/wallet/**/*.test.tsx",
             "components/features/account/**/*.test.tsx",
+            "components/features/notifications/**/*.test.tsx",
             "lib/utils/clipboard.test.ts",
             "lib/search/**/*.test.ts",
             "components/features/lending/**/*.test.tsx",
@@ -98,6 +100,7 @@ export default defineConfig({
 
           include: [
             "types/enums.test.ts",
+            "types/Transaction.test.ts",
             "app/api/markets/route.test.ts",
             "app/api/transactions/route.test.ts",
             "app/api/liquidations/route.test.ts",

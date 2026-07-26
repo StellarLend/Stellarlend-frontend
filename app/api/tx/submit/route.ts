@@ -5,7 +5,8 @@ import serverConfig from '@/lib/server-config';
 import { httpPost } from '@/lib/http/client';
 import { metrics } from '@/lib/metrics/registry';
 import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
-import { appendAuditEvent, hashIp } from '@/lib/audit/logger';
+import { hashIp, appendAuditEvent } from '@/lib/audit/logger';
+import { simulateSorobanTransaction } from '@/lib/soroban/simulate';
 import {
   buildSorobanRpcError,
   buildSorobanSubmitRpcRequest,
@@ -110,13 +111,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const payload = buildSorobanSubmitRpcRequest(body.signedEnvelopeXdr);
+  const payload = buildSorobanSubmitRpcRequest((body as any).signedEnvelopeXdr);
   const shouldSimulate = new URL(request.url).searchParams.get('simulate') === 'true';
   const rpcUrl = serverConfig.stellar.sorobanRpcUrl || config.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
 
   try {
     if (shouldSimulate) {
-      await simulateSorobanTransaction(rpcUrl, body.signedEnvelopeXdr);
+      await simulateSorobanTransaction(config.stellar.sorobanRpcUrl, (body as any).signedEnvelopeXdr);
     }
 
     const start = Date.now();

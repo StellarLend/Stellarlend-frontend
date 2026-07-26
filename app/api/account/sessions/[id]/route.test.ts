@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server';
 import { DELETE } from './route';
 
 // ── mocks ──────────────────────────────────────────────────────────────────
+// vi.mock factories are hoisted before variable declarations, so we must use
+// vi.hoisted to ensure the mock functions exist when the factories run.
 
 const { mockGetSession, mockGetStoredSession, mockRevokeStoredSession } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),

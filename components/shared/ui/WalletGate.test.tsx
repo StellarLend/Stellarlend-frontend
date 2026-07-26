@@ -43,6 +43,24 @@ describe('WalletGate', () => {
     expect(connectMock).toHaveBeenCalled();
   });
 
+  it('renders error message when wallet connection fails', () => {
+    const connectMock = vi.fn();
+    (useWalletConnection as any).mockReturnValue({
+      isConnected: false,
+      isLoading: false,
+      connect: connectMock,
+      error: 'Freighter not detected',
+    });
+
+    render(
+      <WalletGate>
+        <div>Content</div>
+      </WalletGate>
+    );
+
+    expect(screen.getByTestId('wallet-error')).toHaveTextContent('Freighter not detected');
+  });
+
   it('renders loading state', () => {
     (useWalletConnection as any).mockReturnValue({
       isConnected: false,
@@ -57,7 +75,6 @@ describe('WalletGate', () => {
     );
     
     expect(screen.queryByText('Content')).not.toBeInTheDocument();
-    // Check for pulse animation class or something that indicates loading
-    expect(screen.getByRole('button', { name: /Connect/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Connect/i })).not.toBeInTheDocument();
   });
 });

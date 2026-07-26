@@ -176,10 +176,10 @@ describe("WithdrawForm", () => {
       fireEvent.click(screen.getByText(/Review Withdrawal/i));
 
       expect(
-        await screen.findByText(
+        await screen.findAllByText(
           /Please fix the errors in the form before continuing/i,
         ),
-      ).toBeInTheDocument();
+      ).not.toHaveLength(0);
     });
   });
 
@@ -517,8 +517,62 @@ describe("WithdrawForm", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Withdrawal confirmed/i),
-        ).toBeInTheDocument();
+          screen.getAllByText(/Withdrawal confirmed/i).length,
+        ).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("StatusAnnouncer — aria-live withdraw announcements", () => {
+    it("renders a sr-only aria-live region with role=status", () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+      // The StatusAnnouncer always renders a sr-only div with role="status" and aria-live="polite"
+      const announcer = screen.getByTestId("status-announcer");
+      expect(announcer).toBeInTheDocument();
+      expect(announcer).toHaveAttribute("aria-live", "polite");
+      expect(announcer).toHaveAttribute("aria-atomic", "true");
+      expect(announcer).toHaveAttribute("role", "status");
+    });
+
+    it("announces an error when the form is submitted with no amount", async () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status-announcer")).toHaveTextContent(
+          /Please fix the errors in the form before continuing/i,
+        );
+      });
+    });
+
+    it("announces success after a valid withdrawal is confirmed", async () => {
+      const user = userEvent.setup();
+      render(
+        <WithdrawForm
+          positions={positions}
+          onSubmit={onSubmit}
+          initialPositionId="supply-2"
+        />,
+      );
+
+      fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
+        target: { value: "100" },
+      });
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      const dialog = await screen.findByRole("dialog", {
+        name: /confirm withdrawal transaction/i,
+      });
+      await user.click(within(dialog).getByRole("checkbox"));
+      await user.click(
+        within(dialog).getByRole("button", { name: /confirm withdrawal/i }),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status-announcer")).toHaveTextContent(
+          /Withdrawal confirmed/i,
+        );
       });
     });
   });

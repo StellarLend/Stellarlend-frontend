@@ -1,4 +1,5 @@
 "use client";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
 import MetricsCards from "@/components/features/dashboard/components/MetricsCards";
@@ -106,10 +107,16 @@ const getDashboardAlertData = (position: PositionMetrics): DashboardAlertData | 
 
 export default function Dashboard() {
   const [alertData, setAlertData] = useState<DashboardAlertData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/positions")
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch positions");
+        }
+        return response.json();
+      })
       .then((data) => {
         const alert = getDashboardAlertData({
           nextDue: data.nextDue,
@@ -118,7 +125,10 @@ export default function Dashboard() {
 
         setAlertData(alert);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load positions data. Please try again later.");
+      });
   }, []);
 
   return (
@@ -153,16 +163,24 @@ export default function Dashboard() {
             }
           />
 
-{alertData ? (
-             <div className="mb-6">
-               <AlertBanner
-                 title={alertData.title}
-                 message={alertData.message}
-                 severity={alertData.severity}
-                 dismissKey={alertData.dismissKey}
-               />
-             </div>
-           ) : null}
+          {error ? (
+            <div className="mb-6">
+              <AlertBanner
+                title="Error"
+                message={error}
+                severity="error"
+              />
+            </div>
+          ) : alertData ? (
+            <div className="mb-6">
+              <AlertBanner
+                title={alertData.title}
+                message={alertData.message}
+                severity={alertData.severity}
+                dismissKey={alertData.dismissKey}
+              />
+            </div>
+          ) : null}
 
            <NetWorthTrend />
            <MetricsCards />

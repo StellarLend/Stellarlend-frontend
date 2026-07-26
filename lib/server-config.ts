@@ -21,6 +21,9 @@ interface ServerConfig {
     urls: string[];
     primaryUrl: string;
   };
+  stellar: {
+    sorobanRpcUrl: string;
+  };
   db: {
     url: string;
   };
@@ -65,6 +68,12 @@ const serverConfig: ServerConfig = {
   horizon: {
     urls: horizonUrls,
     primaryUrl: horizonUrls[0] || "https://horizon-testnet.stellar.org",
+  },
+  stellar: {
+    sorobanRpcUrl:
+      process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+      process.env.SOROBAN_RPC_URL ||
+      "https://soroban-testnet.stellar.org",
   },
   db: {
     url: process.env.DATABASE_URL || "postgres://localhost:5432/stellarlend",

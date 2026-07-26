@@ -26,6 +26,7 @@ export class InMemoryCache {
     const age = now - entry.createdAt;
 
     if (age >= entry.ttl + entry.swr) {
+      this.cache.delete(key);
       return null;
     }
 
@@ -63,6 +64,7 @@ export class InMemoryCache {
     const age = now - entry.createdAt;
 
     if (age >= entry.ttl + entry.swr) {
+      this.cache.delete(key);
       return null;
     }
 

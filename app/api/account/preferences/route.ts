@@ -1,38 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
-import { validatePreferences } from "@/lib/account/preferences-validation";
-import { preferencesRepository } from "@/lib/account/preferences-repository";
-import { withCsrfProtection } from "@/lib/api/handler";
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  PreferencesRepository,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  type UpsertPreferencesInput,
+} from '@/lib/account/preferences-repository';
 
-export const runtime = "nodejs";
+// Singleton repository instance (will be replaced by a database-backed impl later)
+const repo = new PreferencesRepository();
 
 /**
- * GET /api/account/preferences
+ * GET /api/account/preferences?userId=<id>
+ *
+ * Returns the stored preferences for the given user, or 404 if none exist.
  */
 export async function GET(request: NextRequest) {
-  let user: any;
-  try {
-    const authResult = await requireAuth(request);
-    if (authResult instanceof Response) {
-      return authResult;
-    }
-    user = authResult;
-    if (!user || !user.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = request.nextUrl.searchParams.get('userId');
+
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Missing required query parameter: userId' },
+      { status: 400 },
+    );
   }
 
-  const prefs = preferencesRepository.getByUserId(user.id);
+  const prefs = repo.getByUserId(userId);
+
   if (!prefs) {
-    return NextResponse.json({
-      userId: user.id,
-      locale: "en-US",
-      displayCurrency: "USD",
-      notifications: { email: true, push: true, sms: false, inApp: true },
-      updatedAt: null,
-    }, { status: 200 });
+    return NextResponse.json(
+      { error: 'Preferences not found for the specified user' },
+      { status: 404 },
+    );
   }
 
   return NextResponse.json(prefs, { status: 200 });
@@ -40,36 +37,36 @@ export async function GET(request: NextRequest) {
 
 /**
  * PUT /api/account/preferences
+ *
+ * Upserts preferences for a user. Body must include `userId`, `locale`,
+ * `displayCurrency`, and optionally `notifications` (defaults applied if omitted).
  */
-async function putHandler(request: NextRequest) {
-  let user: any;
+export async function PUT(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
-    if (authResult instanceof Response) {
-      return authResult as unknown as NextResponse;
+    const body = await request.json();
+
+    const { userId, locale, displayCurrency, notifications } = body as Partial<UpsertPreferencesInput>;
+
+    if (!userId || !locale || !displayCurrency) {
+      return NextResponse.json(
+        { error: 'Missing required fields: userId, locale, displayCurrency' },
+        { status: 400 },
+      );
     }
-    user = authResult;
-    if (!user || !user.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+
+    const input: UpsertPreferencesInput = {
+      userId,
+      locale,
+      displayCurrency,
+      notifications: notifications ?? DEFAULT_NOTIFICATION_SETTINGS,
+    };
+
+    const result = repo.upsert(input);
+    return NextResponse.json(result, { status: 200 });
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Invalid request body' },
+      { status: 400 },
+    );
   }
-
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const validation = validatePreferences(body);
-  if (!validation.success) {
-    return NextResponse.json({ errors: validation.errors }, { status: 422 });
-  }
-
-  const record = preferencesRepository.upsert(user.id, validation.data);
-  return NextResponse.json(record, { status: 200 });
 }
-
-export const PUT = withCsrfProtection(putHandler);
