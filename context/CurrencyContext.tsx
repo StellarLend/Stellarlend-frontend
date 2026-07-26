@@ -23,8 +23,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
           throw new Error("Failed to fetch preferences");
         }
         const data = await response.json();
-        if (data && data.currency) {
-          setCurrency(data.currency);
+        if (data && data.displayCurrency) {
+          setCurrency(data.displayCurrency);
         }
       } catch (err) {
         setError(err instanceof Error ? err : new Error(String(err)));
