@@ -31,42 +31,39 @@ export async function GET(request: NextRequest) {
       { status: 404 },
     );
   }
-
-  return NextResponse.json(prefs, { status: 200 });
 }
 
 /**
  * PUT /api/account/preferences
  *
- * Upserts preferences for a user. Body must include `userId`, `locale`,
- * `displayCurrency`, and optionally `notifications` (defaults applied if omitted).
+ * Upserts preferences for the logged-in user.
  */
-export async function PUT(request: NextRequest) {
+async function putHandler(request: NextRequest) {
   try {
-    const body = await request.json();
+    const user = requireAuth(request);
+    if (user instanceof NextResponse) return user;
 
-    const { userId, locale, displayCurrency, notifications } = body as Partial<UpsertPreferencesInput>;
-
-    if (!userId || !locale || !displayCurrency) {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
-        { error: 'Missing required fields: userId, locale, displayCurrency' },
-        { status: 400 },
+        { error: "Invalid request body" },
+        { status: 400 }
       );
     }
 
-    const input: UpsertPreferencesInput = {
-      userId,
-      locale,
-      displayCurrency,
-      notifications: notifications ?? DEFAULT_NOTIFICATION_SETTINGS,
-    };
+    const validation = validatePreferences(body);
+    if (!validation.success) {
+      return NextResponse.json({ errors: validation.errors }, { status: 422 });
+    }
 
-    const result = repo.upsert(input);
-    return NextResponse.json(result, { status: 200 });
-  } catch {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 },
-    );
+    const record = await preferencesRepository.upsert(user.id, validation.data);
+    return NextResponse.json(record);
+  } catch (error) {
+    if (error instanceof NextResponse) {
+      return error;
+    }
+    throw error;
   }
 }
