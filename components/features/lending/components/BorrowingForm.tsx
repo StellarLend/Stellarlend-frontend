@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LendingData } from "@/app/lending/page";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
-import { ASSETS } from "@/lib/assets";
+import { useWalletBalances } from "@/hooks/useWalletBalances";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
@@ -111,8 +111,9 @@ export default function BorrowingForm({
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
-  const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
-  const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
+  const { assetsWithBalances } = useWalletBalances();
+  const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
+  const collateralAsset = assetsWithBalances.find((a) => a.symbol === formData.collateral);
   const assetKey = formData.asset?.toUpperCase();
   const fallbackInterestRate =
     (assetKey && assetKey in INTEREST_RATES
@@ -456,11 +457,11 @@ export default function BorrowingForm({
           </label>
           <div className="grid grid-cols-2 gap-4">
             <AssetSelector
-              assets={ASSETS}
+              assets={assetsWithBalances}
               value={formData.asset}
               label="Asset to Borrow"
               interestRates={Object.fromEntries(
-                ASSETS.map((asset) => [
+                assetsWithBalances.map((asset) => [
                   asset.symbol,
                   asset.symbol === assetKey
                     ? resolvedBorrowRate
@@ -663,7 +664,7 @@ export default function BorrowingForm({
         {/* Collateral Selection */}
         <div>
           <AssetSelector
-            assets={ASSETS}
+            assets={assetsWithBalances}
             value={formData.collateral ?? ""}
             label="Collateral Asset"
             onChange={(collateral) => {
