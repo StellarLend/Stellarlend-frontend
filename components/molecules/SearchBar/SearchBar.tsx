@@ -287,6 +287,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
           inputRef.current &&
           !inputRef.current.contains(e.target as Node)
         ) {
+          setValue('');
           onSearch?.('');
         }
       };

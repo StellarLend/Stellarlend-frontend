@@ -339,6 +339,30 @@ describe('SearchBar Live Results', () => {
       expect(onSearch).not.toHaveBeenCalled();
     });
 
+    it('should clear input text on outside click and not re-trigger search on refocus', () => {
+      const onSearch = vi.fn();
+      render(
+        <SearchBar
+          results={loadingResults('test')}
+          onSearch={onSearch}
+        />
+      );
+
+      const input = screen.getByRole('combobox') as HTMLInputElement;
+      expect(input.value).toBe('test');
+
+      fireEvent.mouseDown(document.body);
+      fireEvent.mouseUp(document.body);
+
+      expect(onSearch).toHaveBeenCalledWith('');
+      expect(input.value).toBe('');
+
+      onSearch.mockClear();
+      fireEvent.focus(input);
+
+      expect(onSearch).not.toHaveBeenCalled();
+    });
+
     it('should not close when clicking inside the dropdown', () => {
       const onSearch = vi.fn();
       const { container } = render(
