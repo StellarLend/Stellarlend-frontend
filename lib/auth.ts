@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { User, Session, AuthError } from "@/types/common";
+import { validatedEnv } from "./configValidation";
 
 /**
  * Auth Configuration
@@ -9,11 +10,31 @@ import { User, Session, AuthError } from "@/types/common";
  */
 const AUTH_CONFIG = {
   sessionCookieName: process.env.NEXT_PUBLIC_SESSION_COOKIE || "session",
-  sessionSecret: process.env.AUTH_SECRET || "dev-secret-change-in-production",
+  sessionSecret: validatedEnv.AUTH_SECRET,
   sessionExpiryHours: parseInt(process.env.AUTH_SESSION_EXPIRY || "24", 10),
 };
 
 const JWT_SECRET = process.env.JWT_SECRET || AUTH_CONFIG.sessionSecret;
+
+/**
+ * Shared cookie + expiry configuration. Auth routes (session, refresh,
+ * logout) read this helper so the cookie name and expiry window stay in
+ * lockstep across the codebase. The signing secret stays internal to
+ * lib/auth.ts — only this module signs tokens.
+ */
+export interface AuthCookieConfig {
+  sessionCookieName: string;
+  sessionExpiryHours: number;
+  sessionExpirySeconds: number;
+}
+
+export function getAuthCookieConfig(): AuthCookieConfig {
+  return {
+    sessionCookieName: AUTH_CONFIG.sessionCookieName,
+    sessionExpiryHours: AUTH_CONFIG.sessionExpiryHours,
+    sessionExpirySeconds: AUTH_CONFIG.sessionExpiryHours * 60 * 60,
+  };
+}
 
 import { SignJWT, jwtVerify } from "jose";
 

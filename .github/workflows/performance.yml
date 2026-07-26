@@ -13,6 +13,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
       - name: Wait for deployment
         if: github.event_name == 'pull_request'
@@ -23,7 +31,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Run Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v10
+        uses: treosh/lighthouse-ci-action@v12
         with:
           urls: |
             https://stellarlend-staging.vercel.app
@@ -41,7 +49,7 @@ jobs:
 
       - name: Comment PR with performance results
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');

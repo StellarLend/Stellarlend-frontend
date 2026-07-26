@@ -83,7 +83,7 @@ async function handleHealth() {
       },
     };
 
-    const httpStatus = healthData.status === 'healthy' ? 200 : 503;
+    const httpStatus = healthData.status === 'unhealthy' ? 503 : 200;
     return NextResponse.json(healthData, { status: httpStatus });
   } catch {
     return NextResponse.json(

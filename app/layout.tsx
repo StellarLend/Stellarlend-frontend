@@ -5,6 +5,8 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { WalletProvider } from "@/context/WalletContext";
 import NextTopLoader from "nextjs-toploader";
 import { headers } from "next/headers";
+import { ToastProvider } from "@/components/shared/common/Toast";
+import NotificationToastBridge from "@/components/shared/common/NotificationToastBridge";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -17,16 +19,24 @@ export const metadata: Metadata = {
   description: "Decentralized lending and borrowing on Stellar",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   // Retrieve CSP nonce from middleware header
-  const nonce = headers().get("x-csp-nonce") ?? undefined;
+  const nonce = (await headers()).get("x-csp-nonce") ?? undefined;
 
   return (
     <html lang="en" suppressHydrationWarning={true}>
+      <head>
+        {/*
+         * Strict referrer policy: browsers will only send the origin (no path/query)
+         * when navigating cross-origin, and the full URL for same-origin requests.
+         * This prevents sensitive URL parameters from leaking to third parties.
+         */}
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
+      </head>
       <body className={`${inter.variable} antialiased`}>
         {/* Top progress bar */}
         <NextTopLoader
@@ -41,16 +51,24 @@ export default function RootLayout({
           shadow="0 0 10px #15a350, 0 0 5px #15a350"
           zIndex={9999}
         />
-        {/* Example inline script that uses the CSP nonce */}
+        {/* Inline script that exposes the CSP nonce for client-side use.
+             referrerPolicy is set on this element as belt-and-suspenders even
+             though <script> elements without src do not generate HTTP requests. */}
         {nonce && (
           <script
             nonce={nonce}
-            dangerouslySetInnerHTML={{ __html: `window.CSP_NONCE = "${nonce}";` }}
+            referrerPolicy="strict-origin-when-cross-origin"
+            dangerouslySetInnerHTML={{
+              __html: `window.CSP_NONCE = "${nonce}";`,
+            }}
           />
         )}
-        <WalletProvider>
-          <SidebarProvider>{children}</SidebarProvider>
-        </WalletProvider>
+        <ToastProvider>
+          <NotificationToastBridge />
+          <WalletProvider>
+            <SidebarProvider>{children}</SidebarProvider>
+          </WalletProvider>
+        </ToastProvider>
       </body>
     </html>
   );

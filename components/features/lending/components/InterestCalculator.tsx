@@ -1,12 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { LendingData, CalculationResult } from "@/lib/lending/types";
 import { calculateQuote } from "@/lib/lending/quote";
 import { generateAmortizationSchedule } from "@/lib/lending/amortization";
-import AmortizationSchedule from "./AmortizationSchedule";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
+
+const AmortizationSchedule = dynamic(() => import("./AmortizationSchedule"), {
+  loading: () => (
+    <div className="rounded-xl border border-gray-200 p-6">
+      <div className="h-4 bg-gray-200 rounded w-1/3 mb-2 animate-pulse" />
+      <div className="h-4 bg-gray-200 rounded w-2/3 mb-2 animate-pulse" />
+      <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse" />
+    </div>
+  ),
+});
 
 interface InterestCalculatorProps {
   data: LendingData;

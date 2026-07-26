@@ -65,6 +65,17 @@ Starting position: `healthFactor = 1.85`, `suppliedAmount = 5,000 XLM`, `outstan
 | 1,000 XLM  | 1.85 × 4,000 / 5,000 = **1.48**            | At Risk (warning)  |
 | 2,750 XLM  | 1.85 × 2,250 / 5,000 = **0.83** (blocked)  | Critical           |
 
+## Data Source
+
+The withdraw form now reads its live supply positions from the existing `/api/positions` endpoint via the shared `usePositions` hook. The hook parses the route payload into the `SupplyPosition` shape expected by `WithdrawForm`, including:
+
+- `suppliedAmount`
+- `lockedCollateral`
+- `outstandingDebt`
+- `healthFactor`
+
+If the request is still loading, the form shows a loading state. If the account has no withdrawable supply positions, it shows an empty state. If the request fails, it surfaces an error state instead of falling back to the old static fixtures.
+
 ## Data Flow
 
 ```
@@ -97,6 +108,18 @@ app/lending/page.tsx                                                      │
 | `collateralAmount` | Amount locked as collateral (informational)   |
 | `healthFactorBefore` | Health factor before withdrawal             |
 | `healthFactorAfter`  | Projected health factor after withdrawal    |
+
+## Transaction Summary
+
+After a withdrawal is confirmed via `ConfirmModal`, `TransactionSummary` renders a confirmation breakdown in the right-hand panel with `type="withdraw"`:
+
+| Row | Source | Condition |
+|-----|--------|-----------|
+| Amount Redeemed | `LendingData.amount` | Always shown |
+| Remaining Supply | `LendingData.remainingDebt` | Always shown |
+| New Health Factor | `LendingData.healthFactorAfter` | Only when `outstandingDebt > 0` |
+
+The empty state is shown until `WithdrawForm` calls its `onSubmit` callback with an amount greater than zero. No `CalculationResult` is used for the withdraw breakdown.
 
 ## Key Files
 

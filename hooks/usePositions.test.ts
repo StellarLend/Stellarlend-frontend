@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { usePositions, mapPositionsResponse } from "./usePositions";
+import {
+  usePositions,
+  mapPositionsResponse,
+  mapSupplyPositionsResponse,
+} from "./usePositions";
 
 describe("mapPositionsResponse", () => {
   it("should return empty array if input is null or undefined", () => {
@@ -62,6 +66,33 @@ describe("mapPositionsResponse", () => {
   });
 });
 
+describe("mapSupplyPositionsResponse", () => {
+  it("maps the live /api/positions payload into supply positions", () => {
+    const mockData = {
+      positions: [
+        {
+          asset: "XLM",
+          suppliedFunds: "$5,000.00 XLM",
+          availableBalance: "$3,750.00 XLM",
+          borrowedAmount: "$1,500.00 XLM",
+          healthFactor: 1.5,
+        },
+      ],
+    };
+
+    expect(mapSupplyPositionsResponse(mockData)).toEqual([
+      {
+        id: "supply-XLM-0",
+        asset: "XLM",
+        suppliedAmount: 5000,
+        lockedCollateral: 1250,
+        outstandingDebt: 1500,
+        healthFactor: 1.5,
+      },
+    ]);
+  });
+});
+
 describe("usePositions Hook", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -100,12 +131,18 @@ describe("usePositions Hook", () => {
       nextDue: "$250.00 in 4 days",
     });
     expect(result.current.error).toBeNull();
+    expect(result.current.isStale).toBe(false);
+    expect(result.current.isOffline).toBe(false);
   });
 
   it("should handle fetch failure and call onError callback", async () => {
     const mockError = new Error("Network error");
     vi.mocked(global.fetch).mockRejectedValueOnce(mockError);
     const mockOnError = vi.fn();
+
+    // Force offline so the hook reports the failure immediately instead of
+    // entering its retry/backoff loop (covered separately in usePositions.retry.test.ts).
+    const onLineSpy = vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
 
     const { result } = renderHook(() => usePositions(mockOnError));
 
@@ -115,7 +152,11 @@ describe("usePositions Hook", () => {
 
     expect(result.current.positions).toEqual([]);
     expect(result.current.error).toEqual(mockError);
+    expect(result.current.isStale).toBe(true);
+    expect(result.current.isOffline).toBe(true);
     expect(mockOnError).toHaveBeenCalledWith(mockError);
+
+    onLineSpy.mockRestore();
   });
 
   it("should return empty array for only-lend positions", async () => {
@@ -135,6 +176,41 @@ describe("usePositions Hook", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.positions).toEqual([]);
+    expect(result.current.supplyPositions).toEqual([]);
     expect(result.current.error).toBeNull();
+  });
+
+  it("should expose supply positions derived from the API response", async () => {
+    const mockResponse = {
+      positions: [
+        {
+          asset: "USDC",
+          suppliedFunds: "$3,000.00 USDC",
+          availableBalance: "$2,000.00 USDC",
+          borrowedAmount: "$0.00 USDC",
+          healthFactor: undefined,
+        },
+      ],
+    };
+
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    } as Response);
+
+    const { result } = renderHook(() => usePositions());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.supplyPositions).toEqual([
+      {
+        id: "supply-USDC-0",
+        asset: "USDC",
+        suppliedAmount: 3000,
+        lockedCollateral: 1000,
+        outstandingDebt: 0,
+        healthFactor: undefined,
+      },
+    ]);
   });
 });

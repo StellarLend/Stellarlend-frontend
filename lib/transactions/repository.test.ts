@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fetchTransactions, filterTransactions, getTransactionDetail } from './repository';
 
-vi.mock('@/lib/db', () => {
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/db/client', () => {
   const mockSelect = vi.fn(() => ({
     from: vi.fn(async () => [
       { id: 'TXN12345', type: 'Deposit',      amount:  2000,    asset: 'XLM',  date: '2025-04-12', time: '09:32AM', status: 'Completed'  },

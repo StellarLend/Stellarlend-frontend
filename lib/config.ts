@@ -18,6 +18,7 @@ interface Config {
   stellar: {
     network: string;
     horizonUrl: string;
+    sorobanRpcUrl: string;
     sorobanContractId: string;
   };
   rateLimit: {
@@ -35,10 +36,6 @@ interface Config {
   };
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
-  };
-  rateLimit: {
-    max: number;
-    window: number;
   };
 }
 
@@ -58,6 +55,9 @@ const config: Config = {
     horizonUrl:
       validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
       'https://horizon-testnet.stellar.org',
+    sorobanRpcUrl:
+      validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+      'https://soroban-testnet.stellar.org',
     sorobanContractId:
       process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
   },
@@ -71,6 +71,11 @@ const config: Config = {
   rateLimit: {
     max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
     window: parseInt(process.env.RATE_LIMIT_WINDOW || '60000', 10),
+    account: {
+      limit: parseInt(process.env.TX_ACCOUNT_RATE_LIMIT_MAX || '30', 10),
+      windowMs: parseInt(process.env.TX_ACCOUNT_RATE_LIMIT_WINDOW_MS || '60000', 10),
+      burst: parseInt(process.env.TX_ACCOUNT_RATE_LIMIT_BURST || '60', 10),
+    },
   },
 };
 

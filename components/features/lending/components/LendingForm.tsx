@@ -1,8 +1,4 @@
 "use client";
-import { AmountInput } from '@/components/shared/ui/AmountInput';
-import { Tooltip } from '@/components/atoms/Tooltip';
-import { IconButton } from '@/components/atoms/IconButton';
-
 import { useState, useEffect, useRef } from "react";
 import { LendingData } from "@/app/lending/page";
 import type { CalculationResult } from "@/lib/lending/types";
@@ -12,10 +8,8 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { ASSETS } from "@/lib/assets";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
-import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
-import { IconButton } from "@/components/atoms/IconButton/IconButton";
-import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -150,7 +144,7 @@ export default function LendingForm({
         setIsSubmitting(false);
       }
     } else {
-      setSubmitStatus("error");
+      setStatus("error");
       setSubmitMessage("Please fix the errors in the form before continuing.");
     }
   };
@@ -360,15 +354,17 @@ export default function LendingForm({
         )}
 
         {/* Submit Button */}
-        <Button
-          type="submit"
-          variant="success"
-          size="lg"
-          fullWidth
-          isLoading={isSubmitting}
-        >
-          Review Lending Offer
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review offer">
+          <Button
+            type="submit"
+            variant="success"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+          >
+            Review Lending Offer
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

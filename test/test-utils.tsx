@@ -1,8 +1,9 @@
 import { render } from "@testing-library/react";
 import { ReactElement } from "react";
+import { CurrencyProvider } from "@/context/CurrencyContext";
 
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
-  return <>{children}</>;
+  return <CurrencyProvider>{children}</CurrencyProvider>;
 };
 
 const customRender = (ui: ReactElement) =>

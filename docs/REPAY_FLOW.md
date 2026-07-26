@@ -62,6 +62,18 @@ If the borrower repays `500 XLM`, the live preview shows:
 
 If the borrower repays the full `1,500 XLM`, the preview shows `0 XLM` remaining debt and `Debt cleared` for the health factor state.
 
+## Transaction Summary
+
+After a repayment preview is submitted, `TransactionSummary` renders a confirmation breakdown in the right-hand panel with `type="repay"`:
+
+| Row | Source |
+|-----|--------|
+| Amount Repaid | `LendingData.amount` |
+| Remaining Debt | `LendingData.remainingDebt` (shows "Debt cleared" when 0) |
+| New Health Factor | `LendingData.healthFactorAfter` (shows "Debt cleared" when `Infinity`) |
+
+The empty state is shown until `RepayForm` calls its `onSubmit` callback with an amount greater than zero. No `CalculationResult` is required for the repay breakdown — the summary renders from `LendingData` fields alone.
+
 ## Tests
 
 `components/features/lending/components/RepayForm.test.tsx` covers:
