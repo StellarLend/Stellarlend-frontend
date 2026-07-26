@@ -1,15 +1,24 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { processAccountExport } from '../../../lib/account/export-bundle';
+import { processAccountExport } from '@/lib/account/export-bundle';
 import { withCsrfProtection } from '@/lib/api/handler';
+import { getUser } from '@/lib/auth';
+import { exportThrottleStore, resetThrottleRegistry } from '@/lib/account/export-throttle';
 
-// Simple in-memory mock store tracking timestamps for the 24-hour rate limit throttle
-const exportThrottleStore = new Map<string, number>();
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const postHandler = async (request: NextRequest) => {
   try {
-    // Simulated authenticated context retrieval (normally parsed from session token)
-    const userId = "user_test_9921"; 
+    // Retrieve authenticated user from session
+    const user = await getUser();
+    
+    if (!user || !user.id) {
+      return NextResponse.json(
+        { error: "Unauthorized: User must be authenticated to request account export" },
+        { status: 401 }
+      );
+    }
+
+    const userId = user.id; 
 
     // 1. Throttle check: Enforce maximum 1 export per 24 hours per account
     const now = Date.now();
@@ -25,9 +34,10 @@ const postHandler = async (request: NextRequest) => {
     }
 
     // Mock payload aggregation from database services
+    // In production, this would fetch real user data from the database
     const mockUserPayload = {
       userId,
-      profile: { email: "user@example.com", joinedAt: "2025-01-15" },
+      profile: { email: user.email || "user@example.com", joinedAt: "2025-01-15" },
       preferences: { darkMode: true, emailNotifications: true },
       transactions: [{ id: "tx_01", asset: "XLM", amount: 500 }],
       notifications: [{ id: "notif_01", message: "Deposit confirmed" }]
@@ -61,8 +71,3 @@ const postHandler = async (request: NextRequest) => {
 };
 
 export const POST = withCsrfProtection(postHandler);
-
-// Helper utility exposed to clear mock states during testing execution runs
-export function resetThrottleRegistry() {
-  exportThrottleStore.clear();
-}
