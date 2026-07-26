@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { flattenSearchResults, getResultByIndex, getResultsCount } from './useSearchResults';
 import type { GroupedSearchResults } from './types';
 
@@ -206,5 +206,111 @@ describe('Search Utilities', () => {
       const count = getResultsCount(grouped);
       expect(count).toBe(80);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchPositions – tests exercising the real /api/positions integration path
+// ---------------------------------------------------------------------------
+
+// We test the normalisation logic directly via renderHook.  useSearchResults
+// uses a setTimeout for debouncing, so we need fake timers to flush it.
+
+import { renderHook, act } from '@testing-library/react';
+import { useSearchResults } from './useSearchResults';
+
+const POSITIONS_ARRAY_RESPONSE = {
+  positions: [
+    { id: 'pos-xlm-1', asset: 'XLM', availableBalance: '$3,750.00 XLM' },
+    { id: 'pos-usdc-1', asset: 'USDC', availableBalance: '$1,200.00 USDC' },
+  ],
+};
+
+const POSITIONS_FLAT_RESPONSE = {
+  asset: 'XLM',
+  availableBalance: '$3,750.00 XLM',
+};
+
+/** Builds a URL-aware fetch mock so /api/transactions and /api/positions can
+ *  return independent responses in the same test. */
+function makeRoutedFetch(positionsBody: unknown, positionsOk = true) {
+  return vi.fn().mockImplementation((url: string) => {
+    if (typeof url === 'string' && url.includes('/api/positions')) {
+      return Promise.resolve({
+        ok: positionsOk,
+        statusText: positionsOk ? 'OK' : 'Unauthorized',
+        json: () => Promise.resolve(positionsBody),
+      });
+    }
+    // /api/transactions – return empty list
+    return Promise.resolve({
+      ok: true,
+      statusText: 'OK',
+      json: () => Promise.resolve({ transactions: [] }),
+    });
+  });
+}
+
+describe('useSearchResults – fetchPositions', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  /** Helper: search + flush debounce setTimeout + await all async microtasks. */
+  async function searchAndFlush(result: ReturnType<typeof renderHook<ReturnType<typeof useSearchResults>, unknown>>['result'], query: string) {
+    act(() => { result.current.search(query); });
+    await act(async () => { vi.runAllTimers(); });
+  }
+
+  it('maps an array positions response and filters by query', async () => {
+    vi.stubGlobal('fetch', makeRoutedFetch(POSITIONS_ARRAY_RESPONSE));
+
+    const { result } = renderHook(() => useSearchResults(0, 5));
+    await searchAndFlush(result, 'XLM');
+
+    expect(result.current.results.state).toBe('success');
+    const positions = result.current.results.results.positions;
+    expect(positions).toHaveLength(1);
+    expect(positions[0].asset).toBe('XLM');
+    expect(positions[0].id).toBe('pos-xlm-1');
+    expect(positions[0].subtitle).toBe('Balance: $3,750.00 XLM');
+  });
+
+  it('maps a flat (single-position) positions response', async () => {
+    vi.stubGlobal('fetch', makeRoutedFetch(POSITIONS_FLAT_RESPONSE));
+
+    const { result } = renderHook(() => useSearchResults(0, 5));
+    await searchAndFlush(result, 'XLM');
+
+    expect(result.current.results.state).toBe('success');
+    const positions = result.current.results.results.positions;
+    expect(positions).toHaveLength(1);
+    expect(positions[0].asset).toBe('XLM');
+    expect(positions[0].subtitle).toBe('Balance: $3,750.00 XLM');
+  });
+
+  it('returns empty positions when /api/positions returns an empty array', async () => {
+    vi.stubGlobal('fetch', makeRoutedFetch({ positions: [] }));
+
+    const { result } = renderHook(() => useSearchResults(0, 5));
+    await searchAndFlush(result, 'XLM');
+
+    expect(result.current.results.state).toBe('success');
+    expect(result.current.results.results.positions).toHaveLength(0);
+  });
+
+  it('transitions to error state when /api/positions returns a non-OK status', async () => {
+    vi.stubGlobal('fetch', makeRoutedFetch({ error: 'Unauthorized' }, false));
+
+    const { result } = renderHook(() => useSearchResults(0, 5));
+    await searchAndFlush(result, 'XLM');
+
+    expect(result.current.results.state).toBe('error');
+    expect(result.current.results.error?.message).toContain('Unauthorized');
   });
 });
