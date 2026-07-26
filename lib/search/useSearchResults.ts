@@ -50,44 +50,46 @@ export function useSearchResults(
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
-   * Parses mock positions data.
-   * TODO: Replace with actual API call to /api/positions when available.
+   * Fetches positions from /api/positions and filters by the search query.
    */
   const fetchPositions = useCallback(
-    async (query: string): Promise<SearchResultPosition[]> => {
-      // Mock positions data - in a real app, this would query /api/positions
-      const mockPositions = [
-        {
-          id: 'pos-xlm-1',
-          asset: 'XLM',
-          balance: '$5,000.00',
-        },
-        {
-          id: 'pos-usdc-1',
-          asset: 'USDC',
-          balance: '$3,750.00',
-        },
-        {
-          id: 'pos-btc-1',
-          asset: 'BTC',
-          balance: '$1,250.00',
-        },
-      ];
+    async (query: string, signal: AbortSignal): Promise<SearchResultPosition[]> => {
+      const response = await fetch('/api/positions', { signal });
 
-      // Filter by search term (asset or ID match)
-      return mockPositions
-        .filter(
-          (pos) =>
-            pos.asset.toLowerCase().includes(query.toLowerCase()) ||
-            pos.id.toLowerCase().includes(query.toLowerCase())
-        )
+      if (!response.ok) {
+        throw new Error(`Failed to fetch positions: ${response.statusText}`);
+      }
+
+      const data = await response.json() as Record<string, unknown>;
+
+      // Normalise: the route may return { positions: [...] } or a single flat object
+      type RawPosition = { id?: string; asset?: string; availableBalance?: string };
+      let rawList: RawPosition[];
+
+      if (Array.isArray(data.positions) && data.positions.length > 0) {
+        rawList = data.positions as RawPosition[];
+      } else if (data.asset || data.availableBalance) {
+        // Top-level flat object (single-position response)
+        rawList = [data as RawPosition];
+      } else {
+        rawList = [];
+      }
+
+      const lowerQuery = query.toLowerCase();
+
+      return rawList
+        .filter((pos) => {
+          const asset = (pos.asset ?? '').toLowerCase();
+          const id = (pos.id ?? '').toLowerCase();
+          return asset.includes(lowerQuery) || id.includes(lowerQuery);
+        })
         .slice(0, maxResults)
-        .map((pos) => ({
-          id: pos.id,
+        .map((pos, i) => ({
+          id: pos.id ?? `pos-${pos.asset ?? i}`,
           type: 'position' as const,
-          title: `${pos.asset} Position`,
-          subtitle: `Balance: ${pos.balance}`,
-          asset: pos.asset,
+          title: `${pos.asset ?? 'Unknown'} Position`,
+          subtitle: `Balance: ${pos.availableBalance ?? 'N/A'}`,
+          asset: pos.asset ?? '',
         }));
     },
     [maxResults]
@@ -163,7 +165,7 @@ export function useSearchResults(
           // Fetch from both sources in parallel
           const [transactions, positions] = await Promise.all([
             searchTransactions(query, controller.signal),
-            fetchPositions(query),
+            fetchPositions(query, controller.signal),
           ]);
 
           if (controller.signal.aborted) {
