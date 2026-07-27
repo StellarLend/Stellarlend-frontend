@@ -38,6 +38,16 @@ export function setCsrfCookie(response: NextResponse, token: string) {
   response.cookies.set(CSRF_COOKIE_NAME, token, cookieOptions);
 }
 
+/**
+ * Verifies the CSRF token for a request.
+ * 
+ * IMPORTANT CONTRACT: This function immediately returns true (skipping CSRF 
+ * verification) if the request contains any Authorization header starting with 
+ * 'Bearer '. It explicitly checks only for the PRESENCE of this header, not 
+ * its VALIDITY. Callers wrapping a route with this CSRF protection MUST 
+ * independently and securely verify the bearer token in a separate step 
+ * before granting access to protected resources.
+ */
 export function verifyCsrfToken(request: NextRequest): boolean {
   const authorizationHeader = request.headers.get('authorization');
   if (authorizationHeader?.startsWith('Bearer ')) {
