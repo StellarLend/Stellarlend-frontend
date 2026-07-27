@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { SnapshotHistoryResponse } from "@/lib/positions/snapshot";
+import { buildSvgPath } from "@/lib/utils/svg";
 
 interface SupplyApyChartPoint {
   timestamp: number;
@@ -82,7 +83,7 @@ function buildAreaPath(points: Array<{ x: number; y: number }>, width: number, h
     return "";
   }
 
-  const linePath = buildPath(points);
+  const linePath = buildSvgPath(points);
   if (!linePath) {
     return "";
   }
@@ -193,7 +194,7 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
       width,
       height,
       padding,
-      linePath: buildPath(mappedPoints),
+      linePath: buildSvgPath(mappedPoints),
       areaPath: buildAreaPath(mappedPoints, width, height, padding),
       lastPoint: mappedPoints[mappedPoints.length - 1],
       firstPoint: mappedPoints[0],

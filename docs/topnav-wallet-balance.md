@@ -1,5 +1,7 @@
 # TopNav Wallet Balance Summary
 
+> Warning: This documented wallet-balance popover is currently non-functional in the codebase because the TopNav component is missing the required state declarations for the balance popover UI. Until that runtime issue is fixed, contributors should not treat this documentation as an implemented feature.
+
 The TopNav wallet balance summary gives connected users a compact account
 balance view without leaving the dashboard.
 
