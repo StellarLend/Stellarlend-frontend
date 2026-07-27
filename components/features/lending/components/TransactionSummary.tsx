@@ -8,6 +8,8 @@ interface TransactionSummaryProps {
 
 import { useCurrencyPreference } from '@/context/CurrencyContext';
 import { formatCurrency } from '@/lib/utils/format';
+import { Copy } from 'lucide-react';
+import { Toast } from '@/components/shared/common/Toast';
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
   const { currency } = useCurrencyPreference();

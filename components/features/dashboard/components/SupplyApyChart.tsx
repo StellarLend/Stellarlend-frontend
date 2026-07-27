@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { SnapshotHistoryResponse } from "@/lib/positions/snapshot";
+import { buildSvgPath } from "@/lib/utils/svg";
 
 interface SupplyApyChartPoint {
   timestamp: number;
@@ -26,27 +27,12 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function buildPath(points: Array<{ x: number; y: number }>): string {
-  if (points.length === 0) {
-    return "";
-  }
-
-  if (points.length === 1) {
-    return `M ${points[0].x} ${points[0].y}`;
-  }
-
-  return points.reduce((path, point, index) => {
-    const prefix = index === 0 ? "M" : "L";
-    return `${path} ${prefix} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
-  }, "").trim();
-}
-
 function buildAreaPath(points: Array<{ x: number; y: number }>, width: number, height: number, padding: number): string {
   if (points.length === 0) {
     return "";
   }
 
-  const linePath = buildPath(points);
+  const linePath = buildSvgPath(points);
   if (!linePath) {
     return "";
   }
@@ -157,7 +143,7 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
       width,
       height,
       padding,
-      linePath: buildPath(mappedPoints),
+      linePath: buildSvgPath(mappedPoints),
       areaPath: buildAreaPath(mappedPoints, width, height, padding),
       lastPoint: mappedPoints[mappedPoints.length - 1],
       firstPoint: mappedPoints[0],
