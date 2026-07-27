@@ -6,14 +6,13 @@ import { calculateQuote } from "@/lib/lending/quote";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
-import { ASSETS } from "@/lib/assets";
+import { useWalletBalances } from "@/hooks/useWalletBalances";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
-import { WalletGate } from "@/components/shared/ui/WalletGate";
 
 interface LendingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -46,7 +45,8 @@ export default function LendingForm({
   // preview once a newer input is in flight.
   const requestSeqRef = useRef(0);
 
-  const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
+  const { assetsWithBalances } = useWalletBalances();
+  const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
   const rates = INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
 
   useEffect(() => {
@@ -188,7 +188,7 @@ export default function LendingForm({
           </label>
           <div className="grid grid-cols-2 gap-4">
             <AssetSelector
-              assets={ASSETS}
+              assets={assetsWithBalances}
               value={formData.asset}
               label="Select Asset"
               onChange={(asset) => {

@@ -756,10 +756,6 @@ describe("BorrowingForm Component", () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // Custom loan duration
-  // ---------------------------------------------------------------------------
-
   describe("Custom loan duration", () => {
     /** Helper: render with a non-zero amount so only the duration field can block submit. */
     const renderWithAmount = (amount = 10) => {

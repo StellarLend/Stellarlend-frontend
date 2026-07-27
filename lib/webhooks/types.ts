@@ -1,7 +1,13 @@
 import type { TransactionStatus } from "@/types/enums";
+import type { MemoType } from "@/lib/stellar/memo";
 
 /**
  * Payload sent by the upstream indexer/service to update transaction status.
+ *
+ * The optional `memo` / `memo_type` fields are populated for inbound deposits
+ * so the receiver can resolve the originating Stellar account via memo.
+ * They are validated at runtime against {@link webhooks/webhookDataSchema} —
+ * see `lib/validation/schemas/webhooks.ts`.
  *
  * @see WEBHOOKS.md for the full contract documentation.
  */
@@ -24,6 +30,16 @@ export interface WebhookPayload {
 
     /** The new status to set on the transaction. */
     status: TransactionStatus;
+
+    /** Optional Stellar memo value accompanying the transaction. */
+    memo?: string;
+
+    /**
+     * Optional Stellar memo type. Must be one of the four memo format
+     * identifiers (`MEMO_TEXT`, `MEMO_ID`, `MEMO_HASH`, `MEMO_RETURN`) — any
+     * other value is rejected with HTTP 400 by the receiving route.
+     */
+    memo_type?: MemoType;
   };
 }
 

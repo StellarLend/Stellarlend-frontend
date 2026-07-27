@@ -38,6 +38,12 @@ function parseEventData(event: MessageEvent): unknown {
  * and provides the current unread notification count plus a debounced
  * connection state for the live notification feed.
  */
+export type NotificationStreamConnectionState = "connected" | "reconnecting" | "offline";
+
+const RECONNECTING_DEBOUNCE_MS = 1500;
+const OFFLINE_DELAY_MS = 5000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+
 export const useNotificationStream = (
   options: UseNotificationStreamOptions = {},
 ) => {
@@ -46,8 +52,21 @@ export const useNotificationStream = (
     useState<NotificationStreamConnectionState>("reconnecting");
   const sourceRef = useRef<EventSource | null>(null);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectingStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offlineStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backoff = useRef<number>(1000); // start at 1s
   const onNotificationRef = useRef(options.onNotification);
+
+  const clearStateTimers = () => {
+    if (reconnectingStateTimeout.current) {
+      clearTimeout(reconnectingStateTimeout.current);
+      reconnectingStateTimeout.current = null;
+    }
+    if (offlineStateTimeout.current) {
+      clearTimeout(offlineStateTimeout.current);
+      offlineStateTimeout.current = null;
+    }
+  };
 
   useEffect(() => {
     onNotificationRef.current = options.onNotification;
@@ -100,6 +119,12 @@ export const useNotificationStream = (
         }
       };
 
+      source.onopen = () => {
+        setConnectionState("connected");
+        backoff.current = 1000;
+        clearStateTimers();
+      };
+
       source.onmessage = handleUnreadCount;
       source.addEventListener?.(
         "unreadCount",
@@ -109,15 +134,6 @@ export const useNotificationStream = (
         "notification",
         handleNotification as EventListener,
       );
-
-      source.onerror = () => {
-        cleanup();
-        // exponential backoff up to 30s
-        reconnectTimeout.current = setTimeout(() => {
-          backoff.current = Math.min(backoff.current * 2, 30000);
-          connect();
-        }, backoff.current);
-      };
 
       source.onerror = () => {
         if (reconnectTimeout.current) {

@@ -55,6 +55,8 @@ export interface UsePositionsResult {
   positions: BorrowPosition[];
   supplyPositions: SupplyPosition[];
   isLoading: boolean;
+  isStale: boolean;
+  isOffline: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
 }
@@ -241,16 +243,18 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
   const [positions, setPositions] = useState<BorrowPosition[]>([]);
   const [supplyPositions, setSupplyPositions] = useState<SupplyPosition[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isStale, setIsStale] = useState<boolean>(false);
+  const [isOffline, setIsOffline] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
   const hasLoadedOnceRef = useRef(false);
 
-  const fetchPositions = useCallback(async () => {
+  const fetchPositions = useCallback(async (signal: AbortSignal, attempts = 0) => {
     if (!hasLoadedOnceRef.current) {
       setIsLoading(true);
     }
     setError(null);
     try {
-      const response = await fetch("/api/positions", { signal: abortSignal });
+      const response = await fetch("/api/positions", { signal });
       if (!response.ok) {
         throw new Error(`Failed to fetch positions: ${response.statusText}`);
       }
@@ -259,6 +263,8 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
       const mappedSupply = mapSupplyPositionsResponse(data);
       setPositions(mapped);
       setSupplyPositions(mappedSupply);
+      setIsStale(false);
+      setIsOffline(false);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         return; // Aborted
@@ -266,18 +272,16 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
 
       setIsStale(true);
       const errorObj = err instanceof Error ? err : new Error(String(err));
-      
-      if (!navigator.onLine) {
-        setIsOffline(true);
-      }
+      const offline = typeof navigator !== "undefined" && !navigator.onLine;
+      setIsOffline(offline);
 
       const maxAttempts = 5;
-      if (attempts < maxAttempts && navigator.onLine) {
+      if (attempts < maxAttempts && !offline) {
         const backoff = Math.min(1000 * (2 ** attempts), 10000);
         const jitter = Math.random() * 500;
         setTimeout(() => {
-          if (abortSignal && abortSignal.aborted) return;
-          fetchPositions(abortSignal, attempts + 1);
+          if (signal.aborted) return;
+          fetchPositions(signal, attempts + 1);
         }, backoff + jitter);
       } else {
         setError(errorObj);
@@ -297,14 +301,19 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
     return () => controller.abort();
   }, [fetchPositions]);
 
+  const refetch = useCallback(() => {
+    const controller = new AbortController();
+    return fetchPositions(controller.signal);
+  }, [fetchPositions]);
+
   return {
     positions,
     supplyPositions,
     isLoading,
-    error,
-    refetch: () => fetchPositions(),
     isStale,
-    isOffline
+    isOffline,
+    error,
+    refetch,
   };
 }
 

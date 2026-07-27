@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
 import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
@@ -37,7 +37,7 @@ function checkDatabase(): 'healthy' | 'unhealthy' {
   }
 }
 
-async function handleHealth() {
+async function handleHealth(request: NextRequest) {
   try {
     const [horizonStatus, sorobanStatus] = await Promise.all([
       checkHorizon(),
@@ -45,8 +45,8 @@ async function handleHealth() {
     ]);
     const dbStatus = checkDatabase();
 
-    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy' 
-      ? 'unhealthy' 
+    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy'
+      ? 'unhealthy'
       : horizonStatus === 'degraded' || sorobanStatus === 'degraded'
       ? 'degraded'
       : 'healthy';
@@ -69,8 +69,15 @@ async function handleHealth() {
       },
     };
 
+    const etag = generateETag(healthData);
+
+    if (isNotModified(request, etag)) {
+      return new NextResponse(null, notModifiedResponse(etag));
+    }
+
     const httpStatus = healthData.status === 'unhealthy' ? 503 : 200;
-    return NextResponse.json(healthData, { status: httpStatus });
+    const headers = cacheHeaders(etag, 5, 'public');
+    return NextResponse.json(healthData, { status: httpStatus, headers });
   } catch {
     return NextResponse.json(
       {

@@ -1,49 +1,65 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { fetchTransactions, filterTransactions } from '@/lib/transactions/repository';
-import type { Transaction, TransactionFilters } from '@/lib/transactions/types';
+
+interface TransactionSummary {
+  inflow: number;
+  outflow: number;
+  net: number;
+}
 
 export function useTransactionSummary() {
   const searchParams = useSearchParams();
-  const [summary, setSummary] = useState({ inflow: 0, outflow: 0, net: 0 });
+  const [summary, setSummary] = useState<TransactionSummary>({ inflow: 0, outflow: 0, net: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function calculateSummary() {
       setIsLoading(true);
-      const allTransactions = await fetchTransactions();
-      
-      // Filter transactions
-      const filters: TransactionFilters = {
-          search: searchParams.get('search') || '',
-          status: (searchParams.get('status') as any) || 'All',
-          dateFrom: searchParams.get('fromDate') || undefined,
-          dateTo: searchParams.get('toDate') || undefined,
-      };
+      try {
+        const params = new URLSearchParams();
+        const search = searchParams.get('search');
+        const status = searchParams.get('status');
+        const fromDate = searchParams.get('fromDate');
+        const toDate = searchParams.get('toDate');
 
-      const filtered = filterTransactions(allTransactions as any, filters);
+        if (search) params.set('search', search);
+        if (status && status !== 'All') params.set('status', status);
+        if (fromDate) params.set('dateFrom', fromDate);
+        if (toDate) params.set('dateTo', toDate);
+        params.set('pageSize', '1000');
 
-      // Compute totals
-      let inflow = 0;
-      let outflow = 0;
-      
-      filtered.forEach(txn => {
-        if (txn.amount > 0) {
-          inflow += txn.amount;
-        } else {
-          outflow += Math.abs(txn.amount);
+        const res = await fetch(`/api/transactions?${params.toString()}`);
+        if (!res.ok) throw new Error('Failed to fetch transactions');
+        const data = await res.json();
+        const transactions: Array<{ amount: number }> = data.transactions ?? [];
+
+        let inflow = 0;
+        let outflow = 0;
+
+        for (const txn of transactions) {
+          if (txn.amount > 0) {
+            inflow += txn.amount;
+          } else {
+            outflow += Math.abs(txn.amount);
+          }
         }
-      });
-      
-      setSummary({
-        inflow,
-        outflow,
-        net: inflow - outflow,
-      });
-      setIsLoading(false);
+
+        if (!cancelled) {
+          setSummary({ inflow, outflow, net: inflow - outflow });
+          setIsLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setSummary({ inflow: 0, outflow: 0, net: 0 });
+          setIsLoading(false);
+        }
+      }
     }
-    
+
     calculateSummary();
+    return () => { cancelled = true; };
   }, [searchParams]);
 
   return { ...summary, isLoading };

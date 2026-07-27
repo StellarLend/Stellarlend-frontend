@@ -18,6 +18,7 @@ interface Config {
   stellar: {
     network: string;
     horizonUrl: string;
+    sorobanRpcUrl: string;
     sorobanContractId: string;
   };
   rateLimit: {
@@ -54,8 +55,7 @@ const config: Config = {
     horizonUrl:
       validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
       'https://horizon-testnet.stellar.org',
-    sorobanContractId:
-      process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',
+    sorobanContractId: validatedEnv.NEXT_PUBLIC_SOROBAN_CONTRACT_ID,
   },
   analytics: {
     googleAnalyticsId: validatedEnv.NEXT_PUBLIC_GA_TRACKING_ID,
@@ -94,6 +94,7 @@ export const publicConfig = {
   stellar: {
     network: config.stellar.network,
     horizonUrl: config.stellar.horizonUrl,
+    sorobanContractId: config.stellar.sorobanContractId,
   },
   analytics: {
     googleAnalyticsId: config.analytics.googleAnalyticsId,

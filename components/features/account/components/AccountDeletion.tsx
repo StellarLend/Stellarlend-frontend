@@ -11,6 +11,33 @@ type ToastState = {
   description?: string;
 } | null;
 
+/**
+ * Map known server error codes to fixed, reviewed user-facing messages.
+ * Any unrecognised code falls through to `null` so callers use a
+ * generic fallback instead of echoing raw server strings to the user.
+ */
+function mapChallengeError(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const d = data as Record<string, unknown>;
+  const code = typeof d.code === "string" ? d.code : null;
+  const status = typeof d.status === "number" ? d.status : null;
+
+  const messages: Record<string, string> = {
+    CHALLENGE_EXPIRED: "Your deletion request has expired. Please try again.",
+    CHALLENGE_RATE_LIMITED: "Too many attempts. Please wait a moment and try again.",
+    ACCOUNT_NOT_FOUND: "Account not found. It may have already been deleted.",
+    UNAUTHORIZED: "You are not authorised to perform this action. Please sign in again.",
+  };
+
+  if (code && messages[code]) return messages[code];
+
+  // Fall back to HTTP status for well-known codes
+  if (status === 429) return "Too many requests. Please try again later.";
+  if (status === 401) return "Your session has expired. Please sign in again.";
+
+  return null;
+}
+
 export default function AccountDeletion() {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -30,17 +57,18 @@ export default function AccountDeletion() {
       const res = await fetch("/api/account/delete/challenge");
       const data = await res.json();
       if (!res.ok) {
+        const mapped = mapChallengeError(data);
         if (res.status === 429) {
           showToast(
             "error",
             "Rate limit exceeded",
-            data.error?.message || "Too many requests. Please try again later.",
+            mapped ?? "Too many requests. Please try again later.",
           );
         } else {
           showToast(
             "error",
             "Challenge failed",
-            data.error?.message || data.error || "Could not start deletion. Please try again.",
+            mapped ?? "Could not start deletion. Please try again.",
           );
         }
         return;

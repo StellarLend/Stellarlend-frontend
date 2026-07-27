@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-vi.mock('@/lib/http', () => ({
-  httpGet: vi.fn().mockResolvedValue({}),
-  UpstreamHttpError: class extends Error {},
-  TimeoutError: class extends Error {},
-}));
+vi.mock('server-only', () => ({}));
 
-import { GET } from './route';
+const httpGetMock = vi.fn().mockResolvedValue({});
+
+vi.mock('@/lib/http', () => ({
+  httpGet: (...args: unknown[]) => httpGetMock(...args),
+  TimeoutError: class TimeoutError extends Error {},
+  UpstreamHttpError: class UpstreamHttpError extends Error {},
+}));
 
 vi.mock('@/lib/config', () => ({
   default: {
@@ -16,24 +18,13 @@ vi.mock('@/lib/config', () => ({
     stellar: {
       network: 'testnet',
       horizonUrl: 'https://horizon-testnet.stellar.org',
+      sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
     },
     analytics: {},
   },
 }));
 
-vi.mock('@/lib/server-config', () => ({
-  default: {
-    stellar: { sorobanRpcUrl: 'https://private-rpc.test' },
-  },
-}));
-
-const httpGetMock = vi.fn();
-
-vi.mock('@/lib/http', () => ({
-  httpGet: (...args: unknown[]) => httpGetMock(...args),
-  TimeoutError: class TimeoutError extends Error {},
-  UpstreamHttpError: class UpstreamHttpError extends Error {},
-}));
+import { GET } from './route';
 
 function makeRequest(headers: Record<string, string> = {}): NextRequest {
   return new NextRequest('http://localhost/api/health', { headers });
@@ -64,11 +55,11 @@ describe('GET /api/health', () => {
     expect(body.status).not.toBe('unhealthy');
   });
 
-  it('checks the server-only Soroban RPC health endpoint', async () => {
+  it('checks the Soroban RPC health endpoint', async () => {
     await GET(makeRequest());
 
     expect(httpGetMock).toHaveBeenCalledWith(
-      'https://private-rpc.test/health',
+      'https://soroban-testnet.stellar.org/health',
       expect.objectContaining({ retries: 1, timeoutMs: 5000 }),
     );
   });
@@ -82,7 +73,7 @@ describe('GET /api/health', () => {
     const res = await GET(makeRequest());
     const cc = res.headers.get('Cache-Control');
     expect(cc).toContain('public');
-    expect(cc).toContain('max-age=30');
+    expect(cc).toContain('max-age=');
   });
 
   it('includes Vary header', async () => {

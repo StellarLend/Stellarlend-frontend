@@ -107,6 +107,60 @@ describe("ConfirmModal accessibility", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it("has a properly-typed terms and conditions button that opens terms content", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmModalHarness />);
+
+    await user.click(screen.getByRole("button", { name: /open confirmation/i }));
+    const dialog = screen.getByRole("dialog", { name: /confirm lending transaction/i });
+    const termsButton = within(dialog).getByRole("button", { name: /terms and conditions/i });
+
+    expect(termsButton).toHaveAttribute("type", "button");
+    expect(screen.queryByRole("dialog", { name: /terms and conditions/i })).not.toBeInTheDocument();
+
+    await user.click(termsButton);
+
+    const termsDialog = screen.getByRole("dialog", { name: /terms and conditions/i });
+    expect(termsDialog).toBeInTheDocument();
+    expect(within(termsDialog).getByRole("button", { name: /close terms and conditions/i })).toHaveFocus();
+  });
+
+  it("opens the terms and conditions content via the keyboard", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmModalHarness />);
+
+    await user.click(screen.getByRole("button", { name: /open confirmation/i }));
+    const dialog = screen.getByRole("dialog", { name: /confirm lending transaction/i });
+    const termsButton = within(dialog).getByRole("button", { name: /terms and conditions/i });
+
+    termsButton.focus();
+    expect(termsButton).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("dialog", { name: /terms and conditions/i })).toBeInTheDocument();
+  });
+
+  it("closes the terms modal on Escape without closing the underlying confirmation modal", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmModalHarness />);
+
+    await user.click(screen.getByRole("button", { name: /open confirmation/i }));
+    const dialog = screen.getByRole("dialog", { name: /confirm lending transaction/i });
+    const termsButton = within(dialog).getByRole("button", { name: /terms and conditions/i });
+
+    await user.click(termsButton);
+    expect(screen.getByRole("dialog", { name: /terms and conditions/i })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: /terms and conditions/i })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("dialog", { name: /confirm lending transaction/i })).toBeInTheDocument();
+    expect(termsButton).toHaveFocus();
+  });
+
   it("closes from the close button, cancel button, and backdrop", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
