@@ -21,7 +21,7 @@ function parseFilters(searchParams: URLSearchParams): TransactionFilters {
   const normalizedStatus = status && status !== 'All' ? (status as TransactionStatus) : 'All';
 
   return {
-    search: searchParams.get('search') ?? undefined,
+    search: parsed.filter.search ?? searchParams.get('search') ?? undefined,
     status: normalizedStatus,
     dateFrom: parsed.filter.fromDate,
     dateTo: parsed.filter.toDate,

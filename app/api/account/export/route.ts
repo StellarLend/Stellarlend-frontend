@@ -2,8 +2,6 @@ import { NextResponse, NextRequest } from "next/server";
 import { processAccountExport } from "@/lib/account/export-bundle";
 import { withCsrfProtection } from "@/lib/api/handler";
 
-// Simple in-memory mock store tracking timestamps for the 24-hour rate limit throttle
-const exportThrottleStore = new Map<string, number>();
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const postHandler = async (request: NextRequest) => {
@@ -27,9 +25,10 @@ const postHandler = async (request: NextRequest) => {
     }
 
     // Mock payload aggregation from database services
+    // In production, this would fetch real user data from the database
     const mockUserPayload = {
       userId,
-      profile: { email: "user@example.com", joinedAt: "2025-01-15" },
+      profile: { email: user.email || "user@example.com", joinedAt: "2025-01-15" },
       preferences: { darkMode: true, emailNotifications: true },
       transactions: [{ id: "tx_01", asset: "XLM", amount: 500 }],
       notifications: [{ id: "notif_01", message: "Deposit confirmed" }],
@@ -72,8 +71,3 @@ const postHandler = async (request: NextRequest) => {
 };
 
 export const POST = withCsrfProtection(postHandler);
-
-// Helper utility exposed to clear mock states during testing execution runs
-export function resetThrottleRegistry() {
-  exportThrottleStore.clear();
-}

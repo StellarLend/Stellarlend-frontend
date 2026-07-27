@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeOperation, normalizeOperations } from './normalizer';
 import type { HorizonOperation } from './types';
+import { isAssetSymbol } from '@/types/enums';
 
 const ACCOUNT_ID = 'GBXYZ1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890ABCDEF';
 const OTHER_ACCOUNT_ID = 'GABCD1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890ABCDEF';
@@ -46,6 +47,36 @@ describe('normalizeOperation', () => {
       const op = makeOp({ asset_type: 'credit_alphanum4', asset_code: 'EUR' });
       const tx = normalizeOperation(op, ACCOUNT_ID);
       expect(tx).toBeNull();
+    });
+
+    it('drops deprecated STRK (outside ASSET_SYMBOLS) instead of passing an invalid asset through', () => {
+      // STRK was removed from the canonical vocabulary (see VOCABULARY.md).
+      // Horizon may still return historical STRK payments; intentional behavior
+      // is to drop the record (return null), not throw and not emit an invalid AssetSymbol.
+      const op = makeOp({
+        id: 'op-strk-deprecated',
+        asset_type: 'credit_alphanum4',
+        asset_code: 'STRK',
+        amount: '42.0000000',
+      });
+
+      const tx = normalizeOperation(op, ACCOUNT_ID);
+
+      expect(tx).toBeNull();
+      expect(isAssetSymbol('STRK')).toBe(false);
+    });
+
+    it('drops real-world Stellar assets outside the canonical ASSET_SYMBOLS vocabulary', () => {
+      // e.g. AQUA is a common Stellar asset this app does not support.
+      const op = makeOp({
+        id: 'op-aqua-unsupported',
+        asset_type: 'credit_alphanum4',
+        asset_code: 'AQUA',
+        amount: '10.0000000',
+      });
+
+      expect(normalizeOperation(op, ACCOUNT_ID)).toBeNull();
+      expect(isAssetSymbol('AQUA')).toBe(false);
     });
 
     it('returns null for missing non-native asset codes', () => {
@@ -423,6 +454,36 @@ describe('normalizeOperations', () => {
     expect(result[0].amount).toBe(10);
     expect(result[1].id).toBe('op-3');
     expect(result[1].amount).toBe(20);
+  });
+
+  it('silently drops Horizon records whose asset code is outside ASSET_SYMBOLS', () => {
+    const ops: HorizonOperation[] = [
+      makeOp({ id: 'op-xlm', asset_type: 'native', amount: '5' }),
+      makeOp({
+        id: 'op-strk',
+        asset_type: 'credit_alphanum4',
+        asset_code: 'STRK',
+        amount: '99',
+      }),
+      makeOp({
+        id: 'op-aqua',
+        asset_type: 'credit_alphanum4',
+        asset_code: 'AQUA',
+        amount: '7',
+      }),
+      makeOp({
+        id: 'op-usdc',
+        asset_type: 'credit_alphanum4',
+        asset_code: 'USDC',
+        amount: '3',
+      }),
+    ];
+
+    const result = normalizeOperations(ops, ACCOUNT_ID);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((tx) => tx.id)).toEqual(['op-xlm', 'op-usdc']);
+    expect(result.every((tx) => isAssetSymbol(tx.asset))).toBe(true);
   });
 
   it('returns empty array when given an empty list', () => {

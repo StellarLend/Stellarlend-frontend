@@ -6,7 +6,7 @@ interface FastSecureProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   title?: string;
 }
 
-export const FastSecure = ({
+export const FastSecureIcon = ({
   className = "",
   width = "400",
   height = "400",

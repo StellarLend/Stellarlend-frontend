@@ -31,7 +31,6 @@ export default function AmortizationSchedule({
     if (!shouldCollapse || isExpanded) {
       return periods;
     }
-    // Show first 2 and last 2 periods
     if (periods.length <= 4) {
       return periods;
     }
