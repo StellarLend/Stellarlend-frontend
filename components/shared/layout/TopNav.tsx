@@ -236,6 +236,7 @@ const TopNav = () => {
           <div className="flex gap-3 items-center">
             <NotificationBell />
             {/* StreamStatusIndicator removed — see note below */}
+
             <button
               type="button"
               className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
@@ -263,6 +264,8 @@ const TopNav = () => {
 
         <div className="flex gap-3 items-center">
           <NotificationBell />
+          {/* StreamStatusIndicator removed — see note below */}
+
           <button
             type="button"
             className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
