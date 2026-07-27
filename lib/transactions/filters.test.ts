@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTransactionFilter } from './filters';
+import { parseTransactionFilter, serializeTransactionFilters } from './filters';
 import type { FilterValidationResult } from './filters';
 
 function parse(query: string): FilterValidationResult {
@@ -27,14 +27,15 @@ describe('parseTransactionFilter', () => {
       },
     );
 
-    it.each(['completed', 'pending', 'failed'])(
-      'accepts valid status: %s',
-      (status) => {
-        const result = parse(`status=${status}`);
-        expect(result.valid).toBe(true);
-        expect(result.filter.status).toBe(status);
-      },
-    );
+    it.each([
+      ['completed', 'Completed'],
+      ['pending', 'Processing'],
+      ['failed', 'Failed'],
+    ])('accepts valid status: %s', (inputStatus, expectedStatus) => {
+      const result = parse(`status=${inputStatus}`);
+      expect(result.valid).toBe(true);
+      expect(result.filter.status).toBe(expectedStatus);
+    });
 
     it('accepts valid asset and uppercases it', () => {
       const result = parse('asset=btc');
@@ -73,10 +74,35 @@ describe('parseTransactionFilter', () => {
       expect(result.valid).toBe(true);
       expect(result.filter).toStrictEqual({
         type: 'lend',
-        status: 'completed',
+        status: 'Completed',
         asset: 'XLM',
         fromDate: '2026-01-01',
         toDate: '2026-06-30',
+      });
+    });
+
+    it('round-trips all supported filter fields including search and the All status sentinel', () => {
+      const filters = {
+        type: 'lend',
+        status: 'All' as const,
+        asset: 'XLM',
+        fromDate: '2026-01-01',
+        toDate: '2026-06-30',
+        search: 'hello world',
+      };
+
+      const result = parseTransactionFilter(serializeTransactionFilters(filters));
+
+      expect(result).toStrictEqual({
+        valid: true,
+        filter: {
+          type: 'lend',
+          status: 'All',
+          asset: 'XLM',
+          fromDate: '2026-01-01',
+          toDate: '2026-06-30',
+          search: 'hello world',
+        },
       });
     });
   });
