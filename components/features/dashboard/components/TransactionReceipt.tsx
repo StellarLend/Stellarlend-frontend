@@ -4,8 +4,8 @@ import { Printer, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import type { Transaction } from "@/types/Transaction";
 import { sanitiseString } from "@/lib/security/input-sanitizer";
-import type { StellarNetwork } from "@/lib/wallet/connectHandshake";
-import { getTransactionHash, buildStellarExpertTransactionUrl } from "@/lib/utils/explorer";
+import { isValidTxHash } from "@/lib/validation/stellar";
+import { formatCurrency } from "@/lib/utils/format";
 import config from "@/lib/config";
 
 interface TransactionReceiptProps {
@@ -41,7 +41,7 @@ export default function TransactionReceipt({ transaction, details, onBack }: Tra
     window.print();
   };
 
-  const signedAmount = amount > 0 ? `+$${amount}` : `-$${Math.abs(amount)}`;
+  const signedAmount = amount > 0 ? `+$${formatCurrency(amount)}` : `-$${formatCurrency(Math.abs(amount))}`;
 
   const formatDateTime = (dateStr: string, timeStr: string) => {
     let fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
