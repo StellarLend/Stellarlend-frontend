@@ -8,7 +8,7 @@ export function buildSslConfig(): boolean | Record<string, unknown> {
   }
 
   if (process.env.DATABASE_SSL_INSECURE === 'true') {
-    logger.warn('DATABASE_SSL_INSECURE is enabled — TLS certificate verification is disabled. Do not use in production without explicit sign-off.');
+    logger.warn('DATABASE_SSL_INSECURE is enabled — TLS certificate verification is disabled. Do not use in production without explicit sign-off.', 'lib/db/pool');
     return { rejectUnauthorized: false };
   }
 
