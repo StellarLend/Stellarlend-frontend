@@ -21,7 +21,9 @@ describe('SupplyApyChart', () => {
 
     render(<SupplyApyChart />);
 
-    expect(screen.getByRole('status')).toHaveTextContent('Loading trend data');
+    expect(
+      screen.getByRole('status', { name: /loading trend data/i })
+    ).toBeInTheDocument();
   });
 
   it('shows an empty state when the history response has no snapshots', async () => {
@@ -62,7 +64,7 @@ describe('SupplyApyChart', () => {
     render(<SupplyApyChart />);
 
     expect(await screen.findByRole('img', { name: /supply apy trend/i })).toBeInTheDocument();
-    expect(await screen.findByText(/4\.2%/i)).toBeInTheDocument();
+    expect(await screen.findByText(/4\.20%/i)).toBeInTheDocument();
   });
 
   it('shows an error message when the request fails', async () => {
