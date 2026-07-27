@@ -68,6 +68,52 @@ export const AccountMenu = () => {
     };
   }, [isOpen, closeMenu]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    requestAnimationFrame(() => menuRef.current?.focus());
+
+    const getFocusableMenuItems = () =>
+      Array.from(
+        menuRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((el) => !el.hasAttribute("disabled") && el.tabIndex !== -1);
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Tab") {
+        if (!menuRef.current) return;
+        const focusableItems = getFocusableMenuItems();
+        if (focusableItems.length === 0) {
+          event.preventDefault();
+          menuRef.current.focus();
+          return;
+        }
+
+        const firstItem = focusableItems[0];
+        const lastItem = focusableItems[focusableItems.length - 1];
+
+        if (document.activeElement === menuRef.current) {
+          event.preventDefault();
+          (event.shiftKey ? lastItem : firstItem).focus();
+          return;
+        }
+        if (event.shiftKey && document.activeElement === firstItem) {
+          event.preventDefault();
+          lastItem.focus();
+        } else if (!event.shiftKey && document.activeElement === lastItem) {
+          event.preventDefault();
+          firstItem.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
   const handleCopy = useCallback(async () => {
     if (!address) return;
     setCopyError(null);
@@ -120,8 +166,10 @@ export const AccountMenu = () => {
           <button
             ref={triggerRef}
             type="button"
-            aria-label="Account menu"
+            aria-label="Connected wallet"
+            aria-haspopup="menu"
             aria-expanded={isOpen}
+            aria-controls={isOpen ? "topnav-wallet-menu" : undefined}
             onClick={handleToggle}
             onKeyDown={handleKeyDown}
             className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
@@ -134,10 +182,12 @@ export const AccountMenu = () => {
           </button>
           {isOpen && (
             <div
+              id="topnav-wallet-menu"
               ref={menuRef}
               role="menu"
-              aria-label="Account options"
-              className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700"
+              aria-label="Connected wallet actions"
+              tabIndex={-1}
+              className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700 focus:outline-none"
             >
               <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
                 <p className="text-xs text-gray-500 dark:text-gray-400 break-all font-mono">
@@ -177,7 +227,7 @@ export const AccountMenu = () => {
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 disabled:opacity-50"
               >
                 <LogOut className="h-4 w-4" aria-hidden="true" />
-                <span>Disconnect</span>
+                <span>Disconnect Wallet</span>
               </button>
             </div>
           )}

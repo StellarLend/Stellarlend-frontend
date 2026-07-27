@@ -2,6 +2,13 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
 import LendingForm from "./LendingForm";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { ASSETS } from "@/lib/assets";
+
+const mockUseWalletBalances = vi.hoisted(() => vi.fn());
+
+vi.mock("@/hooks/useWalletBalances", () => ({
+  useWalletBalances: mockUseWalletBalances,
+}));
 
 describe("LendingForm Component", () => {
   const mockInitialData = {
@@ -13,6 +20,11 @@ describe("LendingForm Component", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    mockUseWalletBalances.mockReturnValue({
+      assetsWithBalances: ASSETS,
+      loading: false,
+      error: null,
+    });
     // Stub a benign fetch globally so the debounced /api/quote preview effect
     // never touches the real network or surfaces as an unhandled rejection
     // when an existing test advances the fake clock.
@@ -127,6 +139,44 @@ describe("LendingForm Component", () => {
     fireEvent.click(screen.getByText(/Review Lending Offer/i));
 
     expect(await screen.findByText(/Interest rate must be between/)).toBeInTheDocument();
+  });
+
+  it("validates against live wallet balance when wallet is connected", async () => {
+    const liveBalances = ASSETS.map((a) =>
+      a.symbol === "XLM" ? { ...a, balance: 50 } : a,
+    );
+    mockUseWalletBalances.mockReturnValue({
+      assetsWithBalances: liveBalances,
+      loading: false,
+      error: null,
+    });
+
+    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+    const amountInput = screen.getByLabelText(/Amount to Lend/i);
+
+    fireEvent.change(amountInput, { target: { value: "100" } });
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+
+    expect(
+      await screen.findByText(/Insufficient balance/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Maximum available: 50 XLM/i),
+    ).toBeInTheDocument();
+
+    fireEvent.change(amountInput, { target: { value: "25" } });
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Insufficient balance/i),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("updates default interest rate when asset changes", async () => {
