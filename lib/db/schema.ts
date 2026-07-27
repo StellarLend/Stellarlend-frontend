@@ -1,5 +1,14 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
+export const subscribers = sqliteTable('subscribers', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  email: text('email').notNull().unique(),
+  subscribedAt: integer('subscribed_at', { mode: 'timestamp' }).notNull(),
+});
+
+export type Subscriber = typeof subscribers.$inferSelect;
+export type NewSubscriber = typeof subscribers.$inferInsert;
+
 export const profiles = sqliteTable('profiles', {
   userId: text('userId').primaryKey(),
   displayName: text('displayName').notNull(),

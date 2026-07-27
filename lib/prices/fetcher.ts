@@ -49,6 +49,52 @@ async function fetchMockPrices(assets: SupportedAsset[]): Promise<UpstreamPriceS
   };
 }
 
+async function fetchRealUpstreamPrices(
+  assets: SupportedAsset[],
+  apiKey: string,
+  config: PriceSourceConfig,
+): Promise<UpstreamPriceSource> {
+  const apiUrl = process.env.PRICE_ORACLE_API_URL;
+  if (!apiUrl) {
+    throw new Error('PRICE_ORACLE_API_URL not configured');
+  }
+
+  const url = new URL(apiUrl);
+  assets.forEach((asset) => url.searchParams.append('assets', asset));
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Price oracle upstream error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (!isValidUpstreamResponse(data)) {
+      throw new Error('Invalid upstream price response structure');
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Price oracle request timed out');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * Fetches prices from an upstream oracle API
  * Uses API key from environment variables (kept server-side only)
@@ -63,14 +109,16 @@ export async function fetchUpstreamPrices(
   config: Partial<PriceSourceConfig> = {}
 ): Promise<UpstreamPriceSource> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const apiKey = process.env.PRICE_ORACLE_API_KEY;
 
-  // For now, use mock prices. In production, integrate with real API
-  // Example production integration:
-  // const apiKey = process.env.PRICE_ORACLE_API_KEY;
-  // if (!apiKey) throw new Error('PRICE_ORACLE_API_KEY not configured');
-  // return fetchRealUpstreamPrices(assets, apiKey, finalConfig);
+  if (!apiKey) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('PRICE_ORACLE_API_KEY not configured');
+    }
+    return fetchMockPrices(assets);
+  }
 
-  return fetchMockPrices(assets);
+  return fetchRealUpstreamPrices(assets, apiKey, finalConfig);
 }
 
 /**

@@ -291,3 +291,75 @@ describe("AccountDeletion", () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 });
+
+  it("maps known server error code to user-safe message", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        code: "CHALLENGE_EXPIRED",
+        error: "Internal: challenge TTL exceeded for token abc123",
+      }),
+    });
+
+    render(<AccountDeletion />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete My Account" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Challenge failed")).toBeInTheDocument();
+      expect(
+        screen.getByText("Your deletion request has expired. Please try again."),
+      ).toBeInTheDocument();
+    });
+
+    // Raw server string must NOT leak through
+    expect(
+      screen.queryByText(/Internal: challenge TTL exceeded/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not leak raw server error string when code is unknown", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: "Database connection pool exhausted on host db-internal-7",
+      }),
+    });
+
+    render(<AccountDeletion />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete My Account" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Challenge failed")).toBeInTheDocument();
+      expect(
+        screen.getByText("Could not start deletion. Please try again."),
+      ).toBeInTheDocument();
+    });
+
+    // Raw internal string must not appear in the DOM
+    expect(
+      screen.queryByText(/db-internal-7/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Database connection pool exhausted/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("maps 401 status to session expiry message", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "Invalid token" }),
+    });
+
+    render(<AccountDeletion />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete My Account" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Challenge failed")).toBeInTheDocument();
+      expect(
+        screen.getByText("Your session has expired. Please sign in again."),
+      ).toBeInTheDocument();
+    });
+  });

@@ -56,7 +56,7 @@ const config: Config = {
       validatedEnv.NEXT_PUBLIC_STELLAR_HORIZON_URL ||
       'https://horizon-testnet.stellar.org',
     sorobanRpcUrl:
-      validatedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+      process.env.SOROBAN_RPC_URL ||
       'https://soroban-testnet.stellar.org',
     sorobanContractId:
       process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID || '',

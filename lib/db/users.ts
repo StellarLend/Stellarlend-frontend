@@ -77,6 +77,38 @@ export const USER_STORE: AdminUserRecord[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Production guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Detects whether `getUsers` is still backed by the in-memory seed array.
+ *
+ * Returns `true` when the module-level USER_STORE export is the same object
+ * reference that was defined in this file — i.e. it has NOT been replaced
+ * with a real DB-backed implementation at runtime.
+ *
+ * This check is intentionally conservative: if someone reassigns USER_STORE
+ * to a *different* array (even an empty one), the guard treats it as a real
+ * implementation and stays silent.
+ *
+ * @internal exported only for testing.
+ */
+export const _isSeedStore = (store: AdminUserRecord[]): boolean =>
+  store === USER_STORE;
+
+// Throw loudly at module-initialisation time in production so that a missing
+// DB swap is a deployment blocker, not a silent data leak.
+if (process.env.NODE_ENV === 'production' && _isSeedStore(USER_STORE)) {
+  const msg =
+    '[lib/db/users] FATAL: getUsers is still backed by the hardcoded in-memory ' +
+    'USER_STORE seed array. Replace the USER_STORE implementation with real DB ' +
+    'calls before deploying to production. Refusing to start.';
+  // eslint-disable-next-line no-console
+  console.error(msg);
+  throw new Error(msg);
+}
+
+// ---------------------------------------------------------------------------
 // Data-access function
 // ---------------------------------------------------------------------------
 
