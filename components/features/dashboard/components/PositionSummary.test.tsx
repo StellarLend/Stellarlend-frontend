@@ -1,7 +1,8 @@
 import React from "react";
 import { render, screen } from "@/test/test-utils";
 import PositionSummary from "./PositionSummary";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import * as UsePositionsHook from "@/hooks/usePositions";
 
 describe("PositionSummary Component", () => {
   const mockHealthyData = {
@@ -444,6 +445,26 @@ describe("PositionSummary Component", () => {
 
       const grid = document.querySelector(".grid");
       expect(grid).toHaveClass("grid-cols-2", "md:grid-cols-2");
+    });
+  });
+
+  describe("Stale Data Indicator", () => {
+    it("renders the stale data warning when useCollateralShares reports isStale", () => {
+      // Force the hook to return isStale: true for this specific test
+      const spy = vi.spyOn(UsePositionsHook, "useCollateralShares").mockReturnValue({
+        shares: [],
+        isLoading: false,
+        isStale: true,
+      });
+
+      render(<PositionSummary data={mockHealthyData} />);
+
+      // Assert the banner is visible
+      expect(screen.getByRole("alert", { name: "Stale data warning" })).toBeInTheDocument();
+      expect(screen.getByText("Data May Be Outdated")).toBeInTheDocument();
+
+      // Clean up the mock so other tests don't fail
+      spy.mockRestore();
     });
   });
 
