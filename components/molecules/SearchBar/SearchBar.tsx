@@ -97,6 +97,11 @@ export interface SearchBarProps {
   onNavigate?: (path: string) => void;
 
   /**
+   * Callback to retry the last search after a transient server error.
+   */
+  onRetry?: () => void;
+
+  /**
    * Unique ID for the combobox. Auto-generated if not provided.
    * Used for ARIA attribute linkage between input and results listbox.
    */
@@ -153,6 +158,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
       results,
       onResultSelect,
       onNavigate,
+      onRetry,
       resultsListId,
     },
     ref
@@ -433,6 +439,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
               isOpen={resultsOpen}
               onResultSelect={onResultSelect}
               onNavigate={onNavigate}
+              onRetry={onRetry}
               onClose={() => onSearch?.('')}
               id={listId}
               onActiveIndexChange={setActiveDescendantId}

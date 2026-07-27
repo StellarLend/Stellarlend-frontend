@@ -11,6 +11,7 @@ import {
   fetchWalletBalances,
   type WalletBalanceSummaryItem,
 } from "@/lib/wallet/balances";
+import AccountMenu from "./AccountMenu";
 
 declare global {
   interface Window {
@@ -45,36 +46,15 @@ const TopNav = () => {
   const {
     address: walletAddress,
     network,
-    status,
-    error,
-    connect: handleConnect,
-    disconnect,
   } = useWallet();
 
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isBalanceOpen, setIsBalanceOpen] = useState(false);
   const [balances, setBalances] = useState<WalletBalanceSummaryItem[]>([]);
   const [balanceStatus, setBalanceStatus] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle");
 
-  const walletButtonRef = useRef<HTMLButtonElement | null>(null);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const balanceTriggerRef = useRef<HTMLButtonElement | null>(null);
-
-  const loading = status === "connecting";
-
-  const closeDropdown = useCallback((restoreFocus = true) => {
-    setIsDropdownOpen(false);
-    if (restoreFocus) {
-      requestAnimationFrame(() => walletButtonRef.current?.focus());
-    }
-  }, []);
-
-  const handleDisconnect = async () => {
-    await disconnect();
-    closeDropdown(false);
-  };
 
   const closeBalancePopover = useCallback(() => {
     setIsBalanceOpen(false);
@@ -123,69 +103,6 @@ const TopNav = () => {
   const getShortAddress = (addr: string) =>
     `${addr.slice(0, 5)}...${addr.slice(-4)}`;
 
-  useEffect(() => {
-    if (!isDropdownOpen) return;
-
-    requestAnimationFrame(() => dropdownRef.current?.focus());
-
-    const getFocusableMenuItems = () =>
-      Array.from(
-        dropdownRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      ).filter((el) => !el.hasAttribute("disabled") && el.tabIndex !== -1);
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeDropdown();
-        return;
-      }
-      if (event.key !== "Tab" || !dropdownRef.current) return;
-
-      const focusableItems = getFocusableMenuItems();
-      if (focusableItems.length === 0) {
-        event.preventDefault();
-        dropdownRef.current.focus();
-        return;
-      }
-
-      const firstItem = focusableItems[0];
-      const lastItem = focusableItems[focusableItems.length - 1];
-
-      if (document.activeElement === dropdownRef.current) {
-        event.preventDefault();
-        (event.shiftKey ? lastItem : firstItem).focus();
-        return;
-      }
-      if (event.shiftKey && document.activeElement === firstItem) {
-        event.preventDefault();
-        lastItem.focus();
-      } else if (!event.shiftKey && document.activeElement === lastItem) {
-        event.preventDefault();
-        firstItem.focus();
-      }
-    };
-
-    const handleMouseDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        dropdownRef.current?.contains(target) ||
-        walletButtonRef.current?.contains(target)
-      ) {
-        return;
-      }
-      closeDropdown(false);
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleMouseDown);
-    };
-  }, [closeDropdown, isDropdownOpen]);
-
   return (
     <div className="w-full flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between bg-green-600 px-6 md:px-12 py-4 rounded-md gap-4 sm:gap-0">
       <div className="w-full sm:flex-1 max-w-full sm:max-w-md text-white">
@@ -219,76 +136,7 @@ const TopNav = () => {
             </svg>
           </button>
 
-          <div className="relative flex items-center">
-            {walletAddress ? (
-              <div className="relative">
-                <button
-                  ref={walletButtonRef}
-                  type="button"
-                  aria-label="Connected wallet"
-                  aria-haspopup="menu"
-                  aria-expanded={isDropdownOpen}
-                  aria-controls={
-                    isDropdownOpen ? "topnav-wallet-menu" : undefined
-                  }
-                  onClick={() =>
-                    isDropdownOpen ? closeDropdown() : setIsDropdownOpen(true)
-                  }
-                  className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
-                >
-                  <span>{getShortAddress(walletAddress)}</span>
-                  <svg
-                    className="w-3 h-3 text-white"
-                    viewBox="0 0 10 6"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
-                      fill="#FFFFFF"
-                    />
-                  </svg>
-                </button>
-                {isDropdownOpen && (
-                  <div
-                    id="topnav-wallet-menu"
-                    ref={dropdownRef}
-                    role="menu"
-                    aria-label="Connected wallet actions"
-                    tabIndex={-1}
-                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700 focus:outline-none"
-                  >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={handleDisconnect}
-                      className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 text-red-600 font-medium"
-                    >
-                      Disconnect Wallet
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                aria-label="Connect wallet"
-                onClick={handleConnect}
-                disabled={loading}
-                className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-4 w-[139px] rounded-full ${focusClasses} ${loading ? "opacity-80" : ""}`}
-              >
-                <span>{loading ? "Connecting..." : "Connect Wallet"}</span>
-              </button>
-            )}
-            {error && (
-              <span
-                data-testid="wallet-error"
-                className="text-xs text-red-200 absolute -bottom-5 right-0 whitespace-nowrap bg-red-800/80 px-2 py-0.5 rounded"
-              >
-                {error}
-              </span>
-            )}
-          </div>
+          <AccountMenu />
 
           <div className="relative">
             <button

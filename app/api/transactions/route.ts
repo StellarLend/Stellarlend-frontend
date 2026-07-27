@@ -1,12 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  ASSET_SYMBOLS,
-  TRANSACTION_TYPES,
-  TRANSACTION_STATUSES,
-  isAssetSymbol,
-  isTransactionType,
-  isTransactionStatus,
-} from '@/types/enums';
 import type { Transaction } from '@/types/Transaction';
 import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
@@ -15,29 +7,6 @@ import { fetchTransactionRecords, filterTransactions, paginateTransactionsByCurs
 import { parseTransactionParams } from '@/lib/transactions/validator';
 
 export const runtime = 'nodejs';
-
-const DEFAULT_PAGE = 1;
-const DEFAULT_PAGE_SIZE = 6;
-const MAX_PAGE_SIZE = 100;
-
-function parsePageParam(value: string | null, fallback: number) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function parsePageSizeParam(value: string | null, fallback: number) {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) return fallback;
-  return Math.min(parsed, MAX_PAGE_SIZE);
-}
-
-function parseSortBy(value: string | null): 'date' | 'amount' {
-  return value === 'amount' ? 'amount' : 'date';
-}
-
-function parseSortDir(value: string | null): 'asc' | 'desc' {
-  return value === 'asc' ? 'asc' : 'desc';
-}
 
 function sortTransactions(transactions: Transaction[], sortBy: 'date' | 'amount', sortDir: 'asc' | 'desc') {
   return [...transactions].sort((a, b) => {
@@ -49,6 +18,10 @@ function sortTransactions(transactions: Transaction[], sortBy: 'date' | 'amount'
       ? new Date(a.date).getTime() - new Date(b.date).getTime()
       : new Date(b.date).getTime() - new Date(a.date).getTime();
   });
+}
+
+function firstSchemaError(error: { issues: Array<{ message: string }> }): string {
+  return error.issues[0]?.message ?? 'Invalid request';
 }
 
 /** GET /api/transactions
@@ -72,30 +45,27 @@ async function handleGetTransactions(req: NextRequest) {
   const pageSize = searchParams.has('pageSize') ? validatedParams.pageSize : DEFAULT_PAGE_SIZE;
 
 
-  if (asset !== null && !isAssetSymbol(asset)) {
-    return NextResponse.json(
-      { error: `Unknown asset "${asset}". Supported: ${ASSET_SYMBOLS.join(', ')}` },
-      { status: 400 },
-    );
+  if (!parsed.success) {
+    return NextResponse.json({ error: firstSchemaError(parsed.error) }, { status: 400 });
   }
 
-  if (type !== null && !isTransactionType(type)) {
-    return NextResponse.json(
-      { error: `Unknown type "${type}". Supported: ${TRANSACTION_TYPES.join(', ')}` },
-      { status: 400 },
-    );
-  }
+  const {
+    asset,
+    type,
+    status,
+    search,
+    dateFrom,
+    dateTo,
+    sortBy,
+    sortDir,
+    page,
+    pageSize,
+    cursor: rawCursor,
+    limit: rawLimit,
+  } = parsed.data;
 
-  if (status !== null && !isTransactionStatus(status)) {
-    return NextResponse.json(
-      { error: `Unknown status "${status}". Supported: ${TRANSACTION_STATUSES.join(', ')}` },
-      { status: 400 },
-    );
-  }
-
-  const rawCursor = searchParams.get('cursor');
-  const hasCursor = rawCursor !== null;
-  const hasLimit = searchParams.has('limit');
+  const hasCursor = rawCursor !== undefined;
+  const hasLimit = rawLimit !== undefined;
 
   if ((hasCursor || hasLimit) && sortBy === 'amount') {
     return NextResponse.json(
@@ -127,7 +97,7 @@ async function handleGetTransactions(req: NextRequest) {
   if (hasCursor || hasLimit) {
     let cursor: { v: 1; date: string; id: string; direction: 'next' | 'prev' } | null = null;
 
-    if (rawCursor !== null) {
+    if (rawCursor !== undefined) {
       try {
         cursor = decodeTransactionCursor(rawCursor);
       } catch (error) {
@@ -138,7 +108,7 @@ async function handleGetTransactions(req: NextRequest) {
       }
     }
 
-    const limit = parseCursorLimit(searchParams.get('limit'));
+    const limit = parseCursorLimit(rawLimit ?? null);
     const paginated = paginateTransactionsByCursor(transactions, { cursor, limit, sortDir });
 
     return NextResponse.json({
@@ -161,7 +131,7 @@ async function handleGetTransactions(req: NextRequest) {
  *  Validates asset, type, and status against canonical enums.
  */
 async function handlePostTransactions(req: NextRequest) {
-  let body: Partial<Transaction>;
+  let body: unknown;
 
   try {
     body = await req.json();
@@ -169,36 +139,12 @@ async function handlePostTransactions(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { asset, type, status, amount, date, time } = body;
-
-  if (!isAssetSymbol(asset)) {
-    return NextResponse.json(
-      { error: `Unknown asset "${asset}". Supported: ${ASSET_SYMBOLS.join(', ')}` },
-      { status: 400 },
-    );
+  const parsed = transactionBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: firstSchemaError(parsed.error) }, { status: 400 });
   }
 
-  if (!isTransactionType(type)) {
-    return NextResponse.json(
-      { error: `Unknown type "${type}". Supported: ${TRANSACTION_TYPES.join(', ')}` },
-      { status: 400 },
-    );
-  }
-
-  if (!isTransactionStatus(status)) {
-    return NextResponse.json(
-      { error: `Unknown status "${status}". Supported: ${TRANSACTION_STATUSES.join(', ')}` },
-      { status: 400 },
-    );
-  }
-
-  if (typeof amount !== 'number') {
-    return NextResponse.json({ error: 'amount must be a number' }, { status: 400 });
-  }
-
-  if (!date || !time) {
-    return NextResponse.json({ error: 'date and time are required' }, { status: 400 });
-  }
+  const { asset, type, status, amount, date, time } = parsed.data;
 
   const transaction: Transaction = {
     id: `TXN${Date.now()}`,

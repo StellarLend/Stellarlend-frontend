@@ -16,6 +16,7 @@ export default function AccountDeletionUndo({
   onElapsed,
 }: AccountDeletionUndoProps) {
   const [secondsRemaining, setSecondsRemaining] = useState(durationSeconds);
+  const mountTimeRef = useRef(Date.now());
   const onElapsedRef = useRef(onElapsed);
   const undoButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -32,9 +33,12 @@ export default function AccountDeletionUndo({
       onElapsedRef.current();
       return;
     }
-    const timerId = setTimeout(() => setSecondsRemaining((s) => s - 1), 1000);
+    const timerId = setTimeout(() => {
+      const elapsedSeconds = Math.floor((Date.now() - mountTimeRef.current) / 1000);
+      setSecondsRemaining(Math.max(0, durationSeconds - elapsedSeconds));
+    }, 1000);
     return () => clearTimeout(timerId);
-  }, [secondsRemaining]);
+  }, [secondsRemaining, durationSeconds]);
 
   const percentage = (secondsRemaining / durationSeconds) * 100;
 
