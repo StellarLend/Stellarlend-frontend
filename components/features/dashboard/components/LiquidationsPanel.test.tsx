@@ -118,9 +118,9 @@ describe("LiquidationsPanel", () => {
 
     const rows = screen.getAllByRole("row").slice(1);
 
-    expect(within(rows[0]).getByText("100 USDC")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("100 XLM")).toBeInTheDocument();
-    expect(within(rows[2]).getByText("100 ETH")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("100.00 USDC")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("100.00 XLM")).toBeInTheDocument();
+    expect(within(rows[2]).getByText("100.00 ETH")).toBeInTheDocument();
     expect(within(rows[3]).getByText("100 BTC")).toBeInTheDocument();
   });
 
@@ -164,8 +164,8 @@ describe("LiquidationsPanel", () => {
 
     const rows = screen.getAllByRole("row").slice(1);
 
-    expect(within(rows[0]).getByText("100 XLM")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("100 BTC")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("100.00 XLM")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("100.00 BTC")).toBeInTheDocument();
     expect(within(rows[1]).getAllByText("N/A")).toHaveLength(2);
     expect(within(rows[1]).getAllByText("Unavailable")).toHaveLength(2);
   });
