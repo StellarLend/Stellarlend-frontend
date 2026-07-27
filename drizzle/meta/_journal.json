@@ -8,6 +8,20 @@
       "when": 1717243200000,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1730000000000,
+      "tag": "0001_transactions_date_id_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780790400000,
+      "tag": "0002_notification_type_enum",
+      "breakpoints": true
     }
   ]
 }
