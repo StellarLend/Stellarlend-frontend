@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { getMarketsResponse } from '@/hooks/useMarketsData';
 
 export interface UtilizationBarProps {
   asset: string;
@@ -13,11 +13,10 @@ export function UtilizationBar({ asset }: UtilizationBarProps) {
     let isMounted = true;
     setIsLoading(true);
 
-    fetch('/api/markets')
-      .then(res => res.json())
-      .then(data => {
+    getMarketsResponse()
+      .then((data) => {
         if (!isMounted) return;
-        const marketData = data.find((m: any) => m.asset === asset);
+        const marketData = data.markets.find((m) => m.asset === asset);
         if (marketData && typeof marketData.utilization === 'number') {
           // Ensure within 0-100 range
           setUtilization(Math.max(0, Math.min(100, marketData.utilization)));

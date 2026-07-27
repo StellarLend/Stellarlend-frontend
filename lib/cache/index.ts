@@ -13,6 +13,10 @@ export interface CacheEntry<T> {
 export class InMemoryCache {
   private cache = new Map<string, CacheEntry<any>>();
   private revalidatingKeys = new Set<string>();
+  private pendingFetches = new Map<
+    string,
+    Promise<{ value: any; status: 'HIT' | 'STALE' | 'MISS' }>
+  >();
 
   constructor() {}
 
@@ -107,6 +111,7 @@ export class InMemoryCache {
   public clear(): void {
     this.cache.clear();
     this.revalidatingKeys.clear();
+    this.pendingFetches.clear();
   }
 
   /**
@@ -132,56 +137,67 @@ export class InMemoryCache {
     fetcher: () => Promise<T>,
     options: CacheOptions
   ): Promise<{ value: T; status: 'HIT' | 'STALE' | 'MISS' }> {
+    const existingFetch = this.pendingFetches.get(key) as
+      | Promise<{ value: T; status: 'HIT' | 'STALE' | 'MISS' }>
+      | undefined;
+
+    if (existingFetch) {
+      return existingFetch;
+    }
+
     const entry = this.cache.get(key);
     const now = Date.now();
 
-    if (!entry) {
-      // Miss: fetch synchronously
-      const value = await fetcher();
-      this.set(key, value, options);
-      return { value, status: 'MISS' };
-    }
+    if (entry) {
+      const age = now - entry.createdAt;
 
-    const age = now - entry.createdAt;
-
-    if (age < entry.ttl) {
-      // Fresh: absolute hit
-      return { value: entry.value, status: 'HIT' };
-    }
-
-    // Stale but within SWR window
-    if (age < entry.ttl + entry.swr) {
-      // Trigger background revalidation if not already in progress
-      if (!this.revalidatingKeys.has(key)) {
-        this.revalidatingKeys.add(key);
-
-        // Execute background fetch asynchronously
-        fetcher()
-          .then((freshValue) => {
-            this.set(key, freshValue, options);
-          })
-          .catch((err) => {
-            // Error resiliency: log error, but do not delete stale cache entry
-            console.error(`Background revalidation failed for key "${key}":`, err);
-          })
-          .finally(() => {
-            this.revalidatingKeys.delete(key);
-          });
+      if (age < entry.ttl) {
+        return { value: entry.value, status: 'HIT' };
       }
 
-      // Return the stale value immediately
-      return { value: entry.value, status: 'STALE' };
+      if (age < entry.ttl + entry.swr) {
+        if (!this.revalidatingKeys.has(key)) {
+          this.revalidatingKeys.add(key);
+
+          fetcher()
+            .then((freshValue) => {
+              this.set(key, freshValue, options);
+            })
+            .catch((err) => {
+              console.error(`Background revalidation failed for key "${key}":`, err);
+            })
+            .finally(() => {
+              this.revalidatingKeys.delete(key);
+            });
+        }
+
+        return { value: entry.value, status: 'STALE' };
+      }
     }
 
-    // Completely expired: fetch synchronously (acts like a miss)
+    const fetchPromise = (async () => {
+      try {
+        const value = await fetcher();
+        this.set(key, value, options);
+        return { value, status: 'MISS' } as const;
+      } catch (err) {
+        if (entry) {
+          console.error(
+            `Synchronous fetch failed for key "${key}". Falling back to stale value:`,
+            err,
+          );
+          return { value: entry.value, status: 'STALE' } as const;
+        }
+        throw err;
+      }
+    })();
+
+    this.pendingFetches.set(key, fetchPromise);
+
     try {
-      const value = await fetcher();
-      this.set(key, value, options);
-      return { value, status: 'MISS' };
-    } catch (err) {
-      // Fallback to stale value as a safety measure instead of hard crash
-      console.error(`Synchronous fetch failed for key "${key}". Falling back to stale value:`, err);
-      return { value: entry.value, status: 'STALE' };
+      return await fetchPromise;
+    } finally {
+      this.pendingFetches.delete(key);
     }
   }
 }
