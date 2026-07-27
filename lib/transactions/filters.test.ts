@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseTransactionFilter } from './filters';
+import { parseTransactionFilter, serializeTransactionFilters } from './filters';
 import type { FilterValidationResult } from './filters';
 
 function parse(query: string): FilterValidationResult {
@@ -81,6 +81,31 @@ describe('parseTransactionFilter', () => {
         asset: 'XLM',
         fromDate: '2026-01-01',
         toDate: '2026-06-30',
+      });
+    });
+
+    it('round-trips all supported filter fields including search and the All status sentinel', () => {
+      const filters = {
+        type: 'lend',
+        status: 'All' as const,
+        asset: 'XLM',
+        fromDate: '2026-01-01',
+        toDate: '2026-06-30',
+        search: 'hello world',
+      };
+
+      const result = parseTransactionFilter(serializeTransactionFilters(filters));
+
+      expect(result).toStrictEqual({
+        valid: true,
+        filter: {
+          type: 'lend',
+          status: 'All',
+          asset: 'XLM',
+          fromDate: '2026-01-01',
+          toDate: '2026-06-30',
+          search: 'hello world',
+        },
       });
     });
   });

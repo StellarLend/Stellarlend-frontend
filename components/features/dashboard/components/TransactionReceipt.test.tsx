@@ -8,6 +8,19 @@ import {
 import TransactionReceipt from "./TransactionReceipt";
 import type { Transaction } from "@/types/Transaction";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { buildStellarExpertTransactionUrl } from "@/lib/utils/explorer";
+
+// Mock lib/config so the explorer link test has a deterministic network
+vi.mock("@/lib/config", () => ({
+  default: {
+    stellar: { network: "testnet" },
+    app: { name: "Stellarlend", version: "1.0.0", environment: "test" },
+    api: { baseUrl: "http://localhost:3001", timeout: 10000 },
+    rateLimit: { max: 100, window: 60000, account: { limit: 30, windowMs: 60000, burst: 60 } },
+    analytics: {},
+    logging: { level: "debug" },
+  },
+}));
 
 // Mock next/image so JSDOM does not need the Next.js runtime/config.
 vi.mock("next/image", () => ({
@@ -584,6 +597,45 @@ describe("TransactionReceipt Component", () => {
       // Should only contain receipt-related content, no nav/header/footer from main app
       expect(container.querySelector("nav")).not.toBeInTheDocument();
       expect(container.querySelector("header")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Explorer Link Integration with Shared Utility", () => {
+    it("renders explorer link matching buildStellarExpertTransactionUrl when constructed locally", () => {
+      const txHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6abcd";
+      const expectedUrl = buildStellarExpertTransactionUrl(txHash, "TESTNET");
+
+      render(
+        <TransactionReceipt
+          transaction={buildTransaction({ id: txHash })}
+        />,
+      );
+
+      const link = screen.getByText("View on Stellar Expert");
+      expect(link).toHaveAttribute("href", expectedUrl);
+    });
+
+    it("uses details.explorerUrl when provided instead of constructing locally", () => {
+      const customUrl = "https://stellar.explorer.custom/tx/custom123";
+      render(
+        <TransactionReceipt
+          transaction={buildTransaction({ id: "a".repeat(64) })}
+          details={{ explorerUrl: customUrl }}
+        />,
+      );
+
+      const link = screen.getByText("View on Stellar Expert");
+      expect(link).toHaveAttribute("href", customUrl);
+    });
+
+    it("does not render explorer link for non-hash transaction ids", () => {
+      render(
+        <TransactionReceipt
+          transaction={buildTransaction({ id: "TXN-001" })}
+        />,
+      );
+
+      expect(screen.queryByText("View on Stellar Expert")).not.toBeInTheDocument();
     });
   });
 });

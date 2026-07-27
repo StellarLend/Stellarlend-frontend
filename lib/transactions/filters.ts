@@ -10,10 +10,11 @@ export const TRANSACTION_TYPE_OPTIONS = TRANSACTION_TYPES.map((type) => ({
 
 export interface TransactionFilter {
   type?: string;
-  status?: TransactionStatus;
+  status?: TransactionStatus | 'All';
   asset?: TransactionAsset | string;
   fromDate?: string;
   toDate?: string;
+  search?: string;
 }
 
 const ALLOWED_TYPES = new Set<string>(TRANSACTION_TYPES);
@@ -34,6 +35,7 @@ export function serializeTransactionFilters(filters: TransactionFilter): URLSear
   if (filters.asset) params.set('asset', filters.asset);
   if (filters.fromDate) params.set('fromDate', filters.fromDate);
   if (filters.toDate) params.set('toDate', filters.toDate);
+  if (filters.search) params.set('search', filters.search);
 
   return params;
 }
@@ -93,6 +95,11 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
       return { valid: false, filter, error: `Invalid toDate: ${toDate}` };
     }
     filter.toDate = toDate;
+  }
+
+  const search = params.get('search');
+  if (search) {
+    filter.search = search;
   }
 
   return { valid: true, filter };
