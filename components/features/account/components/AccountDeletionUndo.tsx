@@ -34,7 +34,9 @@ export default function AccountDeletionUndo({
       return;
     }
     const timerId = setTimeout(() => {
-      const elapsedSeconds = Math.floor((Date.now() - mountTimeRef.current) / 1000);
+      const elapsedSeconds = Math.floor(
+        (Date.now() - mountTimeRef.current) / 1000,
+      );
       setSecondsRemaining(Math.max(0, durationSeconds - elapsedSeconds));
     }, 1000);
     return () => clearTimeout(timerId);
