@@ -5,6 +5,7 @@ import NavLink from "./NavLink";
 import { NavigationMenu } from "./NavigationMenu";
 import { SideNav } from "./SideNav";
 import { SidebarProvider } from "@/context/SidebarContext";
+import { NavigationMenu } from "./NavigationMenu";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 import { clientLog } from "@/lib/utils/client-log";

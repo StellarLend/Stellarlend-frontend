@@ -6,6 +6,7 @@ import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu, WalletCards } from "lucide-react";
 import NotificationBell from "@/components/shared/layout/NotificationBell";
+import StreamStatusIndicator from "./StreamStatusIndicator";
 import { useWallet } from "@/hooks/useWallet";
 import {
   fetchWalletBalances,

@@ -75,7 +75,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const allTransactions = await fetchTransactionRecords();
-  let transactions = filterTransactions(allTransactions as Transaction[], {
+  let transactions = filterTransactions(allTransactions as any, {
     search: search ?? undefined,
     status: status ?? undefined,
     dateFrom: dateFrom ?? undefined,
@@ -120,7 +120,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const total = transactions.length;
-  const sorted = sortTransactions(transactions, sortBy, sortDir);
+  const sorted = sortTransactions(transactions as any, sortBy, sortDir);
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return NextResponse.json({ transactions: paginated, total });
@@ -160,4 +160,4 @@ async function handlePostTransactions(req: NextRequest) {
 }
 
 export const GET = withRequestLogging('/api/transactions', handleGetTransactions);
-export const POST = withRequestLogging('/api/transactions', (req: NextRequest) => withIdempotency(req, handlePostTransactions));
+export const POST = withRequestLogging('/api/transactions', async (req: NextRequest) => (await withIdempotency(req, handlePostTransactions)) as NextResponse);

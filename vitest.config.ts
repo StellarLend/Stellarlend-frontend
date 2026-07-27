@@ -79,7 +79,7 @@ export default defineConfig({
             "components/shared/layout/**/*.test.tsx",
             "components/shared/common/**/*.test.tsx",
             "components/shared/ui/**/*.test.tsx",
-            "components/features/dashboard/**/*.test.tsx",
+            "components/features/wallet/**/*.test.tsx",
             "components/features/account/**/*.test.tsx",
             "components/features/notifications/**/*.test.tsx",
             "lib/utils/**/*.test.{ts,tsx}",

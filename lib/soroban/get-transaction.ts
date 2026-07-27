@@ -1,37 +1,46 @@
 import config from '@/lib/config';
-import { httpPost } from '@/lib/http/client';
 
-export interface GetTransactionResult {
-  status: 'SUCCESS' | 'FAILED' | 'NOT_FOUND' | string;
+export interface SorobanTransactionStatus {
+  status: 'SUCCESS' | 'FAILED' | 'NOT_FOUND' | 'PENDING' | string;
   raw?: unknown;
 }
 
-export async function getTransaction(hash: string): Promise<GetTransactionResult> {
+export async function getTransaction(hash: string): Promise<SorobanTransactionStatus> {
   const rpcUrl = config.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
-  const requestBody = {
-    jsonrpc: '2.0',
-    id: 'get_transaction',
-    method: 'getTransaction',
-    params: [hash],
-  };
+  const response = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'get_transaction',
+      method: 'getTransaction',
+      params: [hash],
+    }),
+  });
 
-  const response = await httpPost<Record<string, unknown>>(rpcUrl, requestBody);
-
-  if (response && typeof response === 'object' && 'error' in response && response.error) {
-    throw response.error;
+  if (!response.ok) {
+    throw { code: response.status, message: `RPC request failed with HTTP ${response.status}` };
   }
 
-  const result = response?.result as Record<string, unknown> | null | undefined;
+  const data = await response.json();
+
+  if (data.error) {
+    throw data.error;
+  }
+
+  const result = data.result;
   if (!result) {
     return { status: 'NOT_FOUND', raw: null };
   }
 
-  const rawStatus = typeof result.status === 'string' ? result.status.toUpperCase() : 'UNKNOWN';
+  const rawStatus = (result.status || '').toUpperCase();
+  let status = 'NOT_FOUND';
+  if (rawStatus === 'SUCCESS') status = 'SUCCESS';
+  else if (rawStatus === 'FAILED') status = 'FAILED';
+  else if (rawStatus === 'NOT_FOUND') status = 'NOT_FOUND';
+  else if (rawStatus) status = rawStatus;
 
-  return {
-    status: rawStatus,
-    raw: result,
-  };
+  return { status, raw: result };
 }
 
 export default getTransaction;

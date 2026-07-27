@@ -9,13 +9,13 @@ type RouteContext = {
 };
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
   const session = await getSession();
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await context.params;
   const target = getStoredSession(id);
 
   if (!target || target.userId !== session.user.id) {

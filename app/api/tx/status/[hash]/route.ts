@@ -8,20 +8,25 @@ export const runtime = 'nodejs';
 const cache = new SimpleCache<{ status: string; raw?: unknown }>();
 
 function badRequest() {
-  return NextResponse.json({ error: { code: 'INVALID_INPUT', message: 'Invalid transaction hash.' } }, { status: 400 });
+  return NextResponse.json(
+    { error: { code: 'INVALID_INPUT', message: 'Invalid transaction hash.' } },
+    { status: 400 }
+  );
 }
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ hash?: string }> }) {
-  const { hash: rawHash } = await params;
-  const hash = rawHash ?? '';
+  const { hash = '' } = await params;
 
   // Reject non-hex inputs
   if (!hash || !/^[0-9a-fA-F]+$/.test(hash)) return badRequest();
 
   try {
-    const cached = cache.get(hash);
+    const cached = cache.get<{ status: string; raw?: unknown }>(hash);
     if (cached) {
-      return NextResponse.json({ status: cached.status, cached: true, raw: cached.raw ?? null }, { status: 200 });
+      return NextResponse.json(
+        { status: cached.status, cached: true, raw: cached.raw ?? null },
+        { status: 200 }
+      );
     }
 
     const result = await getTransaction(hash);
@@ -30,7 +35,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ has
       cache.set(hash, { status: result.status, raw: result.raw }, DEFAULT_TTL_MS);
     }
 
-    return NextResponse.json({ status: result.status, cached: false, raw: result.raw ?? null }, { status: 200 });
+    return NextResponse.json(
+      { status: result.status, cached: false, raw: result.raw ?? null },
+      { status: 200 }
+    );
   } catch (err) {
     return NextResponse.json({ error: buildSorobanRpcError(err) }, { status: 502 });
   }

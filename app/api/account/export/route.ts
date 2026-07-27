@@ -1,6 +1,6 @@
-import { NextResponse, NextRequest } from "next/server";
-import { processAccountExport } from "@/lib/account/export-bundle";
-import { withCsrfProtection } from "@/lib/api/handler";
+import { NextResponse, NextRequest } from 'next/server';
+import { processAccountExport, exportThrottleStore } from '@/lib/account/export-bundle'; 
+import { withCsrfProtection } from '@/lib/api/handler';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 

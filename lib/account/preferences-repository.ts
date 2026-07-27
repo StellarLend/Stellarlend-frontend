@@ -1,10 +1,8 @@
-// lib/account/preferences-repository.ts
-
 export interface NotificationSettings {
-  emailNotifications: boolean;
-  pushNotifications: boolean;
-  loanAlerts: boolean;
-  marketingEmails: boolean;
+  email: boolean;
+  push: boolean;
+  sms: boolean;
+  inApp: boolean;
 }
 
 export interface UserPreferences {
@@ -16,62 +14,62 @@ export interface UserPreferences {
   updatedAt: Date;
 }
 
-/** Input type for creating/updating preferences (timestamps managed internally). */
 export type UpsertPreferencesInput = {
   userId: string;
-  locale: string;
-  displayCurrency: string;
-  notifications: NotificationSettings;
+  locale?: string;
+  displayCurrency?: string;
+  notifications?: Partial<NotificationSettings>;
 };
 
-/**
- * Default notification settings — all alerts enabled, marketing emails disabled.
- */
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  emailNotifications: true,
-  pushNotifications: true,
-  loanAlerts: true,
-  marketingEmails: false,
+  email: true,
+  push: true,
+  sms: false,
+  inApp: true,
 };
 
-/**
- * In-memory preferences repository.
- *
- * Provides `getByUserId` and `upsert` operations for user preference records.
- * Each instance maintains its own isolated store, making it safe to instantiate
- * fresh copies in tests.
- */
 export class PreferencesRepository {
   private store = new Map<string, UserPreferences>();
 
-  /**
-   * Retrieve preferences for a given user.
-   * @returns The stored preferences, or `null` if no record exists.
-   */
   getByUserId(userId: string): UserPreferences | null {
     return this.store.get(userId) ?? null;
   }
 
-  /**
-   * Insert or update preferences for a user.
-   *
-   * - On first call for a userId, creates a new record with `createdAt` and `updatedAt` set to now.
-   * - On subsequent calls, updates the record while preserving the original `createdAt` and refreshing `updatedAt`.
-   */
-  upsert(input: UpsertPreferencesInput): UserPreferences {
+  upsert(
+    userIdOrInput: string | UpsertPreferencesInput,
+    data?: Partial<UserPreferences>
+  ): UserPreferences {
     const now = new Date();
-    const existing = this.store.get(input.userId);
+
+    let userId: string;
+    let inputData: Partial<UserPreferences>;
+
+    if (typeof userIdOrInput === 'string') {
+      userId = userIdOrInput;
+      inputData = data ?? {};
+    } else {
+      userId = userIdOrInput.userId;
+      inputData = userIdOrInput;
+    }
+
+    const existing = this.store.get(userId);
+
+    const mergedNotifications: NotificationSettings = {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...(existing?.notifications ?? {}),
+      ...(inputData.notifications ?? {}),
+    };
 
     const record: UserPreferences = {
-      userId: input.userId,
-      locale: input.locale,
-      displayCurrency: input.displayCurrency,
-      notifications: { ...input.notifications },
+      userId,
+      locale: inputData.locale ?? existing?.locale ?? 'en-US',
+      displayCurrency: inputData.displayCurrency ?? existing?.displayCurrency ?? 'USD',
+      notifications: mergedNotifications,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
 
-    this.store.set(input.userId, record);
+    this.store.set(userId, record);
     return record;
   }
 }

@@ -48,12 +48,14 @@ export interface SnapshotHistoryResponse {
  */
 export const PositionHistoryParamsSchema = z.object({
   from: z
+    .coerce
     .number()
     .int()
     .positive()
     .optional()
     .describe('Start timestamp in milliseconds (default: 90 days ago)'),
   to: z
+    .coerce
     .number()
     .int()
     .positive()
@@ -86,7 +88,7 @@ export function getIntervalDuration(interval: Interval): number {
  */
 export function validateAndNormalizeParams(
   params: Record<string, unknown>
-): PositionHistoryParams {
+): { from: number; to: number; interval: Interval } {
   const now = Date.now();
   const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
 

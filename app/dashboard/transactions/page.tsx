@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import React, { useMemo, useState } from "react";
+import { IconPlaceholder } from "@/components";
 import { DashboardLayout } from "@/components";
-import { Transactions } from "@/components/shared/common/Transaction";
-import { PageHeader } from "@/components/shared/common";
+import { TransactionExportButton } from "@/components/features/dashboard/components/TransactionExportButton";
 import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
 import { TransactionsSummaryHeader } from "@/components/features/dashboard/components";
-import TransactionExportButton from "@/components/features/dashboard/components/TransactionExportButton";
+import { Transactions } from "@/components/shared/common/Transaction";
+import { PageHeader } from "@/components/shared/common";
 import { useTransactionSummary } from "@/hooks/useTransactionSummary";
 
 const IconPlaceholder = () => <span className="inline-block w-4 h-4 bg-slate-200 animate-pulse rounded" />;

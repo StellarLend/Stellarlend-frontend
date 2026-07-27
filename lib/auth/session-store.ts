@@ -25,6 +25,55 @@ const revocationStore = new Map<string, RevokedSession>();
  */
 const userRevocations = new Map<string, number>();
 
+export interface StoredSession {
+  id: string;
+  userId: string;
+  userAgent?: string;
+  ipAddress?: string;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+const activeSessions = new Map<string, StoredSession>();
+
+export function listStoredSessions(userId: string): StoredSession[] {
+  const result: StoredSession[] = [];
+  for (const session of activeSessions.values()) {
+    if (session.userId === userId) {
+      result.push(session);
+    }
+  }
+  if (result.length === 0) {
+    const now = new Date().toISOString();
+    const defaultSession: StoredSession = {
+      id: `${userId}_default`,
+      userId,
+      userAgent: 'Browser',
+      ipAddress: '127.0.0.1',
+      createdAt: now,
+      lastSeenAt: now,
+    };
+    activeSessions.set(defaultSession.id, defaultSession);
+    return [defaultSession];
+  }
+  return result;
+}
+
+export function touchStoredSession(sessionId: string): void {
+  const session = activeSessions.get(sessionId);
+  if (session) {
+    session.lastSeenAt = new Date().toISOString();
+  }
+}
+
+export function getStoredSession(sessionId: string): StoredSession | null {
+  return activeSessions.get(sessionId) ?? null;
+}
+
+export function revokeStoredSession(sessionId: string): boolean {
+  return activeSessions.delete(sessionId);
+}
+
 // Session TTL in milliseconds (matches AUTH_SESSION_EXPIRY, default 24 hours)
 const SESSION_TTL_MS = (parseInt(process.env.AUTH_SESSION_EXPIRY || '24', 10)) * 60 * 60 * 1000;
 
