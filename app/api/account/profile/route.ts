@@ -50,11 +50,9 @@ const putHandler = async (req: NextRequest): Promise<NextResponse> => {
         return NextResponse.json({ errors: validation.errors }, { status: 422 });
     }
 
-    const record = db.transaction((tx) => {
-        // 1. Update the profile
-        const updatedRecord = profileRepository.upsert(user.id, validation.data, tx) as ProfileRecord;
+    const updatedRecord = await profileRepository.upsert(user.id, validation.data);
 
-        // 2. Queue in-app notification event in the outbox
+    db.transaction((tx) => {
         tx.insert(outboxEvents).values({
             id: crypto.randomUUID(),
             type: 'notification',
@@ -69,13 +67,10 @@ const putHandler = async (req: NextRequest): Promise<NextResponse> => {
             createdAt: new Date(),
         }).run();
 
-        // 3. Queue audit log event in the outbox
         auditLogger.log(tx, user.id, 'profile_update', validation.data);
-
-        return updatedRecord;
     });
 
-    return NextResponse.json(record);
+    return NextResponse.json(updatedRecord);
 };
 
 export const PUT = withCsrfProtection(putHandler);
