@@ -11,17 +11,17 @@ const TestComponent = () => {
 
 describe("CurrencyContext", () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
+    global.fetch = vi.fn();
   });
 
   afterEach(() => {
-    jest.resetAllMocks();
+    vi.resetAllMocks();
   });
 
-  it("fetches and provides the currency preference", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+  it("fetches and provides the displayCurrency preference", async () => {
+    global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ currency: "EUR" }),
+      json: async () => ({ displayCurrency: "EUR" }),
     });
 
     render(
@@ -36,8 +36,25 @@ describe("CurrencyContext", () => {
     });
   });
 
+  it("picks up a non-USD displayCurrency from the preferences endpoint", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ displayCurrency: "BTC" }),
+    });
+
+    render(
+      <CurrencyProvider>
+        <TestComponent />
+      </CurrencyProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("currency")).toHaveTextContent("BTC");
+    });
+  });
+
   it("falls back to USD if preference is unset", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    global.fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({}),
     });
@@ -54,7 +71,7 @@ describe("CurrencyContext", () => {
   });
 
   it("falls back to USD on invalid preference or fetch error", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+    global.fetch.mockRejectedValueOnce(new Error("Network error"));
 
     render(
       <CurrencyProvider>
@@ -65,6 +82,5 @@ describe("CurrencyContext", () => {
     await waitFor(() => {
       expect(screen.getByTestId("error")).toHaveTextContent("Network error");
     });
-    // The state currency is technically still USD internally though.
   });
 });

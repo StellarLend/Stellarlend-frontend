@@ -115,6 +115,12 @@ describe("NotificationBell", () => {
   });
 
   describe("badge and label", () => {
+    it("renders without crashing (smoke test)", () => {
+      // Verifies the component mounts without throwing, catching any
+      // ReferenceError from undefined variables like ariaLabel.
+      expect(() => render(<NotificationBell />)).not.toThrow();
+    });
+
     it("hides the badge and exposes a no-unread label when count is zero", () => {
       render(<NotificationBell />);
       expect(screen.queryByText("99+")).not.toBeInTheDocument();

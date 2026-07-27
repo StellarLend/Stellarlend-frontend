@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   computeLiquidationPriceFactor,
   computeHealthFactor,
@@ -7,6 +7,7 @@ import {
   generateMockPositions,
   SAFE_HEALTH_FACTOR,
 } from './liquidation';
+import { fetchUserPositions } from './fetchPositions';
 
 describe('computeLiquidationPriceFactor', () => {
   it('returns correct factor for normal inputs', () => {
@@ -170,5 +171,70 @@ describe('generateMockPositions', () => {
       expect(pos).toHaveProperty('collateralAsset');
       expect(pos).toHaveProperty('collateralAmount');
     }
+  });
+
+  it('returns different positions for different wallet addresses', () => {
+    const walletA = 'GA1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const walletB = 'GB9876543210ZYXWVUTSRQPONMLKJIHGFEDCBA';
+    const positionsA = generateMockPositions(walletA);
+    const positionsB = generateMockPositions(walletB);
+
+    expect(positionsA).not.toEqual(positionsB);
+  });
+
+  it('returns the same positions for the same wallet address (deterministic)', () => {
+    const wallet = 'GA-DETERMINISTIC-WALLET-TEST-ADDRESS';
+    const first = generateMockPositions(wallet);
+    const second = generateMockPositions(wallet);
+
+    expect(first).toEqual(second);
+  });
+
+  it('returns 1-3 positions per wallet', () => {
+    for (let i = 0; i < 10; i++) {
+      const wallet = `GA-WALLET-${i}-ADDRESS`;
+      const positions = generateMockPositions(wallet);
+      expect(positions.length).toBeGreaterThanOrEqual(1);
+      expect(positions.length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('uses only valid pool assets', () => {
+    const validAssets = ['XLM', 'USDC', 'BTC', 'ETH'];
+    for (let i = 0; i < 20; i++) {
+      const wallet = `GA-ASSET-CHECK-${i}`;
+      const positions = generateMockPositions(wallet);
+      for (const pos of positions) {
+        expect(validAssets).toContain(pos.asset);
+        expect(validAssets).toContain(pos.collateralAsset);
+      }
+    }
+  });
+});
+
+describe('fetchUserPositions', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns deterministic positions when RPC is unavailable', async () => {
+    const wallet = 'GA-TEST-WALLET-FOR-POSITIONS';
+    const positions = await fetchUserPositions(wallet);
+
+    expect(Array.isArray(positions)).toBe(true);
+    expect(positions.length).toBeGreaterThan(0);
+
+    const positions2 = await fetchUserPositions(wallet);
+    expect(positions).toEqual(positions2);
+  });
+
+  it('returns different positions for different wallets', async () => {
+    const walletA = 'GA1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const walletB = 'GB9876543210ZYXWVUTSRQPONMLKJIHGFEDCBA';
+
+    const positionsA = await fetchUserPositions(walletA);
+    const positionsB = await fetchUserPositions(walletB);
+
+    expect(positionsA).not.toEqual(positionsB);
   });
 });

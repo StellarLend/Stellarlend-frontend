@@ -47,17 +47,17 @@ export const sharedRedisConnection = new Redis(redisUrl, {
 });
 
 export const indexerQueue = new Queue(queueNames.indexer, {
-  connection: sharedRedisConnection as any,
+  connection: sharedRedisConnection,
   defaultJobOptions,
 });
 
 export const notificationsQueue = new Queue(queueNames.notifications, {
-  connection: sharedRedisConnection as any,
+  connection: sharedRedisConnection,
   defaultJobOptions,
 });
 
 export const indexerDeadLetterQueue = new Queue(queueNames.indexerDeadLetter, {
-  connection: sharedRedisConnection as any,
+  connection: sharedRedisConnection,
   defaultJobOptions: {
     removeOnComplete: 1_000,
     removeOnFail: 10_000,
@@ -65,7 +65,7 @@ export const indexerDeadLetterQueue = new Queue(queueNames.indexerDeadLetter, {
 });
 
 export const notificationsDeadLetterQueue = new Queue(queueNames.notificationsDeadLetter, {
-  connection: sharedRedisConnection as any,
+  connection: sharedRedisConnection,
   defaultJobOptions: {
     removeOnComplete: 1_000,
     removeOnFail: 10_000,
@@ -90,7 +90,7 @@ export async function enqueue<K extends QueueName>(
   const queue = queueByName[queueName];
   const jobName = jobByQueueName[queueName];
 
-  await queue.add(jobName as any, data as any, options);
+  await queue.add(jobName, data, options);
 }
 
 let shutdownHooksRegistered = false;

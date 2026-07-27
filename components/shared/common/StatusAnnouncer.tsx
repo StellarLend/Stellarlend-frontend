@@ -7,7 +7,7 @@ export type AnnouncerStatus = "idle" | "submitting" | "success" | "error";
 interface StatusAnnouncerProps {
   status: AnnouncerStatus;
   message?: string;
-  type: "lend" | "borrow" | "repay";
+  type: "lend" | "borrow" | "repay" | "withdraw";
 }
 
 export default function StatusAnnouncer({
@@ -41,6 +41,7 @@ export default function StatusAnnouncer({
       role="status"
       aria-live="polite"
       aria-atomic="true"
+      data-testid="status-announcer"
     >
       {announcement}
     </div>

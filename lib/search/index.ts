@@ -1,4 +1,10 @@
-export { useSearchResults, flattenSearchResults, getResultByIndex, getResultsCount } from './useSearchResults';
+export {
+  useSearchResults,
+  toSearchError,
+  flattenSearchResults,
+  getResultByIndex,
+  getResultsCount,
+} from './useSearchResults';
 export type {
   SearchResult,
   SearchResultTransaction,

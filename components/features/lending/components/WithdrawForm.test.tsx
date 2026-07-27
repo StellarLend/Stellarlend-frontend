@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from "@/test/test-utils";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
+import { usePositions } from "@/hooks/usePositions";
 import WithdrawForm, {
   SupplyPosition,
   computeWithdrawHealthFactor,
@@ -11,8 +12,17 @@ import WithdrawForm, {
 vi.mock("@/hooks/useWalletConnection", () => ({
   useWalletConnection: vi.fn(),
 }));
+vi.mock("@/hooks/usePositions", () => ({
+  usePositions: vi.fn(),
+  useCollateralShares: vi.fn(() => ({
+    shares: [],
+    isLoading: false,
+    error: null,
+  })),
+}));
 
 const mockedUseWalletConnection = vi.mocked(useWalletConnection);
+const mockedUsePositions = vi.mocked(usePositions);
 
 const positions: SupplyPosition[] = [
   {
@@ -68,6 +78,16 @@ describe("WithdrawForm", () => {
       connect: vi.fn(),
       disconnect: vi.fn(),
     } as ReturnType<typeof useWalletConnection>);
+
+    mockedUsePositions.mockReturnValue({
+      positions: [],
+      supplyPositions: [],
+      isLoading: false,
+      isStale: false,
+      isOffline: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   describe("rendering", () => {
@@ -176,10 +196,10 @@ describe("WithdrawForm", () => {
       fireEvent.click(screen.getByText(/Review Withdrawal/i));
 
       expect(
-        await screen.findByText(
+        await screen.findAllByText(
           /Please fix the errors in the form before continuing/i,
         ),
-      ).toBeInTheDocument();
+      ).not.toHaveLength(0);
     });
   });
 
@@ -517,8 +537,62 @@ describe("WithdrawForm", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Withdrawal confirmed/i),
-        ).toBeInTheDocument();
+          screen.getAllByText(/Withdrawal confirmed/i).length,
+        ).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("StatusAnnouncer — aria-live withdraw announcements", () => {
+    it("renders a sr-only aria-live region with role=status", () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+      // The StatusAnnouncer always renders a sr-only div with role="status" and aria-live="polite"
+      const announcer = screen.getByTestId("status-announcer");
+      expect(announcer).toBeInTheDocument();
+      expect(announcer).toHaveAttribute("aria-live", "polite");
+      expect(announcer).toHaveAttribute("aria-atomic", "true");
+      expect(announcer).toHaveAttribute("role", "status");
+    });
+
+    it("announces an error when the form is submitted with no amount", async () => {
+      render(<WithdrawForm positions={positions} onSubmit={onSubmit} />);
+
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status-announcer")).toHaveTextContent(
+          /Please fix the errors in the form before continuing/i,
+        );
+      });
+    });
+
+    it("announces success after a valid withdrawal is confirmed", async () => {
+      const user = userEvent.setup();
+      render(
+        <WithdrawForm
+          positions={positions}
+          onSubmit={onSubmit}
+          initialPositionId="supply-2"
+        />,
+      );
+
+      fireEvent.change(screen.getByLabelText(/Withdrawal amount/i), {
+        target: { value: "100" },
+      });
+      fireEvent.click(screen.getByText(/Review Withdrawal/i));
+
+      const dialog = await screen.findByRole("dialog", {
+        name: /confirm withdrawal transaction/i,
+      });
+      await user.click(within(dialog).getByRole("checkbox"));
+      await user.click(
+        within(dialog).getByRole("button", { name: /confirm withdrawal/i }),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status-announcer")).toHaveTextContent(
+          /Withdrawal confirmed/i,
+        );
       });
     });
   });
@@ -591,6 +665,88 @@ describe("WithdrawForm", () => {
         /Supply position/i,
       ) as HTMLSelectElement;
       expect(select.value).toBe("supply-2");
+    });
+  });
+
+  describe("live hook integration (props omitted)", () => {
+    it("renders loading state from usePositions hook", () => {
+      mockedUsePositions.mockReturnValue({
+        positions: [],
+        supplyPositions: [],
+        isLoading: true,
+        isStale: false,
+        isOffline: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<WithdrawForm onSubmit={onSubmit} />);
+
+      expect(
+        screen.getAllByText(/Loading your supply positions/i).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("renders empty state from usePositions hook", () => {
+      mockedUsePositions.mockReturnValue({
+        positions: [],
+        supplyPositions: [],
+        isLoading: false,
+        isStale: false,
+        isOffline: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<WithdrawForm onSubmit={onSubmit} />);
+
+      expect(
+        screen.getByText(/No withdrawable supply positions found/i),
+      ).toBeInTheDocument();
+    });
+
+    it("renders error state from usePositions hook with Retry button, and calls refetch on click", () => {
+      const refetchSpy = vi.fn();
+      mockedUsePositions.mockReturnValue({
+        positions: [],
+        supplyPositions: [],
+        isLoading: false,
+        isStale: true,
+        isOffline: false,
+        error: new Error("Failed to load positions"),
+        refetch: refetchSpy,
+      });
+
+      render(<WithdrawForm onSubmit={onSubmit} />);
+
+      expect(
+        screen.getAllByText(/Unable to load your supply positions/i).length,
+      ).toBeGreaterThan(0);
+
+      const retryButton = screen.getByRole("button", { name: /retry/i });
+      expect(retryButton).toBeInTheDocument();
+
+      fireEvent.click(retryButton);
+      expect(refetchSpy).toHaveBeenCalled();
+    });
+
+    it("renders positions successfully loaded from usePositions hook", () => {
+      mockedUsePositions.mockReturnValue({
+        positions: [],
+        supplyPositions: positions,
+        isLoading: false,
+        isStale: false,
+        isOffline: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<WithdrawForm onSubmit={onSubmit} />);
+
+      const select = screen.getByLabelText(/Supply position/i);
+      expect(select).toBeInTheDocument();
+      expect(screen.getByText(/XLM supply/i)).toBeInTheDocument();
+      expect(screen.getByText(/USDC supply/i)).toBeInTheDocument();
     });
   });
 });
