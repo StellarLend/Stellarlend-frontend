@@ -1,69 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthUser } from '@/lib/auth';
+import { withCsrfProtection } from '@/lib/api/handler';
 import {
   PreferencesRepository,
   DEFAULT_NOTIFICATION_SETTINGS,
-  type UpsertPreferencesInput,
 } from '@/lib/account/preferences-repository';
+import { validatePreferences } from '@/lib/account/preferences-validation';
 
-// Singleton repository instance (will be replaced by a database-backed impl later)
 const repo = new PreferencesRepository();
 
-/**
- * GET /api/account/preferences?userId=<id>
- *
- * Returns the stored preferences for the given user, or 404 if none exist.
- */
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get('userId');
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  if (!userId) {
+  const prefs = repo.getByUserId(user.id);
+
+  if (!prefs) {
+    return NextResponse.json({
+      userId: user.id,
+      locale: 'en-US',
+      displayCurrency: 'USD',
+      notifications: {
+        ...DEFAULT_NOTIFICATION_SETTINGS,
+        email: true,
+        push: true,
+        sms: false,
+        inApp: true,
+      },
+      createdAt: null,
+      updatedAt: null,
+    });
+  }
+
+  return NextResponse.json(prefs);
+}
+
+async function putHandler(request: NextRequest) {
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
     return NextResponse.json(
-      { error: 'Missing required query parameter: userId' },
+      { error: 'Invalid request body' },
       { status: 400 },
     );
   }
 
-  const prefs = repo.getByUserId(userId);
-
-  if (!prefs) {
-    return NextResponse.json(
-      { error: 'Preferences not found for the specified user' },
-      { status: 404 },
-    );
+  const validation = validatePreferences(body);
+  if (!validation.success) {
+    return NextResponse.json({ errors: validation.errors }, { status: 422 });
   }
+
+  const record = repo.upsert(user.id, validation.data);
+  return NextResponse.json(record);
 }
 
-/**
- * PUT /api/account/preferences
- *
- * Upserts preferences for the logged-in user.
- */
-async function putHandler(request: NextRequest) {
-  try {
-    const user = requireAuth(request);
-    if (user instanceof NextResponse) return user;
-
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 }
-      );
-    }
-
-    const validation = validatePreferences(body);
-    if (!validation.success) {
-      return NextResponse.json({ errors: validation.errors }, { status: 422 });
-    }
-
-    const record = await preferencesRepository.upsert(user.id, validation.data);
-    return NextResponse.json(record);
-  } catch (error) {
-    if (error instanceof NextResponse) {
-      return error;
-    }
-    throw error;
-  }
-}
+export const PUT = withCsrfProtection(putHandler);

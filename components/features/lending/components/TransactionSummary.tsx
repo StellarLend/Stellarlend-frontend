@@ -1,4 +1,11 @@
+"use client";
+
+import { useState } from 'react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { useCurrencyPreference } from '@/context/CurrencyContext';
+import { formatCurrency } from '@/lib/utils/format';
+import { Copy } from 'lucide-react';
+import { Toast } from '@/components/shared/common/Toast';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -6,110 +13,19 @@ interface TransactionSummaryProps {
   type: 'lend' | 'borrow' | 'repay' | 'withdraw';
 }
 
-import { useCurrencyPreference } from '@/context/CurrencyContext';
-import { formatCurrency } from '@/lib/utils/format';
-import { Copy } from 'lucide-react';
-import { Toast } from '@/components/shared/common/Toast';
-
-/**
- * Column width (in characters) that every label in the plain-text summary
- * is padded to, so the values that follow line up regardless of how long
- * each label is.
- */
-export const SUMMARY_LABEL_WIDTH = 20;
-
-/**
- * Pad a label (including its trailing colon) out to `SUMMARY_LABEL_WIDTH`
- * characters. Unlike hand-counted spaces in a template string, this stays
- * correct automatically as labels are added, renamed, or reworded — a label
- * longer than the width is left as-is (no truncation) rather than silently
- * misaligning everything after it.
- */
-export function padLabel(label: string): string {
-  return label.padEnd(SUMMARY_LABEL_WIDTH);
-}
-
-function formatDate(daysFromNow: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + daysFromNow);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-/**
- * Serialises the transaction breakdown to plain text
- * for clipboard export.
- *
- * @security Never includes session tokens, wallet keys,
- * or any secret values — display values only.
- */
-export function buildSummaryText(
-  data: LendingData,
-  calculation: CalculationResult | null,
-  type: TransactionSummaryProps['type'],
-): string {
-  const lines = [
-    'Transaction Summary',
-    '==================',
-    '',
-    `${padLabel('Type:')}${type === 'lend' ? 'Lending' : 'Borrowing'}`,
-    `${padLabel('Asset:')}${data.asset}`,
-    `${padLabel('Amount:')}${formatCurrency(data.amount, data.asset)}`,
-    `${padLabel('Interest Rate:')}${data.interestRate.toFixed(1)}% ${type === 'lend' ? 'APY' : 'APR'}`,
-  ];
-
-  if (type === 'borrow' && data.duration) {
-    lines.push(`${padLabel('Duration:')}${data.duration} days`);
+async function copyToClipboard(text: string): Promise<{ success: boolean }> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return { success: true };
+  } catch {
+    return { success: false };
   }
-
-  lines.push(`${padLabel('Start Date:')}${formatDate(0)}`);
-
-  if (data.duration) {
-    lines.push(`${padLabel('End Date:')}${formatDate(data.duration)}`);
-  }
-
-  if (type === 'borrow' && data.collateral && data.collateralAmount) {
-    lines.push('');
-    lines.push('Collateral');
-    lines.push('----------');
-    lines.push(`${padLabel('Asset:')}${data.collateral}`);
-    lines.push(`${padLabel('Amount:')}${formatCurrency(data.collateralAmount, data.collateral)}`);
-    lines.push(`${padLabel('Ratio:')}150%`);
-  }
-
-  if (calculation) {
-    lines.push('');
-    lines.push(type === 'lend' ? 'Expected Returns' : 'Repayment Details');
-    lines.push(type === 'lend' ? '----------------' : '-------------------');
-
-    if (type === 'lend') {
-      lines.push(`${padLabel('Daily Earnings:')}${formatCurrency(calculation.dailyEarnings, data.asset)}`);
-      lines.push(`${padLabel('Total Earnings:')}${formatCurrency(calculation.totalEarnings, data.asset)}`);
-      lines.push(
-        `${padLabel('Total Return:')}${formatCurrency(data.amount + calculation.totalEarnings, data.asset)}`,
-      );
-    } else {
-      if (calculation.monthlyPayment) {
-        lines.push(`${padLabel('Monthly Payment:')}${formatCurrency(calculation.monthlyPayment, data.asset)}`);
-      }
-      lines.push(`${padLabel('Total Interest:')}${formatCurrency(calculation.totalEarnings, data.asset)}`);
-      if (calculation.totalRepayment) {
-        lines.push(`${padLabel('Total Repayment:')}${formatCurrency(calculation.totalRepayment, data.asset)}`);
-      }
-    }
-  }
-
-  lines.push('');
-  lines.push(`${padLabel('Exported at:')}${new Date().toISOString()}`);
-
-  return lines.join('\n');
 }
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
   const { currency } = useCurrencyPreference();
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [toast, setToast] = useState<{ variant: string; title: string; description: string } | null>(null);
 
   const formatValue = (amount: number) => {
     return formatCurrency(amount, 4, currency);

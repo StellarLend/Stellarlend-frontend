@@ -22,7 +22,6 @@ export interface PgPoolLike {
 
 function createPool(): PgPoolLike {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pg = require('pg');
     const PoolClass = pg.Pool || pg.default?.Pool;
     if (PoolClass) {
@@ -36,7 +35,6 @@ function createPool(): PgPoolLike {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const postgres = require('postgres');
     const sql = postgres(process.env.DATABASE_URL || 'postgres://localhost:5432/stellarlend', {
       ssl: buildSslConfig(),
