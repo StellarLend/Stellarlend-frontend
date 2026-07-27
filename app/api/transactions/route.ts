@@ -4,10 +4,7 @@ import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
 import { withIdempotency } from '@/lib/api/idempotency';
 import { fetchTransactionRecords, filterTransactions, paginateTransactionsByCursor } from '@/lib/transactions/repository';
-import {
-  transactionBodySchema,
-  transactionQuerySchema,
-} from '@/lib/validation/schemas/transactions';
+import { parseTransactionParams } from '@/lib/transactions/validator';
 
 export const runtime = 'nodejs';
 
@@ -34,21 +31,19 @@ function firstSchemaError(error: { issues: Array<{ message: string }> }): string
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
+  const { params: validatedParams } = parseTransactionParams(searchParams);
 
-  const parsed = transactionQuerySchema.safeParse({
-    page: searchParams.get('page') ?? undefined,
-    pageSize: searchParams.get('pageSize') ?? undefined,
-    asset: searchParams.get('asset') ?? undefined,
-    type: searchParams.get('type') ?? undefined,
-    status: searchParams.get('status') ?? undefined,
-    search: searchParams.get('search') ?? undefined,
-    dateFrom: searchParams.get('dateFrom') ?? undefined,
-    dateTo: searchParams.get('dateTo') ?? undefined,
-    sortBy: searchParams.get('sortBy') ?? undefined,
-    sortDir: searchParams.get('sortDir') ?? undefined,
-    cursor: searchParams.get('cursor') ?? undefined,
-    limit: searchParams.get('limit') ?? undefined,
-  });
+  const asset = searchParams.get('asset');
+  const type = searchParams.get('type');
+  const status = searchParams.get('status');
+  const search = searchParams.get('search');
+  const dateFrom = searchParams.get('dateFrom') ?? validatedParams.startDate;
+  const dateTo = searchParams.get('dateTo') ?? validatedParams.endDate;
+  const sortBy = parseSortBy(searchParams.get('sortBy'));
+  const sortDir = parseSortDir(searchParams.get('sortDir'));
+  const page = searchParams.has('page') ? validatedParams.page : DEFAULT_PAGE;
+  const pageSize = searchParams.has('pageSize') ? validatedParams.pageSize : DEFAULT_PAGE_SIZE;
+
 
   if (!parsed.success) {
     return NextResponse.json({ error: firstSchemaError(parsed.error) }, { status: 400 });
