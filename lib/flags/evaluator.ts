@@ -16,13 +16,13 @@ export type FlagConfig = {
 export type Flags = Record<string, FlagConfig>;
 
 const CONFIG_PATH = path.resolve(process.cwd(), 'config', 'feature-flags.json');
-let flags: Flags = {};
+let flags: Flags = {};`nlet flagsLoadedAt = 0;`nconst FLAGS_TTL_MS = 60 * 1000; // 60s cache then re-read from disk
 
 export function getFlags(): Flags {
-  if (process.env.NODE_ENV === 'test' || Object.keys(flags).length === 0) {
+  if (process.env.NODE_ENV === 'test' || Object.keys(flags).length === 0 || Date.now() - flagsLoadedAt > FLAGS_TTL_MS) {
     try {
       const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
-      flags = JSON.parse(raw) as Flags;
+      flags = JSON.parse(raw) as Flags;`n      flagsLoadedAt = Date.now();
     } catch (e) {
       flags = {};
     }
