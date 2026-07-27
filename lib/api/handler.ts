@@ -168,5 +168,5 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
         );
       }
     });
-  }) as T;
+  };
 }
