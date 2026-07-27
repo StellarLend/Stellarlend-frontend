@@ -493,6 +493,7 @@ export function MarketsTable({ apiUrl = "/api/markets" }: MarketsTableProps) {
           description={error}
           actionLabel="Retry"
           onAction={fetchMarkets}
+          tone="error"
         />
       </div>
     );
