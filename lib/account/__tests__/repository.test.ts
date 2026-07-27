@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { profileRepository } from '../repository';
 import { db } from '../../db';
 
-vi.mock('../../db', () => {
+const { mockDb, mockSelect, mockInsert } = vi.hoisted(() => {
   const mockSelectResult = [] as any[];
-  const mockSelect = vi.fn(() => ({
+  const select = vi.fn(() => ({
     from: vi.fn(() => ({
       where: vi.fn(() => ({
         limit: vi.fn(async () => mockSelectResult),
@@ -12,19 +12,26 @@ vi.mock('../../db', () => {
     })),
   }));
 
-  const mockInsert = vi.fn(() => ({
-    values: vi.fn(() => ({
-      onConflictDoUpdate: vi.fn(async () => ({})),
+  const insert = vi.fn(() => ({
+    values: vi.fn((vals: any) => ({
+      onConflictDoUpdate: vi.fn(() => ({
+        returning: vi.fn(async () => [vals]),
+        all: vi.fn(() => [vals]),
+        then: vi.fn((resolve) => resolve([vals])),
+      })),
     })),
   }));
 
   return {
-    db: {
-      select: mockSelect,
-      insert: mockInsert,
-    },
+    mockDb: { select, insert },
+    mockSelect: select,
+    mockInsert: insert,
   };
 });
+
+vi.mock('../../db', () => ({ db: mockDb }));
+vi.mock('../../db/client', () => ({ db: mockDb }));
+vi.mock('@/lib/db/client', () => ({ db: mockDb }));
 
 describe('Drizzle Profile Repository', () => {
   beforeEach(() => {
