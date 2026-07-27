@@ -83,6 +83,55 @@ describe("inFlightTxStore", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it("should handle rapid subscribe/unsubscribe churn without leaking listeners", () => {
+    const activeListener = vi.fn();
+    const activeUnsub = subscribeInFlightTxs(activeListener);
+
+    const churnListeners: Array<ReturnType<typeof vi.fn>> = [];
+    // Rapidly subscribe and unsubscribe multiple times (simulating remount-thrashing)
+    for (let i = 0; i < 50; i++) {
+      const l = vi.fn();
+      churnListeners.push(l);
+      const unsub = subscribeInFlightTxs(l);
+      unsub();
+    }
+
+    addInFlightTx({
+      hash: "0xchurn",
+      type: "Supply" as any,
+      amount: 100,
+      asset: "XLM" as any,
+    });
+
+    expect(activeListener).toHaveBeenCalledTimes(1);
+    churnListeners.forEach((l) => {
+      expect(l).not.toHaveBeenCalled();
+    });
+
+    activeUnsub();
+  });
+
+  it("should notify subscribers exactly once when removeInFlightTx removes an existing transaction", () => {
+    addInFlightTx({
+      hash: "0xremove",
+      type: "Supply" as any,
+      amount: 100,
+      asset: "XLM" as any,
+    });
+
+    const listener = vi.fn();
+    const unsubscribe = subscribeInFlightTxs(listener);
+
+    removeInFlightTx("0xremove");
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // Removing a non-existent hash should not trigger notification
+    removeInFlightTx("0xremove");
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
   it("should clear all in-flight transactions", () => {
     addInFlightTx({
       hash: "0x111",
