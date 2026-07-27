@@ -9,6 +9,14 @@ interface DataExportButtonProps {
   className?: string;
 }
 
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
+
 export default function DataExportButton({ className = "" }: DataExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);
@@ -30,12 +38,18 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
     setHasFailed(false);
     showToast("processing", "Preparing your data export...", "This may take a moment.");
 
+    const csrfToken = readCookie("csrf-token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (csrfToken) {
+      headers["x-csrf-token"] = csrfToken;
+    }
+
     try {
       const response = await fetch("/api/account/export", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
       });
 
       const data = await response.json();
@@ -59,12 +73,21 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
       }
 
       if (data.downloadUrl) {
+        // Fetch the file contents from the signed download link as a blob
+        const fileResponse = await fetch(data.downloadUrl);
+        if (!fileResponse.ok) {
+          throw new Error("Failed to download the data export archive file.");
+        }
+        const blob = await fileResponse.blob();
+        const downloadUrlObj = URL.createObjectURL(blob);
+
         const link = document.createElement("a");
-        link.href = data.downloadUrl;
+        link.href = downloadUrlObj;
         link.download = `stellarlend-export-${Date.now()}.zip`;
         document.body.appendChild(link);
         link.click();
         link.remove();
+        URL.revokeObjectURL(downloadUrlObj);
 
         showToast(
           "success",
