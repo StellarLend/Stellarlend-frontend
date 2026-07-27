@@ -73,7 +73,13 @@ describe('Auth API Endpoints', () => {
     
     const res2 = await VerifyPOST(req2);
     expect(res2.status).toBe(200);
-    
+
+    const headers = Object.fromEntries(res2.headers.entries());
+    expect(headers['set-cookie']).toBeDefined();
+    expect(headers['set-cookie']).toContain('session=');
+    expect(headers['set-cookie']).toContain('HttpOnly');
+    expect(headers['set-cookie']).toContain('Path=/');
+
     const body2 = await res2.json();
     expect(body2.success).toBe(true);
     expect(body2.walletAddress).toBe(clientKeypair.publicKey());
