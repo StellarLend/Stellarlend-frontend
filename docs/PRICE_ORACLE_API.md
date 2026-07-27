@@ -195,42 +195,31 @@ try {
 ```
 
 ### React Hook Example
+### React Hook Example
+
+Import and use the real `usePrices` hook from `hooks/usePrices.ts`:
 
 ```typescript
-import { useEffect, useState } from 'react';
-import type { PriceResponse } from '@/lib/prices';
+import { usePrices } from '@/hooks/usePrices';
 
-export function usePrices(assets?: string[]) {
-  const [prices, setPrices] = useState<Record<string, number> | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+function MyComponent() {
+  const { getPriceLabel, isLoading, hasError, refresh } = usePrices(['XLM', 'USDC']);
 
-  useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        const url = new URL('/api/prices', window.location.origin);
-        if (assets?.length) {
-          url.searchParams.set('assets', assets.join(','));
-        }
-
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch prices');
-
-        const data: PriceResponse = await response.json();
-        setPrices(data.prices);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPrices();
-  }, [assets]);
-
-  return { prices, loading, error };
+  return (
+    <div>
+      <p>XLM Price: {getPriceLabel('XLM')}</p>
+      <p>USDC Price: {getPriceLabel('USDC')}</p>
+      {isLoading && <p>Loading...</p>}
+      {hasError && <p>Failed to load prices.</p>}
+      <button onClick={refresh}>Refresh</button>
+    </div>
+  );
 }
 ```
+
+The real hook provides session caching, in-flight request de-duplication, and
+stale-while-revalidate semantics. See `hooks/usePrices.ts` for the full
+implementation.
 
 ## Testing
 

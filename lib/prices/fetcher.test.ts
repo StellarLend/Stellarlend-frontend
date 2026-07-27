@@ -3,12 +3,26 @@
  * Tests for upstream price fetching and response validation
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchUpstreamPrices, isValidUpstreamResponse } from '@/lib/prices/fetcher';
 
 describe('fetchUpstreamPrices', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalPriceOracleApiKey = process.env.PRICE_ORACLE_API_KEY;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.NODE_ENV = 'test';
+    delete process.env.PRICE_ORACLE_API_KEY;
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    if (originalPriceOracleApiKey === undefined) {
+      delete process.env.PRICE_ORACLE_API_KEY;
+    } else {
+      process.env.PRICE_ORACLE_API_KEY = originalPriceOracleApiKey;
+    }
   });
 
   describe('Mock Implementation', () => {
@@ -86,6 +100,15 @@ describe('fetchUpstreamPrices', () => {
     it('should validate response structure', async () => {
       const result = await fetchUpstreamPrices(['XLM']);
       expect(isValidUpstreamResponse(result)).toBe(true);
+    });
+
+    it('should throw when PRICE_ORACLE_API_KEY is missing in production', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.PRICE_ORACLE_API_KEY;
+
+      await expect(fetchUpstreamPrices(['XLM'])).rejects.toThrow(
+        'PRICE_ORACLE_API_KEY not configured',
+      );
     });
   });
 

@@ -32,7 +32,7 @@ export const indexerWorker = new Worker(
     });
   },
   {
-    connection: indexerWorkerConnection as any,
+    connection: indexerWorkerConnection,
   }
 );
 

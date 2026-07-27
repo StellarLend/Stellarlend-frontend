@@ -1,12 +1,12 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { IconButton } from '@/components/atoms/IconButton/IconButton';
-import { IconPlaceholder } from '@/components/shared/ui/icons/IconPlaceholder';
-import useNotificationStream from '@/hooks/useNotificationStream';
-import { useNotificationPins } from '@/hooks/useNotificationPins';
-import { type DateGroup } from '@/lib/notifications/grouping';
-import type { Notification } from '@/lib/notifications/types';
-import NotificationCenter from './NotificationCenter';
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import dynamic from "next/dynamic";
+import { IconButton } from "@/components/atoms/IconButton/IconButton";
+import { IconPlaceholder } from "@/components/shared/ui/icons/IconPlaceholder";
+import useNotificationStream from "@/hooks/useNotificationStream";
+import { useNotificationPins } from "@/hooks/useNotificationPins";
+import { type DateGroup } from "@/lib/notifications/grouping";
+import type { Notification } from "@/lib/notifications/types";
+import NotificationCenter from "./NotificationCenter";
 
 const NotificationIcon = dynamic(
   () =>
@@ -94,13 +94,15 @@ const NotificationBell = () => {
 
       if (triggerRef.current?.contains(target)) return;
 
-      const panel = document.querySelector('[data-testid="notification-panel"]');
+      const panel = document.querySelector(
+        '[data-testid="notification-panel"]',
+      );
       if (panel && panel.contains(target)) return;
 
       closePanel();
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, closePanel]);
 
   useEffect(() => {
@@ -191,8 +193,11 @@ const NotificationBell = () => {
     });
   }, []);
 
-  const displayCount = unreadCount > 99 ? '99+' : unreadCount.toString();
+  const displayCount = unreadCount > 99 ? "99+" : unreadCount.toString();
   const showBadge = unreadCount > 0;
+  const ariaLabel = showBadge
+    ? `Notifications, ${displayCount} unread`
+    : "Notifications";
 
   return (
     <div className="relative inline-block">

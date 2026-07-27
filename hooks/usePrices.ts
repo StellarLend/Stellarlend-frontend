@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PRICE_CACHE_CONFIG } from "@/lib/prices/constants";
 import type { PriceResponse } from "@/lib/prices/types";
 import { formatCurrency } from "@/lib/utils/format";
@@ -108,6 +108,14 @@ export function usePrices(assets: string[]): UsePricesResult {
     [assets.join(",")],
   );
 
+  // Callers typically pass a fresh array literal (e.g. usePrices(['XLM','USDC']))
+  // on every render, so `assets` itself is not a stable dependency. `symbolsKey`
+  // is the stable, memoized identity for a given set of symbols; the ref lets
+  // the effect and refresh() read the latest array contents without needing
+  // `assets` in their dependency lists.
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
+
   const [entry, setEntry] = useState<CacheEntry | null>(
     () => sessionCache.get(symbolsKey) ?? null,
   );
@@ -126,7 +134,7 @@ export function usePrices(assets: string[]): UsePricesResult {
       setIsLoading(true);
     }
 
-    loadPrices(assets).then((result) => {
+    loadPrices(assetsRef.current).then((result) => {
       if (active) {
         setEntry(result);
         setIsLoading(false);
@@ -136,13 +144,13 @@ export function usePrices(assets: string[]): UsePricesResult {
     return () => {
       active = false;
     };
-  }, [symbolsKey, assets]);
+  }, [symbolsKey]);
 
   const refresh = useCallback(async () => {
-    const result = await loadPrices(assets);
+    const result = await loadPrices(assetsRef.current);
     setEntry(result);
     setIsLoading(false);
-  }, [assets]);
+  }, []);
 
   const getPriceLabel = useCallback(
     (symbol: string): string => {

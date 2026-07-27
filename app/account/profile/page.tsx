@@ -2,11 +2,8 @@
 import { DisplayProfileForm, DataExportButton, PreferencesForm, AccountDeletion } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
 import { PageHeader } from "@/components/shared/common";
-import { usePathname } from "next/navigation";
 
 export default function Account() {
-  const pathname = usePathname();
-
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8">
       <div className="flex flex-col md:flex-row gap-6 max-w-6xl mx-auto">

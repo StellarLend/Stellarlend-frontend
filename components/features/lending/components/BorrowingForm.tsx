@@ -4,26 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { LendingData } from "@/app/lending/page";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
-import { ASSETS } from "@/lib/assets";
+import { useWalletBalances } from "@/hooks/useWalletBalances";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
-import {
-  FALLBACK_PRICES,
-  MAX_TARGET_HEALTH_FACTOR,
-  MIN_TARGET_HEALTH_FACTOR,
-  calculateCollateralForTargetHealth,
-  clampTargetHealthFactor,
-  calculateProjectedBorrowHealth,
+import { calculateProjectedBorrowHealth,
   calculateRequiredCollateralAmount,
+  clampTargetHealthFactor,
+  calculateCollateralForTargetHealth,
   getHealthBand,
   isProjectedBorrowCollateralized,
+  MAX_TARGET_HEALTH_FACTOR,
+  MIN_TARGET_HEALTH_FACTOR,
+  FALLBACK_PRICES,
   type PriceMap,
 } from "@/lib/lending/health";
 import { useMarketRates } from "@/hooks/useMarketRates";
+import { LeverageSlider } from "./LeverageSlider";
 
 interface BorrowingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -111,9 +111,9 @@ export default function BorrowingForm({
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
-
-  const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
-  const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
+  const { assetsWithBalances } = useWalletBalances();
+  const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
+  const collateralAsset = assetsWithBalances.find((a) => a.symbol === formData.collateral);
   const assetKey = formData.asset?.toUpperCase();
   const fallbackInterestRate =
     (assetKey && assetKey in INTEREST_RATES
@@ -359,8 +359,6 @@ export default function BorrowingForm({
   // ---------------------------------------------------------------------------
   // Form validation / submission
   // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -459,11 +457,11 @@ export default function BorrowingForm({
           </label>
           <div className="grid grid-cols-2 gap-4">
             <AssetSelector
-              assets={ASSETS}
+              assets={assetsWithBalances}
               value={formData.asset}
               label="Asset to Borrow"
               interestRates={Object.fromEntries(
-                ASSETS.map((asset) => [
+                assetsWithBalances.map((asset) => [
                   asset.symbol,
                   asset.symbol === assetKey
                     ? resolvedBorrowRate
@@ -521,6 +519,29 @@ export default function BorrowingForm({
           }}
           precision={selectedAsset?.precision ?? 2}
           max={selectedAsset?.balance ?? 0}
+        />
+
+        {/* Leverage Slider */}
+        <LeverageSlider
+          value={formData.amount || 0}
+          onChange={(amount) => {
+            setFormData((prev) => ({
+              ...prev,
+              amount,
+            }));
+            if (errors.amount) {
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.amount;
+                return next;
+              });
+            }
+          }}
+          collateralAmount={collateralAmount}
+          collateralAsset={formData.collateral ?? ""}
+          borrowAsset={formData.asset ?? ""}
+          borrowApr={resolvedBorrowRate}
+          prices={priceMap}
         />
 
         {/* Loan Duration */}
@@ -643,7 +664,7 @@ export default function BorrowingForm({
         {/* Collateral Selection */}
         <div>
           <AssetSelector
-            assets={ASSETS}
+            assets={assetsWithBalances}
             value={formData.collateral ?? ""}
             label="Collateral Asset"
             onChange={(collateral) => {

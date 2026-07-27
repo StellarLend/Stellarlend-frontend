@@ -7,10 +7,9 @@ vi.mock("@/hooks/usePositionHistory", () => ({
   usePositionHistory: vi.fn(),
 }));
 
-const mockUsePositionHistory = vi.mocked(
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  (await import("@/hooks/usePositionHistory")).usePositionHistory
-);
+import { usePositionHistory } from "@/hooks/usePositionHistory";
+
+const mockUsePositionHistory = vi.mocked(usePositionHistory);
 
 describe("NetWorthTrend Component", () => {
   beforeEach(() => {

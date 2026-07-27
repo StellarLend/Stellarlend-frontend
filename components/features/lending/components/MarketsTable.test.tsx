@@ -483,4 +483,62 @@ describe("MarketsTable", () => {
       ).toBeInTheDocument();
     });
   });
+
+  describe("skeleton loading accessibility", () => {
+    it("desktop skeleton exposes aria-busy and aria-label on the table element", () => {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
+      render(<MarketsTable />);
+
+      // The <table> inside MarketsTableSkeleton carries aria-busy="true"
+      const table = screen.getByRole("table");
+      expect(table).toHaveAttribute("aria-busy", "true");
+
+      // The wrapping div carries aria-label="Loading markets"
+      expect(
+        screen.getByLabelText("Loading markets"),
+      ).toBeInTheDocument();
+    });
+
+    it("mobile skeleton exposes the same aria-busy and aria-label as the desktop skeleton", () => {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
+      render(<MarketsTable />);
+
+      // Both skeletons sit inside data-testid="markets-loading"
+      const loadingWrapper = screen.getByTestId("markets-loading");
+
+      // Every element labelled "Loading markets" (desktop wrapper + mobile wrapper)
+      const labelledRegions = within(loadingWrapper).getAllByLabelText(
+        "Loading markets",
+      );
+
+      // At least two: one for the desktop table wrapper, one for the mobile card wrapper
+      expect(labelledRegions.length).toBeGreaterThanOrEqual(2);
+
+      // All of them must advertise aria-busy="true"
+      for (const region of labelledRegions) {
+        expect(region).toHaveAttribute("aria-busy", "true");
+      }
+    });
+
+    it("both skeleton variants have identical loading semantics regardless of viewport", () => {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
+      render(<MarketsTable />);
+
+      const loadingWrapper = screen.getByTestId("markets-loading");
+      const labelledRegions = within(loadingWrapper).getAllByLabelText(
+        "Loading markets",
+      );
+
+      // Collect the unique set of aria-label values — should all be identical
+      const labels = new Set(
+        labelledRegions.map((el) => el.getAttribute("aria-label")),
+      );
+      const busyValues = new Set(
+        labelledRegions.map((el) => el.getAttribute("aria-busy")),
+      );
+
+      expect(labels).toEqual(new Set(["Loading markets"]));
+      expect(busyValues).toEqual(new Set(["true"]));
+    });
+  });
 });

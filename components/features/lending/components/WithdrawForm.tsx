@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LendingData } from "@/lib/lending/types";
+import type { LendingData } from "@/lib/lending/types";
 import type { SupplyPosition as HookSupplyPosition } from "@/hooks/usePositions";
+import { usePositions } from "@/hooks/usePositions";
 import { Input } from "@/components/shared/ui/Input";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import Button from "@/components/shared/ui/Button";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import HealthFactorBadge from "@/components/shared/ui/HealthFactorBadge";
-import { WalletGate } from "@/components/shared/ui/WalletGate";
 import PositionSummary from "@/components/features/dashboard/components/PositionSummary";
 import {
   CRITICAL_HEALTH_FACTOR_THRESHOLD,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/lending/health";
 import { cn } from "@/lib/utils/cn";
 import ConfirmModal from "./ConfirmModal";
+import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
 
 export interface SupplyPosition extends HookSupplyPosition {}
 
@@ -25,9 +27,10 @@ interface WithdrawFormProps {
   initialPositionId?: string;
   isLoading?: boolean;
   error?: Error | null;
+  refetch?: () => void;
 }
 
-const DEFAULT_POSITIONS: SupplyPosition[] = [
+export const DEFAULT_POSITIONS: SupplyPosition[] = [
   {
     id: "xlm-supply-001",
     asset: "XLM",
@@ -70,19 +73,31 @@ export function computeWithdrawHealthFactor(
 
 export default function WithdrawForm({
   onSubmit,
-  positions,
+  positions: propPositions,
   initialPositionId,
-  isLoading = false,
-  error = null,
+  isLoading: propIsLoading,
+  error: propError,
+  refetch: propRefetch,
 }: WithdrawFormProps) {
-  const resolvedPositions = positions ?? DEFAULT_POSITIONS;
+  const {
+    supplyPositions: hookPositions,
+    isLoading: hookIsLoading,
+    error: hookError,
+    refetch: hookRefetch,
+  } = usePositions();
+
+  const resolvedPositions = propPositions ?? hookPositions;
+  const isLoading = propIsLoading ?? (propPositions === undefined ? hookIsLoading : false);
+  const error = propError ?? (propPositions === undefined ? hookError : null);
+  const refetch = propRefetch ?? hookRefetch;
+
   const [selectedPositionId, setSelectedPositionId] = useState(
     initialPositionId ?? resolvedPositions[0]?.id ?? "",
   );
   const [amount, setAmount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitStatus, setSubmitStatus] = useState<
-    "idle" | "success" | "error"
+    "idle" | "submitting" | "success" | "error"
   >("idle");
   const [submitMessage, setSubmitMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -260,8 +275,21 @@ export default function WithdrawForm({
             Unable to load your supply positions right now.
           </p>
         </div>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          Unable to load your supply positions. Please try again.
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span>Unable to load your supply positions. Please try again.</span>
+          {refetch && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-red-700 border-red-300 hover:bg-red-100 self-start sm:self-auto"
+              onClick={() => {
+                refetch();
+              }}
+            >
+              Retry
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -278,6 +306,8 @@ export default function WithdrawForm({
           open borrows cannot be withdrawn.
         </p>
       </div>
+
+      <StatusAnnouncer status={submitStatus} type="withdraw" message={submitMessage} />
 
       {submitMessage && (
         <div
