@@ -1,14 +1,14 @@
-interface FastSecureProps {
+interface FastSecureIconProps {
   className?: string;
   width?: string | number;
   height?: string | number;
 }
 
-export const FastSecure = ({
+export const FastSecureIcon = ({
   className = "",
   width = "400",
   height = "400",
-}: FastSecureProps) => {
+}: FastSecureIconProps) => {
   return (
     <svg
       className={className}
