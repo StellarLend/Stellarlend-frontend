@@ -35,3 +35,30 @@ export function serializeTransactionsToCSV(transactions: Transaction[]): string 
 
   return [header, ...rows].join('\r\n');
 }
+
+export function escapeCsvField(value: string): string {
+  const needsQuotes = /[,="\n\r]/.test(value) || /^[=+\-@]/.test(value);
+  if (!needsQuotes) return value;
+  const escaped = value.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+export function transactionsToCsv(transactions: any[]): string {
+  const header = 'id,userId,type,amount,asset,status,timestamp,txHash';
+  const rows = transactions.map((t) => {
+    return [
+      t.id,
+      t.userId,
+      t.type,
+      t.amount?.toString() ?? '',
+      t.asset ?? '',
+      t.status,
+      t.timestamp ?? '',
+      t.txHash ?? '',
+    ]
+      .map((val) => escapeCsvField(val))
+      .join(',');
+  });
+  return [header, ...rows].join('\n');
+}
+

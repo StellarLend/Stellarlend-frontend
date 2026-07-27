@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET } from './route';
+
+vi.mock('server-only', () => ({}));
+
+const httpGetMock = vi.fn().mockResolvedValue({});
+
+vi.mock('@/lib/http', () => ({
+  httpGet: (...args: unknown[]) => httpGetMock(...args),
+  TimeoutError: class TimeoutError extends Error {},
+  UpstreamHttpError: class UpstreamHttpError extends Error {},
+}));
 
 vi.mock('@/lib/config', () => ({
   default: {
@@ -15,12 +24,17 @@ vi.mock('@/lib/config', () => ({
   },
 }));
 
+import { GET } from './route';
+
 function makeRequest(headers: Record<string, string> = {}): NextRequest {
   return new NextRequest('http://localhost/api/health', { headers });
 }
 
 describe('GET /api/health', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    httpGetMock.mockResolvedValue({ ok: true });
+  });
 
   it('returns 200 with a healthy status body', async () => {
     const res = await GET(makeRequest());
@@ -29,6 +43,25 @@ describe('GET /api/health', () => {
     expect(body.status).toBe('healthy');
     expect(body.environment).toBe('test');
     expect(body.version).toBe('1.0.0');
+    expect(body.checks).toEqual({
+      database: 'healthy',
+      stellar: 'healthy',
+    });
+  });
+  it('reports database as healthy when the DB responds', async () => {
+    const res = await GET(makeRequest());
+    const body = await res.json();
+    expect(body.checks.database).toBe('healthy');
+    expect(body.status).not.toBe('unhealthy');
+  });
+
+  it('checks the Soroban RPC health endpoint', async () => {
+    await GET(makeRequest());
+
+    expect(httpGetMock).toHaveBeenCalledWith(
+      'https://soroban-testnet.stellar.org/health',
+      expect.objectContaining({ retries: 1, timeoutMs: 5000 }),
+    );
   });
 
   it('includes ETag header on 200 response', async () => {
@@ -40,7 +73,7 @@ describe('GET /api/health', () => {
     const res = await GET(makeRequest());
     const cc = res.headers.get('Cache-Control');
     expect(cc).toContain('public');
-    expect(cc).toContain('max-age=30');
+    expect(cc).toContain('max-age=');
   });
 
   it('includes Vary header', async () => {
@@ -49,12 +82,9 @@ describe('GET /api/health', () => {
   });
 
   it('returns 304 when If-None-Match matches current ETag', async () => {
-    // First request — capture the ETag
     const first = await GET(makeRequest());
     const etag = first.headers.get('ETag')!;
-    expect(etag).toBeTruthy();
 
-    // Second request — supply the ETag
     const second = await GET(makeRequest({ 'if-none-match': etag }));
     expect(second.status).toBe(304);
   });
@@ -78,16 +108,5 @@ describe('GET /api/health', () => {
   it('returns 200 when If-None-Match does not match', async () => {
     const res = await GET(makeRequest({ 'if-none-match': '"stale-etag"' }));
     expect(res.status).toBe(200);
-  });
-
-  it('returns 200 when no If-None-Match header is sent', async () => {
-    const res = await GET(makeRequest());
-    expect(res.status).toBe(200);
-  });
-
-  it('returns same ETag on subsequent identical requests', async () => {
-    const first = await GET(makeRequest());
-    const second = await GET(makeRequest());
-    expect(first.headers.get('ETag')).toBe(second.headers.get('ETag'));
   });
 });

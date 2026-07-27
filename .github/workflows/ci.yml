@@ -13,11 +13,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -25,6 +27,8 @@ jobs:
 
       - name: Run linting
         run: npm run lint
+        env:
+          ESLINT_USE_FLAT_CONFIG: "false"
 
       - name: Type checking
         run: npx tsc --noEmit
@@ -34,7 +38,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage/lcov.info
           flags: unittests

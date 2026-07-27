@@ -1,148 +1,124 @@
-import { AllEndpointsUnhealthyError } from './errors';
+import { metrics } from '@/lib/metrics/registry';
 
-export interface EndpointConfig {
+const DEFAULT_ERROR_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 3;
+const CIRCUIT_BREAKER_OPEN_MS = 30 * 1000; // 30 seconds
+const MIN_EFFECTIVE_WEIGHT = 0.1;
+
+export interface HorizonEndpoint {
   url: string;
-  /** Relative weight for selection (higher = preferred). Default 1. */
-  weight?: number;
+  host: string;
 }
 
-export interface CircuitBreakerOptions {
-  /** Number of consecutive failures before tripping an endpoint. Default 3. */
-  failureThreshold?: number;
-  /** Milliseconds the circuit stays open before allowing a half-open probe. Default 30 000. */
-  openMs?: number;
+interface EndpointState extends HorizonEndpoint {
+  currentWeight: number;
+  successes: number[];
+  failures: number[];
+  lastFailureAt: number | null;
 }
 
-interface InternalEndpoint {
-  url: string;
-  weight: number;
-  effectiveWeight: number;
-  failureCount: number;
-  lastFailureAt: number;
-  tripped: boolean;
+function normalizeHorizonUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl.trim());
+    return url.toString().replace(/\/+$/, '');
+  } catch {
+    throw new Error(`Invalid Horizon URL: ${rawUrl}`);
+  }
 }
 
-const DEFAULT_FAILURE_THRESHOLD = 3;
-const DEFAULT_OPEN_MS = 30_000;
+function pruneWindow(records: number[], now: number, windowMs: number): number[] {
+  return records.filter((timestamp) => now - timestamp <= windowMs);
+}
 
 export class HorizonSelector {
-  private readonly endpoints: InternalEndpoint[];
-  private readonly failureThreshold: number;
-  private readonly openMs: number;
+  private endpoints: EndpointState[];
 
-  constructor(
-    endpoints: EndpointConfig[],
-    options?: CircuitBreakerOptions,
-  ) {
-    if (endpoints.length === 0) {
-      throw new Error('HorizonSelector requires at least one endpoint');
+  constructor(urls: string[]) {
+    if (!urls.length) {
+      throw new Error('HorizonSelector requires at least one Horizon endpoint URL');
     }
 
-    this.failureThreshold = options?.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD;
-    this.openMs = options?.openMs ?? DEFAULT_OPEN_MS;
+    const normalizedUrls = Array.from(
+      new Set(urls.map((url) => normalizeHorizonUrl(url))),
+    );
 
-    this.endpoints = endpoints.map((ep) => ({
-      url: ep.url,
-      weight: ep.weight ?? 1,
-      effectiveWeight: ep.weight ?? 1,
-      failureCount: 0,
-      lastFailureAt: 0,
-      tripped: false,
+    if (!normalizedUrls.length) {
+      throw new Error('HorizonSelector requires at least one valid Horizon endpoint URL');
+    }
+
+    this.endpoints = normalizedUrls.map((url) => ({
+      url,
+      host: new URL(url).host,
+      currentWeight: 0,
+      successes: [],
+      failures: [],
+      lastFailureAt: null,
     }));
   }
 
-  /**
-   * Select the best available endpoint using weighted random selection.
-   *
-   * Throws `AllEndpointsUnhealthyError` when every configured endpoint is
-   * currently tripped (circuit breaker open).
-   */
-  selectEndpoint(): string {
-    this.recoverHalfOpenEndpoints();
-
-    const available = this.endpoints.filter((ep) => !ep.tripped);
-
-    if (available.length === 0) {
-      throw new AllEndpointsUnhealthyError(this.endpoints.length);
-    }
-
-    const totalWeight = available.reduce((sum, ep) => sum + ep.effectiveWeight, 0);
-    let random = Math.random() * totalWeight;
-
-    for (const ep of available) {
-      random -= ep.effectiveWeight;
-      if (random <= 0) {
-        return ep.url;
-      }
-    }
-
-    return available[available.length - 1].url;
-  }
-
-  /**
-   * Record a successful request — resets the failure count and restores
-   * the endpoint's effective weight.
-   */
-  recordSuccess(url: string): void {
-    const ep = this.findEndpoint(url);
-    if (!ep) return;
-    ep.failureCount = 0;
-    ep.tripped = false;
-    ep.effectiveWeight = ep.weight;
-  }
-
-  /**
-   * Record a failed request — increments the failure count and, once the
-   * threshold is crossed, trips the endpoint (opens the circuit).
-   */
-  recordFailure(url: string): void {
-    const ep = this.findEndpoint(url);
-    if (!ep) return;
-
-    ep.failureCount += 1;
-    ep.lastFailureAt = Date.now();
-
-    if (ep.failureCount >= this.failureThreshold) {
-      ep.tripped = true;
-      ep.effectiveWeight = 0;
-    }
-  }
-
-  /** Return a snapshot of every endpoint's current health status. */
-  getStatus(): Array<{
-    url: string;
-    weight: number;
-    effectiveWeight: number;
-    failureCount: number;
-    tripped: boolean;
-  }> {
-    this.recoverHalfOpenEndpoints();
-    return this.endpoints.map((ep) => ({
-      url: ep.url,
-      weight: ep.weight,
-      effectiveWeight: ep.effectiveWeight,
-      failureCount: ep.failureCount,
-      tripped: ep.tripped,
-    }));
-  }
-
-  // ── internals ──────────────────────────────────────────────────────
-
-  /**
-   * If an endpoint's circuit has been open longer than `openMs`, allow a
-   * single half-open probe by untripping it and restoring minimal weight.
-   */
-  private recoverHalfOpenEndpoints(): void {
+  selectEndpoint(): HorizonEndpoint {
     const now = Date.now();
-    for (const ep of this.endpoints) {
-      if (ep.tripped && now - ep.lastFailureAt >= this.openMs) {
-        ep.tripped = false;
-        ep.effectiveWeight = 1;
+    let totalWeight = 0;
+
+    for (const endpoint of this.endpoints) {
+      endpoint.successes = pruneWindow(endpoint.successes, now, DEFAULT_ERROR_WINDOW_MS);
+      endpoint.failures = pruneWindow(endpoint.failures, now, DEFAULT_ERROR_WINDOW_MS);
+
+      const failureCount = endpoint.failures.length;
+      const successCount = endpoint.successes.length;
+      const isTripped =
+        failureCount >= CIRCUIT_BREAKER_FAILURE_THRESHOLD &&
+        endpoint.lastFailureAt !== null &&
+        now - endpoint.lastFailureAt < CIRCUIT_BREAKER_OPEN_MS;
+
+      const errorRate =
+        successCount + failureCount === 0 ? 0 : failureCount / (successCount + failureCount);
+      const effectiveWeight = isTripped
+        ? 0
+        : Math.max(MIN_EFFECTIVE_WEIGHT, 1 - errorRate);
+
+      endpoint.currentWeight += effectiveWeight;
+      totalWeight += effectiveWeight;
+    }
+
+    let selected = this.endpoints[0];
+    for (const endpoint of this.endpoints) {
+      if (endpoint.currentWeight > selected.currentWeight) {
+        selected = endpoint;
       }
     }
+
+    if (totalWeight > 0) {
+      selected.currentWeight -= totalWeight;
+    }
+
+    metrics.horizonSelections.inc({ host: selected.host });
+    return { url: selected.url, host: selected.host };
   }
 
-  private findEndpoint(url: string): InternalEndpoint | undefined {
-    return this.endpoints.find((ep) => ep.url === url);
+  recordSuccess(url: string): void {
+    const endpoint = this.endpoints.find((entry) => entry.url === normalizeHorizonUrl(url));
+    if (!endpoint) return;
+    endpoint.successes.push(Date.now());
+  }
+
+  recordFailure(url: string): void {
+    const endpoint = this.endpoints.find((entry) => entry.url === normalizeHorizonUrl(url));
+    if (!endpoint) return;
+    endpoint.failures.push(Date.now());
+    endpoint.lastFailureAt = Date.now();
+  }
+
+  getUrls(): string[] {
+    return this.endpoints.map((endpoint) => endpoint.url);
+  }
+
+  reset(): void {
+    this.endpoints.forEach((endpoint) => {
+      endpoint.currentWeight = 0;
+      endpoint.successes = [];
+      endpoint.failures = [];
+      endpoint.lastFailureAt = null;
+    });
   }
 }

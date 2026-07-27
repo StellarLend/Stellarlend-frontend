@@ -5,6 +5,12 @@ import { createHmac, timingSafeEqual } from "crypto";
  */
 export const DEFAULT_TOLERANCE_MS = 5 * 60 * 1000;
 
+/**
+ * Maximum number of distinct nonces tracked within the tolerance window.
+ * Once exceeded, the oldest entry is evicted to bound memory usage.
+ */
+export const NONCE_STORE_MAX_ENTRIES = 10_000;
+
 // ---------------------------------------------------------------------------
 // Signature verification
 // ---------------------------------------------------------------------------
@@ -39,15 +45,19 @@ export function verifyWebhookSignature(
     .update(payload)
     .digest("hex");
 
-  // timingSafeEqual requires equal-length buffers
-  if (receivedHex.length !== expectedHex.length) {
-    return false;
-  }
+  // Constant-time comparison: pad shorter buffer with zeros to match length
+  const receivedBuf = Buffer.from(receivedHex, "hex");
+  const expectedBuf = Buffer.from(expectedHex, "hex");
 
-  return timingSafeEqual(
-    Buffer.from(receivedHex, "hex"),
-    Buffer.from(expectedHex, "hex"),
-  );
+  // Create buffers of equal length by padding the shorter one
+  const maxLength = Math.max(receivedBuf.length, expectedBuf.length);
+  const receivedPadded = Buffer.alloc(maxLength);
+  const expectedPadded = Buffer.alloc(maxLength);
+
+  receivedBuf.copy(receivedPadded);
+  expectedBuf.copy(expectedPadded);
+
+  return timingSafeEqual(receivedPadded, expectedPadded);
 }
 
 /**
@@ -96,14 +106,25 @@ interface NonceEntry {
 /**
  * In-memory nonce store that tracks recently-seen event nonces to prevent
  * replay attacks. Old entries are automatically pruned when new ones are added.
+ *
+ * The store is bounded by two constraints:
+ * 1. Time-based: entries older than `toleranceMs` are pruned on every operation.
+ * 2. Count-based: if more than `NONCE_STORE_MAX_ENTRIES` distinct nonces
+ *    accumulate within the tolerance window, the oldest entry is evicted
+ *    to prevent unbounded memory growth during traffic spikes or replay floods.
  */
 export class NonceStore {
   private readonly entries: NonceEntry[] = [];
   private readonly seen: Set<string> = new Set();
   private readonly toleranceMs: number;
+  private readonly maxEntries: number;
 
-  constructor(toleranceMs: number = DEFAULT_TOLERANCE_MS) {
+  constructor(
+    toleranceMs: number = DEFAULT_TOLERANCE_MS,
+    maxEntries: number = NONCE_STORE_MAX_ENTRIES,
+  ) {
     this.toleranceMs = toleranceMs;
+    this.maxEntries = maxEntries;
   }
 
   /** Returns `true` if the nonce has already been processed. */
@@ -112,10 +133,17 @@ export class NonceStore {
     return this.seen.has(nonce);
   }
 
-  /** Record a nonce as processed. */
+  /** Record a nonce as processed. Evicts oldest if at max capacity. */
   add(nonce: string, timestamp: number): void {
     this.prune();
     if (!this.seen.has(nonce)) {
+      // Enforce maximum entries cap: evict oldest-first
+      while (this.entries.length >= this.maxEntries) {
+        const evicted = this.entries.shift();
+        if (evicted) {
+          this.seen.delete(evicted.nonce);
+        }
+      }
       this.seen.add(nonce);
       this.entries.push({ nonce, timestamp });
     }

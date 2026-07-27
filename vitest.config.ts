@@ -25,6 +25,20 @@ export default defineConfig({
 
   test: {
     globals: true,
+    env: {
+      NEXT_PUBLIC_APP_NAME: 'Stellarlend',
+      NEXT_PUBLIC_APP_VERSION: '1.0.0',
+      NEXT_PUBLIC_APP_ENV: 'development',
+      NEXT_PUBLIC_API_BASE_URL: 'http://localhost:3001',
+      NEXT_PUBLIC_STELLAR_NETWORK: 'testnet',
+      NEXT_PUBLIC_STELLAR_HORIZON_URL: 'https://horizon-testnet.stellar.org',
+      NEXT_PUBLIC_SOROBAN_RPC_URL: 'https://soroban-testnet.stellar.org',
+      API_RATE_LIMIT_MAX: '100',
+      API_RATE_LIMIT_WINDOW_MS: '60000',
+      TX_ACCOUNT_RATE_LIMIT_MAX: '30',
+      TX_ACCOUNT_RATE_LIMIT_WINDOW_MS: '60000',
+      TX_ACCOUNT_RATE_LIMIT_BURST: '60',
+    },
 
     projects: [
       {
@@ -50,15 +64,32 @@ export default defineConfig({
 
       {
         extends: true,
-
         test: {
           name: "accessibility",
           environment: "jsdom",
           setupFiles: "./vitest.setup.ts",
 
           include: [
+            "app/page.test.tsx",
+            "app/lending/**/*.test.tsx",
+            "app/account/sessions/**/*.test.tsx",
+            "app/account/profile/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
+            "components/atoms/Button/Button.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
+            "components/shared/layout/**/*.test.tsx",
+            "components/shared/common/**/*.test.tsx",
+            "components/shared/ui/**/*.test.tsx",
+            "components/features/wallet/**/*.test.tsx",
+            "components/features/account/**/*.test.tsx",
+            "components/features/notifications/**/*.test.tsx",
+            "lib/utils/**/*.test.{ts,tsx}",
+            "lib/search/**/*.test.ts",
+            "components/features/lending/**/*.test.tsx",
+            "context/**/*.test.{ts,tsx}",
+            "hooks/**/*.test.{ts,tsx}",
+            "components/marketing/**/*.test.tsx",
+            "app/security/**/*.test.tsx",
           ],
         },
       },
@@ -72,15 +103,32 @@ export default defineConfig({
 
           include: [
             "types/enums.test.ts",
+            "types/Transaction.test.ts",
+            "app/api/markets/route.test.ts",
             "app/api/transactions/route.test.ts",
+            "app/api/liquidations/route.test.ts",
+            "app/api/notifications/[id]/route.test.ts",
+            "app/api/auth/logout/route.test.ts",
+            "app/api/stream/prices/route.test.ts",
+            "__tests__/**/*.test.ts",
+            "lib/streams/**/*.test.ts",
+            "lib/soroban/**/*.test.ts",
+            "lib/indexer/**/*.test.ts",
+            "scripts/**/*.test.ts",
           ],
         },
       },
       {
+        extends: true,
         test: {
           name: "server",
           environment: "node",
-          include: ["test/server/**/*.test.ts"],
+          globals: true,
+          setupFiles: "./vitest.setup.ts",
+          include: [
+            "test/server/**/*.test.ts",
+            "app/api/**/*.test.ts",
+          ],
           alias: {
             "@": path.resolve(dirname, "."),
           },
@@ -94,8 +142,16 @@ export default defineConfig({
       include: [
         "app/api/**",
         "lib/**",
+        "components/atoms/Tooltip/Tooltip.tsx",
         "components/atoms/IconButton/IconButton.tsx",
+        "components/shared/ui/AmountInput.tsx",
         "components/shared/layout/TopNav.tsx",
+        "components/shared/layout/NavLink.tsx",
+        "components/shared/layout/NavigationMenu.tsx",
+        "components/shared/layout/Navbar.tsx",
+        "components/shared/layout/SideNav.tsx",
+        "components/shared/common/PriceTicker.tsx",
+        "constants/design-tokens.ts",
         "types/enums.ts",
         "app/api/transactions/route.ts",
         "app/api/webhooks/transactions/route.ts",

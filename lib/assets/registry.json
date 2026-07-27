@@ -1,0 +1,32 @@
+{
+  "assets": [
+    {
+      "symbol": "XLM",
+      "name": "Stellar Lumens",
+      "decimals": 7,
+      "issuer": "native",
+      "logoUrl": "https://assets.coingecko.com/coins/images/100/standard/stellar.png"
+    },
+    {
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "decimals": 6,
+      "issuer": "GBUQWP3BOUZX34TROJODA25QQV3MQBSBLAYWXBX3Z2HQ2QGMHGZS26RP",
+      "logoUrl": "https://assets.coingecko.com/coins/images/6319/standard/usdc.png"
+    },
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "decimals": 7,
+      "issuer": "GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ65JJLDHKHRUZI3EUEKMTCH",
+      "logoUrl": "https://assets.coingecko.com/coins/images/1/standard/bitcoin.png"
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "decimals": 7,
+      "issuer": "GBBD47UZQ5YKVDQGOFJZS7NOXOGGYAZFHUJX3DTVHP4IOOVHZG4CKXRY",
+      "logoUrl": "https://assets.coingecko.com/coins/images/279/standard/ethereum.png"
+    }
+  ]
+}

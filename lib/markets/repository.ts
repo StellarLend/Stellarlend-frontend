@@ -1,4 +1,3 @@
-import config from '@/lib/config';
 import { ASSET_SYMBOLS, type AssetSymbol } from '@/types/enums';
 import type { AssetMarket, MarketsResponse } from './types';
 
@@ -16,7 +15,7 @@ const BASE_MARKETS: Record<AssetSymbol, Omit<AssetMarket, 'asset'>> = {
  *
  * Production integration steps:
  *   1. Install `@stellar/stellar-sdk` and import `SorobanRpc`.
- *   2. Point the server at `config.stellar.sorobanRpcUrl` (set via NEXT_PUBLIC_SOROBAN_RPC_URL).
+ *   2. Point the server at `serverConfig.stellar.sorobanRpcUrl` (set via SOROBAN_RPC_URL).
  *   3. Invoke the lending pool contract method `get_reserve_data(asset_address)` for each asset.
  *   4. Set the contract ID via env var: SOROBAN_LENDING_POOL_CONTRACT_ID.
  *   5. Decode the XDR ScVal response to extract liquidity_rate (supplyApr),
@@ -24,7 +23,7 @@ const BASE_MARKETS: Record<AssetSymbol, Omit<AssetMarket, 'asset'>> = {
  *      utilization_rate fields.
  *
  * Example (not yet wired up):
- *   const server = new SorobanRpc.Server(config.stellar.sorobanRpcUrl);
+ *   const server = new SorobanRpc.Server(serverConfig.stellar.sorobanRpcUrl);
  *   const account = await server.getAccount(sourceKeypair.publicKey());
  *   const tx = buildGetReserveDataTx(account, contractId, assetAddress);
  *   const sim = await server.simulateTransaction(tx);
@@ -53,7 +52,7 @@ export async function fetchMarkets(assets: AssetSymbol[]): Promise<MarketsRespon
   return {
     markets,
     timestamp: new Date().toISOString(),
-    source: `Soroban RPC stub (${config.stellar.sorobanRpcUrl})`,
+    source: 'Soroban RPC stub (server relay)',
   };
 }
 

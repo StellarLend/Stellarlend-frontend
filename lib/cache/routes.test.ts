@@ -107,7 +107,7 @@ describe('API Caching Routes Integration', () => {
       expect(response.status).toBe(500);
       
       const body = await response.json();
-      expect(body.error).toBe('Failed to fetch prices');
+      expect(body.error).toBe('Simulated URL parsing error');
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
     });
@@ -115,7 +115,9 @@ describe('API Caching Routes Integration', () => {
 
   describe('GET /api/positions', () => {
     it('should fetch public positions as a MISS', async () => {
-      const req = new NextRequest('http://localhost/api/positions');
+      const req = new NextRequest('http://localhost/api/positions', {
+        headers: { 'x-public-positions': 'true' }
+      });
       const response = await positionsGET(req);
       
       expect(response.status).toBe(200);
@@ -129,10 +131,14 @@ describe('API Caching Routes Integration', () => {
     });
 
     it('should return cached positions as a HIT', async () => {
-      const req1 = new NextRequest('http://localhost/api/positions');
+      const req1 = new NextRequest('http://localhost/api/positions', {
+        headers: { 'x-public-positions': 'true' }
+      });
       await positionsGET(req1);
       
-      const req2 = new NextRequest('http://localhost/api/positions');
+      const req2 = new NextRequest('http://localhost/api/positions', {
+        headers: { 'x-public-positions': 'true' }
+      });
       const response = await positionsGET(req2);
       
       expect(response.status).toBe(200);
@@ -180,7 +186,7 @@ describe('API Caching Routes Integration', () => {
       expect(response.status).toBe(500);
       
       const body = await response.json();
-      expect(body.error).toBe('Failed to fetch positions');
+      expect(body.error).toBe('Internal server error');
       expect(consoleErrorSpy).toHaveBeenCalled();
       consoleErrorSpy.mockRestore();
     });

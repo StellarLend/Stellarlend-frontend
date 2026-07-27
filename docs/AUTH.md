@@ -285,6 +285,25 @@ Different secrets for:
 - Staging (unique secrets)
 - Production (secure, rotated secrets)
 
+## Authorisation (RBAC)
+
+`/lib/auth.ts` is concerned only with **authentication** — proving who the
+caller is. The **authorisation** layer (deciding what an authenticated caller
+is allowed to do) lives in [`lib/auth/rbac.ts`](../lib/auth/rbac.ts) and is
+fully documented in [`docs/rbac.md`](./rbac.md).
+
+Read [`docs/rbac.md`](./rbac.md) for:
+
+- The `Role` enum (`user` / `ops` / `admin`) and the case-sensitive matching rule.
+- How the `role` claim is minted into the session JWT.
+- `requireAdmin` / `requireOpsOrAdmin` / `hasRole` guard helpers — including the
+  401 vs 403 outcomes that client code should distinguish.
+- A copy-pasteable template for protecting a new admin/ops route and an
+  end-to-end error matrix.
+
+If you are granting the admin role for the first time, also see
+[`docs/admin-onboarding.md`](./admin-onboarding.md).
+
 ## Testing
 
 ### Run Tests
@@ -382,6 +401,41 @@ AUTH_SESSION_EXPIRY=48
 # Check that the secret is the same
 echo $AUTH_SECRET # Should be identical everywhere
 ```
+
+## End-to-End Testing & Mocking
+
+The codebase includes comprehensive Playwright E2E tests for the wallet connection journey (connect → connected → disconnect). Because browser extensions (like Freighter) cannot run in headless CI environments, we mock the injected wallet provider (`window.stellar`).
+
+### How Mocking Works
+
+In our Playwright specs (e.g., `test/e2e/wallet-connect.spec.ts`), we stub the wallet API using Playwright’s initialization hook `page.addInitScript`.
+
+1. **Expose Node.js Signer:**
+   We expose a secure cryptographic signing helper `mockSignTransaction` from the Node test environment to the browser context using `page.exposeFunction()`. This helper parses the challenge transaction XDR and signs it using a mock client Keypair:
+   ```typescript
+   await page.exposeFunction('mockSignTransaction', async (xdr: string) => {
+     const tx = TransactionBuilder.fromXDR(xdr, Networks.TESTNET);
+     tx.sign(mockClientKeypair);
+     return tx.toXDR();
+   });
+   ```
+
+2. **Inject `window.stellar`:**
+   We stub `window.stellar` on page load:
+   ```typescript
+   await page.addInitScript(({ publicKey }) => {
+     window.stellar = {
+       getPublicKey: async () => publicKey,
+       signTransaction: async (xdr) => window.mockSignTransaction(xdr)
+     };
+   }, { publicKey: mockClientPublicKey });
+   ```
+
+3. **Running the E2E Suite:**
+   Run the E2E tests locally or in CI using:
+   ```bash
+   npm run test:e2e
+   ```
 
 ## Further Reading
 

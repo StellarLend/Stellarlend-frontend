@@ -59,6 +59,20 @@ Manually invalidates/removes a single key from the cache.
 ### `globalCache.clear()`
 Purges all cache entries and resets the revalidation keys.
 
+### `globalCache.invalidateNamespaces(namespaces)`
+Invalidates all cache keys that belong to the provided namespaces. A namespace is
+matched when a cache key is exactly equal to the namespace or when it starts
+with `${namespace}:` (for example `markets:assets:XLM` will match the
+`markets` namespace). The method returns the number of deleted keys.
+
+Supported namespaces (common examples):
+- `prices` — price oracle cache keys (e.g. `prices:all`, `prices:XLM`)
+- `markets` — market data cache keys (e.g. `markets:assets:XLM`)
+- `idempotency` — idempotency records (e.g. `idempotency:<hash>`)
+
+This API is used by the internal deployment invalidation endpoint
+`POST /api/internal/cache/invalidate` which accepts `{ namespaces: string[] }`.
+
 ---
 
 ## 🔒 Security & Cache Key Safety

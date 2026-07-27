@@ -23,7 +23,7 @@ describe('GET /api/markets', () => {
     const body = await res.json();
     expect(body.markets).toHaveLength(4);
     expect(body.timestamp).toBeDefined();
-    expect(body.source).toBeDefined();
+    expect(body.source).toBe('Soroban RPC stub (server relay)');
   });
 
   it('returns cached data on subsequent request as HIT', async () => {

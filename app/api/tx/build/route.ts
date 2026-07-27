@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
+import serverConfig from '@/lib/server-config';
 import { httpPost } from '@/lib/http/client';
+import { getSession } from '@/lib/auth';
+import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
+import {
+  buildSorobanSimulationApiError,
+  getSorobanSimulationStatus,
+  simulateSorobanTransaction,
+} from '@/lib/soroban/simulate';
 import {
   buildSorobanRpcError,
   buildSorobanTransactionRpcRequest,
   extractUnsignedXdr,
   isTxBuildRequest,
-  TxBuildRequest,
 } from '@/lib/soroban/tx';
+import {
+  isSorobanRpcErrorResponse,
+  SorobanRpcResponseSchema,
+  type SorobanRpcResponse,
+} from '@/lib/soroban/types';
 
 export const runtime = 'nodejs';
 
@@ -41,6 +53,34 @@ export async function POST(request: NextRequest) {
     return invalidBody();
   }
 
+  const session = await getSession();
+  const walletAddress = session?.user?.walletAddress;
+
+  if (walletAddress) {
+    const accountLimit = accountBucketRateLimit(walletAddress, config.rateLimit.account);
+    if (!accountLimit.success) {
+      const response = NextResponse.json(
+        {
+          error: {
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Account rate limit exceeded. Please try again later.',
+            limit: accountLimit.limit,
+            remaining: accountLimit.remaining,
+            reset: accountLimit.reset,
+            retryAfter: accountLimit.retryAfter,
+          },
+        },
+        { status: 429 },
+      );
+
+      response.headers.set('X-RateLimit-Limit', accountLimit.limit.toString());
+      response.headers.set('X-RateLimit-Remaining', accountLimit.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', accountLimit.reset.toString());
+      response.headers.set('Retry-After', accountLimit.retryAfter.toString());
+      return response;
+    }
+  }
+
   if (!config.stellar.sorobanContractId) {
     return NextResponse.json(
       {
@@ -54,29 +94,49 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = buildSorobanTransactionRpcRequest(
-    body as TxBuildRequest,
+    body,
     config.stellar.sorobanContractId,
     config.stellar.network,
+    { fee: body.fee ?? serverConfig.stellar.transactionFee },
   );
 
   try {
-    const rpcResponse = await httpPost<unknown>(config.stellar.sorobanRpcUrl, payload, {
+    const rawResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
     });
 
-    if (typeof rpcResponse === 'object' && rpcResponse && 'error' in rpcResponse) {
+    const parsedResponse = SorobanRpcResponseSchema.safeParse(rawResponse);
+    if (!parsedResponse.success) {
+      return rpcFailure();
+    }
+
+    const rpcResponse = parsedResponse.data;
+
+    if (isSorobanRpcErrorResponse(rpcResponse)) {
       return NextResponse.json(
-        { error: buildSorobanRpcError((rpcResponse as any).error) },
+        { error: buildSorobanRpcError(rpcResponse.error) },
         { status: 502 },
       );
     }
 
-    const unsignedXdr = extractUnsignedXdr((rpcResponse as any).result ?? rpcResponse);
+    const unsignedXdr = extractUnsignedXdr(rpcResponse.result);
     if (!unsignedXdr) {
       return rpcFailure();
     }
 
-    return NextResponse.json({ unsignedXdr }, { status: 200 });
+    try {
+      const simulation = await simulateSorobanTransaction(
+        serverConfig.stellar.sorobanRpcUrl,
+        unsignedXdr,
+      );
+
+      return NextResponse.json({ unsignedXdr, simulation }, { status: 200 });
+    } catch (error) {
+      return NextResponse.json(
+        { error: buildSorobanSimulationApiError(error) },
+        { status: getSorobanSimulationStatus(error) },
+      );
+    }
   } catch (error) {
     return NextResponse.json(
       { error: buildSorobanRpcError(error) },

@@ -1,15 +1,27 @@
-import { TransactionStatus } from "../../types/Transaction";
+import {
+  ASSET_SYMBOLS,
+  TRANSACTION_STATUSES,
+  isAssetSymbol,
+  isTransactionStatus,
+  type AssetSymbol,
+  type TransactionStatus,
+} from "@/types/enums";
 
-const VALID_STATUSES = new Set(["Completed", "Processing", "Failed"]);
-const VALID_ASSETS = new Set(["XLM", "BTC", "STRK"]);
+const VALID_STATUSES = new Set<string>(TRANSACTION_STATUSES);
+const VALID_ASSETS = new Set<string>(ASSET_SYMBOLS);
+
+function parseIntegerParam(value: string | null, fallback: number) {
+  const parsed = parseInt(value || String(fallback), 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
 
 export function parseTransactionParams(searchParams: URLSearchParams) {
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-  const rawPageSize = parseInt(searchParams.get("pageSize") || "10", 10);
+  const page = Math.max(1, parseIntegerParam(searchParams.get("page"), 1));
+  const rawPageSize = parseIntegerParam(searchParams.get("pageSize"), 10);
   const pageSize = Math.min(100, Math.max(1, rawPageSize)); // Clamped to 100 max
   const sort = searchParams.get("sort") || "date-desc";
   const status = searchParams.get("status") as TransactionStatus | null;
-  const asset = searchParams.get("asset") as "XLM" | "BTC" | "STRK" | null;
+  const asset = searchParams.get("asset") as AssetSymbol | null;
   const startDate = searchParams.get("startDate");
   const endDate = searchParams.get("endDate");
 
@@ -19,6 +31,7 @@ export function parseTransactionParams(searchParams: URLSearchParams) {
 
   return {
     params: { page, pageSize, sort, status, asset, startDate, endDate },
-    errors: errors.length > 0 ? errors : null
+    errors: errors.length > 0 ? errors : null,
   };
 }
+

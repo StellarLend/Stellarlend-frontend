@@ -1,43 +1,53 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { navClasses } from "@/constants/design-tokens";
+import { clientLog } from "@/lib/utils/client-log";
+
+interface NavLinkProps {
+  href: string;
+  children: React.ReactNode;
+  /** Extra Tailwind classes; optional */
+  className?: string;
+  /** Override active detection (e.g. for hash links or stories) */
+  isActive?: boolean;
+}
+
+/** Shared active-indicator bar */
+const ActiveBar = ({ active }: { active: boolean }) => (
+  <span
+    className={`absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] transition-opacity ${
+      active ? "opacity-100" : "opacity-0 group-hover:opacity-50"
+    }`}
+    aria-hidden="true"
+  />
+);
 
 const NavLink = ({
   href,
   children,
   className = "",
-}: {
-  href: string;
-  children: React.ReactNode;
-  className: string;
-}) => {
+  isActive: isActiveProp,
+}: NavLinkProps) => {
   const pathname = usePathname();
 
   if (!href) {
-    console.warn("NavLink requires a valid href prop.");
+    clientLog.warn("NavLink requires a valid href prop.");
     return null;
   }
 
-  const isActive = pathname === href;
-  const isHashLink = typeof href === "string" && href.startsWith("#");
+  const isActive = isActiveProp ?? pathname === href;
+  const stateClasses = isActive ? navClasses.active : navClasses.inactive;
+  const linkClasses = `${navClasses.base} ${navClasses.touchTarget} ${stateClasses} ${className}`;
 
-  if (isHashLink) {
+  if (href.startsWith("#")) {
     return (
       <a
         href={href}
-        className={`
-          group flex items-center gap-2 px-4 py-3.5 rounded-lg font-medium transition-all duration-200 relative
-          focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2
-          ${isActive ? 'bg-[#15A350]/10 text-[#15A350]' : 'text-[#AAABAB] hover:bg-gray-100 hover:text-[#15A350]'}
-          ${className}
-        `}
-        aria-current={isActive ? 'page' : undefined}
+        className={linkClasses}
+        aria-current={isActive ? "page" : undefined}
       >
-        {/* Active indicator */}
-        <span
-          className={`absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
-          aria-hidden="true"
-        />
+        <ActiveBar active={isActive} />
         {children}
       </a>
     );
@@ -46,19 +56,10 @@ const NavLink = ({
   return (
     <Link
       href={href}
-      className={`
-        group flex items-center gap-2 px-4 py-3.5 rounded-lg font-medium transition-all duration-200 relative
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2
-        ${isActive ? 'bg-[#15A350]/10 text-[#15A350]' : 'text-[#AAABAB] hover:bg-gray-100 hover:text-[#15A350]'}
-        ${className}
-      `}
-      aria-current={isActive ? 'page' : undefined}
+      className={linkClasses}
+      aria-current={isActive ? "page" : undefined}
     >
-      {/* Active indicator */}
-      <span
-        className={`absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
-        aria-hidden="true"
-      />
+      <ActiveBar active={isActive} />
       {children}
     </Link>
   );

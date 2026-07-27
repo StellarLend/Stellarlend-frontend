@@ -1,5 +1,4 @@
-export { httpGet, httpPost } from './client';
-export { HorizonSelector } from './horizon-selector';
+export { httpFetch, httpGet, httpPost } from './client';
 export {
   AllEndpointsUnhealthyError,
   HttpError,

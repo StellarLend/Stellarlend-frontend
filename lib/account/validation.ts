@@ -1,11 +1,12 @@
 import { z } from "zod";
+import { sanitiseRecord } from "@/lib/security/input-sanitizer";
 
 export const profileSchema = z.object({
     displayName: z
         .string()
+        .trim()
         .min(1, "Display name is required")
-        .max(80, "Display name must be 80 characters or fewer")
-        .trim(),
+        .max(80, "Display name must be 80 characters or fewer"),
 
     bio: z
         .string()
@@ -36,7 +37,8 @@ export function validateProfile(raw: unknown):
     | { success: false; errors: Record<string, string> } {
     const result = profileSchema.safeParse(raw);
     if (result.success) {
-        return { success: true, data: result.data };
+        const sanitized = sanitiseRecord(result.data);
+        return { success: true, data: sanitized };
     }
 
     const errors: Record<string, string> = {};

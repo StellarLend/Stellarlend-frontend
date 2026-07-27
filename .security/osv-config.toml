@@ -1,0 +1,5 @@
+# Local configuration for OSV-Scanner anomalies
+[IgnoreVulnerabilities]
+# Example template entry:
+# id = "GHSA-c2qf-rxjj-qqgw"
+# reason = "Unreachable code path in production build framework."

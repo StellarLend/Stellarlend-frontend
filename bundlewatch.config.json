@@ -1,6 +1,10 @@
 {
   "files": [
     {
+      "path": ".next/static/chunks/app/lending/**/*.js",
+      "maxSize": "150kb"
+    },
+    {
       "path": ".next/static/chunks/pages/*.js",
       "maxSize": "250kb"
     },

@@ -1,49 +1,62 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import NavLink from './NavLink';
+import type { Meta, StoryObj } from "@storybook/react";
+import NavLink from "./NavLink";
+import { NavigationMenu } from "./NavigationMenu";
 
 const meta: Meta = {
-  title: 'Design System/Navigation States',
-  parameters: {
-    layout: 'centered',
-  },
+  title: "Design System/Navigation States",
+  parameters: { layout: "centered" },
 };
-
 export default meta;
 
-export const ActiveStates: StoryObj = {
+/** All NavLink states side-by-side */
+export const NavLinkStates: StoryObj = {
   render: () => (
-    <div className="flex flex-col md:flex-row gap-8 p-8 bg-gray-50 dark:bg-neutral-900 rounded-xl">
-      {/* Light Theme Sidebar Example */}
-      <div className="w-64 flex flex-col gap-4">
-        <h3 className="text-sm font-semibold text-gray-500 mb-2">Light Context (Sidebar)</h3>
-        <NavLink href="/active" className="bg-[#15A350]/10 text-[#15A350]">
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] opacity-100" />
-          Active Link
-        </NavLink>
-        <NavLink href="/inactive" className="text-gray-600">
-          Inactive Link
-        </NavLink>
-        <NavLink href="/hover" className="text-gray-600 bg-gray-100 text-[#15A350]">
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] opacity-50" />
-          Hover State
-        </NavLink>
-      </div>
+    <div className="flex flex-col gap-2 p-6 bg-white rounded-xl w-64">
+      <p className="text-xs font-semibold text-gray-400 mb-1">NavLink states</p>
+      {/* Active — forced via isActive prop so story works outside Next.js router */}
+      <NavLink href="/dashboard" isActive>Active link</NavLink>
+      {/* Inactive */}
+      <NavLink href="/settings">Inactive link</NavLink>
+      {/* Focus-visible — use :focus-visible pseudo in browser devtools or Tab key */}
+      <NavLink href="/focus-demo" className="[&:focus-visible]:ring-2 [&:focus-visible]:ring-[#15A350]">
+        Focus-visible (Tab to me)
+      </NavLink>
+    </div>
+  ),
+};
 
-      {/* Dark Theme SideNav Example */}
-      <div className="w-64 flex flex-col gap-4 p-4 bg-black rounded-lg">
-        <h3 className="text-sm font-semibold text-gray-400 mb-2">Dark Context (SideNav)</h3>
-        <div className="relative group flex items-center gap-2 px-4 py-3.5 rounded-lg font-medium transition-all duration-200 bg-[#15A350]/15 text-[#15A350]">
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] opacity-100" />
-          <span className="ml-2 font-semibold">Active Menu Item</span>
-        </div>
-        <div className="relative group flex items-center gap-2 px-4 py-3.5 rounded-lg font-medium transition-all duration-200 text-[#AAABAB]">
-          <span className="ml-2">Inactive Menu Item</span>
-        </div>
-        <div className="relative group flex items-center gap-2 px-4 py-3.5 rounded-lg font-medium transition-all duration-200 text-white bg-white/5">
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1.5 rounded-r-md bg-[#15A350] opacity-50" />
-          <span className="ml-2">Hover State</span>
-        </div>
+/** NavigationMenu with a pre-selected active path */
+export const NavigationMenuStates: StoryObj = {
+  render: () => (
+    <div className="w-64 bg-black rounded-xl p-4">
+      <p className="text-xs font-semibold text-gray-400 mb-3">NavigationMenu (dark)</p>
+      <NavigationMenu visibleLinks={["Dashboard", "Loan", "Transactions", "Settings"]} />
+    </div>
+  ),
+};
+
+/** Token reference card */
+export const TokenReference: StoryObj = {
+  render: () => (
+    <div className="flex flex-col gap-3 p-6 bg-gray-50 rounded-xl text-sm font-mono w-80">
+      <p className="font-semibold text-gray-600 mb-1">navClasses tokens</p>
+      <div className="flex items-center gap-3">
+        <span className="w-4 h-4 rounded-full bg-[#15A350] inline-block" />
+        <span>focusRing / activeText / indicatorBar — #15A350</span>
       </div>
+      <div className="flex items-center gap-3">
+        <span className="w-4 h-4 rounded-full bg-[#AAABAB] inline-block" />
+        <span>inactiveText — #AAABAB</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="w-4 h-4 rounded bg-[#15A350]/10 border border-[#15A350] inline-block" />
+        <span>activeBgLight — #15A350/10</span>
+      </div>
+      <div className="flex items-center gap-3 bg-black p-2 rounded">
+        <span className="w-4 h-4 rounded bg-[#15A350]/15 border border-[#15A350] inline-block" />
+        <span className="text-white">activeBgDark — #15A350/15</span>
+      </div>
+      <div className="text-gray-500 mt-1">minTouchTarget: 44 px (py-3.5)</div>
     </div>
   ),
 };

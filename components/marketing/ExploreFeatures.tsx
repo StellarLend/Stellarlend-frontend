@@ -3,12 +3,28 @@
 import { ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Dollar } from '../shared/ui/icons/Dollar';
-import { ShieldBlockchain } from '../shared/ui/icons/ShieldBlockchain';
-import { Zap } from '../shared/ui/icons/Zap';
-import { Global } from '../shared/ui/icons/Global';
-import { Union } from '../shared/ui/icons/Union';
-import { File } from '../shared/ui/icons/File';
+import dynamic from 'next/dynamic';
+import { IconPlaceholder } from '../shared/ui/icons/IconPlaceholder';
+
+// Lazy load icons to reduce initial bundle size
+const Dollar = dynamic(() => import('../shared/ui/icons/Dollar').then(mod => ({ default: mod.Dollar })), {
+  loading: () => <IconPlaceholder />,
+});
+const ShieldBlockchain = dynamic(() => import('../shared/ui/icons/ShieldBlockchain').then(mod => ({ default: mod.ShieldBlockchain })), {
+  loading: () => <IconPlaceholder />,
+});
+const Zap = dynamic(() => import('../shared/ui/icons/Zap').then(mod => ({ default: mod.Zap })), {
+  loading: () => <IconPlaceholder />,
+});
+const Global = dynamic(() => import('../shared/ui/icons/Global').then(mod => ({ default: mod.Global })), {
+  loading: () => <IconPlaceholder />,
+});
+const Union = dynamic(() => import('../shared/ui/icons/Union').then(mod => ({ default: mod.Union })), {
+  loading: () => <IconPlaceholder />,
+});
+const File = dynamic(() => import('../shared/ui/icons/File').then(mod => ({ default: mod.File })), {
+  loading: () => <IconPlaceholder />,
+});
 
 const features = [
   {
@@ -94,7 +110,7 @@ export default function ExploreFeatures() {
                 Start Earning <ChevronRight className="h-4 w-4 ml-2" />
               </Link>
               <Link
-                href="/borrow"
+                href="/lending?tab=borrow"
                 className="border border-[#15A350] text-[#15A350] flex items-center py-3 px-8 rounded-lg
                  hover:bg-[#15A350] hover:text-white transition-all duration-300 font-medium"
               >

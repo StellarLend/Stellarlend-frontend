@@ -51,12 +51,4 @@ export class RetryExhaustedError extends HttpError {
   }
 }
 
-export class AllEndpointsUnhealthyError extends HttpError {
-  constructor(endpointCount: number) {
-    super(
-      'ALL_ENDPOINTS_UNHEALTHY',
-      `All ${endpointCount} Horizon endpoint(s) are currently tripped (circuit breaker open). No healthy endpoint is available.`,
-    );
-    this.name = 'AllEndpointsUnhealthyError';
-  }
-}
+export { HttpError as UpstreamError };

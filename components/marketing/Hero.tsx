@@ -2,14 +2,16 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
-import Button from "../shared/ui/Button";
+import Button from "@/components/shared/ui/Button";
 import Image from "next/image";
 import HeroImage from "@/public/images/heroimg1.png";
 import MobileHeroImage from "@/public/images/heromobile.png";
 import { motion, Variants } from "framer-motion";
 
 export default function Hero() {
+  const router = useRouter();
   // Animation variants
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -82,6 +84,7 @@ export default function Hero() {
             <motion.div variants={itemVariants}>
               <Button
                 text="Launch App"
+                onClick={() => router.push("/lending")}
                 className="bg-[#15A350] 
                 text-[#F8F8F8] text-xs md:text-sm font-medium rounded-lg 
                 flex items-center py-2 sm:py-3 px-4 sm:px-6 cursor-pointer"
@@ -91,6 +94,7 @@ export default function Hero() {
             <motion.div variants={itemVariants}>
               <Button
                 text="Sign Up"
+                onClick={() => router.push("/lending")}
                 className="border border-[#15A350] text-[#15A350] 
                 text-xs md:text-sm font-medium rounded-lg 
                 flex items-center py-2 sm:py-3 px-4 sm:px-6 cursor-pointer

@@ -2,10 +2,12 @@
 
 import Button from "./Button";
 
-export default {
+const meta = {
   title: "Components/Button",
   component: Button,
 };
+
+export default meta;
 
 export const Primary = {
   args: {

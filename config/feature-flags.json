@@ -1,0 +1,8 @@
+{
+  "a": {
+    "enabled": true
+  },
+  "b": {
+    "enabled": false
+  }
+}

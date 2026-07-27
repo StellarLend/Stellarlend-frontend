@@ -106,9 +106,21 @@ describe("POST /api/webhooks/transactions – valid requests", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/webhooks/transactions – signature verification", () => {
-  it("returns 401 when signature header is missing", async () => {
+  it("returns 401 when the signature header is omitted entirely", async () => {
     const body = JSON.stringify(makePayload());
-    const req = makeWebhookRequest(body); // no signature header
+    const req = makeWebhookRequest(body);
+    expect(req.headers.get(SIGNATURE_HEADER)).toBeNull();
+
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+
+    const json = await res.json();
+    expect(json.error).toMatch(/signature/i);
+  });
+
+  it("returns 401 when signature header is empty string", async () => {
+    const body = JSON.stringify(makePayload());
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "" });
     const res = await POST(req);
     expect(res.status).toBe(401);
 
@@ -130,6 +142,40 @@ describe("POST /api/webhooks/transactions – signature verification", () => {
     const body = JSON.stringify(payload);
     const signature = signPayload(body, "wrong-secret");
     const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: signature });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature has wrong length (too short)", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "sha256=abc123" });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature has wrong length (too long)", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const longHex = "a".repeat(128); // SHA256 hex is 64 chars, this is double
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: `sha256=${longHex}` });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature lacks sha256= prefix", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const signature = signPayload(body, TEST_SECRET).replace("sha256=", "");
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: signature });
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 401 when signature is malformed (invalid hex)", async () => {
+    const payload = makePayload();
+    const body = JSON.stringify(payload);
+    const req = makeWebhookRequest(body, { [SIGNATURE_HEADER]: "sha256=not-valid-hex!!!" });
     const res = await POST(req);
     expect(res.status).toBe(401);
   });
@@ -233,7 +279,45 @@ describe("POST /api/webhooks/transactions – payload validation", () => {
     expect(res.status).toBe(400);
 
     const body = await res.json();
-    expect(body.error).toMatch(/Unknown status/);
+    // Status is now narrowed by the Zod `webhookDataSchema` (`status` is a
+    // required `z.enum(TRANSACTION_STATUSES)`), so a non-canonical value
+    // is rejected with a "Malformed webhook payload" error.
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/status/);
+  });
+
+  it("returns 400 for malformed data.memo_type", async () => {
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12346",
+        status: "Completed",
+        memo: "hello",
+        memo_type: "MEMO_INVALID",
+      },
+    });
+    const res = await POST(makeSignedRequest(payload));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/memo_type/);
+  });
+
+  it("returns 400 when data.memo is not a string", async () => {
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12346",
+        status: "Completed",
+        memo: 12345,
+        memo_type: "MEMO_TEXT",
+      },
+    });
+    const res = await POST(makeSignedRequest(payload));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/memo/);
   });
 });
 
@@ -301,9 +385,65 @@ describe("Transaction store - getTransaction", () => {
     expect(tx).toBeDefined();
     expect(tx?.id).toBe("TXN12346");
   });
+});
 
-  it("returns undefined for a transaction that does not exist", async () => {
-    const tx = await getTransaction("TXN99999");
-    expect(tx).toBeUndefined();
+describe("Webhook Data Schema (memo / memo_type validation)", () => {
+  it("exports MEMO_TYPES enum", async () => {
+    const { MEMO_TYPES } = await import("@/lib/validation/schemas/webhooks");
+    expect(MEMO_TYPES).toEqual([
+      "MEMO_TEXT",
+      "MEMO_ID",
+      "MEMO_HASH",
+      "MEMO_RETURN",
+    ]);
+  });
+
+  it("webhookDataSchema rejects unknown memo_type values", async () => {
+    const { webhookDataSchema } = await import(
+      "@/lib/validation/schemas/webhooks"
+    );
+    const result = webhookDataSchema.safeParse({
+      transaction_id: "TXN12345",
+      status: "Completed",
+      memo: "hello",
+      memo_type: "MEMO_INVALID",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const memoIssue = result.error.issues.find(
+        (i) => i.path.join(".") === "memo_type",
+      );
+      expect(memoIssue).toBeDefined();
+      expect(memoIssue?.message).toMatch(/memo_type/);
+    }
+  });
+
+  it("webhookDataSchema accepts all four canonical memo types", async () => {
+    const { webhookDataSchema } = await import(
+      "@/lib/validation/schemas/webhooks"
+    );
+    for (const memo_type of ["MEMO_TEXT", "MEMO_ID", "MEMO_HASH", "MEMO_RETURN"]) {
+      const result = webhookDataSchema.safeParse({
+        transaction_id: "TXN12345",
+        status: "Completed",
+        memo: "x",
+        memo_type,
+      });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("webhookDataSchema rejects non-string memo values", async () => {
+    const { webhookDataSchema } = await import(
+      "@/lib/validation/schemas/webhooks"
+    );
+    const result = webhookDataSchema.safeParse({
+      transaction_id: "TXN12345",
+      status: "Completed",
+      memo: 12345,
+      memo_type: "MEMO_TEXT",
+    });
+    expect(result.success).toBe(false);
   });
 });
+

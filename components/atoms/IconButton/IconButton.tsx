@@ -1,5 +1,6 @@
 import React, { forwardRef } from "react";
 import { cn } from "../../../lib/utils/cn";
+import { navClasses } from "../../../constants/design-tokens";
 
 export interface IconButtonProps
     extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -23,9 +24,6 @@ const variantClasses = {
     outline:
         "text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900",
 };
-
-const focusClasses =
-    "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1";
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     (
@@ -67,7 +65,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                     "disabled:opacity-50 disabled:cursor-not-allowed",
                     sizeClasses[size],
                     variantClasses[variant],
-                    focusClasses,
+                    navClasses.iconButtonFocusClasses,
                     className,
                 )}
                 {...props}

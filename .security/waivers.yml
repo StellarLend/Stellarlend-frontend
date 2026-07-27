@@ -1,0 +1,9 @@
+version: "1.0"
+metadata:
+  description: "Security vulnerability waivers for Stellarlend Frontend dependencies"
+waivers:
+  - id: "GHSA-c2qf-rxjj-qqgw"
+    package: "sample-package"
+    severity: "low"
+    reason: "Developer dependency used only in local testing environments; completely unreachable via production build paths."
+    expiry: "2026-12-31"

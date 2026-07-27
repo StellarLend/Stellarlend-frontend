@@ -21,7 +21,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const notifications = getNotifications(user.id);
+  const notifications = await getNotifications(user.id);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return NextResponse.json({ notifications, unreadCount });

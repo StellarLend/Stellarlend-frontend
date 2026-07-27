@@ -1,168 +1,288 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Searchbar from "../common/Searchbar";
+import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
-import { Menu } from "lucide-react";
+import { Menu, WalletCards } from "lucide-react";
+import NotificationBell from "@/components/shared/layout/NotificationBell";
+import StreamStatusIndicator from "./StreamStatusIndicator";
+import { useWallet } from "@/hooks/useWallet";
+import {
+  fetchWalletBalances,
+  type WalletBalanceSummaryItem,
+} from "@/lib/wallet/balances";
+import AccountMenu from "./AccountMenu";
+
+declare global {
+  interface Window {
+    stellar?: {
+      getPublicKey: () => Promise<string>;
+      signTransaction: (
+        xdr: string,
+        opts?: { network: string },
+      ) => Promise<string>;
+    };
+  }
+}
+
+const focusClasses =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-green-600";
 
 export const SidebarToggle = () => {
   const { toggleSidebar } = useSidebar();
-
   return (
-      <button
-          type="button"
-          onClick={toggleSidebar}
-          className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-          aria-label="Toggle sidebar"
-      >
-        <Menu className="h-6 w-6" aria-hidden="true" />
-      </button>
+    <button
+      type="button"
+      onClick={toggleSidebar}
+      className={`p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${focusClasses}`}
+      aria-label="Toggle sidebar"
+    >
+      <Menu className="h-6 w-6" aria-hidden="true" />
+    </button>
   );
 };
 
 const TopNav = () => {
+  const {
+    address: walletAddress,
+    network,
+  } = useWallet();
+
+  const [isBalanceOpen, setIsBalanceOpen] = useState(false);
+  const [balances, setBalances] = useState<WalletBalanceSummaryItem[]>([]);
+  const [balanceStatus, setBalanceStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+
+  const balanceTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeBalancePopover = useCallback(() => {
+    setIsBalanceOpen(false);
+    balanceTriggerRef.current?.focus();
+  }, []);
+
+  const loadBalances = useCallback(async () => {
+    if (!walletAddress) return;
+    setBalanceStatus("loading");
+    try {
+      const nextBalances = await fetchWalletBalances(walletAddress);
+      setBalances(nextBalances);
+      setBalanceStatus("success");
+    } catch {
+      setBalances([]);
+      setBalanceStatus("error");
+    }
+  }, [walletAddress]);
+
+  const handleBalanceToggle = () => {
+    setIsBalanceOpen((current) => {
+      const next = !current;
+      if (next && walletAddress) {
+        void loadBalances();
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!isBalanceOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeBalancePopover();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [closeBalancePopover, isBalanceOpen]);
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setBalances([]);
+      setBalanceStatus("idle");
+    }
+  }, [walletAddress]);
+
+  const getShortAddress = (addr: string) =>
+    `${addr.slice(0, 5)}...${addr.slice(-4)}`;
+
   return (
-      <div className="w-full flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between bg-green-600 px-6 md:px-12 py-4 rounded-md gap-4 sm:gap-0">
-        {/* Search Bar */}
-        <div className="w-full sm:flex-1 max-w-full sm:max-w-md text-white">
-          <Searchbar placeholder="Search for token, asset, wallet address" />
-        </div>
+    <div className="w-full flex flex-col-reverse sm:flex-row items-start sm:items-center justify-between bg-green-600 px-6 md:px-12 py-4 rounded-md gap-4 sm:gap-0">
+      <div className="w-full sm:flex-1 max-w-full sm:max-w-md text-white">
+        <SearchBar placeholder="Search for token, asset, wallet address" />
+      </div>
 
-        {/* Desktop Controls */}
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex gap-4 items-center">
-            {/* Network Selector */}
-            <button
-                type="button"
-                aria-label="Select network"
-                className="flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-            >
-              <Image
-                  src="/icons/stellar.png"
-                  alt="Stellar network"
-                  width={22}
-                  height={22}
-              />
-
-              <span>Stellar</span>
-
-              <svg
-                  className="w-3 h-3 text-white"
-                  viewBox="0 0 10 6"
-                  fill="none"
-                  aria-hidden="true"
-              >
-                <path
-                    d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
-                    fill="#FFFFFF"
-                />
-              </svg>
-            </button>
-
-            {/* Wallet Address */}
-            <button
-                type="button"
-                aria-label="Connected wallet"
-                className="flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-            >
-              <span>Ga2j6...f5g3</span>
-
-              <svg
-                  className="w-3 h-3 text-white"
-                  viewBox="0 0 10 6"
-                  fill="none"
-                  aria-hidden="true"
-              >
-                <path
-                    d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
-                    fill="#FFFFFF"
-                />
-              </svg>
-            </button>
-
-            {/* Divider */}
-            <div
-                className="h-8 border-l"
-                style={{ borderColor: "#71B48D" }}
-                aria-hidden="true"
+      <div className="flex items-center gap-3">
+        <div className="hidden md:flex gap-4 items-center">
+          <button
+            type="button"
+            aria-label="Select network"
+            className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-between border py-2 px-4 w-[139px] rounded-full ${focusClasses}`}
+          >
+            <Image
+              src="/icons/stellar.png"
+              alt="Stellar network"
+              width={22}
+              height={22}
             />
-
-            <div className="flex gap-4 items-center">
-              {/* Notification */}
-              <button
-                  type="button"
-                  className="p-2 rounded-md hover:bg-white/30 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                  aria-label="View notifications"
-              >
-                <Image
-                    src="/icons/notification.png"
-                    alt=""
-                    width={24}
-                    height={24}
-                />
-              </button>
-
-              {/* Profile Avatar */}
-              <button
-                  type="button"
-                  className="rounded-full hover:ring-2 hover:ring-white hover:ring-opacity-50 transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                  aria-label="View profile"
-              >
-                <Image
-                    src="/images/profile.jpg"
-                    alt="User profile"
-                    className="rounded-full"
-                    width={32}
-                    height={32}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Header */}
-        <div className="md:hidden flex justify-between w-full items-center">
-          <div className="flex items-center gap-2">
-            <SidebarToggle />
-
-            <h1 className="text-white md:text-[24px] text-xl font-bold">
-              Dashboard
-            </h1>
-          </div>
-
-          <div className="flex gap-4 items-center">
-            {/* Notification */}
-            <button
-                type="button"
-                className="p-2 rounded-md hover:bg-white/30 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                aria-label="View notifications"
+            <span>Stellar</span>
+            <svg
+              className="w-3 h-3 text-white"
+              viewBox="0 0 10 6"
+              fill="none"
+              aria-hidden="true"
             >
-              <Image
-                  src="/icons/notification.png"
-                  alt=""
-                  width={24}
-                  height={24}
+              <path
+                d="M5 6.0006L0.757324 1.758L2.17154 0.34375L5 3.1722L7.8284 0.34375L9.2426 1.758L5 6.0006Z"
+                fill="#FFFFFF"
               />
+            </svg>
+          </button>
+
+          <AccountMenu />
+
+          <div className="relative">
+            <button
+              ref={balanceTriggerRef}
+              type="button"
+              aria-label="Wallet balances"
+              aria-expanded={isBalanceOpen}
+              aria-controls="topnav-wallet-balances"
+              onClick={handleBalanceToggle}
+              className={`flex cursor-pointer hover:bg-white/30 items-center text-white text-sm justify-center border py-2 px-3 rounded-full ${focusClasses}`}
+            >
+              <WalletCards className="h-4 w-4" aria-hidden="true" />
             </button>
 
-            {/* Profile Avatar */}
+            {isBalanceOpen && (
+              <div
+                id="topnav-wallet-balances"
+                role="dialog"
+                aria-label="Wallet balance summary"
+                className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border border-gray-200 dark:border-gray-700 p-4 text-gray-900 dark:text-gray-100"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-sm font-semibold">Wallet balances</h2>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {walletAddress
+                        ? `${network} · ${getShortAddress(walletAddress)}`
+                        : "Connect a wallet to view balances."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeBalancePopover}
+                    className={`text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white ${focusClasses}`}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {!walletAddress && (
+                  <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+                    Not connected.
+                  </p>
+                )}
+                {walletAddress && balanceStatus === "loading" && (
+                  <p
+                    role="status"
+                    className="mt-4 text-sm text-gray-600 dark:text-gray-300"
+                  >
+                    Loading balances...
+                  </p>
+                )}
+                {walletAddress && balanceStatus === "error" && (
+                  <p role="alert" className="mt-4 text-sm text-red-600">
+                    Could not load balances. Try again later.
+                  </p>
+                )}
+                {walletAddress && balanceStatus === "success" && (
+                  <ul className="mt-4 space-y-3">
+                    {balances.length === 0 ? (
+                      <li className="text-sm text-gray-600 dark:text-gray-300">
+                        No balances found for this account.
+                      </li>
+                    ) : (
+                      balances.map((balance) => (
+                        <li
+                          key={`${balance.symbol}-${balance.name}`}
+                          className="flex items-center justify-between gap-3"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">
+                              {balance.symbol}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {balance.name}
+                              {!balance.hasMetadata ? " · unregistered" : ""}
+                            </p>
+                          </div>
+                          <span className="text-sm font-semibold">
+                            {balance.formatted}
+                          </span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div
+            className="h-8 border-l"
+            style={{ borderColor: "#71B48D" }}
+            aria-hidden="true"
+          />
+
+          <div className="flex gap-3 items-center">
+            <NotificationBell />
+            {/* StreamStatusIndicator removed — see note below */}
+
             <button
-                type="button"
-                className="rounded-full hover:ring-2 hover:ring-white hover:ring-opacity-50 transition-all focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
-                aria-label="View profile"
+              type="button"
+              className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
+              aria-label="View profile"
             >
               <Image
-                  src="/images/profile.jpg"
-                  alt="User profile"
-                  className="rounded-full"
-                  width={32}
-                  height={32}
+                src="/images/profile.jpg"
+                alt="User profile"
+                className="rounded-full"
+                width={32}
+                height={32}
               />
             </button>
           </div>
         </div>
       </div>
+
+      <div className="md:hidden flex justify-between w-full items-center">
+        <div className="flex items-center gap-2">
+          <SidebarToggle />
+          <h1 className="text-white md:text-[24px] text-xl font-bold">
+            Dashboard
+          </h1>
+        </div>
+
+        <div className="flex gap-3 items-center">
+          <NotificationBell />
+          {/* StreamStatusIndicator removed — see note below */}
+
+          <button
+            type="button"
+            className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
+            aria-label="View profile"
+          >
+            <Image
+              src="/images/profile.jpg"
+              alt="User profile"
+              className="rounded-full"
+              width={32}
+              height={32}
+            />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 

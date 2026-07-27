@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": "simulate_transaction",
+  "result": {
+    "transactionData": "AAAAAgAAAAE=",
+    "minResourceFee": "3210",
+    "footprint": {
+      "readOnly": ["AAAAAQ=="],
+      "readWrite": ["AAAAAg=="]
+    },
+    "results": [
+      {
+        "auth": ["AAAAAw==", "AAAABA=="],
+        "xdr": "AAAAAg=="
+      }
+    ]
+  }
+}

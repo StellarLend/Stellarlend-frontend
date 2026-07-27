@@ -2,8 +2,21 @@
 // Example API endpoint for session management
 // This shows how to set session cookies after user authentication
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
+import { getSession } from "@/lib/auth";
+import { isAccountId } from '@/lib/validation/stellar';
 import { withIdempotency } from "@/lib/api/idempotency";
+import { withCsrfProtection } from "@/lib/api/handler";
+import { generateCsrfToken, setCsrfCookie } from "@/lib/security/csrf";
+
+// Fall back to "no claim available" (null) instead of the epoch when the
+// JWT payload omitted iat/exp. lib/auth.ts:getSession falls back to
+// `new Date(0)` for missing claims; serialising that would falsely imply
+// a 50+ year-old session.
+function toIsoOrNull(date: Date | undefined | null): string | null {
+  if (!date || date.getTime() <= 0) return null;
+  return date.toISOString();
+}
 
 /**
  * Example payload structure for session creation
@@ -18,7 +31,7 @@ interface CreateSessionRequest {
 
 /**
  * Example: Create a session (POST /api/auth/session)
- * 
+ *
  * Usage:
  * const response = await fetch("/api/auth/session", {
  *   method: "POST",
@@ -31,10 +44,14 @@ interface CreateSessionRequest {
  *   })
  * });
  */
-export async function POST(request: NextRequest) {
-  return withIdempotency(request, async (request) => {
+const postHandler = async (request: NextRequest): Promise<NextResponse> => {
+  const res = await withIdempotency(request, async (request) => {
     try {
       const body: CreateSessionRequest = await request.json();
+// Validate wallet address if provided
+if (body.walletAddress && !isAccountId(body.walletAddress)) {
+  return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400 });
+}
 
       // Validate required fields
       if (!body.userId || !body.email || !body.name) {
@@ -95,6 +112,10 @@ export async function POST(request: NextRequest) {
         path: "/", // Available to all routes
       });
 
+      // Set CSRF cookie
+      const csrfToken = generateCsrfToken();
+      setCsrfCookie(response, csrfToken);
+
       return response;
     } catch (error) {
       console.error("Session creation error:", error);
@@ -104,33 +125,42 @@ export async function POST(request: NextRequest) {
       );
     }
   });
-}
+  return res as NextResponse;
+};
+
+export const POST = withCsrfProtection(postHandler);
 
 /**
  * Example: Get current session (GET /api/auth/session)
- * 
- * This endpoint would return session info from the server-side getSession()
+ *
+ * Returns session info from the server-side getSession().
+ * Includes `issuedAt` and `expiresAt` so the client can derive
+ * time-to-expiry and drive proactive UI like the session-expiry modal.
+ *
+ * Shape: `issuedAt` and `expiresAt` are nullable ISO strings. Clients
+ * should treat `null` as "unknown" (the JWT payload omitted the claim)
+ * rather than missing / 1970-01-01.
  */
 export async function GET(request: NextRequest) {
   try {
-    // This is a simple example - in production, import and use getSession()
-    // import { getSession } from "@/lib/auth";
-    // const session = await getSession();
+    const session = await getSession();
 
-    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
-    const sessionCookie = request.cookies.get(cookieName);
-
-    if (!sessionCookie?.value) {
+    if (!session) {
       return NextResponse.json(
         { error: "No active session" },
         { status: 401 }
       );
     }
 
+    const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
+
     return NextResponse.json({
       session: {
         active: true,
         cookie: cookieName,
+        user: session.user,
+        issuedAt: toIsoOrNull(session.issuedAt),
+        expiresAt: toIsoOrNull(session.expiresAt),
       },
     });
   } catch (error) {
@@ -144,12 +174,12 @@ export async function GET(request: NextRequest) {
 
 /**
  * Example: Clear session (DELETE /api/auth/session)
- * 
+ *
  * Usage:
  * await fetch("/api/auth/session", { method: "DELETE" });
  */
-export async function DELETE(request: NextRequest) {
-  return withIdempotency(request, async () => {
+const deleteHandler = async (request: NextRequest): Promise<NextResponse> => {
+  const res = await withIdempotency(request, async () => {
     try {
       const response = NextResponse.json({
         success: true,
@@ -160,6 +190,10 @@ export async function DELETE(request: NextRequest) {
       const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
       response.cookies.delete(cookieName);
 
+      // Clear the CSRF cookie too
+      const csrfCookieName = process.env.CSRF_COOKIE_NAME || "csrf-token";
+      response.cookies.delete(csrfCookieName);
+
       return response;
     } catch (error) {
       console.error("Session deletion error:", error);
@@ -169,4 +203,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
   });
-}
+  return res as NextResponse;
+};
+
+export const DELETE = withCsrfProtection(deleteHandler);

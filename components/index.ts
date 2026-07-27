@@ -10,3 +10,6 @@ export * from './features/account/components';
 
 // Marketing components
 // export * from './marketing'; 
+
+// Organisms components
+export * from './organisms';

@@ -1,13 +1,43 @@
-import { TransactionFilter } from './repository';
+import type { TransactionStatus, TransactionAsset } from './types';
 
-const ALLOWED_TYPES   = new Set(['lend', 'borrow', 'repay', 'withdraw']);
-const ALLOWED_STATUSES = new Set(['completed', 'pending', 'failed']);
+export type TransactionTypeFilter = (typeof TRANSACTION_TYPES)[number];
+
+export const TRANSACTION_TYPES = ['lend', 'borrow', 'repay', 'withdraw'] as const;
+export const TRANSACTION_TYPE_OPTIONS = TRANSACTION_TYPES.map((type) => ({
+  value: type,
+  label: type.charAt(0).toUpperCase() + type.slice(1),
+}));
+
+export interface TransactionFilter {
+  type?: string;
+  status?: TransactionStatus | 'All';
+  asset?: TransactionAsset | string;
+  fromDate?: string;
+  toDate?: string;
+  search?: string;
+}
+
+const ALLOWED_TYPES = new Set<string>(TRANSACTION_TYPES);
+const ALLOWED_STATUSES = new Set(['completed', 'pending', 'processing', 'failed']);
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$/;
 
 export interface FilterValidationResult {
   valid: boolean;
   filter: TransactionFilter;
   error?: string;
+}
+
+export function serializeTransactionFilters(filters: TransactionFilter): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (filters.type) params.set('type', filters.type);
+  if (filters.status) params.set('status', filters.status);
+  if (filters.asset) params.set('asset', filters.asset);
+  if (filters.fromDate) params.set('fromDate', filters.fromDate);
+  if (filters.toDate) params.set('toDate', filters.toDate);
+  if (filters.search) params.set('search', filters.search);
+
+  return params;
 }
 
 /**
@@ -27,10 +57,20 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
 
   const status = params.get('status');
   if (status) {
-    if (!ALLOWED_STATUSES.has(status)) {
+    const normalizedStatus = status.toLowerCase();
+    if (!ALLOWED_STATUSES.has(normalizedStatus)) {
       return { valid: false, filter, error: `Invalid status: ${status}` };
     }
-    filter.status = status as TransactionFilter['status'];
+
+    if (normalizedStatus === 'all') {
+      filter.status = 'All';
+    } else     if (normalizedStatus === 'completed') {
+      filter.status = 'Completed';
+    } else if (normalizedStatus === 'pending' || normalizedStatus === 'processing') {
+      filter.status = 'Processing';
+    } else {
+      filter.status = 'Failed';
+    }
   }
 
   const asset = params.get('asset');
@@ -55,6 +95,11 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
       return { valid: false, filter, error: `Invalid toDate: ${toDate}` };
     }
     filter.toDate = toDate;
+  }
+
+  const search = params.get('search');
+  if (search) {
+    filter.search = search;
   }
 
   return { valid: true, filter };
