@@ -132,7 +132,7 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   isLoading = false,
 }) => {
   const shouldReduceMotion = useReducedMotion();
-  const { shares, isLoading: sharesLoading } = useCollateralShares();
+  const { shares, isLoading: sharesLoading, isStale } = useCollateralShares();
   const { netPosition, formattedNetPosition, healthStatus } = useMemo(() => {
     if (!data || isLoading) {
       return {
@@ -198,6 +198,23 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
           : "worsening"
       }
     >
+      {/* Stale Data Warning */}
+      {isStale && (
+        <div
+          className="mb-6 flex items-start gap-3 rounded-lg border border-amber-700 bg-amber-950 p-4"
+          role="alert"
+          aria-label="Stale data warning"
+        >
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-amber-400 text-sm font-bold">Data May Be Outdated</h3>
+            <p className="text-[#AAABAB] text-xs mt-1 font-medium">
+              We encountered a network issue. The numbers displayed below might not reflect your current real-time position.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Position Display */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
