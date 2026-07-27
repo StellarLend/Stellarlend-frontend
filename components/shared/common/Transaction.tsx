@@ -4,9 +4,12 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import {
   Search,
   ChevronsUpDown,
+  ArrowUpDown,
   ListFilter,
   CalendarDays,
 } from "lucide-react";
+import Image from "next/image";
+import { StatusBadge } from "../ui";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
@@ -525,7 +528,11 @@ export const Transactions = ({
                 <thead>
                   <tr className="bg-gray-50 text-gray-500 border-b whitespace-nowrap">
                     <th className="py-3 px-4 text-left font-semibold">Transaction Type</th>
-                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                    <th
+                      className="py-3 px-4 text-left font-semibold"
+                      scope="col"
+                      aria-sort={sortKey === "amount" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                    >
                       <button
                         type="button"
                         className="flex items-center gap-1 text-left font-semibold"
@@ -552,7 +559,11 @@ export const Transactions = ({
                         {effectiveSortKey === "date" ? (effectiveSortOrder === "asc" ? " ↑" : " ↓") : " ↕"}
                       </button>
                     </th>
-                    <th className="py-3 px-4 text-left font-semibold" scope="col">
+                    <th
+                      className="py-3 px-4 text-left font-semibold"
+                      scope="col"
+                      aria-sort={sortKey === "status" ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
+                    >
                       <button
                         type="button"
                         className="flex items-center gap-1 text-left font-semibold"

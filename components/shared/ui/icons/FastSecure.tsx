@@ -1,13 +1,19 @@
-interface FastSecureProps {
+import type { SVGProps } from "react";
+interface FastSecureProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
+  title?: string;
 }
 
-export const FastSecure = ({
+export const FastSecureIcon = ({
   className = "",
   width = "400",
   height = "400",
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: FastSecureProps) => {
   return (
     <svg
@@ -17,7 +23,12 @@ export const FastSecure = ({
       viewBox="0 0 400 400"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <rect width="400" height="400" fill="none" />
       <defs>
         <pattern

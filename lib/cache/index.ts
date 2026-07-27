@@ -1,6 +1,6 @@
 export interface CacheOptions {
-  ttl: number; // Time-to-Live in milliseconds
-  swr: number; // Stale-While-Revalidate window in milliseconds
+  ttl: number;
+  swr: number;
 }
 
 export interface CacheEntry<T> {
@@ -9,6 +9,8 @@ export interface CacheEntry<T> {
   ttl: number;
   swr: number;
 }
+
+export const DEFAULT_TTL_MS = 60000;
 
 export class InMemoryCache {
   private cache = new Map<string, CacheEntry<any>>();
@@ -20,9 +22,6 @@ export class InMemoryCache {
 
   constructor() {}
 
-  /**
-   * Retrieves the raw value from the cache if it exists and is not fully expired.
-   */
   public get<T>(key: string): T | null {
     const entry = this.cache.get(key);
     if (!entry) return null;
@@ -30,7 +29,6 @@ export class InMemoryCache {
     const now = Date.now();
     const age = now - entry.createdAt;
 
-    // If completely expired past the SWR window
     if (age >= entry.ttl + entry.swr) {
       this.cache.delete(key);
       return null;
@@ -39,12 +37,6 @@ export class InMemoryCache {
     return entry.value as T;
   }
 
-  /**
-   * Invalidates all keys that belong to the provided namespaces.
-   * A namespace matches a key when the key is exactly the namespace
-   * or when it starts with `${namespace}:` (covers nested keys like `markets:assets:XLM`).
-   * Returns the number of deleted keys.
-   */
   public invalidateNamespaces(namespaces: string[]): number {
     if (!namespaces || namespaces.length === 0) return 0;
 
@@ -68,9 +60,6 @@ export class InMemoryCache {
     return toDelete.length;
   }
 
-  /**
-   * Retrieves the full cache entry including metadata if not fully expired.
-   */
   public getEntry<T>(key: string): CacheEntry<T> | null {
     const entry = this.cache.get(key);
     if (!entry) return null;
@@ -86,52 +75,38 @@ export class InMemoryCache {
     return entry as CacheEntry<T>;
   }
 
-  /**
-   * Stores a value in the cache with the given TTL and SWR parameters.
-   */
-  public set<T>(key: string, value: T, options: CacheOptions): void {
+  public set<T>(key: string, value: T, options: CacheOptions | number = DEFAULT_TTL_MS): void {
+    const opts: CacheOptions =
+      typeof options === 'number'
+        ? { ttl: options, swr: 0 }
+        : options;
+
     this.cache.set(key, {
       value,
       createdAt: Date.now(),
-      ttl: options.ttl,
-      swr: options.swr,
+      ttl: opts.ttl,
+      swr: opts.swr,
     });
   }
 
-  /**
-   * Deletes an entry from the cache.
-   */
   public delete(key: string): boolean {
     return this.cache.delete(key);
   }
 
-  /**
-   * Clears the cache completely.
-   */
   public clear(): void {
     this.cache.clear();
     this.revalidatingKeys.clear();
     this.pendingFetches.clear();
   }
 
-  /**
-   * Returns the number of items in the cache.
-   */
   public size(): number {
     return this.cache.size;
   }
 
-  /**
-   * Checks if a key is currently undergoing background revalidation.
-   */
   public isRevalidating(key: string): boolean {
     return this.revalidatingKeys.has(key);
   }
 
-  /**
-   * High-level utility to retrieve a cached item or fetch it from source,
-   * managing TTL, SWR, concurrent background revalidation locks, and error recovery.
-   */
   public async getOrFetch<T>(
     key: string,
     fetcher: () => Promise<T>,
@@ -202,5 +177,6 @@ export class InMemoryCache {
   }
 }
 
-// Global shared cache instance
+export const SimpleCache = InMemoryCache;
 export const globalCache = new InMemoryCache();
+export default InMemoryCache;

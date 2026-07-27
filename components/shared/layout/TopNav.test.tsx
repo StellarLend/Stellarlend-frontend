@@ -82,6 +82,22 @@ describe("TopNav Accessibility", () => {
     expect(notificationButtons.length).toBeGreaterThan(0);
   });
 
+  it("renders the NotificationBell component in both desktop and mobile slots", () => {
+    renderTopNav();
+
+    // TopNav renders NotificationBell in two slots: desktop (hidden md:flex) and
+    // mobile (md:hidden). The mock renders a button with aria-label="View notifications"
+    // for each, so we expect exactly two instances.
+    const notificationButtons = screen.getAllByRole("button", {
+      name: /view notifications/i,
+    });
+
+    expect(notificationButtons).toHaveLength(2);
+    notificationButtons.forEach((btn) => {
+      expect(btn).toBeInTheDocument();
+    });
+  });
+
   it("renders profile button with proper aria-label", () => {
     renderTopNav();
 
@@ -226,16 +242,28 @@ describe("TopNav Accessibility", () => {
     const menu = await screen.findByRole("menu", {
       name: /connected wallet actions/i,
     });
+    const copyItem = within(menu).getByRole("menuitem", {
+      name: /copy address/i,
+    });
+    const settingsItem = within(menu).getByRole("menuitem", {
+      name: /account settings/i,
+    });
     const disconnectItem = within(menu).getByRole("menuitem", {
       name: /disconnect wallet/i,
     });
     await waitFor(() => expect(menu).toHaveFocus());
 
     await user.tab();
-    expect(disconnectItem).toHaveFocus();
+    expect(copyItem).toHaveFocus();
+
+    await user.tab();
+    expect(settingsItem).toHaveFocus();
 
     await user.tab();
     expect(disconnectItem).toHaveFocus();
+
+    await user.tab();
+    expect(copyItem).toHaveFocus();
 
     await user.tab({ shift: true });
     expect(disconnectItem).toHaveFocus();

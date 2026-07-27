@@ -2,10 +2,12 @@
 
 import { X, Menu } from "lucide-react";
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavLink from "./NavLink";
 
 const Header = () => {
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -24,10 +26,16 @@ const Header = () => {
           </div>
 
           <div className="hidden md:flex text-white space-x-4">
-            <button className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black">
+            <button
+              onClick={() => router.push("/lending")}
+              className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
               Launch app
             </button>
-            <button className="bg-[#15A350] text-white px-3 py-2 rounded-sm hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black">
+            <button
+              onClick={() => router.push("/lending")}
+              className="bg-[#15A350] text-white px-3 py-2 rounded-sm hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            >
               Sign Up
             </button>
           </div>
@@ -50,10 +58,16 @@ const Header = () => {
             <NavLink href="#features">Features</NavLink>
             <NavLink href="#testimonials">Testimonials</NavLink>
             <div className="flex flex-col w-fit text-white space-y-4">
-              <button className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black">
+              <button
+                onClick={() => router.push("/lending")}
+                className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              >
                 Launch app
               </button>
-              <button className="bg-[#15A350] text-white px-3 py-2 rounded-sm hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black">
+              <button
+                onClick={() => router.push("/lending")}
+                className="bg-[#15A350] text-white px-3 py-2 rounded-sm hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              >
                 Sign Up
               </button>
             </div>

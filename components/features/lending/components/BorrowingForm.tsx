@@ -4,26 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { LendingData } from "@/app/lending/page";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
-import { ASSETS } from "@/lib/assets";
+import { useWalletBalances } from "@/hooks/useWalletBalances";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
-import {
-  FALLBACK_PRICES,
-  MAX_TARGET_HEALTH_FACTOR,
-  MIN_TARGET_HEALTH_FACTOR,
-  calculateCollateralForTargetHealth,
-  clampTargetHealthFactor,
-  calculateProjectedBorrowHealth,
+import { calculateProjectedBorrowHealth,
   calculateRequiredCollateralAmount,
+  clampTargetHealthFactor,
+  calculateCollateralForTargetHealth,
   getHealthBand,
   isProjectedBorrowCollateralized,
+  MAX_TARGET_HEALTH_FACTOR,
+  MIN_TARGET_HEALTH_FACTOR,
+  FALLBACK_PRICES,
   type PriceMap,
 } from "@/lib/lending/health";
 import { useMarketRates } from "@/hooks/useMarketRates";
+import { LeverageSlider } from "./LeverageSlider";
 
 interface BorrowingFormProps {
   onSubmit: (data: LendingData) => void;
@@ -97,28 +97,26 @@ export default function BorrowingForm({
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const lastSuggestedCollateral = useRef<number | null>(null);
 
-  // "preset" = one of the LOAN_DURATIONS chips is active
-  // "custom" = the Custom chip is active and the numeric input is visible
-  const [durationMode, setDurationMode] = useState<"preset" | "custom">(
-    "preset",
-  );
-  // Raw string so the input can be empty / partially typed without coercion
-  const [customDays, setCustomDays] = useState<string>("");
-  const [customDaysError, setCustomDaysError] = useState<string>("");
   const [targetHealthMode, setTargetHealthMode] = useState<"preset" | "custom">(
     "preset",
   );
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
 
-  const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
-  const collateralAsset = ASSETS.find((a) => a.symbol === formData.collateral);
+  const { assetsWithBalances } = useWalletBalances();
+  const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
+  const collateralAsset = assetsWithBalances.find((a) => a.symbol === formData.collateral);
   const assetKey = formData.asset?.toUpperCase();
   const fallbackInterestRate =
     (assetKey && assetKey in INTEREST_RATES
       ? INTEREST_RATES[assetKey as keyof typeof INTEREST_RATES]
       : undefined) ?? 0;
-  const { rate: liveBorrowRate, isLoading: isLoadingMarketRates, error: marketRateError, lastUpdated: marketRateTimestamp } = useMarketRates(assetKey);
+  const {
+    rate: liveBorrowRate,
+    isLoading: isLoadingMarketRates,
+    error: marketRateError,
+    lastUpdated: marketRateTimestamp,
+  } = useMarketRates(assetKey);
   const resolvedBorrowRate =
     typeof liveBorrowRate === "number" && Number.isFinite(liveBorrowRate)
       ? liveBorrowRate
@@ -269,50 +267,6 @@ export default function BorrowingForm({
    * Returns an error message string on failure, or `""` on success.
    * When valid, it also calls the `onValid` callback with the parsed integer.
    */
-  const validateCustomDays = (
-    raw: string,
-    onValid?: (days: number) => void,
-  ): string => {
-    if (raw.trim() === "" || isNaN(Number(raw))) {
-      return "Please enter a number of days";
-    }
-
-    const parsed = Number(raw);
-
-    if (!Number.isInteger(parsed)) {
-      return "Duration must be a whole number of days";
-    }
-
-    if (parsed < CUSTOM_DURATION_MIN_DAYS) {
-      return `Minimum duration is ${CUSTOM_DURATION_MIN_DAYS} day`;
-    }
-
-    if (parsed > CUSTOM_DURATION_MAX_DAYS) {
-      return `Maximum duration is ${CUSTOM_DURATION_MAX_DAYS} days`;
-    }
-
-    onValid?.(parsed);
-    return "";
-  };
-
-  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setCustomDays(raw);
-
-    const errorMsg = validateCustomDays(raw, (days) => {
-      setFormData((prev) => ({ ...prev, duration: days }));
-      // Clear the duration field error if the user fixes it
-      if (errors.duration) {
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next.duration;
-          return next;
-        });
-      }
-    });
-
-    setCustomDaysError(errorMsg);
-  };
 
   const formatCollateralUnits = (amount: number): string =>
     amount.toLocaleString(undefined, {
@@ -456,16 +410,17 @@ export default function BorrowingForm({
           </label>
           <div className="grid grid-cols-2 gap-4">
             <AssetSelector
-              assets={ASSETS}
+              assets={assetsWithBalances}
               value={formData.asset}
               label="Asset to Borrow"
               interestRates={Object.fromEntries(
-                ASSETS.map((asset) => [
+                assetsWithBalances.map((asset) => [
                   asset.symbol,
                   asset.symbol === assetKey
                     ? resolvedBorrowRate
-                    : INTEREST_RATES[asset.symbol as keyof typeof INTEREST_RATES] ??
-                      0,
+                    : (INTEREST_RATES[
+                        asset.symbol as keyof typeof INTEREST_RATES
+                      ] ?? 0),
                 ]),
               )}
               onChange={(asset) => {
@@ -520,6 +475,29 @@ export default function BorrowingForm({
           max={selectedAsset?.balance ?? 0}
         />
 
+        {/* Leverage Slider */}
+        <LeverageSlider
+          value={formData.amount || 0}
+          onChange={(amount) => {
+            setFormData((prev) => ({
+              ...prev,
+              amount,
+            }));
+            if (errors.amount) {
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.amount;
+                return next;
+              });
+            }
+          }}
+          collateralAmount={collateralAmount}
+          collateralAsset={formData.collateral ?? ""}
+          borrowAsset={formData.asset ?? ""}
+          borrowApr={resolvedBorrowRate}
+          prices={priceMap}
+        />
+
         {/* Loan Duration */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -547,7 +525,8 @@ export default function BorrowingForm({
                 }}
                 className={cn(
                   "p-3 rounded-xl border-2 text-center transition-all duration-200",
-                  durationMode === "preset" && formData.duration === duration.days
+                  durationMode === "preset" &&
+                    formData.duration === duration.days
                     ? "border-[#2600FF] bg-blue-50 text-[#2600FF] ring-1 ring-[#2600FF]"
                     : "border-gray-100 hover:border-gray-200 bg-gray-50/30 text-gray-600",
                 )}
@@ -604,7 +583,9 @@ export default function BorrowingForm({
                 onChange={handleCustomDaysChange}
                 placeholder={`${CUSTOM_DURATION_MIN_DAYS}–${CUSTOM_DURATION_MAX_DAYS}`}
                 aria-label="Custom loan duration in days"
-                aria-describedby={customDaysError ? "custom-days-error" : undefined}
+                aria-describedby={
+                  customDaysError ? "custom-days-error" : undefined
+                }
                 aria-invalid={customDaysError ? true : undefined}
                 className={cn(
                   "w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors",
@@ -640,7 +621,7 @@ export default function BorrowingForm({
         {/* Collateral Selection */}
         <div>
           <AssetSelector
-            assets={ASSETS}
+            assets={assetsWithBalances}
             value={formData.collateral ?? ""}
             label="Collateral Asset"
             onChange={(collateral) => {
