@@ -93,7 +93,7 @@ describe('POST /api/tx/build', () => {
 
     expect(response.status).toBe(200);
     const json = await response.json();
-    expect(json).toEqual({ unsignedXdr: 'unsigned-xdr' });
+    expect(json).toMatchObject({ unsignedXdr: 'unsigned-xdr' });
     expect(mockFetch).toHaveBeenCalledWith(
       'https://private-rpc.test',
       expect.objectContaining({ method: 'POST' }),

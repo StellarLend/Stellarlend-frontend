@@ -5,14 +5,14 @@ import { withRequestLogging } from '@/lib/api/handler';
 import { computeLiquidations } from '@/lib/positions/liquidation';
 import { fetchUserPositions } from '@/lib/positions/fetchPositions';
 
-async function handleLiquidations(request?: NextRequest) {
+async function handleLiquidations(request: NextRequest) {
   const user = await getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const walletParam = request?.nextUrl?.searchParams.get('wallet') ?? null;
+  const walletParam = request.nextUrl.searchParams.get('wallet') ?? null;
 
   if (walletParam !== null) {
     const parsed = walletAddressSchema.safeParse(walletParam);

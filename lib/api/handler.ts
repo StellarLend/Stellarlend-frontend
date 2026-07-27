@@ -59,10 +59,10 @@ function serializeError(error: unknown) {
   return String(error);
 }
 
-export function withCsrfProtection<T extends ApiHandler>(handler: T): T {
-  return (async (...args: Parameters<T>): Promise<NextResponse> => {
-    const request = args[0];
-    if (request instanceof NextRequest) {
+export function withCsrfProtection<T extends (...args: any[]) => Promise<NextResponse> | NextResponse>(handler: T) {
+  return async (...args: Parameters<T>): Promise<NextResponse> => {
+    const request = args[0] as NextRequest | undefined;
+    if (request) {
       const method = request.method;
       if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
         if (!verifyCsrfToken(request)) {
@@ -70,14 +70,14 @@ export function withCsrfProtection<T extends ApiHandler>(handler: T): T {
         }
       }
     }
-    return handler(...args);
-  }) as T;
+    return await handler(...args);
+  };
 }
 
-export function withRequestLogging<T extends ApiHandler>(route: string, handler: T): T {
-  return (async (...args: Parameters<T>): Promise<NextResponse> => {
-    const request = args[0];
-    const method = request instanceof NextRequest ? request.method : 'UNKNOWN';
+export function withRequestLogging<T extends (...args: any[]) => Promise<NextResponse> | NextResponse>(route: string, handler: T) {
+  return async (...args: Parameters<T>): Promise<NextResponse> => {
+    const request = args[0] as NextRequest | undefined;
+    const method = request?.method ?? 'UNKNOWN';
     const startedAt = Date.now();
     const requestId =
       request instanceof NextRequest && request.headers

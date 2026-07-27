@@ -25,6 +25,9 @@ export const envSchema = z.object({
   NEXT_PUBLIC_SOROBAN_RPC_URL: isProd
     ? z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' }).optional()
     : z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' }).default('https://soroban-testnet.stellar.org'),
+  NEXT_PUBLIC_SOROBAN_CONTRACT_ID: isProd
+    ? z.string().min(1, { message: 'SOROBAN_CONTRACT_ID is required in production' })
+    : z.string().default(''),
   // Optional analytics ids
   NEXT_PUBLIC_GA_TRACKING_ID: z.string().optional(),
   NEXT_PUBLIC_MIXPANEL_TOKEN: z.string().optional(),

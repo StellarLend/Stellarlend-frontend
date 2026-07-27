@@ -6,13 +6,19 @@ import { httpPost } from '@/lib/http/client';
 import { metrics } from '@/lib/metrics/registry';
 import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
 import { hashIp, appendAuditEvent } from '@/lib/audit/logger';
-import { simulateSorobanTransaction } from '@/lib/soroban/simulate';
+import { simulateSorobanTransaction, SorobanSimulationError, buildSorobanSimulationApiError, getSorobanSimulationStatus } from '@/lib/soroban/simulate';
 import {
   buildSorobanRpcError,
   buildSorobanSubmitRpcRequest,
   extractSubmitResult,
   isTxSubmitRequest,
 } from '@/lib/soroban/tx';
+import {
+  SorobanSimulationError,
+  buildSorobanSimulationApiError,
+  getSorobanSimulationStatus,
+  simulateSorobanTransaction,
+} from '@/lib/soroban/simulate';
 import { withCsrfProtection } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
@@ -107,6 +113,7 @@ export async function POST(request: NextRequest) {
 
   const payload = buildSorobanSubmitRpcRequest((body as any).signedEnvelopeXdr);
   const shouldSimulate = new URL(request.url).searchParams.get('simulate') === 'true';
+  const rpcUrl = serverConfig.stellar.sorobanRpcUrl || config.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
 
   try {
     if (shouldSimulate) {
@@ -114,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
 
     const start = Date.now();
-    const rpcResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
+    const rpcResponse = await httpPost<unknown>(rpcUrl, payload, {
       timeoutMs: 10000,
     });
     const dur = (Date.now() - start) / 1000;
@@ -161,6 +168,13 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error) {
+    if (error instanceof SorobanSimulationError) {
+      return NextResponse.json(
+        { error: buildSorobanSimulationApiError(error) },
+        { status: getSorobanSimulationStatus(error) },
+      );
+    }
+
     try {
       metrics.sorobanSubmissions.inc({ result: 'failure' });
       metrics.sorobanSubmitDuration.observe(0, { result: 'failure' });
@@ -176,6 +190,13 @@ export async function POST(request: NextRequest) {
       requestId,
       ipHash,
     });
+
+    if (error instanceof SorobanSimulationError) {
+      return NextResponse.json(
+        { error: buildSorobanSimulationApiError(error) },
+        { status: getSorobanSimulationStatus(error) },
+      );
+    }
 
     return NextResponse.json({ error: buildSorobanRpcError(error) }, { status: 502 });
   }

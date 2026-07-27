@@ -46,14 +46,19 @@ const MetricCard: React.FC<MetricCardProps> = ({
       return;
     }
 
-    const messages: Record<CopyFailureReason, { title: string; description: string }> = {
+    const messages: Record<
+      CopyFailureReason,
+      { title: string; description: string }
+    > = {
       invalid_address: {
         title: "Invalid Address",
-        description: "The wallet address could not be validated before copying.",
+        description:
+          "The wallet address could not be validated before copying.",
       },
       clipboard_error: {
         title: "Copy Failed",
-        description: "Clipboard access is unavailable. Try copying the address manually.",
+        description:
+          "Clipboard access is unavailable. Try copying the address manually.",
       },
     };
 
@@ -84,9 +89,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
           </div>
           <span className={`${textColor} text-sm font-medium`}>{label}</span>
         </div>
-        <h3 className={`${textColor} text-[28px] font-bold mb-4`}>
-          {value}
-        </h3>
+        <h3 className={`${textColor} text-[28px] font-bold mb-4`}>{value}</h3>
       </div>
 
       {(subLabel || copyValue) && (
@@ -154,7 +157,12 @@ interface AssetFilterBarProps {
   total: number;
 }
 
-function AssetFilterBar({ query, onChange, showing, total }: AssetFilterBarProps) {
+function AssetFilterBar({
+  query,
+  onChange,
+  showing,
+  total,
+}: AssetFilterBarProps) {
   return (
     <div className="flex items-center gap-3 mb-4 flex-wrap">
       <div className="relative flex-1 min-w-[200px]">
@@ -184,7 +192,10 @@ function AssetFilterBar({ query, onChange, showing, total }: AssetFilterBarProps
           </button>
         )}
       </div>
-      <span className="text-[#AAABAB] text-sm whitespace-nowrap" aria-live="polite">
+      <span
+        className="text-[#AAABAB] text-sm whitespace-nowrap"
+        aria-live="polite"
+      >
         Showing {showing} of {total}
       </span>
     </div>
@@ -198,11 +209,17 @@ function AssetCard({ asset }: { asset: AssetMetadata }) {
   return (
     <div
       className={`bg-[#097C4C] rounded-xl p-4 border border-[#71B48D33] ${
-        shouldReduceMotion ? "" : "transform transition-transform hover:scale-[1.02]"
+        shouldReduceMotion
+          ? ""
+          : "transform transition-transform hover:scale-[1.02]"
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
-        <img src={asset.logoUrl} alt={`${asset.name} logo`} className="w-6 h-6 rounded-full" />
+        <img
+          src={asset.logoUrl}
+          alt={`${asset.name} logo`}
+          className="w-6 h-6 rounded-full"
+        />
         <span className="text-white text-sm font-semibold">{asset.symbol}</span>
       </div>
       <p className="text-[#D4F3E6] text-xs">{asset.name}</p>
@@ -231,20 +248,14 @@ function usePositionsData(): {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/positions");
-      if (!res.ok) throw new Error(`Failed to fetch positions: ${res.statusText}`);
-      const json = await res.json();
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  function usePositionsData(): {
+    data: PositionsData | null;
+    isLoading: boolean;
+    error: Error | null;
+  } {
+    const [data, setData] = useState<PositionsData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -267,15 +278,13 @@ export default function MetricsCards() {
     }
   }, []);
 
-  const filteredAssets = useMemo(() => {
-    const q = filterQuery.trim().toLowerCase();
-    if (!q) return allAssets;
-    return allAssets.filter(
-      (a) =>
-        a.symbol.toLowerCase().includes(q) ||
-        a.name.toLowerCase().includes(q),
-    );
-  }, [allAssets, filterQuery]);
+    const allAssets = useMemo(() => {
+      try {
+        return getAssets();
+      } catch {
+        return [];
+      }
+    }, []);
 
   if (isLoading || !data) {
     return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
@@ -289,64 +298,94 @@ export default function MetricsCards() {
     );
   }
 
-  return (
-    <div>
-      <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <MetricCard
-            isPrimary
-            icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
-            label="Available Balance"
-            value={data.availableBalance}
-            copyValue={data.copyAddress}
-          />
-          <MetricCard
-            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
-            label="Total Borrowed Amount"
-            value={data.borrowedAmount}
-            subLabel="Next Due Payment"
-            subValue={data.nextDue}
-          />
-          <MetricCard
-            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
-            label={`Total Supplied (Health Factor: ${data.healthFactor})`}
-            value={data.suppliedFunds}
-            subLabel="Earnings from Lending"
-            subValue={data.earnings}
-          />
+    if (!data)
+      return (
+        <div className="text-white p-4 text-sm font-medium">
+          Loading metrics…
         </div>
-      </ScrollCues>
+      );
 
-      {/* Asset filter + breakdown */}
-      <div className="mt-6">
-        <AssetFilterBar
-          query={filterQuery}
-          onChange={setFilterQuery}
-          showing={filteredAssets.length}
-          total={allAssets.length}
-        />
+    return (
+      <div>
+        <ScrollCues
+          className="w-full"
+          role="region"
+          aria-label="Scrollable metrics"
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard
+              isPrimary
+              icon={
+                <img
+                  src="/icons/piggy.svg"
+                  alt="Wallet Icon"
+                  className="w-6 h-6"
+                />
+              }
+              label="Available Balance"
+              value={data.availableBalance}
+              copyValue={data.copyAddress}
+            />
+            <MetricCard
+              icon={
+                <img
+                  src="/icons/Icon-11.svg"
+                  alt="Dollar Icon"
+                  className="w-6 h-6"
+                />
+              }
+              label="Total Borrowed Amount"
+              value={data.borrowedAmount}
+              subLabel="Next Due Payment"
+              subValue={data.nextDue}
+            />
+            <MetricCard
+              icon={
+                <img
+                  src="/icons/Icon-11.svg"
+                  alt="Dollar Icon"
+                  className="w-6 h-6"
+                />
+              }
+              label={`Total Supplied (Health Factor: ${data.healthFactor})`}
+              value={data.suppliedFunds}
+              subLabel="Earnings from Lending"
+              subValue={data.earnings}
+            />
+          </div>
+        </ScrollCues>
 
-        {filteredAssets.length === 0 ? (
-          <div
-            role="status"
-            className="text-[#AAABAB] text-sm py-6 text-center"
-          >
-            No assets match &ldquo;{filterQuery}&rdquo;.{" "}
-            <button
-              onClick={() => setFilterQuery("")}
-              className="underline text-[#71B48D] hover:text-white"
+        {/* Asset filter + breakdown */}
+        <div className="mt-6">
+          <AssetFilterBar
+            query={filterQuery}
+            onChange={setFilterQuery}
+            showing={filteredAssets.length}
+            total={allAssets.length}
+          />
+
+          {filteredAssets.length === 0 ? (
+            <div
+              role="status"
+              className="text-[#AAABAB] text-sm py-6 text-center"
             >
-              Clear filter
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {filteredAssets.map((asset) => (
-              <AssetCard key={asset.symbol} asset={asset} />
-            ))}
-          </div>
-        )}
+              No assets match &ldquo;{filterQuery}&rdquo;.{" "}
+              <button
+                onClick={() => setFilterQuery("")}
+                className="underline text-[#71B48D] hover:text-white"
+              >
+                Clear filter
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {filteredAssets.map((asset) => (
+                <AssetCard key={asset.symbol} asset={asset} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 }

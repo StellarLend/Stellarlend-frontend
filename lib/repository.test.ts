@@ -26,7 +26,7 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn()
 }));
 
-vi.mock('@/lib/db/schema/notification_preferences', () => ({
+vi.mock('@/lib/schema', () => ({
   notificationPreferences: {
     userId: 'userId',
     channel: 'channel',

@@ -7,6 +7,12 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { CollateralBreakdown } from "./CollateralBreakdown";
 import CollateralRatioHistoryChart from "./CollateralRatioHistoryChart";
 import { useCollateralShares } from "@/hooks/usePositions";
+import {
+  getHealthBand,
+  getHealthLabel,
+  HEALTHY_HEALTH_FACTOR_THRESHOLD,
+  type HealthBand,
+} from "@/lib/lending/health";
 
 interface PositionData {
   suppliedFunds: string;
@@ -20,14 +26,55 @@ interface PositionSummaryProps {
 }
 
 /**
- * Determines health status based on health factor value
- * Health Factor ranges:
- * - >= 2.0: Healthy (comfortable buffer)
- * - 1.0 - 2.0: At Risk (approaching danger zone)
- * - < 1.0: Critical (liquidation risk)
+ * Position-summary-specific visual tokens for each shared health band.
+ * Band thresholds/labels come from `lib/lending/health` (same source as HealthFactorBadge).
+ */
+const POSITION_HEALTH_UI: Record<
+  HealthBand,
+  {
+    description: string;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    iconBgColor: string;
+  }
+> = {
+  healthy: {
+    description: "Your position is well-protected",
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-950",
+    borderColor: "border-emerald-700",
+    iconBgColor: "bg-emerald-900",
+  },
+  "at-risk": {
+    description: "Consider reducing borrowed amount",
+    color: "text-amber-400",
+    bgColor: "bg-amber-950",
+    borderColor: "border-amber-700",
+    iconBgColor: "bg-amber-900",
+  },
+  critical: {
+    description: "Risk of liquidation - take action",
+    color: "text-red-400",
+    bgColor: "bg-red-950",
+    borderColor: "border-red-700",
+    iconBgColor: "bg-red-900",
+  },
+  cleared: {
+    description: "No outstanding debt on this position",
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-950",
+    borderColor: "border-emerald-700",
+    iconBgColor: "bg-emerald-900",
+  },
+};
+
+/**
+ * Resolves health presentation via shared `getHealthBand` / `getHealthLabel`
+ * so PositionSummary cannot drift from HealthFactorBadge / lending thresholds.
  */
 function getHealthStatus(healthFactor: number): {
-  status: "healthy" | "at-risk" | "critical";
+  status: HealthBand;
   label: string;
   description: string;
   color: string;
@@ -35,38 +82,13 @@ function getHealthStatus(healthFactor: number): {
   borderColor: string;
   iconBgColor: string;
 } {
-  if (healthFactor >= 2.0) {
-    return {
-      status: "healthy",
-      label: "Healthy",
-      description: "Your position is well-protected",
-      color: "text-emerald-400",
-      bgColor: "bg-emerald-950",
-      borderColor: "border-emerald-700",
-      iconBgColor: "bg-emerald-900",
-    };
-  }
-
-  if (healthFactor >= 1.0) {
-    return {
-      status: "at-risk",
-      label: "At Risk",
-      description: "Consider reducing borrowed amount",
-      color: "text-amber-400",
-      bgColor: "bg-amber-950",
-      borderColor: "border-amber-700",
-      iconBgColor: "bg-amber-900",
-    };
-  }
+  const status = getHealthBand(healthFactor);
+  const ui = POSITION_HEALTH_UI[status];
 
   return {
-    status: "critical",
-    label: "Critical",
-    description: "Risk of liquidation - take action",
-    color: "text-red-400",
-    bgColor: "bg-red-950",
-    borderColor: "border-red-700",
-    iconBgColor: "bg-red-900",
+    status,
+    label: getHealthLabel(healthFactor),
+    ...ui,
   };
 }
 
@@ -111,20 +133,12 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
 }) => {
   const shouldReduceMotion = useReducedMotion();
   const { shares, isLoading: sharesLoading } = useCollateralShares();
-  const {
-    netPosition,
-    formattedNetPosition,
-    healthStatus,
-    supplied,
-    borrowed,
-  } = useMemo(() => {
+  const { netPosition, formattedNetPosition, healthStatus } = useMemo(() => {
     if (!data || isLoading) {
       return {
         netPosition: 0,
         formattedNetPosition: "$0.00",
         healthStatus: getHealthStatus(0),
-        supplied: 0,
-        borrowed: 0,
       };
     }
 
@@ -136,8 +150,6 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
       netPosition: net,
       formattedNetPosition: formatCurrencyValue(net),
       healthStatus: getHealthStatus(data.healthFactor),
-      supplied: suppliedNum,
-      borrowed: borrowedNum,
     };
   }, [data, isLoading]);
 
@@ -171,7 +183,6 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   }
 
   const isPositive = netPosition >= 0;
-  const trend = data.healthFactor >= 2.0 ? "improving" : "worsening";
 
   return (
     <div
@@ -180,6 +191,12 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
       }`}
       role="region"
       aria-label="Position summary"
+      data-health-band={healthStatus.status}
+      data-health-trend={
+        data.healthFactor >= HEALTHY_HEALTH_FACTOR_THRESHOLD
+          ? "improving"
+          : "worsening"
+      }
     >
       {/* Main Position Display */}
       <div className="mb-8">

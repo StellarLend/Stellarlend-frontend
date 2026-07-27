@@ -4,7 +4,7 @@ vi.mock("@/lib/api/handler", () => ({
   withCsrfProtection: (handler: any) => handler,
 }));
 import { NextRequest } from "next/server";
-import { GET, PUT } from "@/app/account/profile/route";
+import { GET, PUT } from "@/app/api/account/profile/route";
 import { profileRepository } from "@/lib/account/repository";
 import { signToken, getAuthUser } from "@/lib/auth";
 import { validateProfile } from "@/lib/account/validation";

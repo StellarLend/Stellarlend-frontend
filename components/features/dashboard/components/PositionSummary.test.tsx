@@ -130,6 +130,56 @@ describe("PositionSummary Component", () => {
       healthCard = screen.getByRole("article");
       expect(healthCard).toHaveClass("bg-red-950");
     });
+
+    it("uses shared getHealthBand thresholds for boundary values", () => {
+      const { rerender } = render(
+        <PositionSummary
+          data={{
+            suppliedFunds: "$5,000.00 XLM",
+            borrowedAmount: "$1,000.00 XLM",
+            healthFactor: 2.0,
+          }}
+        />
+      );
+
+      expect(screen.getByRole("region")).toHaveAttribute(
+        "data-health-band",
+        "healthy"
+      );
+      expect(screen.getByText("Healthy")).toBeInTheDocument();
+
+      rerender(
+        <PositionSummary
+          data={{
+            suppliedFunds: "$5,000.00 XLM",
+            borrowedAmount: "$3,000.00 XLM",
+            healthFactor: 1.0,
+          }}
+        />
+      );
+
+      expect(screen.getByRole("region")).toHaveAttribute(
+        "data-health-band",
+        "at-risk"
+      );
+      expect(screen.getByText("At Risk")).toBeInTheDocument();
+
+      rerender(
+        <PositionSummary
+          data={{
+            suppliedFunds: "$5,000.00 XLM",
+            borrowedAmount: "$5,000.00 XLM",
+            healthFactor: 0.99,
+          }}
+        />
+      );
+
+      expect(screen.getByRole("region")).toHaveAttribute(
+        "data-health-band",
+        "critical"
+      );
+      expect(screen.getByText("Critical")).toBeInTheDocument();
+    });
   });
 
   describe("Accessibility", () => {
