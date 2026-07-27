@@ -3,7 +3,8 @@ export type HttpErrorCode =
   | 'NETWORK_ERROR'
   | 'HTTP_ERROR'
   | 'PARSE_ERROR'
-  | 'RETRY_EXHAUSTED';
+  | 'RETRY_EXHAUSTED'
+  | 'ALL_ENDPOINTS_UNHEALTHY';
 
 export class HttpError extends Error {
   constructor(
@@ -47,5 +48,15 @@ export class RetryExhaustedError extends HttpError {
       lastError,
     );
     this.name = 'RetryExhaustedError';
+  }
+}
+
+export class AllEndpointsUnhealthyError extends HttpError {
+  constructor(endpointCount: number) {
+    super(
+      'ALL_ENDPOINTS_UNHEALTHY',
+      `All ${endpointCount} Horizon endpoint(s) are currently tripped (circuit breaker open). No healthy endpoint is available.`,
+    );
+    this.name = 'AllEndpointsUnhealthyError';
   }
 }
