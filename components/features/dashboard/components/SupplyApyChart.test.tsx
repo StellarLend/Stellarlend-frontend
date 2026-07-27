@@ -21,9 +21,7 @@ describe('SupplyApyChart', () => {
 
     render(<SupplyApyChart />);
 
-    expect(
-      screen.getByRole('status', { name: /loading trend data/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /Loading trend data/i })).toBeInTheDocument();
   });
 
   it('shows an empty state when the history response has no snapshots', async () => {
@@ -64,7 +62,39 @@ describe('SupplyApyChart', () => {
     render(<SupplyApyChart />);
 
     expect(await screen.findByRole('img', { name: /supply apy trend/i })).toBeInTheDocument();
-    expect(await screen.findByText(/4\.20%/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/4\.20%/i, {
+        selector: 'p',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('includes a hidden summary for screen readers with current value and time range', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        walletAddress: 'abc',
+        snapshots: [
+          {
+            timestamp: 1_700_000_000_000,
+            supplied: 1_200,
+            borrowed: 300,
+            effectiveSupplyApy: 4.2,
+            effectiveBorrowApy: 6.1,
+          },
+        ],
+        interval: '1d',
+        bucketCount: 1,
+      }),
+    } as Response);
+
+    render(<SupplyApyChart />);
+
+    expect(
+      await screen.findByText(/Supply APY is 4\.20%.*unchanged.*as of/i, {
+        hidden: true,
+      }),
+    ).toBeInTheDocument();
   });
 
   it('shows an error message when the request fails', async () => {

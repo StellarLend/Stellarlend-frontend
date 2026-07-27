@@ -35,6 +35,39 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
+function getDateRangeText(firstTimestamp: number, lastTimestamp: number): string {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const elapsedDays = Math.round((lastTimestamp - firstTimestamp) / msPerDay);
+
+  if (elapsedDays <= 0) {
+    return `as of ${formatDate(lastTimestamp)}`;
+  }
+
+  if (elapsedDays === 1) {
+    return "over the last day";
+  }
+
+  return `over the last ${elapsedDays} days`;
+}
+
+function formatCollateralRatioSummary(
+  latestRatio: number,
+  firstRatio: number,
+  firstTimestamp: number,
+  lastTimestamp: number,
+): string {
+  const change = latestRatio - firstRatio;
+  const direction = change > 0 ? "up" : change < 0 ? "down" : "unchanged";
+  const changeText = change === 0 ? "unchanged" : `trending ${direction} ${Math.abs(change).toFixed(2)}x`;
+  const rangeText = getDateRangeText(firstTimestamp, lastTimestamp);
+
+  return `Collateral ratio is ${formatRatio(latestRatio)}, ${changeText} ${rangeText}.`;
+}
+
+function buildPath(points: Array<{ x: number; y: number }>): string {
+  if (points.length === 0) {
+    return "";
+  }
 
 
 function toCollateralRatioPoints(
@@ -151,6 +184,12 @@ export function CollateralRatioHistoryChart({
       firstLabel: formatDate(points[0].timestamp),
       lastLabel: formatDate(latestPoint.timestamp),
       isBelowThreshold: latestPoint.ratio <= liquidationThreshold,
+      summary: formatCollateralRatioSummary(
+        latestPoint.ratio,
+        points[0].ratio,
+        points[0].timestamp,
+        latestPoint.timestamp,
+      ),
     };
   }, [liquidationThreshold, points]);
 
@@ -228,6 +267,8 @@ export function CollateralRatioHistoryChart({
           </p>
         </div>
       </div>
+
+      <div className="sr-only">{chart.summary}</div>
 
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
