@@ -18,6 +18,7 @@ interface Config {
   stellar: {
     network: string;
     horizonUrl: string;
+    sorobanRpcUrl: string;
     sorobanContractId: string;
   };
   rateLimit: {

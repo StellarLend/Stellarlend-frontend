@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
 import type { LendingActionType } from "@/lib/lending/types";
 import { cn } from "@/lib/utils/cn";
+import TermsModal from "./TermsModal";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasAgreed, setHasAgreed] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "success" | "error"
   >("idle");
@@ -37,6 +39,7 @@ export default function ConfirmModal({
       setSubmitStatus("idle");
       setSubmitMessage("");
       setHasAgreed(false);
+      setIsTermsOpen(false);
     }
   }, [isOpen]);
 
@@ -139,6 +142,7 @@ export default function ConfirmModal({
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
@@ -420,7 +424,11 @@ export default function ConfirmModal({
               />
               <span className="text-sm text-gray-700">
                 I understand and agree to the{" "}
-                <button className="text-green-600 hover:text-green-700 underline">
+                <button
+                  type="button"
+                  onClick={() => setIsTermsOpen(true)}
+                  className="text-green-600 hover:text-green-700 underline"
+                >
                   terms and conditions
                 </button>
                 {type === "borrow" && (
@@ -509,5 +517,7 @@ export default function ConfirmModal({
         </div>
       </div>
     </div>
+    <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
+    </>
   );
 }

@@ -79,6 +79,35 @@ describe("CollateralRatioHistoryChart", () => {
     expect(screen.getByText("Latest ratio")).toBeInTheDocument();
   });
 
+  it("includes a hidden summary for screen readers with current ratio and trend range", async () => {
+    fetchMock.mockResolvedValueOnce(
+      historyResponse([
+        {
+          timestamp: Date.UTC(2026, 0, 1),
+          supplied: 3_000,
+          borrowed: 1_000,
+          effectiveSupplyApy: 4,
+          effectiveBorrowApy: 7,
+        },
+        {
+          timestamp: Date.UTC(2026, 0, 2),
+          supplied: 2_000,
+          borrowed: 1_000,
+          effectiveSupplyApy: 4,
+          effectiveBorrowApy: 7,
+        },
+      ]),
+    );
+
+    render(<CollateralRatioHistoryChart />);
+
+    expect(
+      await screen.findByText(/Collateral ratio is 2\.00x, trending down 1\.00x over the last day\./i, {
+        hidden: true,
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("renders a single valid snapshot without breaking the chart", async () => {
     fetchMock.mockResolvedValueOnce(
       historyResponse([

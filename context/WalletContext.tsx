@@ -4,21 +4,10 @@ import React, { createContext, useContext, useState, useEffect, FC, ReactNode } 
 import { useRouter } from "next/navigation";
 import config from "@/lib/config";
 import { safeRedirectPath } from "@/lib/security/safe-redirect";
-
-declare global {
-  interface Window {
-    stellar?: {
-      getPublicKey: () => Promise<string>;
-      signTransaction: (xdr: string, opts?: { network: string }) => Promise<string>;
-      // Optional: not all wallet providers expose multiple accounts.
-      // When present, used to enumerate accounts for the switcher.
-      getAccounts?: () => Promise<string[]>;
-    };
-  }
-}
+import { connectWallet, isValidStellarAddress, type StellarNetwork } from "@/lib/wallet/connectHandshake";
 
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error";
-export type StellarNetwork = "PUBLIC" | "TESTNET";
+export type { StellarNetwork };
 
 const ACCOUNTS_STORAGE_KEY = "walletAccounts";
 const ACTIVE_ACCOUNT_STORAGE_KEY = "walletActiveAccount";
@@ -36,10 +25,6 @@ export interface WalletContextType {
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
-
-function isValidStellarAddress(pubKey: string): boolean {
-  return pubKey.length === 56 && pubKey.startsWith("G");
-}
 
 function readStoredAccounts(): string[] {
   try {
@@ -142,60 +127,14 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
     setError(null);
 
     try {
-      const stellar = window.stellar;
-      if (!stellar) {
-        throw new Error("Stellar wallet provider (Freighter) not detected");
-      }
+      const verifiedAddress = await connectWallet(network);
 
-      // 1. Get client public key
-      const pubKey = await stellar.getPublicKey();
-      if (!pubKey) {
-        throw new Error("No public key returned from wallet");
-      }
-
-      // Validate the resolved address is a 56-char Stellar public key before persisting it
-      if (!isValidStellarAddress(pubKey)) {
-        throw new Error("Invalid Stellar public key");
-      }
-
-      // 2. Fetch SEP-10 challenge transaction
-      const challengeResponse = await fetch("/api/auth/challenge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: pubKey }),
-      });
-
-      if (!challengeResponse.ok) {
-        const errData = await challengeResponse.json();
-        throw new Error(errData.error || "Failed to generate challenge");
-      }
-
-      const { transaction } = await challengeResponse.json();
-
-      // 3. Sign transaction
-      const signedTransaction = await stellar.signTransaction(transaction, {
-        network,
-      });
-
-      // 4. Verify transaction signature and establish session
-      const verifyResponse = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transaction: signedTransaction }),
-      });
-
-      if (!verifyResponse.ok) {
-        const errData = await verifyResponse.json();
-        throw new Error(errData.error || "Verification failed");
-      }
-
-      const { walletAddress: verifiedAddress } = await verifyResponse.json();
-
-      // 5. Enumerate accounts if the wallet provider supports it; otherwise
+      // Enumerate accounts if the wallet provider supports it; otherwise
       // fall back gracefully to a single-account list.
       let resolvedAccounts: string[] = [verifiedAddress];
       try {
-        if (typeof stellar.getAccounts === "function") {
+        const stellar = window.stellar;
+        if (stellar && typeof stellar.getAccounts === "function") {
           const list = await stellar.getAccounts();
           if (Array.isArray(list) && list.length > 0) {
             resolvedAccounts = list.filter(isValidStellarAddress);

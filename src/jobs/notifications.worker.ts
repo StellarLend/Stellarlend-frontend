@@ -103,7 +103,7 @@ export const notificationsWorker = new Worker(
     });
   },
   {
-    connection: notificationsWorkerConnection as any,
+    connection: notificationsWorkerConnection,
   }
 );
 

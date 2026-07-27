@@ -1,6 +1,53 @@
 import type { Transaction } from "@/types/Transaction";
-import type { TransactionStatus } from "@/types/enums";
-import { fetchTransactions } from "@/lib/transactions/repository";
+import { isAssetSymbol, isTransactionStatus } from "@/types/enums";
+import { db } from "../db/client";
+import { transactions as transactionsTable } from "../db/schema/transactions";
+import { eq } from "drizzle-orm";
+
+interface TransactionRow {
+  id: string;
+  type: string;
+  amount: number;
+  asset: string;
+  date: string;
+  time: string;
+  status: string;
+}
+
+const MOCK_TRANSACTIONS: TransactionRow[] = [
+  { id: 'TXN12345', type: 'Deposit',      amount: 2000,    asset: 'XLM',  date: '2025-04-12', time: '09:32AM', status: 'Completed'  },
+  { id: 'TXN12346', type: 'Loan Payment', amount:  -250,    asset: 'BTC',  date: '2025-03-10', time: '11:15AM', status: 'Processing' },
+  { id: 'TXN12347', type: 'Withdrawal',   amount:  -7500,   asset: 'STRK', date: '2025-02-28', time: '04:45PM', status: 'Completed'  },
+  { id: 'TXN12348', type: 'Lend Funds',   amount:  -1500,   asset: 'XLM',  date: '2025-01-05', time: '08:00AM', status: 'Completed'  },
+  { id: 'TXN12349', type: 'Lend Funds',   amount:  -607.87, asset: 'BTC',  date: '2024-12-20', time: '10:20PM', status: 'Failed'     },
+  { id: 'TXN12350', type: 'Deposit',      amount: 20000,   asset: 'STRK', date: '2024-11-15', time: '01:05PM', status: 'Completed'  },
+];
+
+async function fetchMockTransactions() {
+  for (const txn of MOCK_TRANSACTIONS) {
+    await db.insert(transactionsTable).values(txn).onConflictDoNothing();
+  }
+}
+
+export function mapTransactionRow(row: TransactionRow): Transaction {
+  if (!isAssetSymbol(row.asset)) {
+    throw new Error(`Invalid transaction asset: ${String(row.asset)}`);
+  }
+
+  if (!isTransactionStatus(row.status)) {
+    throw new Error(`Invalid transaction status: ${String(row.status)}`);
+  }
+
+  return {
+    id: row.id,
+    type: row.type,
+    amount: row.amount,
+    asset: row.asset,
+    date: row.date,
+    time: row.time,
+    status: row.status,
+  };
+}
 
 async function ensureSeeded() {
   const rows = await db.select().from(transactionsTable);
@@ -22,15 +69,7 @@ export async function getTransaction(
 
   if (!row) return undefined;
 
-  return {
-    id: row.id,
-    type: row.type,
-    amount: row.amount,
-    asset: row.asset as any,
-    date: row.date,
-    time: row.time,
-    status: row.status as any,
-  };
+  return mapTransactionRow(row);
 }
 
 /**
@@ -51,15 +90,7 @@ export async function updateTransactionStatus(
 
   if (!row) return null;
 
-  return {
-    id: row.id,
-    type: row.type,
-    amount: row.amount,
-    asset: row.asset as any,
-    date: row.date,
-    time: row.time,
-    status: row.status as any,
-  };
+  return mapTransactionRow(row);
 }
 
 /**

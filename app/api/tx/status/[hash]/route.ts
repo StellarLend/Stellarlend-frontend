@@ -11,8 +11,9 @@ function badRequest() {
   return NextResponse.json({ error: { code: 'INVALID_INPUT', message: 'Invalid transaction hash.' } }, { status: 400 });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { hash?: string } }) {
-  const hash = params?.hash ?? '';
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ hash?: string }> }) {
+  const { hash: rawHash } = await params;
+  const hash = rawHash ?? '';
 
   // Reject non-hex inputs
   if (!hash || !/^[0-9a-fA-F]+$/.test(hash)) return badRequest();
@@ -34,5 +35,3 @@ export async function GET(_req: NextRequest, { params }: { params: { hash?: stri
     return NextResponse.json({ error: buildSorobanRpcError(err) }, { status: 502 });
   }
 }
-
-export default GET;

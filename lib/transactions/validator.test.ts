@@ -47,16 +47,23 @@ describe('parseTransactionParams', () => {
     });
   });
 
+  it.each(['XLM', 'USDC', 'BTC', 'ETH'] as const)('accepts canonical asset=%s without errors', (asset) => {
+    expect(parse(`asset=${asset}`)).toMatchObject({
+      params: { asset },
+      errors: null,
+    });
+  });
+
   it('collects an invalid status error', () => {
     expect(parse('status=Pending').errors).toEqual(['Invalid status']);
   });
 
-  it('collects an invalid asset error', () => {
-    expect(parse('asset=ETH').errors).toEqual(['Invalid asset']);
+  it.each(['STRK', 'DOGE', 'INVALID'])('collects an invalid asset error for %s', (asset) => {
+    expect(parse(`asset=${asset}`).errors).toEqual(['Invalid asset']);
   });
 
   it('collects invalid status and asset errors together in order', () => {
-    expect(parse('status=Pending&asset=ETH').errors).toEqual([
+    expect(parse('status=Pending&asset=STRK').errors).toEqual([
       'Invalid status',
       'Invalid asset',
     ]);
@@ -71,3 +78,4 @@ describe('parseTransactionParams', () => {
     });
   });
 });
+

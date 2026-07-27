@@ -31,6 +31,12 @@ export const envSchema = z.object({
   // Optional analytics ids
   NEXT_PUBLIC_GA_TRACKING_ID: z.string().optional(),
   NEXT_PUBLIC_MIXPANEL_TOKEN: z.string().optional(),
+  AUTH_SECRET: isProd
+    ? z.string().min(1, { message: 'AUTH_SECRET is required' })
+    : z.string().min(1, { message: 'AUTH_SECRET is required' }).default('dev-secret-change-in-production'),
+  MEMO_SALT: isProd
+    ? z.string().min(1, { message: 'MEMO_SALT is required' })
+    : z.string().min(1, { message: 'MEMO_SALT is required' }).default('stellarlend-default-salt'),
 });
 
 // Parse and validate the environment at import time. Throws on error.
