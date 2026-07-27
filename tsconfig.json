@@ -14,6 +14,7 @@
     "jsx": "preserve",
     "incremental": true,
     "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
     "types": ["node", "vitest/globals"],
     "paths": {
       "@/*": ["./*"]

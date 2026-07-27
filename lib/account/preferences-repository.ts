@@ -7,24 +7,14 @@ export interface NotificationSettings {
   marketingEmails: boolean;
 }
 
-export interface NotificationPreferences {
-  email: boolean;
-  push: boolean;
-  sms: boolean;
-  inApp: boolean;
-}
-
 export interface UserPreferences {
   userId: string;
-  email?: string;
   locale: string;
   displayCurrency: string;
-  notifications: NotificationSettings & NotificationPreferences;
+  notifications: NotificationSettings;
   createdAt: Date;
   updatedAt: Date;
 }
-
-export type PreferencesRecord = UserPreferences;
 
 /** Input type for creating/updating preferences (timestamps managed internally). */
 export type UpsertPreferencesInput = {
@@ -64,46 +54,24 @@ export class PreferencesRepository {
 
   /**
    * Insert or update preferences for a user.
-   * Supports both overload signatures:
-   * 1. upsert(input: UpsertPreferencesInput)
-   * 2. upsert(userId: string, data: Omit<UserPreferences, 'userId' | 'createdAt' | 'updatedAt'>)
+   *
+   * - On first call for a userId, creates a new record with `createdAt` and `updatedAt` set to now.
+   * - On subsequent calls, updates the record while preserving the original `createdAt` and refreshing `updatedAt`.
    */
-  upsert(input: UpsertPreferencesInput): UserPreferences;
-  upsert(userId: string, data: any): UserPreferences;
-  upsert(
-    first: string | UpsertPreferencesInput,
-    second?: any
-  ): UserPreferences {
+  upsert(input: UpsertPreferencesInput): UserPreferences {
     const now = new Date();
-    let userId: string;
-    let locale: string;
-    let displayCurrency: string;
-    let notifications: any;
-
-    if (typeof first === 'string') {
-      userId = first;
-      locale = second.locale;
-      displayCurrency = second.displayCurrency;
-      notifications = second.notifications;
-    } else {
-      userId = first.userId;
-      locale = first.locale;
-      displayCurrency = first.displayCurrency;
-      notifications = first.notifications;
-    }
-
-    const existing = this.store.get(userId);
+    const existing = this.store.get(input.userId);
 
     const record: UserPreferences = {
-      userId,
-      locale,
-      displayCurrency,
-      notifications: { ...notifications },
+      userId: input.userId,
+      locale: input.locale,
+      displayCurrency: input.displayCurrency,
+      notifications: { ...input.notifications },
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
 
-    this.store.set(userId, record);
+    this.store.set(input.userId, record);
     return record;
   }
 }
