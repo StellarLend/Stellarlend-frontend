@@ -226,9 +226,9 @@ describe("amortization schedule lib", () => {
       expect(shouldCollapseSchedule(shortSchedule)).toBe(false);
     });
 
-    it("returns false for schedules with exactly 6 periods", () => {
-      const sixPeriodSchedule: AmortizationPeriod[] = Array.from(
-        { length: 6 },
+    it("returns false for schedules with exactly 4 periods", () => {
+      const fourPeriodSchedule: AmortizationPeriod[] = Array.from(
+        { length: 4 },
         (_, i) => ({
           period: i + 1,
           principal: 100,
@@ -236,10 +236,23 @@ describe("amortization schedule lib", () => {
           remainingBalance: 0,
         }),
       );
-      expect(shouldCollapseSchedule(sixPeriodSchedule)).toBe(false);
+      expect(shouldCollapseSchedule(fourPeriodSchedule)).toBe(false);
     });
 
-    it("returns true for schedules with more than 6 periods", () => {
+    it("returns true for schedules with exactly 5 periods", () => {
+      const fivePeriodSchedule: AmortizationPeriod[] = Array.from(
+        { length: 5 },
+        (_, i) => ({
+          period: i + 1,
+          principal: 100,
+          interest: 10,
+          remainingBalance: 0,
+        }),
+      );
+      expect(shouldCollapseSchedule(fivePeriodSchedule)).toBe(true);
+    });
+
+    it("returns true for long schedules", () => {
       const longSchedule: AmortizationPeriod[] = Array.from(
         { length: 12 },
         (_, i) => ({
