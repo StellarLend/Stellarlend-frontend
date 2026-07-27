@@ -90,18 +90,55 @@ describe('GET /api/account/delete/challenge rate limiting', () => {
     expect(res.status).toBe(200);
   });
 
-  it('allows a legitimate challenge after the challenge expires', async () => {
-    vi.useFakeTimers();
+   it('allows a legitimate challenge after the challenge expires', async () => {
+     vi.useFakeTimers();
 
-    const token = signToken(USER);
-    const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+     const token = signToken(USER);
+     const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
-    const res1 = await ChallengeGET(makeRequest(token));
-    expect(res1.status).toBe(200);
+     const res1 = await ChallengeGET(makeRequest(token));
+     expect(res1.status).toBe(200);
 
-    vi.advanceTimersByTime(CHALLENGE_TTL_MS + 1000);
+     vi.advanceTimersByTime(CHALLENGE_TTL_MS + 1000);
 
-    const res2 = await ChallengeGET(makeRequest(token));
-    expect(res2.status).toBe(200);
-  });
-});
+     const res2 = await ChallengeGET(makeRequest(token));
+     expect(res2.status).toBe(200);
+   });
+
+   it('counts each challenge request toward the rate limit even after prior challenges expire unused', async () => {
+     vi.useFakeTimers();
+
+     const token = signToken(USER);
+     const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+     // Exhaust the burst limit with two challenge requests
+     const res1 = await ChallengeGET(makeRequest(token));
+     expect(res1.status).toBe(200);
+
+     const res2 = await ChallengeGET(makeRequest(token));
+     expect(res2.status).toBe(200);
+
+     // A third request right away is correctly blocked
+     const res3 = await ChallengeGET(makeRequest(token));
+     expect(res3.status).toBe(429);
+
+     // Let the issued challenges expire unused — they are never redeemed
+     vi.advanceTimersByTime(CHALLENGE_TTL_MS + 1000);
+
+     // Advance past the rate-limit window so the token bucket refills;
+     // this refill is time-driven, not driven by challenge expiry state.
+     vi.advanceTimersByTime(1000);
+
+     // After expiry the rate limit still enforces the same budget.
+     // Expired challenges did not release their consumed tokens, so
+     // the same burst capacity applies to post-expiry requests.
+     const res4 = await ChallengeGET(makeRequest(token));
+     expect(res4.status).toBe(200);
+
+     const res5 = await ChallengeGET(makeRequest(token));
+     expect(res5.status).toBe(200);
+
+     const res6 = await ChallengeGET(makeRequest(token));
+     expect(res6.status).toBe(429);
+   });
+ });
