@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+vi.mock('server-only', () => ({}));
 import { NextRequest } from 'next/server';
 import { clearAccountBucketCache } from '@/lib/rate-limit/account-bucket';
 import { getAuditEvents, clearAuditLog } from '@/lib/audit/events';
@@ -87,5 +88,20 @@ describe('GET /api/account/delete/challenge rate limiting', () => {
 
     const res = await ChallengeGET(makeRequest(token));
     expect(res.status).toBe(200);
+  });
+
+  it('allows a legitimate challenge after the challenge expires', async () => {
+    vi.useFakeTimers();
+
+    const token = signToken(USER);
+    const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+    const res1 = await ChallengeGET(makeRequest(token));
+    expect(res1.status).toBe(200);
+
+    vi.advanceTimersByTime(CHALLENGE_TTL_MS + 1000);
+
+    const res2 = await ChallengeGET(makeRequest(token));
+    expect(res2.status).toBe(200);
   });
 });
