@@ -60,7 +60,7 @@ importers:
         specifier: 3.7.15
         version: 3.7.15(next@15.2.8(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       pg:
-        specifier: ^8.22.0
+        specifier: ^8.13.3
         version: 8.22.0
       postgres:
         specifier: ^3.4.9
