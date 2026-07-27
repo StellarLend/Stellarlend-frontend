@@ -70,6 +70,8 @@ export async function httpGet<T>(url: string, options: RequestOptions = {}): Pro
       
       // Inject the request ID into headers
       const requestId = getActiveRequestId() || generateRequestId();
+  
+      
       const headers = new Headers(fetchOptions.headers);
       headers.set(REQUEST_ID_HEADER, requestId);
       

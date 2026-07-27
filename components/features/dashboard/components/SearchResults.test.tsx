@@ -161,6 +161,68 @@ describe('SearchResults Component', () => {
       const errorIcon = container.querySelector('svg');
       expect(errorIcon).toBeInTheDocument();
     });
+
+    it('surfaces a 500 server error as a distinct retryable state, not empty results', () => {
+      const onRetry = vi.fn();
+
+      render(
+        <SearchResults
+          results={{
+            ...mockResultsBase,
+            query: 'xlm',
+            state: 'error',
+            error: {
+              message: 'Server error while searching. Please try again.',
+              source: 'all',
+              statusCode: 500,
+              retryable: true,
+            },
+            results: {
+              transactions: [],
+              positions: [],
+            },
+            total: 0,
+          }}
+          isOpen={true}
+          onRetry={onRetry}
+        />
+      );
+
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByTestId('search-results-error')).toBeInTheDocument();
+      expect(screen.getByText('Search Error')).toBeInTheDocument();
+      expect(
+        screen.getByText('Server error while searching. Please try again.')
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/No results found/i)).not.toBeInTheDocument();
+
+      const retryButton = screen.getByRole('button', { name: /try again/i });
+      expect(retryButton).toBeInTheDocument();
+      fireEvent.click(retryButton);
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not show a retry control when the error is not retryable', () => {
+      render(
+        <SearchResults
+          results={{
+            ...mockResultsBase,
+            state: 'error',
+            error: {
+              message: 'Invalid search query',
+              source: 'all',
+              statusCode: 400,
+              retryable: false,
+            },
+          }}
+          isOpen={true}
+          onRetry={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Search Error')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    });
   });
 
   describe('Empty State', () => {

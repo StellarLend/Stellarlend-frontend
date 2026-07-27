@@ -10,6 +10,8 @@ import { Transactions } from "@/components/shared/common/Transaction";
 import { PageHeader } from "@/components/shared/common";
 import { useTransactionSummary } from "@/hooks/useTransactionSummary";
 
+const IconPlaceholder = () => <span className="inline-block w-4 h-4 bg-slate-200 animate-pulse rounded" />;
+
 // Lazy load Bank icon to reduce initial bundle size
 const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod => ({ default: mod.Bank })), {
   loading: () => <IconPlaceholder />,
@@ -19,6 +21,12 @@ const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod 
 export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const { inflow, outflow, net, isLoading } = useTransactionSummary();
+  const searchParams = useSearchParams();
+  const filters = {
+    status: searchParams.get('status') ?? undefined,
+    type: searchParams.get('type') ?? undefined,
+    search: searchParams.get('search') ?? undefined,
+  };
 
   return (
     <DashboardLayout>
@@ -37,3 +45,4 @@ export default function TransactionsPage() {
     </DashboardLayout>
   );
 }
+

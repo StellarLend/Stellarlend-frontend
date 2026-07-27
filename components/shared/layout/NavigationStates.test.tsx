@@ -8,6 +8,7 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { NavigationMenu } from "./NavigationMenu";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
+import { clientLog } from "@/lib/utils/client-log";
 
 const mockPathname = vi.fn().mockReturnValue("/");
 
@@ -65,7 +66,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("returns null and warns when href is empty", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(clientLog, "warn").mockImplementation(() => {});
     // @ts-expect-error intentional bad prop
     const { container } = render(<NavLink href="">Bad</NavLink>);
     expect(container.firstChild).toBeNull();

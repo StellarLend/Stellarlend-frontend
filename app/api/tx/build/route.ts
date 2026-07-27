@@ -14,8 +14,11 @@ import {
   buildSorobanTransactionRpcRequest,
   extractUnsignedXdr,
   isTxBuildRequest,
-  TxBuildRequest,
 } from '@/lib/soroban/tx';
+import {
+  isSorobanRpcErrorResponse,
+  type SorobanRpcResponse,
+} from '@/lib/soroban/types';
 
 export const runtime = 'nodejs';
 
@@ -90,31 +93,32 @@ export async function POST(request: NextRequest) {
   }
 
   const payload = buildSorobanTransactionRpcRequest(
-    body as TxBuildRequest,
+    body,
     config.stellar.sorobanContractId,
     config.stellar.network,
+    { fee: body.fee ?? serverConfig.stellar.transactionFee },
   );
 
   try {
-    const rpcResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
+    const rpcResponse: SorobanRpcResponse = await httpPost<SorobanRpcResponse>(serverConfig.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
     });
 
-    if (typeof rpcResponse === 'object' && rpcResponse && 'error' in rpcResponse) {
+    if (isSorobanRpcErrorResponse(rpcResponse)) {
       return NextResponse.json(
-        { error: buildSorobanRpcError((rpcResponse as any).error) },
+        { error: buildSorobanRpcError(rpcResponse.error) },
         { status: 502 },
       );
     }
 
-    const unsignedXdr = extractUnsignedXdr((rpcResponse as any).result ?? rpcResponse);
+    const unsignedXdr = extractUnsignedXdr(rpcResponse.result);
     if (!unsignedXdr) {
       return rpcFailure();
     }
 
     try {
       const simulation = await simulateSorobanTransaction(
-        config.stellar.sorobanRpcUrl,
+        serverConfig.stellar.sorobanRpcUrl,
         unsignedXdr,
       );
 

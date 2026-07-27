@@ -4,10 +4,12 @@ import type { Transaction } from '@/lib/transactions/types';
 
 export function useTransactionSummary() {
   const searchParams = useSearchParams();
-  const [summary, setSummary] = useState({ inflow: 0, outflow: 0, net: 0 });
+  const [summary, setSummary] = useState<TransactionSummary>({ inflow: 0, outflow: 0, net: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function calculateSummary() {
       setIsLoading(true);
       try {
@@ -45,6 +47,7 @@ export function useTransactionSummary() {
     }
 
     calculateSummary();
+    return () => { cancelled = true; };
   }, [searchParams]);
 
   return { ...summary, isLoading };

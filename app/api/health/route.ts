@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import config from '@/lib/config';
 import { httpGet } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
+import { sqlite } from '@/lib/db/client';
 
 export const runtime = 'nodejs';
 

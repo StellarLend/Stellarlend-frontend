@@ -44,6 +44,7 @@
     "nextjs-toploader": "3.7.15",
     "pg": "^8.22.0",
     "postgres": "^3.4.9",
+    "pg": "^8.13.3",
     "react": "^19.0.0",
     "react-datepicker": "^8.3.0",
     "react-dom": "^19.0.0",

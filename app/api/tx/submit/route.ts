@@ -6,7 +6,7 @@ import { httpPost } from '@/lib/http/client';
 import { metrics } from '@/lib/metrics/registry';
 import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
 import { hashIp, appendAuditEvent } from '@/lib/audit/logger';
-import { simulateSorobanTransaction } from '@/lib/soroban/simulate';
+import { simulateSorobanTransaction, SorobanSimulationError, buildSorobanSimulationApiError, getSorobanSimulationStatus } from '@/lib/soroban/simulate';
 import {
   buildSorobanRpcError,
   buildSorobanSubmitRpcRequest,
@@ -168,6 +168,13 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error) {
+    if (error instanceof SorobanSimulationError) {
+      return NextResponse.json(
+        { error: buildSorobanSimulationApiError(error) },
+        { status: getSorobanSimulationStatus(error) },
+      );
+    }
+
     try {
       metrics.sorobanSubmissions.inc({ result: 'failure' });
       metrics.sorobanSubmitDuration.observe(0, { result: 'failure' });

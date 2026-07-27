@@ -1,8 +1,10 @@
-interface DashboardFillProps {
+import type { SVGProps } from "react";
+interface DashboardFillProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
   color?: string;
+  title?: string;
 }
 
 export const DashboardFill = ({
@@ -10,6 +12,10 @@ export const DashboardFill = ({
   width = "24",
   height = "24",
   color,
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: DashboardFillProps) => {
   return (
     <svg
@@ -18,7 +24,12 @@ export const DashboardFill = ({
       viewBox="0 0 20 20"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         fillRule="evenodd"
         clipRule="evenodd"

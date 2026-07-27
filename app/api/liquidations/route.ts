@@ -12,7 +12,7 @@ async function handleLiquidations(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const walletParam = request?.nextUrl?.searchParams.get('wallet') ?? null;
+  const walletParam = request.nextUrl.searchParams.get('wallet') ?? null;
 
   if (walletParam !== null) {
     const parsed = walletAddressSchema.safeParse(walletParam);
