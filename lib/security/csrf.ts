@@ -41,7 +41,8 @@ export function setCsrfCookie(response: NextResponse, token: string) {
 /**
  * Verifies the CSRF token for a request.
  * 
- * IMPORTANT CONTRACT: This function immediately returns true (skipping CSRF 
+ * IMPORTANT CONTRACT: presence, not validity, of a Bearer header exempts a request from CSRF.
+ * This function immediately returns true (skipping CSRF 
  * verification) if the request contains any Authorization header starting with 
  * 'Bearer '. It explicitly checks only for the PRESENCE of this header, not 
  * its VALIDITY. Callers wrapping a route with this CSRF protection MUST 
