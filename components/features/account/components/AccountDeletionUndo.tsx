@@ -16,7 +16,7 @@ export default function AccountDeletionUndo({
   onElapsed,
 }: AccountDeletionUndoProps) {
   const [secondsRemaining, setSecondsRemaining] = useState(durationSeconds);
-  const mountTimeRef = useRef(Date.now());
+  const mountTimeRef = useRef(new Date().getTime());
   const onElapsedRef = useRef(onElapsed);
   const undoButtonRef = useRef<HTMLButtonElement>(null);
 
