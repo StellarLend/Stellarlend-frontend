@@ -7,7 +7,9 @@ export interface StellarMemo {
   value: string;
 }
 
-const MEMO_SALT = process.env.MEMO_SALT || 'stellarlend-default-salt';
+import { validatedEnv } from '../configValidation';
+
+const MEMO_SALT = validatedEnv.MEMO_SALT;
 
 // Bidirectional registries
 const memoToAccount = new Map<string, string>(); // "type:value" -> accountId

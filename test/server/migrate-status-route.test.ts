@@ -6,12 +6,23 @@ vi.mock('server-only', () => ({}));
 const mockReaddir = vi.fn<[], Promise<string[]>>();
 vi.mock('fs/promises', () => ({ readdir: mockReaddir }));
 
-const mockQuery = vi.fn<Promise<{ rows: Array<{ name: string }> }>, [string]>();
+const mockPoolQuery = vi.fn<Promise<{ rows: Array<{ name: string }> }>, [string]>();
+let pgClientConstructed = false;
+
+vi.mock('@/lib/db/pool', () => ({
+  default: {
+    query: (sql: string) => mockPoolQuery(sql),
+  },
+}));
+
 vi.mock('pg', () => ({
   Client: class {
+    constructor() {
+      pgClientConstructed = true;
+    }
     async connect() {}
     async query(sql: string) {
-      return mockQuery(sql);
+      return mockPoolQuery(sql);
     }
     async end() {}
   },
@@ -21,8 +32,9 @@ describe('GET /api/admin/migrate-status', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...process.env };
+    pgClientConstructed = false;
     mockReaddir.mockReset();
-    mockQuery.mockReset();
+    mockPoolQuery.mockReset();
   });
 
   afterEach(() => {
@@ -33,7 +45,7 @@ describe('GET /api/admin/migrate-status', () => {
     process.env.SERVER_TOKEN = 'test-token';
     process.env.DATABASE_URL = 'postgres://user:pass@localhost/db';
     mockReaddir.mockResolvedValue(['202301_init.sql']);
-    mockQuery.mockResolvedValue({ rows: [{ name: '202301_init' }] });
+    mockPoolQuery.mockResolvedValue({ rows: [{ name: '202301_init' }] });
 
     const { GET } = await import('@/app/api/admin/migrate-status/route');
     const res = await GET(
@@ -52,7 +64,7 @@ describe('GET /api/admin/migrate-status', () => {
     process.env.SERVER_TOKEN = 'test-token-2';
     process.env.DATABASE_URL = 'postgres://user:pass@localhost/db';
     mockReaddir.mockResolvedValue(['202301_init.sql', '202302_new.sql']);
-    mockQuery.mockResolvedValue({ rows: [{ name: '202301_init' }] });
+    mockPoolQuery.mockResolvedValue({ rows: [{ name: '202301_init' }] });
 
     const { GET } = await import('@/app/api/admin/migrate-status/route');
     const res = await GET(
@@ -82,5 +94,32 @@ describe('GET /api/admin/migrate-status', () => {
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.error).toEqual({ message: 'Unauthorized' });
+  });
+
+  it('reuses the connection pool without opening a new raw pg.Client per request', async () => {
+    process.env.SERVER_TOKEN = 'test-token';
+    process.env.DATABASE_URL = 'postgres://user:pass@localhost/db';
+    mockReaddir.mockResolvedValue(['202301_init.sql']);
+    mockPoolQuery.mockResolvedValue({ rows: [{ name: '202301_init' }] });
+
+    const { GET } = await import('@/app/api/admin/migrate-status/route');
+
+    // Make multiple requests to the endpoint
+    for (let i = 0; i < 3; i++) {
+      const res = await GET(
+        new NextRequest('http://localhost/api/admin/migrate-status', {
+          method: 'GET',
+          headers: { 'x-server-token': 'test-token' },
+        }) as any
+      );
+      expect(res.status).toBe(200);
+    }
+
+    // Assert the pooled query was used for each request
+    expect(mockPoolQuery).toHaveBeenCalledTimes(3);
+    expect(mockPoolQuery).toHaveBeenCalledWith('SELECT name FROM __drizzle_migrations ORDER BY id');
+
+    // Assert no raw pg.Client was constructed
+    expect(pgClientConstructed).toBe(false);
   });
 });

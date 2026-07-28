@@ -45,6 +45,14 @@ export function initDb() {
       processedAt INTEGER
     );
   `);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS subscribers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      subscribed_at INTEGER NOT NULL
+    );
+  `);
 }
 
 // Initialize tables immediately

@@ -1,77 +1,40 @@
-import { logger } from '@/lib/logger';
+/**
+ * Re-export wrapper for backward compatibility.
+ *
+ * The canonical module is now `@/lib/audit`. Import from there directly for
+ * new code; this file re-exports the legacy API so existing callers keep
+ * working without changes.
+ */
 
-export type AuditEventType =
-  | 'account.deleted'
-  | 'account.anonymized'
-  | 'sessions.revoked'
-  | 'data.cleanup.enqueued'
-  | 'data.cleanup.completed'
-  | 'data.cleanup.failed'
-  | 'auth.challenge.issued'
-  | 'auth.challenge.verified';
+export type {
+  AccountAuditEventType as AuditEventType,
+  AccountAuditEvent as AuditEvent,
+} from '@/lib/audit';
 
-export interface AuditEvent {
-  id: string;
-  type: AuditEventType;
-  userId: string;
-  timestamp: string;
-  metadata: Record<string, unknown>;
-}
+import {
+  emitAccountAuditEvent as _emitAuditEvent,
+  getAccountAuditEvents as _getAccountEvents,
+  clearAuditLog as _clearAuditLog,
+} from '@/lib/audit';
 
-const auditLog: AuditEvent[] = [];
-let eventIdCounter = 0;
-
-function generateId(): string {
-  eventIdCounter += 1;
-  return `audit-${Date.now()}-${eventIdCounter}`;
-}
+import type { AccountAuditEventType, AccountAuditEvent } from '@/lib/audit';
 
 export function emitAuditEvent(
-  type: AuditEventType,
+  type: AccountAuditEventType,
   userId: string,
-  metadata: Record<string, unknown> = {}
-): AuditEvent {
-  const event: AuditEvent = {
-    id: generateId(),
-    type,
-    userId,
-    timestamp: new Date().toISOString(),
-    metadata,
-  };
-
-  auditLog.push(event);
-
-  logger.info(`audit: ${type}`, '/api/audit', {
-    eventId: event.id,
-    userId,
-    type,
-  });
-
-  return event;
+  metadata: Record<string, unknown> = {},
+): AccountAuditEvent {
+  return _emitAuditEvent(type, userId, metadata);
 }
 
 export function getAuditEvents(filters?: {
   userId?: string;
-  type?: AuditEventType;
+  type?: AccountAuditEventType;
   since?: string;
-}): AuditEvent[] {
-  let events = auditLog;
-
-  if (filters?.userId) {
-    events = events.filter((e) => e.userId === filters.userId);
-  }
-  if (filters?.type) {
-    events = events.filter((e) => e.type === filters.type);
-  }
-  if (filters?.since) {
-    const sinceDate = new Date(filters.since).getTime();
-    events = events.filter((e) => new Date(e.timestamp).getTime() >= sinceDate);
-  }
-
-  return events;
+}): AccountAuditEvent[] {
+  return _getAccountEvents(filters);
 }
 
 export function clearAuditLog(): void {
-  auditLog.length = 0;
-  eventIdCounter = 0;
+  _clearAuditLog();
 }

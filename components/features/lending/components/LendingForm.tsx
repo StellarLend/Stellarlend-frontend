@@ -1,8 +1,4 @@
 "use client";
-import { AmountInput } from '@/components/shared/ui/AmountInput';
-import { Tooltip } from '@/components/atoms/Tooltip';
-import { IconButton } from '@/components/atoms/IconButton';
-
 import { useState, useEffect, useRef } from "react";
 import { LendingData } from "@/app/lending/page";
 import type { CalculationResult } from "@/lib/lending/types";
@@ -10,8 +6,9 @@ import { calculateQuote } from "@/lib/lending/quote";
 import { Input } from "@/components/shared/ui/Input";
 import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
-import { ASSETS } from "@/lib/assets";
+import { useWalletBalances } from "@/hooks/useWalletBalances";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
@@ -48,7 +45,8 @@ export default function LendingForm({
   // preview once a newer input is in flight.
   const requestSeqRef = useRef(0);
 
-  const selectedAsset = ASSETS.find((a) => a.symbol === formData.asset);
+  const { assetsWithBalances } = useWalletBalances();
+  const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
   const rates = INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
 
   useEffect(() => {
@@ -150,7 +148,7 @@ export default function LendingForm({
         setIsSubmitting(false);
       }
     } else {
-      setSubmitStatus("error");
+      setStatus("error");
       setSubmitMessage("Please fix the errors in the form before continuing.");
     }
   };
@@ -190,7 +188,7 @@ export default function LendingForm({
           </label>
           <div className="grid grid-cols-2 gap-4">
             <AssetSelector
-              assets={ASSETS}
+              assets={assetsWithBalances}
               value={formData.asset}
               label="Select Asset"
               onChange={(asset) => {
@@ -360,15 +358,17 @@ export default function LendingForm({
         )}
 
         {/* Submit Button */}
-        <Button
-          type="submit"
-          variant="success"
-          size="lg"
-          fullWidth
-          isLoading={isSubmitting}
-        >
-          Review Lending Offer
-        </Button>
+        <WalletGate fallbackText="Connect wallet to review offer">
+          <Button
+            type="submit"
+            variant="success"
+            size="lg"
+            fullWidth
+            isLoading={isSubmitting}
+          >
+            Review Lending Offer
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

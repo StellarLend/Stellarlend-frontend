@@ -9,6 +9,7 @@ export interface EmptyStateProps {
   onAction?: () => void;
   icon?: ReactNode;
   className?: string;
+  tone?: "neutral" | "error";
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -18,9 +19,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onAction,
   icon,
   className = "",
+  tone = "neutral",
 }) => {
+  const isAlert = tone === "error";
+
   return (
     <section
+      role={isAlert ? "alert" : undefined}
+      aria-live={isAlert ? "assertive" : undefined}
       className={`flex w-full flex-col items-center justify-center gap-5 rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center ${className}`}
     >
       <div

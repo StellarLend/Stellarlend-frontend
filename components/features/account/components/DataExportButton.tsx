@@ -1,125 +1,131 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, Loader2 } from "lucide-react";
-import Toast, { ToastVariant } from "@/components/shared/common/Toast";
+import { Download } from "lucide-react";
+import Button from "@/components/atoms/Button";
+import { useToast } from "@/components/shared/common/Toast";
 
 interface DataExportButtonProps {
   className?: string;
 }
 
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
+
 export default function DataExportButton({ className = "" }: DataExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
-  const [toast, setToast] = useState<{
-    variant: ToastVariant;
-    title: string;
-    description?: string;
-  } | null>(null);
-
-  const showToast = (variant: ToastVariant, title: string, description?: string) => {
-    setToast({ variant, title, description });
-    setTimeout(() => setToast(null), 5000);
-  };
+  const [hasFailed, setHasFailed] = useState(false);
+  const { showToast } = useToast();
 
   const handleExport = async () => {
     if (isExporting) return;
 
     setIsExporting(true);
-    showToast("processing", "Preparing your data export...", "This may take a moment.");
+    setHasFailed(false);
+    showToast({ variant: "processing", title: "Preparing your data export...", description: "This may take a moment." });
+
+    const csrfToken = readCookie("csrf-token");
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (csrfToken) {
+      headers["x-csrf-token"] = csrfToken;
+    }
 
     try {
       const response = await fetch("/api/account/export", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         if (response.status === 429) {
-          showToast(
-            "error",
-            "Export rate limit exceeded",
-            data.error || "Please wait 24 hours before requesting another export."
-          );
+          showToast({
+            variant: "error",
+            title: "Export rate limit exceeded",
+            description: data.error || "Please wait 24 hours before requesting another export."
+          });
         } else {
-          showToast(
-            "error",
-            "Export failed",
-            data.error || "An error occurred while preparing your export."
-          );
+          showToast({
+            variant: "error",
+            title: "Export failed",
+            description: data.error || "An error occurred while preparing your export."
+          });
         }
+        setHasFailed(true);
         return;
       }
 
-      // Trigger download if downloadUrl is provided
       if (data.downloadUrl) {
+        // Fetch the file contents from the signed download link as a blob
+        const fileResponse = await fetch(data.downloadUrl);
+        if (!fileResponse.ok) {
+          throw new Error("Failed to download the data export archive file.");
+        }
+        const blob = await fileResponse.blob();
+        const downloadUrlObj = URL.createObjectURL(blob);
+
         const link = document.createElement("a");
-        link.href = data.downloadUrl;
+        link.href = downloadUrlObj;
         link.download = `stellarlend-export-${Date.now()}.zip`;
         document.body.appendChild(link);
         link.click();
         link.remove();
+        URL.revokeObjectURL(downloadUrlObj);
 
-        showToast(
-          "success",
-          "Export ready",
-          "Your data export has been downloaded successfully."
-        );
+        showToast({
+          variant: "success",
+          title: "Export ready",
+          description: "Your data export has been downloaded successfully."
+        });
       } else {
-        showToast(
-          "error",
-          "Export incomplete",
-          "No download URL received. Please try again."
-        );
+        setHasFailed(true);
+        showToast({
+          variant: "error",
+          title: "Export incomplete",
+          description: "No download URL received. Please try again."
+        });
       }
     } catch (error) {
-      showToast(
-        "error",
-        "Export failed",
-        "Network error occurred. Please check your connection and try again."
-      );
+      setHasFailed(true);
+      showToast({
+        variant: "error",
+        title: "Export failed",
+        description: "Network error occurred. Please check your connection and try again."
+      });
     } finally {
       setIsExporting(false);
     }
   };
 
+  const buttonLabel = isExporting ? "Preparing..." : hasFailed ? "Try Again" : "Export My Data";
+
   return (
     <>
-      <button
+      <Button
         onClick={handleExport}
         disabled={isExporting}
-        className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors ${className}`}
-        aria-busy={isExporting}
+        variant="primary"
+        className={`bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed ${className}`.trim()}
+        aria-busy={isExporting || undefined}
         aria-describedby={isExporting ? "export-status" : undefined}
+        isLoading={isExporting}
+        leftIcon={!isExporting ? <Download className="w-4 h-4" aria-hidden="true" /> : undefined}
       >
-        {isExporting ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-            <span>Preparing...</span>
-          </>
-        ) : (
-          <>
-            <Download className="w-4 h-4" aria-hidden="true" />
-            <span>Export My Data</span>
-          </>
-        )}
-      </button>
-      
+        {buttonLabel}
+      </Button>
+
       {isExporting && (
         <span id="export-status" className="sr-only">
           Your data export is being prepared. Please wait.
         </span>
-      )}
-
-      {toast && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          variant={toast.variant}
-        />
       )}
     </>
   );

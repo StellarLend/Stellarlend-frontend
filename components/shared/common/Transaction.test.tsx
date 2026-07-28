@@ -1,22 +1,82 @@
-import React from 'react';
+import React from "react";
 import { render, screen, waitFor, fireEvent } from "@/test/test-utils";
 import { Transactions } from "./Transaction";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── Hoisted mock data (must be declared before vi.mock calls are hoisted) ───
 
+const mockWalletNetwork = vi.hoisted(() => ({ current: "TESTNET" }));
+
+const txHash =
+  "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6abcd";
+
 const mockFetchTransactions = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
     transactions: [
-      { id: "TXN-001", type: "Deposit",    amount: 100,  asset: "XLM",  date: "2024-04-01", time: "10:00AM", status: "Completed" },
-      { id: "TXN-002", type: "Withdrawal", amount: -50,  asset: "USDC", date: "2024-04-02", time: "11:00AM", status: "Processing" },
-      { id: "TXN-003", type: "Lend",       amount: 200,  asset: "BTC",  date: "2024-04-03", time: "12:00PM", status: "Completed" },
+      {
+        id: "TXN-001",
+        type: "Deposit",
+        amount: 100,
+        asset: "XLM",
+        date: "2024-04-01",
+        time: "10:00AM",
+        status: "Completed",
+      },
+      {
+        id: "TXN-002",
+        type: "Withdrawal",
+        amount: -50,
+        asset: "USDC",
+        date: "2024-04-02",
+        time: "11:00AM",
+        status: "Processing",
+      },
+      {
+        id: "TXN-003",
+        type: "Lend",
+        amount: 200,
+        asset: "BTC",
+        date: "2024-04-03",
+        time: "12:00PM",
+        status: "Completed",
+      },
     ],
     total: 3,
-  })
+  }),
 );
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
+
+vi.mock("@/components/features/dashboard/components/TransactionDetail", () => ({
+  default: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) =>
+    isOpen ? (
+      <div>
+        <h2>Transaction Details</h2>
+        <button onClick={onClose} aria-label="Close">Close</button>
+      </div>
+    ) : null,
+}));
+
+vi.mock("@headlessui/react", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@headlessui/react")>();
+  return {
+    ...original,
+    Transition: Object.assign(
+      ({ children, show }: { children: React.ReactNode; show?: boolean }) =>
+        show !== false ? <>{children}</> : null,
+      {
+        Child: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+      },
+    ),
+    Dialog: Object.assign(
+      ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+      {
+        Panel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+        Title: ({ children, className }: { children: React.ReactNode; className?: string }) => <h2 className={className}>{children}</h2>,
+      },
+    ),
+  };
+});
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -25,22 +85,53 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/dynamic", () => ({
-  default: (loader: () => Promise<{ default: React.ComponentType<unknown> }>) => {
-    let Comp: React.ComponentType<unknown> | null = null;
-    loader().then((m) => { Comp = m.default; });
-    return function DynamicResolved(props: unknown) {
-      return Comp
-        ? React.createElement(Comp, props as Record<string, unknown>)
-        : React.createElement("div", null, "Loading\u2026");
-    };
-  },
+  default: () =>
+    function DynamicTransactionDetail({
+      isOpen,
+      onClose,
+    }: {
+      isOpen: boolean;
+      onClose: () => void;
+    }) {
+      if (!isOpen) return null;
+      return (
+        <div>
+          <h2>Transaction Details</h2>
+          <button type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      );
+    },
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ src, alt, width, height, className }: { src: string; alt: string; width: number; height: number; className?: string }) => (
+  default: ({
+    src,
+    alt,
+    width,
+    height,
+    className,
+  }: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    className?: string;
+  }) => (
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-    <img src={src} alt={alt} width={width} height={height} className={className} />
+    <img
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+    />
   ),
+}));
+
+vi.mock("@/hooks/useWallet", () => ({
+  useWallet: () => ({ network: mockWalletNetwork.current }),
 }));
 
 vi.mock("@/types/Transaction", async (importOriginal) => {
@@ -53,16 +144,44 @@ vi.mock("@/types/Transaction", async (importOriginal) => {
 describe("Transactions Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWalletNetwork.current = "TESTNET";
     // Re-assert the resolved value after clearAllMocks resets it
     mockFetchTransactions.mockResolvedValue({
       transactions: [
-        { id: "TXN-001", type: "Deposit",    amount: 100,  asset: "XLM",  date: "2024-04-01", time: "10:00AM", status: "Completed" },
-        { id: "TXN-002", type: "Withdrawal", amount: -50,  asset: "USDC", date: "2024-04-02", time: "11:00AM", status: "Processing" },
-        { id: "TXN-003", type: "Lend",       amount: 200,  asset: "BTC",  date: "2024-04-03", time: "12:00PM", status: "Completed" },
+        {
+          id: "TXN-001",
+          type: "Deposit",
+          amount: 100,
+          asset: "XLM",
+          date: "2024-04-01",
+          time: "10:00AM",
+          status: "Completed",
+        },
+        {
+          id: "TXN-002",
+          type: "Withdrawal",
+          amount: -50,
+          asset: "USDC",
+          date: "2024-04-02",
+          time: "11:00AM",
+          status: "Processing",
+        },
+        {
+          id: "TXN-003",
+          type: "Lend",
+          amount: 200,
+          asset: "BTC",
+          date: "2024-04-03",
+          time: "12:00PM",
+          status: "Completed",
+        },
       ],
       total: 3,
     });
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
   });
 
   afterEach(() => {
@@ -79,7 +198,9 @@ describe("Transactions Component", () => {
     render(<Transactions />);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Loading transactions"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByText("Transaction Type")).toBeInTheDocument();
@@ -93,7 +214,9 @@ describe("Transactions Component", () => {
     render(<Transactions />);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Loading transactions"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getAllByText("Deposit").length).toBeGreaterThan(0);
@@ -104,7 +227,9 @@ describe("Transactions Component", () => {
     render(<Transactions />);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Loading transactions"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getAllByText("Type").length).toBeGreaterThan(0);
@@ -115,7 +240,9 @@ describe("Transactions Component", () => {
     render(<Transactions />);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Loading transactions"),
+      ).not.toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText("Search"));
@@ -126,10 +253,14 @@ describe("Transactions Component", () => {
     render(<Transactions />);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Loading transactions"),
+      ).not.toBeInTheDocument();
     });
 
-    const detailButtons = await screen.findAllByRole("button", { name: /details/i });
+    const detailButtons = await screen.findAllByRole("button", {
+      name: /details/i,
+    });
     expect(detailButtons.length).toBeGreaterThan(0);
     fireEvent.click(detailButtons[0]);
 
@@ -142,10 +273,14 @@ describe("Transactions Component", () => {
     render(<Transactions />);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText("Loading transactions")).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Loading transactions"),
+      ).not.toBeInTheDocument();
     });
 
-    const detailButtons = await screen.findAllByRole("button", { name: /details/i });
+    const detailButtons = await screen.findAllByRole("button", {
+      name: /details/i,
+    });
     fireEvent.click(detailButtons[0]);
 
     await waitFor(() => {
@@ -156,6 +291,41 @@ describe("Transactions Component", () => {
 
     await waitFor(() => {
       expect(screen.queryByText("Transaction Details")).not.toBeInTheDocument();
+    });
+  });
+
+  it("renders public Stellar Expert links when a transaction has a hash", async () => {
+    mockWalletNetwork.current = "PUBLIC";
+
+    render(
+      <Transactions
+        showPagination={false}
+        transactions={[
+          {
+            id: "TXN-001",
+            hash: txHash,
+            type: "Deposit",
+            amount: 100,
+            asset: "XLM",
+            date: "2024-04-01",
+            time: "10:00AM",
+            status: "Completed",
+          },
+        ]}
+      />,
+    );
+
+    const links = screen.getAllByRole("link", {
+      name: /view transaction TXN-001 on Stellar Expert/i,
+    });
+    expect(links.length).toBeGreaterThan(0);
+    links.forEach((link) => {
+      expect(link).toHaveAttribute(
+        "href",
+        `https://stellar.expert/explorer/public/tx/${txHash}`,
+      );
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
     });
   });
 });

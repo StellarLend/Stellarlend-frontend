@@ -18,7 +18,7 @@ import {
   getPatternsBySeverity
 } from '../lib/security/secret-patterns';
 
-interface SecretMatch {
+export interface SecretMatch {
   pattern: string;
   file: string;
   line: number;
@@ -64,7 +64,7 @@ function scanDirectory(dir: string, extensions: string[]): string[] {
 /**
  * Scan a single file for secret patterns
  */
-function scanFile(filePath: string, patterns: SecretPattern[]): SecretMatch[] {
+export function scanFile(filePath: string, patterns: SecretPattern[]): SecretMatch[] {
   const matches: SecretMatch[] = [];
   
   try {
@@ -79,6 +79,11 @@ function scanFile(filePath: string, patterns: SecretPattern[]): SecretMatch[] {
       regex.lastIndex = 0;
       
       while ((match = regex.exec(content)) !== null) {
+        // Skip false positives for AWS Secret Access Key (e.g. 40-char hex build/commit hashes)
+        if (pattern.name === 'AWS Secret Access Key' && /^[0-9a-fA-F]{40}$/.test(match[0])) {
+          continue;
+        }
+
         // Find line and column
         const matchStart = match.index;
         const matchEnd = match.index + match[0].length;
@@ -272,5 +277,7 @@ function main(): void {
   process.exit(0);
 }
 
-// Run the scanner
-main();
+// Run the scanner (skip when imported by tests)
+if (process.env.VITEST !== 'true') {
+  main();
+}

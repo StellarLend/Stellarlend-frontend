@@ -1,3 +1,4 @@
+import "@testing-library/jest-dom";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import DataExportButton from "./DataExportButton";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -8,15 +9,21 @@ global.fetch = vi.fn();
 describe("DataExportButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.URL.createObjectURL = vi.fn().mockReturnValue("blob:mock-url");
+    window.URL.revokeObjectURL = vi.fn();
+    // Clear cookies
+    document.cookie = "csrf-token=; Max-Age=0; Path=/;";
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clear cookies
+    document.cookie = "csrf-token=; Max-Age=0; Path=/;";
   });
 
   it("renders button with correct text", () => {
     render(<DataExportButton />);
-    expect(screen.getByText("Export My Data")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /export my data/i })).toBeInTheDocument();
   });
 
   it("shows processing state when clicked", async () => {
@@ -30,11 +37,11 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText("Preparing...")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /preparing/i })).toBeInTheDocument();
     });
   });
 
@@ -45,13 +52,13 @@ describe("DataExportButton", () => {
     );
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
 
     fireEvent.click(button);
     fireEvent.click(button); // Second click should be ignored
 
     await waitFor(() => {
-      expect(screen.getByText("Preparing...")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /preparing/i })).toBeInTheDocument();
     });
 
     // Resolve the fetch
@@ -65,22 +72,36 @@ describe("DataExportButton", () => {
     });
   });
 
-  it("shows success toast and triggers download on successful export", async () => {
+  it("shows success toast and triggers download on successful export with CSRF headers", async () => {
+    // Set CSRF cookie
+    document.cookie = "csrf-token=test-csrf-cookie-val; Path=/;";
+
     const mockCreateElement = vi.spyOn(document, "createElement");
     const mockAppendChild = vi.spyOn(document.body, "appendChild");
     const mockRemove = vi.spyOn(Element.prototype, "remove");
 
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        success: true,
-        downloadUrl: "https://example.com/export.zip",
-        expiresInSeconds: 900,
-      }),
+    // Stub dual-stage fetch
+    (global.fetch as any).mockImplementation((url: string, options?: any) => {
+      if (url === "/api/account/export") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            downloadUrl: "https://example.com/export.zip",
+            expiresInSeconds: 900,
+          }),
+        });
+      } else if (url === "https://example.com/export.zip") {
+        return Promise.resolve({
+          ok: true,
+          blob: async () => new Blob(["mock-data"], { type: "application/zip" }),
+        });
+      }
+      return Promise.reject(new Error("Unknown URL: " + url));
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -88,9 +109,26 @@ describe("DataExportButton", () => {
       expect(screen.getByText("Your data export has been downloaded successfully.")).toBeInTheDocument();
     });
 
+    // Assert CSRF token was read from cookie and appended to header
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/account/export",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-csrf-token": "test-csrf-cookie-val",
+        }),
+      })
+    );
+
+    // Assert second stage fetch downloaded from downloadUrl
+    expect(global.fetch).toHaveBeenCalledWith("https://example.com/export.zip");
+
+    // Assert download element trigger
     expect(mockCreateElement).toHaveBeenCalledWith("a");
     expect(mockAppendChild).toHaveBeenCalled();
     expect(mockRemove).toHaveBeenCalled();
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
 
     mockCreateElement.mockRestore();
     mockAppendChild.mockRestore();
@@ -107,7 +145,7 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -125,7 +163,7 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -137,12 +175,34 @@ describe("DataExportButton", () => {
     (global.fetch as any).mockRejectedValue(new Error("Network error"));
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
       expect(screen.getByText("Export failed")).toBeInTheDocument();
       expect(screen.getByText("Network error occurred. Please check your connection and try again.")).toBeInTheDocument();
+    });
+  });
+
+  it("offers a retry affordance after a failed export", async () => {
+    (global.fetch as any).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: "Internal Server Error",
+      }),
+    });
+
+    render(<DataExportButton />);
+    const button = screen.getByRole("button", { name: /export my data/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Export failed")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
     });
   });
 
@@ -157,12 +217,41 @@ describe("DataExportButton", () => {
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
       expect(screen.getByText("Export incomplete")).toBeInTheDocument();
       expect(screen.getByText("No download URL received. Please try again.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows error toast when the second stage file-blob download fails", async () => {
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url === "/api/account/export") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            downloadUrl: "https://example.com/export.zip",
+            expiresInSeconds: 900,
+          }),
+        });
+      } else {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+        });
+      }
+    });
+
+    render(<DataExportButton />);
+    const button = screen.getByRole("button", { name: /export my data/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Export failed")).toBeInTheDocument();
     });
   });
 
@@ -172,7 +261,7 @@ describe("DataExportButton", () => {
     );
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -184,17 +273,27 @@ describe("DataExportButton", () => {
   });
 
   it("removes busy state after completion", async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        success: true,
-        downloadUrl: "https://example.com/export.zip",
-        expiresInSeconds: 900,
-      }),
+    // Mock successful dual-stage fetch
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url === "/api/account/export") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            downloadUrl: "https://example.com/export.zip",
+            expiresInSeconds: 900,
+          }),
+        });
+      } else {
+        return Promise.resolve({
+          ok: true,
+          blob: async () => new Blob(["mock-data"], { type: "application/zip" }),
+        });
+      }
     });
 
     render(<DataExportButton />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     fireEvent.click(button);
 
     await waitFor(() => {
@@ -205,7 +304,7 @@ describe("DataExportButton", () => {
 
   it("applies custom className", () => {
     render(<DataExportButton className="custom-class" />);
-    const button = screen.getByText("Export My Data");
+    const button = screen.getByRole("button", { name: /export my data/i });
     expect(button).toHaveClass("custom-class");
   });
 });

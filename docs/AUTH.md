@@ -285,6 +285,25 @@ Different secrets for:
 - Staging (unique secrets)
 - Production (secure, rotated secrets)
 
+## Authorisation (RBAC)
+
+`/lib/auth.ts` is concerned only with **authentication** — proving who the
+caller is. The **authorisation** layer (deciding what an authenticated caller
+is allowed to do) lives in [`lib/auth/rbac.ts`](../lib/auth/rbac.ts) and is
+fully documented in [`docs/rbac.md`](./rbac.md).
+
+Read [`docs/rbac.md`](./rbac.md) for:
+
+- The `Role` enum (`user` / `ops` / `admin`) and the case-sensitive matching rule.
+- How the `role` claim is minted into the session JWT.
+- `requireAdmin` / `requireOpsOrAdmin` / `hasRole` guard helpers — including the
+  401 vs 403 outcomes that client code should distinguish.
+- A copy-pasteable template for protecting a new admin/ops route and an
+  end-to-end error matrix.
+
+If you are granting the admin role for the first time, also see
+[`docs/admin-onboarding.md`](./admin-onboarding.md).
+
 ## Testing
 
 ### Run Tests
