@@ -66,7 +66,7 @@ describe('POST /api/tx/build', () => {
       .fn()
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ result: { transaction: 'unsigned-xdr' } }),
+          JSON.stringify({ jsonrpc: '2.0', id: '1', result: { transaction: 'unsigned-xdr' } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
@@ -103,7 +103,7 @@ describe('POST /api/tx/build', () => {
   it('maps upstream RPC errors to a 502 response', async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({ error: { code: 400, message: 'invalid request' } }),
+        JSON.stringify({ jsonrpc: '2.0', id: '1', error: { code: 400, message: 'invalid request' } }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
@@ -127,12 +127,39 @@ describe('POST /api/tx/build', () => {
     expect(json.error.code).toBe(400);
   });
 
+  it('returns 502 when the upstream RPC response is malformed', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ result: { transaction: 'unsigned-xdr' }, unexpected: 'shape', jsonrpc: '1.0' }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    vi.stubGlobal('fetch', mockFetch);
+
+    const response = await POST(
+      new Request('http://localhost/api/tx/build', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'lend',
+          sourceAccount: `G${'A'.repeat(55)}`,
+          data: { asset: 'XLM', amount: 1000, interestRate: 5, duration: 30 },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    const json = await response.json();
+    expect(json.error.code).toBe('RPC_ERROR');
+  });
+
   it('returns a safe restore-required error when simulation requires restore', async () => {
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ result: { transaction: 'unsigned-xdr' } }),
+          JSON.stringify({ jsonrpc: '2.0', id: '1', result: { transaction: 'unsigned-xdr' } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
@@ -172,13 +199,13 @@ describe('POST /api/tx/build', () => {
       .fn()
       .mockResolvedValue(
         new Response(
-          JSON.stringify({ result: { transaction: 'unsigned-xdr' } }),
+          JSON.stringify({ jsonrpc: '2.0', id: '1', result: { transaction: 'unsigned-xdr' } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ result: { transaction: 'unsigned-xdr' } }),
+          JSON.stringify({ jsonrpc: '2.0', id: '1', result: { transaction: 'unsigned-xdr' } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
@@ -190,7 +217,7 @@ describe('POST /api/tx/build', () => {
       )
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ result: { transaction: 'unsigned-xdr' } }),
+          JSON.stringify({ jsonrpc: '2.0', id: '1', result: { transaction: 'unsigned-xdr' } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
