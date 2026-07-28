@@ -224,7 +224,7 @@ export async function deleteNotification(
     message: row.message,
     read: row.read,
     createdAt: row.createdAt.toISOString(),
-    type: row.type as any,
+    type: row.type,
   };
 }
 
