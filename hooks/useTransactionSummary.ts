@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { fetchTransactions, filterTransactions } from '@/lib/transactions/repository';
-import type { Transaction, TransactionFilters } from '@/lib/transactions/types';
+import type { Transaction } from '@/lib/transactions/types';
 
 export function useTransactionSummary() {
   const searchParams = useSearchParams();
@@ -11,36 +10,45 @@ export function useTransactionSummary() {
   useEffect(() => {
     async function calculateSummary() {
       setIsLoading(true);
-      const allTransactions = await fetchTransactions();
-      
-      // Filter transactions
-      const filters: TransactionFilters = {
-          search: searchParams.get('search') || '',
-          status: (searchParams.get('status') as any) || 'All',
-          dateFrom: searchParams.get('fromDate') || undefined,
-          dateTo: searchParams.get('toDate') || undefined,
-      };
+      try {
+        const res = await fetch('/api/transactions');
+        const data = res.ok ? await res.json() : { transactions: [] };
+        const allTransactions: Transaction[] = data.transactions ?? [];
 
-      const filtered = filterTransactions(allTransactions as any, filters);
+        // Client-side filter by search/status/date params
+        const search = (searchParams.get('search') || '').toLowerCase();
+        const status = searchParams.get('status') || 'All';
+        const dateFrom = searchParams.get('fromDate');
+        const dateTo = searchParams.get('toDate');
 
-      // Compute totals
-      let inflow = 0;
-      let outflow = 0;
-      
-      filtered.forEach(txn => {
-        if (txn.amount > 0) {
-          inflow += txn.amount;
-        } else {
-          outflow += Math.abs(txn.amount);
-        }
-      });
-      
-      setSummary({
-        inflow,
-        outflow,
-        net: inflow - outflow,
-      });
-      setIsLoading(false);
+        const filtered = allTransactions.filter((txn) => {
+          if (search && !JSON.stringify(txn).toLowerCase().includes(search)) return false;
+          if (status !== 'All' && (txn as any).status !== status) return false;
+          if (dateFrom && new Date((txn as any).date) < new Date(dateFrom)) return false;
+          if (dateTo && new Date((txn as any).date) > new Date(dateTo)) return false;
+          return true;
+        });
+
+        // Compute totals
+        let inflow = 0;
+        let outflow = 0;
+        
+        filtered.forEach(txn => {
+          if (txn.amount > 0) {
+            inflow += txn.amount;
+          } else {
+            outflow += Math.abs(txn.amount);
+          }
+        });
+        
+        setSummary({
+          inflow,
+          outflow,
+          net: inflow - outflow,
+        });
+      } finally {
+        setIsLoading(false);
+      }
     }
     
     calculateSummary();

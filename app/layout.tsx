@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { WalletProvider } from "@/context/WalletContext";
@@ -8,12 +7,6 @@ import { headers } from "next/headers";
 import { ToastProvider } from "@/components/shared/common/Toast";
 import NotificationToastBridge from "@/components/shared/common/NotificationToastBridge";
 import SessionExpiryModal from "@/components/shared/common/SessionExpiryModal";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "StellarLend",
@@ -30,7 +23,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning={true}>
-      <body className={`${inter.variable} antialiased`}>
+      <body className="antialiased">
         {/* Top progress bar */}
         <NextTopLoader
           color="#15a350"

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import config from '@/lib/config';
-import { getSession } from '@/lib/auth';
 import serverConfig from '@/lib/server-config';
 import { httpPost } from '@/lib/http/client';
 import { metrics } from '@/lib/metrics/registry';
@@ -13,8 +12,6 @@ import {
   isTxSubmitRequest,
 } from '@/lib/soroban/tx';
 import { withCsrfProtection } from '@/lib/api/handler';
-import { getSession } from '@/lib/auth';
-import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
 
 export const runtime = 'nodejs';
 

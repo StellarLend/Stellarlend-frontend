@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { IconButton } from '@/components/atoms/IconButton/IconButton';
 import { IconPlaceholder } from '@/components/shared/ui/icons/IconPlaceholder';

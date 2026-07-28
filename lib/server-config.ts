@@ -22,10 +22,9 @@ interface ServerConfig {
   db: {
     url: string;
   };
-}
-
-function normalizeUrl(url: string): string {
-  return url.replace(/\/+$/, '');
+  sentry: {
+    dsn: string;
+  };
 }
 
 function normalizeUrl(url: string): string {
@@ -64,6 +63,9 @@ const serverConfig: ServerConfig = {
   },
   db: {
     url: process.env.DATABASE_URL || 'postgres://localhost:5432/stellarlend',
+  },
+  sentry: {
+    dsn: process.env.SENTRY_DSN || '',
   },
 };
 

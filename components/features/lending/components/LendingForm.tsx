@@ -1,7 +1,4 @@
 "use client";
-import { AmountInput } from '@/components/shared/ui/AmountInput';
-import { Tooltip } from '@/components/atoms/Tooltip';
-import { IconButton } from '@/components/atoms/IconButton';
 
 import { useState, useEffect, useRef } from "react";
 import { LendingData } from "@/app/lending/page";

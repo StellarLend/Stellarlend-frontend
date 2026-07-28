@@ -33,12 +33,6 @@ jobs:
           temporaryPublicStorage: true
           configPath: './lighthouserc.json'
 
-      - name: Bundle size analysis
-        run: |
-          npm ci
-          npm run build
-          npx bundlewatch --config bundlewatch.config.json
-
       - name: Comment PR with performance results
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
@@ -56,3 +50,40 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
+
+  bundle-size:
+    name: Bundle Size Budgets
+    runs-on: ubuntu-latest
+    # Runs on every push/PR so regressions are caught before merge.
+    # bundlewatch exits non-zero when any file exceeds its maxSize,
+    # which causes this job — and therefore the PR check — to fail.
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '11'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production bundle
+        run: pnpm build
+
+      - name: Check bundle size budgets (fails on regression)
+        # bundlewatch exits 1 when any chunk exceeds its maxSize budget.
+        # Budgets are defined in bundlewatch.config.json and include:
+        #   - lending route:   150 KB
+        #   - dashboard route: 200 KB  ← added for issue #539
+        #   - shared chunks:   500 KB
+        #   - pages chunks:    250 KB
+        #   - CSS:              50 KB
+        run: npx bundlewatch --config bundlewatch.config.json

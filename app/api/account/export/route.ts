@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { processAccountExport } from '../../../lib/account/export-bundle';
+import { processAccountExport } from '../../../../lib/account/export-bundle';
 import { withCsrfProtection } from '@/lib/api/handler';
 
 // Simple in-memory mock store tracking timestamps for the 24-hour rate limit throttle
