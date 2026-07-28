@@ -89,4 +89,34 @@ describe('SearchResultsContainer', () => {
     expect(screen.queryByText(/No results found/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
+
+  it('navigates to the correct path when a transaction result is selected', () => {
+    const mockTransactionResult: any = {
+      id: 'txn-123',
+      type: 'transaction',
+      title: 'Transaction 123',
+      subtitle: 'test',
+      transaction: { id: 'txn-123' },
+    };
+
+    render(
+      <SearchResultsContainer
+        results={{
+          ...mockResultsBase,
+          state: 'success',
+          results: {
+            transactions: [mockTransactionResult],
+            positions: [],
+          },
+          total: 1,
+        }}
+        isOpen={true}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Transaction 123'));
+
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/transactions/txn-123');
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
 });
