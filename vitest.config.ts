@@ -114,6 +114,7 @@ export default defineConfig({
             "lib/streams/**/*.test.ts",
             "lib/soroban/**/*.test.ts",
             "lib/indexer/**/*.test.ts",
+            "lib/prices/**/*.test.ts",
             "scripts/**/*.test.ts",
           ],
         },
