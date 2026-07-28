@@ -111,6 +111,7 @@ export default defineConfig({
             "app/api/auth/logout/route.test.ts",
             "app/api/stream/prices/route.test.ts",
             "__tests__/**/*.test.ts",
+            "lib/auth/**/*.test.ts",
             "lib/streams/**/*.test.ts",
             "lib/soroban/**/*.test.ts",
             "lib/indexer/**/*.test.ts",
