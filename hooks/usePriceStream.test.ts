@@ -298,6 +298,54 @@ describe("usePriceStream", () => {
     expect(MockEventSource.instances).toHaveLength(3);
   });
 
+  it("resets backoff to initial delay after backoff climbs and reconnect succeeds", () => {
+    renderHook(() => usePriceStream());
+
+    // Multiple failures causing backoff to climb
+    act(() => {
+      MockEventSource.instances[0].triggerError();
+    });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(MockEventSource.instances).toHaveLength(2);
+
+    act(() => {
+      MockEventSource.instances[1].triggerError();
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(MockEventSource.instances).toHaveLength(3);
+
+    act(() => {
+      MockEventSource.instances[2].triggerError();
+    });
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(MockEventSource.instances).toHaveLength(4);
+
+    // Reconnect succeeds
+    act(() => {
+      MockEventSource.instances[3].triggerOpen();
+    });
+
+    // Next failure restarts backoff from initial 1000ms delay rather than 8000ms
+    act(() => {
+      MockEventSource.instances[3].triggerError();
+    });
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
+    expect(MockEventSource.instances).toHaveLength(4);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(MockEventSource.instances).toHaveLength(5);
+  });
+
   it("closes EventSource on unmount", () => {
     const { unmount } = renderHook(() => usePriceStream());
     const instance = MockEventSource.instances[0];

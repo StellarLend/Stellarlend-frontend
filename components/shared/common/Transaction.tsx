@@ -8,22 +8,15 @@ import {
   ListFilter,
   CalendarDays,
 } from "lucide-react";
-import Image from "next/image";
-import { StatusBadge } from "../ui";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from "date-fns";
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Pagination } from "./Pagination";
 import { EmptyState } from "./EmptyState";
 import { TransactionsSkeleton } from "./Skeleton";
 import { TransactionRow, TransactionMobileRow } from "./TransactionRow";
-import {
-  StatusBadge,
-  transactionStatusToVariant,
-} from "@/components/shared/ui/StatusBadge";
 import { usePendingTransactions } from "@/hooks/usePendingTransactions";
 import {
   fetchTransactions,
@@ -517,8 +510,9 @@ export const Transactions = ({
             <div
               className="hidden md:block overflow-x-auto"
               ref={scrollContainerRef}
-              data-testid="transactions-virtualizer"
+              data-testid={shouldVirtualize ? "transactions-virtualizer" : undefined}
               style={shouldVirtualize ? { height: `${viewportHeight}px`, overflowY: "auto" } : undefined}
+              onScroll={shouldVirtualize ? (e) => setScrollTop(e.currentTarget.scrollTop) : undefined}
             >
               <table
                 className="min-w-full text-sm border"

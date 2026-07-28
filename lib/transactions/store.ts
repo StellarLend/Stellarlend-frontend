@@ -39,10 +39,10 @@ export async function getTransaction(
       id: row.id,
       type: row.type,
       amount: row.amount,
-      asset: row.asset as any,
+      asset: row.asset,
       date: row.date,
       time: row.time,
-      status: row.status as any,
+      status: row.status,
     };
   } catch {
     return inMemoryStore.get(id);
@@ -61,7 +61,7 @@ export async function updateTransactionStatus(
   if (isTestEnv) {
     const mem = inMemoryStore.get(id);
     if (!mem) return null;
-    mem.status = status as any;
+    mem.status = status;
     return mem;
   }
   try {
@@ -74,7 +74,7 @@ export async function updateTransactionStatus(
     if (!row) {
       const mem = inMemoryStore.get(id);
       if (!mem) return null;
-      mem.status = status as any;
+      mem.status = status;
       return mem;
     }
 
@@ -82,15 +82,15 @@ export async function updateTransactionStatus(
       id: row.id,
       type: row.type,
       amount: row.amount,
-      asset: row.asset as any,
+      asset: row.asset,
       date: row.date,
       time: row.time,
-      status: row.status as any,
+      status: row.status,
     };
   } catch {
     const mem = inMemoryStore.get(id);
     if (!mem) return null;
-    mem.status = status as any;
+    mem.status = status;
     return mem;
   }
 }
