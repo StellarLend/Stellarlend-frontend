@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { UtilizationBar } from "@/components/atoms/UtilizationBar/UtilizationBar";
+import { formatCurrency } from "@/lib/utils/format";
 import type {
   LiquidationPosition,
   LiquidationsResponse,
@@ -36,12 +37,6 @@ export function getDistanceToLiquidationPercent(
   }
 
   return Math.round((position.healthFactor - 1) * 1000) / 10;
-}
-
-function formatAmount(amount: number, asset: string): string {
-  return `${new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 2,
-  }).format(amount)} ${asset}`;
 }
 
 function formatLiquidationPriceFactor(factor: number): string {
@@ -384,13 +379,10 @@ export default function LiquidationsPanel({
                     className="bg-[#072815]"
                   >
                     <td className="rounded-l-lg px-3 py-3 font-semibold">
-                      {formatAmount(position.borrowedAmount, position.asset)}
+                      {formatCurrency(position.borrowedAmount, 2, position.asset)}
                     </td>
                     <td className="px-3 py-3">
-                      {formatAmount(
-                        position.collateralAmount,
-                        position.collateralAsset,
-                      )}
+                      {formatCurrency(position.collateralAmount, 2, position.collateralAsset)}
                     </td>
                     <td className="px-3 py-3">
                       <UtilizationBar asset={position.asset} />

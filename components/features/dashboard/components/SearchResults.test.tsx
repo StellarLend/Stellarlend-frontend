@@ -508,6 +508,50 @@ describe('SearchResults Component', () => {
       expect(firstResult).toHaveAttribute('aria-selected', 'true');
     });
 
+    it('should cycle through all results forward and backward with wraparound for 3+ items', () => {
+      const { container } = render(
+        <SearchResults
+          results={{
+            ...mockResultsBase,
+            state: 'success',
+            results: {
+              transactions: [
+                mockTransaction,
+                { ...mockTransaction, id: 'TXN124', title: 'Withdrawal - XLM' },
+                { ...mockTransaction, id: 'TXN125', title: 'Deposit - USDC' },
+              ],
+              positions: [],
+            },
+            total: 3,
+          }}
+          isOpen={true}
+        />
+      );
+
+      const options = container.querySelectorAll('[role="option"]');
+      expect(options).toHaveLength(3);
+
+      // ArrowDown: 0→1→2→0
+      fireEvent.keyDown(options[0], { key: 'ArrowDown' });
+      expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[1], { key: 'ArrowDown' });
+      expect(options[2]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[2], { key: 'ArrowDown' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowUp: 0→2→1→0
+      fireEvent.keyDown(options[0], { key: 'ArrowUp' });
+      expect(options[2]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[2], { key: 'ArrowUp' });
+      expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[1], { key: 'ArrowUp' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    });
+
     it('should call onResultSelect on Enter key', () => {
       const onResultSelect = vi.fn();
       const { container } = render(

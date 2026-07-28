@@ -5,6 +5,8 @@ import {
   StatusBadge,
   transactionStatusToVariant,
 } from "./StatusBadge";
+import { TRANSACTION_STATUSES } from "../../types/enums";
+import { TX_API_STATUS, TX_HOOK_STATE } from "../../lib/tx/constants";
 
 describe("StatusBadge", () => {
   it("renders the success variant with default label and exposes a status role", () => {
@@ -99,5 +101,21 @@ describe("transactionStatusToVariant", () => {
 
   it("falls back to neutral for unknown statuses", () => {
     expect(transactionStatusToVariant("WeirdStatus")).toBe("neutral");
+  });
+
+  it("maps all real status values from enums and constants to a non-neutral variant", () => {
+    const allStatuses = [
+      ...TRANSACTION_STATUSES,
+      ...Object.values(TX_API_STATUS),
+      ...Object.values(TX_HOOK_STATE),
+      "Cancelled",
+      "Expired",
+      "Rejected",
+      "Warning",
+    ];
+
+    allStatuses.forEach((status) => {
+      expect(transactionStatusToVariant(status)).not.toBe("neutral");
+    });
   });
 });

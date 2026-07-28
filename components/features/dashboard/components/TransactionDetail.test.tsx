@@ -309,6 +309,139 @@ describe("TransactionDetail Modal", () => {
     });
   });
 
+  describe('Toast integration with Toast.tsx ToastProps contract', () => {
+    /**
+     * Verify that the toast rendered by TransactionDetail uses exactly the subset of
+     * ToastProps that Toast.tsx expects. Since TransactionDetail declares its own
+     * local toast state shape, this test guards against a mismatch where the local
+     * shape drifts from Toast.tsx's actual props contract.
+     */
+    it('renders success toast with the exact DOM structure Toast.tsx produces', async () => {
+      vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+
+      render(
+        <TransactionDetail
+          transaction={buildTransaction({ id: 'TXN-TOAST-SHAPE' })}
+          isOpen
+          onClose={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Copy transaction ID/i }));
+
+      // Wait for the toast container to appear
+      await waitFor(() => {
+        const toast = screen.getByRole('status');
+        expect(toast).toBeInTheDocument();
+      });
+
+      const toast = screen.getByRole('status');
+
+      // ── ToastProps shape assertions ──
+      // title is rendered inside a font-medium container
+      expect(toast.querySelector('.font-medium')).toHaveTextContent('Copied');
+      // description is rendered inside a text-sm container
+      expect(toast.querySelector('.text-sm')).toHaveTextContent('Transaction ID copied to clipboard');
+
+      // variant="success" → green classes (matching Toast.tsx variantClasses)
+      expect(toast).toHaveClass('bg-green-50');
+      expect(toast).toHaveClass('text-green-800');
+      expect(toast).toHaveClass('border-green-200');
+
+      // accessibility attributes from Toast.tsx
+      expect(toast).toHaveAttribute('role', 'status');
+      expect(toast).toHaveAttribute('aria-live', 'polite');
+    });
+
+    it('renders error toast with the exact DOM structure Toast.tsx produces', async () => {
+      vi.mocked(copyToClipboard).mockResolvedValue({ success: false, reason: 'clipboard_error' });
+
+      render(
+        <TransactionDetail
+          transaction={buildTransaction({ id: 'TXN-TOAST-ERR' })}
+          isOpen
+          onClose={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Copy transaction ID/i }));
+
+      await waitFor(() => {
+        const toast = screen.getByRole('status');
+        expect(toast).toBeInTheDocument();
+      });
+
+      const toast = screen.getByRole('status');
+
+      // title is rendered
+      expect(toast.querySelector('.font-medium')).toHaveTextContent('Copy failed');
+      // description is rendered
+      expect(toast.querySelector('.text-sm')).toHaveTextContent('Failed to copy transaction ID');
+
+      // variant="error" → red classes (matching Toast.tsx variantClasses)
+      expect(toast).toHaveClass('bg-red-50');
+      expect(toast).toHaveClass('text-red-800');
+      expect(toast).toHaveClass('border-red-200');
+
+      // accessibility attributes
+      expect(toast).toHaveAttribute('role', 'status');
+      expect(toast).toHaveAttribute('aria-live', 'polite');
+    });
+
+    it('uses the default position="fixed" classes from Toast.tsx', async () => {
+      vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+
+      render(
+        <TransactionDetail
+          transaction={buildTransaction({ id: 'TXN-NO-CLASS' })}
+          isOpen
+          onClose={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Copy transaction ID/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toBeInTheDocument();
+      });
+
+      // TransactionDetail passes no className, position, or shouldReduceMotion.
+      // position defaults to "fixed" in Toast.tsx, so we should see the fixed positioning class.
+      const toast = screen.getByRole('status');
+      expect(toast).toHaveClass('fixed');
+    });
+
+    it('passes only title, description, and variant to Toast — matching ToastProps optional signature', async () => {
+      vi.mocked(copyToClipboard).mockResolvedValue({ success: true });
+
+      render(
+        <TransactionDetail
+          transaction={buildTransaction({ id: 'TXN-SIGNATURE' })}
+          isOpen
+          onClose={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Copy transaction ID/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('status')).toBeInTheDocument();
+      });
+
+      // Verify no extraneous props leak: the toast element should not have
+      // an id attribute (no id prop passed), and no inline style.
+      const toast = screen.getByRole('status');
+      expect(toast).not.toHaveAttribute('id');
+
+      // The toast has no manual position="inline" override, and since
+      // TransactionDetail doesn't pass position, it should use Toast.tsx default "fixed"
+      // which adds right-4 top-6 z-50 positioning classes.
+      expect(toast).toHaveClass('right-4');
+      expect(toast).toHaveClass('top-6');
+      expect(toast).toHaveClass('z-50');
+    });
+  });
+
   it("resets receipt view when modal is closed and reopened", async () => {
     const { rerender } = render(
       <TransactionDetail

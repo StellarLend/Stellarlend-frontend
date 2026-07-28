@@ -1,106 +1,103 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import TopNav from "@/components/shared/layout/TopNav";
 import { SideNav } from "./SideNav";
 
-interface ErrorBoundaryProps {
+type LayoutRegionName = "TopNav" | "SideNav";
+
+interface LayoutRegionBoundaryProps {
   children: ReactNode;
   fallback: ReactNode;
+  regionName: LayoutRegionName;
 }
 
-interface ErrorBoundaryState {
+interface LayoutRegionBoundaryState {
   hasError: boolean;
 }
 
-class SafeLayoutRegion extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = {
+class LayoutRegionBoundary extends Component<
+  LayoutRegionBoundaryProps,
+  LayoutRegionBoundaryState
+> {
+  public state: LayoutRegionBoundaryState = {
     hasError: false,
   };
 
-  public static getDerivedStateFromError(): ErrorBoundaryState {
+  public static getDerivedStateFromError(): LayoutRegionBoundaryState {
     return { hasError: true };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("DashboardLayout region error caught:", error, errorInfo);
+    console.error(
+      `DashboardLayout ${this.props.regionName} error caught:`,
+      error,
+      errorInfo,
+    );
   }
 
   public render() {
     if (this.state.hasError) {
       return this.props.fallback;
     }
+
     return this.props.children;
   }
+}
+
+function RegionFallback({
+  label,
+  testId,
+}: {
+  label: string;
+  testId: string;
+}) {
+  return (
+    <div
+      data-testid={testId}
+      className="flex min-h-16 items-center rounded-md bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-sm"
+    >
+      {label}
+    </div>
+  );
 }
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="flex">
-      <SafeLayoutRegion fallback={<div data-testid="sidenav-fallback" className="w-64 bg-gray-100 min-h-screen p-4">Navigation unavailable</div>}>
-        <SideNav />
-      </SafeLayoutRegion>
-      <div className="w-full min-h-screen bg-[#15A350] flex flex-col">
-        <SafeLayoutRegion fallback={<div data-testid="topnav-fallback" className="w-full h-16 bg-gray-100 p-4">Header unavailable</div>}>
-          <TopNav />
-        </SafeLayoutRegion>
-        <main className="flex-1">{children}</main>
-/**
- * DashboardLayout
- *
- * Orchestrates the three primary layout regions:
- *
- * 1. **SideNav** — persistent navigation sidebar (collapsible via SidebarContext).
- * 2. **TopNav** — wrapped in a `<header>` landmark for accessibility.
- * 3. **main** — full-height content slot; receives `id="main-content"` so the
- *    skip-to-content link can target it directly.
- *
- * ## Accessibility
- *
- * - A visually-hidden skip link is the **first focusable element** in the DOM.
- *   Keyboard users can press Tab once to reach it and skip directly to the
- *   main content region, bypassing the navigation and top bar.
- * - The `<header>`, `<nav>` (inside SideNav), and `<main>` landmarks are all
- *   present so screen-reader users can jump between regions via landmark
- *   navigation.
- *
- * ## Read-budget note
- *
- * DashboardLayout is a pure slot-composition component — it performs no data
- * fetching and holds no local state. All interactive behaviour is delegated to
- * child components (SideNav uses SidebarContext; TopNav uses WalletContext).
- */
-const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <div className="flex">
-      {/*
-       * Skip-to-content link
-       *
-       * Rendered as the very first DOM node so it is the first Tab stop.
-       * Visually hidden at rest; becomes visible on focus via the
-       * `sr-only focus:not-sr-only` Tailwind pattern.
-       */}
+      {/** Skip-to-content link */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#15A350] focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#15A350] focus:shadow-lg"
       >
         Skip to main content
       </a>
 
-      {/* SideNav contains the <nav> / <aside> landmark */}
-      <SideNav />
+      <LayoutRegionBoundary
+        regionName="SideNav"
+        fallback={
+          <RegionFallback
+            testId="sidenav-fallback"
+            label="Navigation unavailable"
+          />
+        }
+      >
+        <SideNav />
+      </LayoutRegionBoundary>
 
-      <div className="w-full min-h-screen bg-[#15A350] flex flex-col">
-        {/* TopNav wrapped in <header> landmark */}
-        <header>
-          <TopNav />
-        </header>
+      <div className="flex min-h-screen w-full flex-col bg-[#15A350]">
+        <LayoutRegionBoundary
+          regionName="TopNav"
+          fallback={
+            <RegionFallback
+              testId="topnav-fallback"
+              label="Header unavailable"
+            />
+          }
+        >
+          <header>
+            <TopNav />
+          </header>
+        </LayoutRegionBoundary>
 
-        {/*
-         * Main content slot.
-         *
-         * `id="main-content"` is the skip-link target.
-         * `flex-1` ensures the slot expands to fill the remaining viewport
-         * height below the header.
-         */}
         <main id="main-content" className="flex-1">
           {children}
         </main>
@@ -110,4 +107,3 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default DashboardLayout;
-

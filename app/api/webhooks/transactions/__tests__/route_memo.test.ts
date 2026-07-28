@@ -206,6 +206,31 @@ describe("Webhook Route - Stellar Memo Enforcement", () => {
     expect(body.error).toContain("Strict Mode Rejection: Unknown or unregistered memo");
   });
 
+  it("returns 400 when memoType is an unrecognized string outside the MemoType union", async () => {
+    // Regression: the route must NOT silently fall back to MEMO_TEXT semantics
+    // when `memo_type` is a typo'd or future Stellar SDK memo type string.
+    // validateMemo's default case returns false for any out-of-union value,
+    // and the Zod webhookDataSchema must reject it before validateMemo is
+    // even reached so the route always responds with a clear 400.
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12345",
+        status: "Completed",
+        memo: "hello",
+        memo_type: "MEMO_TYPO", // not in MemoType union
+      },
+    });
+
+    const res = await POST(makeSignedRequest(payload));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    // The Zod schema rejects the unrecognized memo_type with a "Malformed
+    // webhook payload" error that includes "memo_type" in its message.
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/memo_type/);
+  });
+
   it("returns 400 when Deposit transaction lacks a memo in strict mode", async () => {
     vi.stubEnv("STRICT_MEMO_MODE", "true");
 

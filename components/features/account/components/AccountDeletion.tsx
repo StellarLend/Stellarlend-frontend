@@ -3,13 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AccountDeletionDialog from "@/components/shared/common/AccountDeletionDialog";
-import Toast, { ToastVariant } from "@/components/shared/common/Toast";
-
-type ToastState = {
-  variant: ToastVariant;
-  title: string;
-  description?: string;
-} | null;
+import { useToast } from "@/components/shared/common/Toast";
 
 /**
  * Map known server error codes to fixed, reviewed user-facing messages.
@@ -43,12 +37,7 @@ export default function AccountDeletion() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [challenge, setChallenge] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
-  const [toast, setToast] = useState<ToastState>(null);
-
-  const showToast = (variant: ToastVariant, title: string, description?: string) => {
-    setToast({ variant, title, description });
-    setTimeout(() => setToast(null), 5000);
-  };
+  const { showToast } = useToast();
 
   const handleInitiate = async () => {
     if (fetching) return;
@@ -59,24 +48,24 @@ export default function AccountDeletion() {
       if (!res.ok) {
         const mapped = mapChallengeError(data);
         if (res.status === 429) {
-          showToast(
-            "error",
-            "Rate limit exceeded",
-            mapped ?? "Too many requests. Please try again later.",
-          );
+          showToast({
+            variant: "error",
+            title: "Rate limit exceeded",
+            description: mapped ?? "Too many requests. Please try again later.",
+          });
         } else {
-          showToast(
-            "error",
-            "Challenge failed",
-            mapped ?? "Could not start deletion. Please try again.",
-          );
+          showToast({
+            variant: "error",
+            title: "Challenge failed",
+            description: mapped ?? "Could not start deletion. Please try again.",
+          });
         }
         return;
       }
       setChallenge(data.challenge);
       setDialogOpen(true);
     } catch {
-      showToast("error", "Network error", "Could not reach the server. Check your connection.");
+      showToast({ variant: "error", title: "Network error", description: "Could not reach the server. Check your connection." });
     } finally {
       setFetching(false);
     }
@@ -125,14 +114,6 @@ export default function AccountDeletion() {
         onCancel={handleCancel}
         onConfirmDelete={handleConfirmDelete}
       />
-
-      {toast && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          variant={toast.variant}
-        />
-      )}
     </>
   );
 }
