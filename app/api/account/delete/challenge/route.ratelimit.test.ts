@@ -16,6 +16,15 @@ vi.mock('@/lib/config', () => ({
   },
 }));
 
+vi.mock('@/lib/account/challenge-store', () => ({
+  createDeletionChallenge: (userId: string) => ({
+    challenge: 'mock-challenge',
+    userId,
+    expiresAt: new Date(Date.now() + 50),
+    createdAt: new Date(),
+  }),
+}));
+
 import { GET as ChallengeGET } from './route';
 
 const USER = { id: 'rate-limit-user', email: 'rate-limit@example.com' };
@@ -87,5 +96,28 @@ describe('GET /api/account/delete/challenge rate limiting', () => {
 
     const res = await ChallengeGET(makeRequest(token));
     expect(res.status).toBe(200);
+  });
+
+  it('rate-limits a new challenge request after a prior challenge has expired unused', async () => {
+    vi.useFakeTimers();
+    const token = signToken(USER);
+
+    await ChallengeGET(makeRequest(token));
+    const r1 = await ChallengeGET(makeRequest(token));
+    expect(r1.status).toBe(200);
+
+    const blocked = await ChallengeGET(makeRequest(token));
+    expect(blocked.status).toBe(429);
+
+    vi.advanceTimersByTime(100);
+
+    const blocked2 = await ChallengeGET(makeRequest(token));
+    expect(blocked2.status).toBe(429);
+    expect(blocked2.headers.get('X-RateLimit-Remaining')).toBe('0');
+
+    vi.advanceTimersByTime(900);
+
+    const r2 = await ChallengeGET(makeRequest(token));
+    expect(r2.status).toBe(200);
   });
 });

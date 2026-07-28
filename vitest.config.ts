@@ -70,6 +70,7 @@ export default defineConfig({
           setupFiles: "./vitest.setup.ts",
 
           include: [
+            "app/page.test.tsx",
             "app/lending/**/*.test.tsx",
             "app/account/sessions/**/*.test.tsx",
             "app/account/profile/**/*.test.tsx",
@@ -100,20 +101,21 @@ export default defineConfig({
           name: "server-unit",
           environment: "node",
 
-          include: [
-            "types/enums.test.ts",
-            "types/Transaction.test.ts",
-            "app/api/markets/route.test.ts",
-            "app/api/transactions/route.test.ts",
-            "app/api/liquidations/route.test.ts",
-            "app/api/notifications/[id]/route.test.ts",
-            "app/api/auth/logout/route.test.ts",
-            "app/api/stream/prices/route.test.ts",
-            "__tests__/**/*.test.ts",
-            "lib/streams/**/*.test.ts",
-            "lib/soroban/**/*.test.ts",
-            "lib/indexer/**/*.test.ts",
-          ],
+            include: [
+                "types/enums.test.ts",
+                "types/Transaction.test.ts",
+                "app/api/markets/route.test.ts",
+                "app/api/transactions/route.test.ts",
+                "app/api/liquidations/route.test.ts",
+                "app/api/notifications/[id]/route.test.ts",
+                "app/api/auth/logout/route.test.ts",
+                "app/api/stream/prices/route.test.ts",
+                "__tests__/**/*.test.ts",
+                "lib/account/**/*.test.ts",
+                "lib/streams/**/*.test.ts",
+                "lib/soroban/**/*.test.ts",
+                "lib/indexer/**/*.test.ts",
+              ],
         },
       },
       {
