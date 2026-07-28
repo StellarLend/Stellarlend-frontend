@@ -27,6 +27,8 @@
   "dependencies": {
     "@headlessui/react": "^2.2.4",
     "@material-tailwind/react": "^2.1.10",
+    "@next/swc-wasm-nodejs": "^16.2.12",
+    "@next/swc-win32-x64-msvc": "^16.2.12",
     "@sentry/nextjs": "^10.55.0",
     "@stellar/stellar-sdk": "^15.1.0",
     "better-sqlite3": "^12.10.0",
