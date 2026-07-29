@@ -28,8 +28,8 @@ interface ServerConfig {
   db: {
     url: string;
   };
-  sentry?: {
-    dsn?: string;
+  sentry: {
+    dsn: string;
   };
 }
 
