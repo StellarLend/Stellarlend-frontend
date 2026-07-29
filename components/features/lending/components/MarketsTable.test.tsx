@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MarketsTable } from "./MarketsTable";
-import type { MarketsResponse } from "@/lib/markets/types";
+import type { MarketsResponse } from "../../../../lib/markets/types";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -129,6 +129,10 @@ describe("MarketsTable", () => {
       // Wait for the error state to appear
       const errorContainer = await screen.findByTestId("markets-error");
       expect(errorContainer).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveAttribute(
+        "aria-live",
+        "assertive",
+      );
       expect(screen.getByText("Unable to load markets")).toBeInTheDocument();
       expect(screen.getByText("Failed to fetch")).toBeInTheDocument();
     });

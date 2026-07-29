@@ -68,7 +68,8 @@ function buildPath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) {
     return "";
   }
-
+  return buildSvgPath(points);
+}
 
 function toCollateralRatioPoints(
   snapshots: SnapshotHistoryResponse["snapshots"],

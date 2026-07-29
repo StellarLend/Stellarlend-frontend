@@ -44,14 +44,11 @@ export function CollateralBreakdown({ shares, isLoading }: CollateralBreakdownPr
         </thead>
         <tbody>
           {shares.map(({ asset, usdValue, share }) => {
-            const meta = getAsset(asset);
-            const label = meta ? meta.name : asset;
             return (
               <tr
                 key={asset}
                 className="border-t border-[#71B48D22] focus-within:bg-[#071e0f]"
                 tabIndex={0}
-                aria-label={`${label}: $${formatCurrency(usdValue)}, ${share}%`}
               >
                 <td className="py-2 text-white font-medium">{asset}</td>
                 <td className="py-2 text-right text-[#D4F3E6] font-mono">

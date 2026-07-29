@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { WalletGate } from './WalletGate';
 import { useWalletConnection } from '@/hooks/useWalletConnection';
@@ -61,7 +62,7 @@ describe('WalletGate', () => {
     expect(screen.getByTestId('wallet-error')).toHaveTextContent('Freighter not detected');
   });
 
-  it('renders loading state', () => {
+  it('disables the connect button while isLoading is true', () => {
     (useWalletConnection as any).mockReturnValue({
       isConnected: false,
       isLoading: true,
@@ -73,8 +74,67 @@ describe('WalletGate', () => {
         <div>Content</div>
       </WalletGate>
     );
-    
+
     expect(screen.queryByText('Content')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Connect/i })).not.toBeInTheDocument();
+    const connectButton = screen.getByRole('button', { name: /Connect wallet to continue/i });
+    expect(connectButton).toBeDisabled();
+  });
+
+  it('user cannot trigger connect when loading', async () => {
+    const connectMock = vi.fn();
+    (useWalletConnection as any).mockReturnValue({
+      isConnected: false,
+      isLoading: true,
+      connect: connectMock,
+    });
+
+    render(
+      <WalletGate>
+        <div>Content</div>
+      </WalletGate>
+    );
+
+    const connectButton = screen.getByRole('button', { name: /Connect wallet to continue/i });
+    await userEvent.click(connectButton);
+    expect(connectMock).not.toHaveBeenCalled();
+  });
+
+  it('rapid double-click results in only one connect attempt', async () => {
+    const connectMock = vi.fn();
+    (useWalletConnection as any).mockReturnValue({
+      isConnected: false,
+      isLoading: false,
+      connect: connectMock,
+    });
+
+    render(
+      <WalletGate>
+        <div>Content</div>
+      </WalletGate>
+    );
+
+    const connectButton = screen.getByRole('button', { name: /Connect wallet to continue/i });
+    await userEvent.dblClick(connectButton);
+    expect(connectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('existing non-loading behavior still works', async () => {
+    const connectMock = vi.fn();
+    (useWalletConnection as any).mockReturnValue({
+      isConnected: false,
+      isLoading: false,
+      connect: connectMock,
+    });
+
+    render(
+      <WalletGate fallbackText="Connect me">
+        <div>Content</div>
+      </WalletGate>
+    );
+
+    const connectButton = screen.getByRole('button', { name: 'Connect me' });
+    expect(connectButton).toBeEnabled();
+    await userEvent.click(connectButton);
+    expect(connectMock).toHaveBeenCalled();
   });
 });

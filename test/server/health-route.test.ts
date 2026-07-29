@@ -24,6 +24,7 @@ afterEach(() => {
 
 describe('GET /api/health', () => {
   it('returns 200 with healthy status', async () => {
+    const { GET } = await import('@/app/api/health/route');
     const response = await GET(new Request('http://localhost/api/health') as any);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -32,6 +33,7 @@ describe('GET /api/health', () => {
   });
 
   it('returns degraded status when stellar is unreachable', async () => {
+    const { GET } = await import('@/app/api/health/route');
     const { httpGet } = await import('@/lib/http');
     (httpGet as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new TimeoutError('url', 5000));
 

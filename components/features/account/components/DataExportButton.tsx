@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Download } from "lucide-react";
 import Button from "@/components/atoms/Button";
-import Toast, { ToastVariant } from "@/components/shared/common/Toast";
+import { useToast } from "@/components/shared/common/Toast";
 
 interface DataExportButtonProps {
   className?: string;
@@ -20,23 +20,14 @@ function readCookie(name: string): string | null {
 export default function DataExportButton({ className = "" }: DataExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);
-  const [toast, setToast] = useState<{
-    variant: ToastVariant;
-    title: string;
-    description?: string;
-  } | null>(null);
-
-  const showToast = (variant: ToastVariant, title: string, description?: string) => {
-    setToast({ variant, title, description });
-    setTimeout(() => setToast(null), 5000);
-  };
+  const { showToast } = useToast();
 
   const handleExport = async () => {
     if (isExporting) return;
 
     setIsExporting(true);
     setHasFailed(false);
-    showToast("processing", "Preparing your data export...", "This may take a moment.");
+    showToast({ variant: "processing", title: "Preparing your data export...", description: "This may take a moment." });
 
     const csrfToken = readCookie("csrf-token");
     const headers: Record<string, string> = {
@@ -56,17 +47,17 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
 
       if (!response.ok) {
         if (response.status === 429) {
-          showToast(
-            "error",
-            "Export rate limit exceeded",
-            data.error || "Please wait 24 hours before requesting another export."
-          );
+          showToast({
+            variant: "error",
+            title: "Export rate limit exceeded",
+            description: data.error || "Please wait 24 hours before requesting another export."
+          });
         } else {
-          showToast(
-            "error",
-            "Export failed",
-            data.error || "An error occurred while preparing your export."
-          );
+          showToast({
+            variant: "error",
+            title: "Export failed",
+            description: data.error || "An error occurred while preparing your export."
+          });
         }
         setHasFailed(true);
         return;
@@ -89,26 +80,26 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
         link.remove();
         URL.revokeObjectURL(downloadUrlObj);
 
-        showToast(
-          "success",
-          "Export ready",
-          "Your data export has been downloaded successfully."
-        );
+        showToast({
+          variant: "success",
+          title: "Export ready",
+          description: "Your data export has been downloaded successfully."
+        });
       } else {
         setHasFailed(true);
-        showToast(
-          "error",
-          "Export incomplete",
-          "No download URL received. Please try again."
-        );
+        showToast({
+          variant: "error",
+          title: "Export incomplete",
+          description: "No download URL received. Please try again."
+        });
       }
     } catch (error) {
       setHasFailed(true);
-      showToast(
-        "error",
-        "Export failed",
-        "Network error occurred. Please check your connection and try again."
-      );
+      showToast({
+        variant: "error",
+        title: "Export failed",
+        description: "Network error occurred. Please check your connection and try again."
+      });
     } finally {
       setIsExporting(false);
     }
@@ -135,14 +126,6 @@ export default function DataExportButton({ className = "" }: DataExportButtonPro
         <span id="export-status" className="sr-only">
           Your data export is being prepared. Please wait.
         </span>
-      )}
-
-      {toast && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          variant={toast.variant}
-        />
       )}
     </>
   );

@@ -4,7 +4,7 @@ import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
 import { withIdempotency } from '@/lib/api/idempotency';
 import { fetchTransactionRecords, filterTransactions, paginateTransactionsByCursor } from '@/lib/transactions/repository';
-import { parseTransactionParams } from '@/lib/transactions/validator';
+import { transactionQuerySchema, transactionBodySchema } from '@/lib/validation/schemas/transactions';
 
 export const runtime = 'nodejs';
 
@@ -31,19 +31,7 @@ function firstSchemaError(error: { issues: Array<{ message: string }> }): string
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const { params: validatedParams } = parseTransactionParams(searchParams);
-
-  const asset = searchParams.get('asset');
-  const type = searchParams.get('type');
-  const status = searchParams.get('status');
-  const search = searchParams.get('search');
-  const dateFrom = searchParams.get('dateFrom') ?? validatedParams.startDate;
-  const dateTo = searchParams.get('dateTo') ?? validatedParams.endDate;
-  const sortBy = parseSortBy(searchParams.get('sortBy'));
-  const sortDir = parseSortDir(searchParams.get('sortDir'));
-  const page = searchParams.has('page') ? validatedParams.page : DEFAULT_PAGE;
-  const pageSize = searchParams.has('pageSize') ? validatedParams.pageSize : DEFAULT_PAGE_SIZE;
-
+  const parsed = transactionQuerySchema.safeParse(Object.fromEntries(searchParams));
 
   if (!parsed.success) {
     return NextResponse.json({ error: firstSchemaError(parsed.error) }, { status: 400 });

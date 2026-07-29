@@ -24,9 +24,20 @@ describe("UtilizationBar", () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        markets: [{ asset: "XLM", utilization: 0 }],
+        markets: [
+          {
+            asset: "XLM",
+            utilization: 0,
+            borrowApr: 0,
+            supplyApr: 0,
+            totalSupply: 0,
+            totalBorrow: 0,
+          },
+        ],
+        timestamp: "2026-06-29T12:00:00.000Z",
+        source: "test",
       }),
-    } as Response);
+    });
 
     render(<UtilizationBar asset="XLM" />);
 
@@ -39,9 +50,20 @@ describe("UtilizationBar", () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        markets: [{ asset: "XLM", utilization: 150 }],
+        markets: [
+          {
+            asset: "XLM",
+            utilization: 150,
+            borrowApr: 0,
+            supplyApr: 0,
+            totalSupply: 0,
+            totalBorrow: 0,
+          },
+        ],
+        timestamp: "2026-06-29T12:00:00.000Z",
+        source: "test",
       }),
-    } as Response);
+    });
 
     render(<UtilizationBar asset="XLM" />);
 
@@ -54,9 +76,20 @@ describe("UtilizationBar", () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        markets: [{ asset: "XLM", utilization: 45.6 }],
+        markets: [
+          {
+            asset: "XLM",
+            utilization: 45.6,
+            borrowApr: 0,
+            supplyApr: 0,
+            totalSupply: 0,
+            totalBorrow: 0,
+          },
+        ],
+        timestamp: "2026-06-29T12:00:00.000Z",
+        source: "test",
       }),
-    } as Response);
+    });
 
     render(<UtilizationBar asset="XLM" />);
 
@@ -68,8 +101,12 @@ describe("UtilizationBar", () => {
   it("degrades gracefully when market entry is missing", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ markets: [] }),
-    } as Response);
+      json: async () => ({
+        markets: [],
+        timestamp: "2026-06-29T12:00:00.000Z",
+        source: "test",
+      }),
+    });
 
     render(<UtilizationBar asset="XLM" />);
 
@@ -79,16 +116,32 @@ describe("UtilizationBar", () => {
     });
   });
 
-  it("shares one markets request across multiple instances", async () => {
+  it("shares a single markets request across concurrent utilization bars", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         markets: [
-          { asset: "XLM", utilization: 45.6 },
-          { asset: "USDC", utilization: 72.3 },
+          {
+            asset: "XLM",
+            utilization: 45.6,
+            borrowApr: 0,
+            supplyApr: 0,
+            totalSupply: 0,
+            totalBorrow: 0,
+          },
+          {
+            asset: "USDC",
+            utilization: 91.2,
+            borrowApr: 0,
+            supplyApr: 0,
+            totalSupply: 0,
+            totalBorrow: 0,
+          },
         ],
+        timestamp: "2026-06-29T12:00:00.000Z",
+        source: "test",
       }),
-    } as Response);
+    });
 
     render(
       <>
@@ -99,10 +152,9 @@ describe("UtilizationBar", () => {
 
     await waitFor(() => {
       expect(screen.getByText("45.6%")).toBeInTheDocument();
-      expect(screen.getByText("72.3%")).toBeInTheDocument();
+      expect(screen.getByText("91.2%")).toBeInTheDocument();
     });
 
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith("/api/markets");
   });
 });

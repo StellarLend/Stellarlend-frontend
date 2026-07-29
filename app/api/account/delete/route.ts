@@ -8,8 +8,15 @@ const ROUTE = '/api/account/delete';
 
 export async function DELETE(req: NextRequest) {
   return withRequestLogging(ROUTE, async () => {
-    const user = requireAuth(req);
-    if (user instanceof NextResponse) return user;
+    let user;
+    try {
+      user = requireAuth(req);
+    } catch (err) {
+      if (err instanceof NextResponse) {
+        return err;
+      }
+      throw err;
+    }
 
     let body: { challenge?: string } | undefined;
     try {

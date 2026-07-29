@@ -61,7 +61,7 @@ async function seedUser(userId: string): Promise<Notification[]> {
     message: x.message,
     read: x.read,
     createdAt: x.createdAt.toISOString(),
-    type: x.type as any,
+    type: x.type,
   }));
 }
 
@@ -86,7 +86,7 @@ export async function getNotifications(
     message: r.message,
     read: r.read,
     createdAt: r.createdAt.toISOString(),
-    type: r.type as any,
+    type: r.type,
   }));
 }
 
@@ -174,7 +174,7 @@ export async function markNotificationRead(
     message: row.message,
     read: row.read,
     createdAt: row.createdAt.toISOString(),
-    type: row.type as any,
+    type: row.type,
   };
 }
 
@@ -224,7 +224,7 @@ export async function deleteNotification(
     message: row.message,
     read: row.read,
     createdAt: row.createdAt.toISOString(),
-    type: row.type as any,
+    type: row.type,
   };
 }
 

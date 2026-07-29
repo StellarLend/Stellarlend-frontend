@@ -83,6 +83,22 @@ describe('Drizzle Profile Repository', () => {
       timezone: 'EST',
     };
 
+    const mockInsert = vi.mocked(db.insert);
+    mockInsert.mockReturnValueOnce({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: vi.fn(() => ({
+          returning: vi.fn(async () => [{
+            userId: 'user-1',
+            displayName: 'New Name',
+            bio: 'New Bio',
+            website: 'https://new.com',
+            timezone: 'EST',
+            updatedAt: new Date(),
+          }]),
+        })),
+      })),
+    } as any);
+
     const profile = await profileRepository.upsert('user-1', data);
     expect(profile.userId).toBe('user-1');
     expect(profile.displayName).toBe('New Name');

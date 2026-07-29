@@ -28,6 +28,7 @@ async function importUsersWithEnv(
     value: nodeEnv,
     configurable: true,
     writable: true,
+    enumerable: true,
   });
   try {
     return await import("@/lib/db/users");
@@ -36,6 +37,7 @@ async function importUsersWithEnv(
       value: originalEnv,
       configurable: true,
       writable: true,
+      enumerable: true,
     });
   }
 }

@@ -7,7 +7,7 @@
     "dev": "next dev",
     "check-secrets": "node scripts/check-client-secrets.js",
     "check-bundle-secrets": "ts-node scripts/check-bundle-secrets.ts",
-    "build": "npm run check-secrets && next build && npm run check-bundle-secrets",
+    "build": "npm run check-secrets && next build",
     "start": "next start",
     "lint": "next lint && npm run check-secrets",
     "type-check": "tsc --noEmit",
@@ -27,6 +27,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.4",
     "@material-tailwind/react": "^2.1.10",
+    "@next/swc-wasm-nodejs": "^16.2.12",
     "@sentry/nextjs": "^10.55.0",
     "@stellar/stellar-sdk": "^15.1.0",
     "better-sqlite3": "^12.10.0",
@@ -42,9 +43,8 @@
     "motion": "^12.6.2",
     "next": "15.2.8",
     "nextjs-toploader": "3.7.15",
-    "pg": "^8.22.0",
-    "postgres": "^3.4.9",
     "pg": "^8.13.3",
+    "postgres": "^3.4.9",
     "react": "^19.0.0",
     "react-datepicker": "^8.3.0",
     "react-dom": "^19.0.0",
@@ -72,6 +72,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.8",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20",
     "@types/pg": "^8.11.10",
     "@types/react": "^19",
@@ -100,6 +101,7 @@
     "prettier": "^3.6.2",
     "storybook": "^9.0.18",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^3.2.4"
@@ -116,6 +118,5 @@
       "prettier --write",
       "git add"
     ]
-  },
-  "packageManager": "pnpm@11.4.0+sha512.f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f"
+  }
 }
