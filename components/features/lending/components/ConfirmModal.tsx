@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
 import type { LendingActionType } from "@/lib/lending/types";
 import { cn } from "@/lib/utils/cn";
+import { calculateProtocolFee } from "@/lib/fee-calculator";
 import TermsModal from "./TermsModal";
 
 interface ConfirmModalProps {
@@ -293,6 +294,27 @@ export default function ConfirmModal({
                     )}
                 </>
               )}
+
+              {(() => {
+                if (type === "withdraw") return null;
+                try {
+                  const feeResult = calculateProtocolFee(
+                    data.asset,
+                    type,
+                    data.amount,
+                  );
+                  return (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Protocol Fee</span>
+                      <span className="font-medium">
+                        {formatCurrency(feeResult.feeAmount, data.asset)}
+                      </span>
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
 
               {calculation && type !== "repay" && (
                 <>

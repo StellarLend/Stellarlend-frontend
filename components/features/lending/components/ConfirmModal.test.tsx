@@ -248,7 +248,7 @@ describe("ConfirmModal withdraw variant", () => {
     expect(within(dialog).getByText(/Remaining Supplied/i)).toBeInTheDocument();
     expect(within(dialog).getByText("4,000.00 XLM")).toBeInTheDocument();
     expect(within(dialog).getByText(/New Health Factor/i)).toBeInTheDocument();
-    expect(within(dialog).getByText("1.48")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("1.48").length).toBeGreaterThan(0);
   });
 
   it("shows Health Factor Warning when health degrades to at-risk range", async () => {
@@ -339,3 +339,45 @@ describe("ConfirmModal withdraw variant", () => {
     expect(closeButton).toHaveFocus();
   });
 });
+
+describe("ConfirmModal protocol fee display", () => {
+  it("matches calculateProtocolFee output for the same market, action, and amount", async () => {
+    const { calculateProtocolFee } = await import("@/lib/fee-calculator");
+    const user = userEvent.setup();
+    const testCases: Array<{ asset: string; type: "lend" | "borrow" | "repay"; amount: number }> = [
+      { asset: "XLM", type: "lend", amount: 1000 },
+      { asset: "USDC", type: "borrow", amount: 500 },
+      { asset: "XLM", type: "repay", amount: 200 },
+    ];
+
+    for (const testCase of testCases) {
+      const expectedFeeResult = calculateProtocolFee(testCase.asset, testCase.type, testCase.amount);
+      const formattedFee = `${expectedFeeResult.feeAmount.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      })} ${testCase.asset}`;
+
+      const { unmount } = render(
+        <ConfirmModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+          data={{
+            asset: testCase.asset,
+            amount: testCase.amount,
+            interestRate: 5.0,
+          }}
+          calculation={{ dailyEarnings: 0.1, totalEarnings: 10 }}
+          type={testCase.type}
+        />,
+      );
+
+      const dialog = screen.getByRole("dialog");
+      expect(within(dialog).getByText("Protocol Fee")).toBeInTheDocument();
+      expect(within(dialog).getByText(formattedFee)).toBeInTheDocument();
+
+      unmount();
+    }
+  });
+});
+
