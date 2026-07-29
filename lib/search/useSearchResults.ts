@@ -31,12 +31,44 @@ import type {
  * // In your component
  * <SearchResults {...results} onResultClick={handleClick} />
  */
+/**
+ * Maps an thrown search failure into a typed SearchError.
+ * 5xx responses are marked retryable so the UI can offer a distinct retry path
+ * instead of treating the failure like an empty result set.
+ */
+export function toSearchError(error: unknown): SearchError {
+  const message =
+    error instanceof Error ? error.message : 'Search failed. Please try again.';
+
+  const statusMatch = message.match(/\b([45]\d{2})\b/);
+  const statusCode = statusMatch ? Number(statusMatch[1]) : undefined;
+  const retryable =
+    typeof statusCode === 'number' ? statusCode >= 500 : true;
+
+  if (statusCode !== undefined && statusCode >= 500) {
+    return {
+      message: 'Server error while searching. Please try again.',
+      source: 'all',
+      statusCode,
+      retryable: true,
+    };
+  }
+
+  return {
+    message,
+    source: 'all',
+    statusCode,
+    retryable,
+  };
+}
+
 export function useSearchResults(
   debounceDelay: number = 300,
   maxResults: number = 5
 ): {
   results: SearchResultsData;
   search: (query: string) => void;
+  retry: () => void;
 } {
   const [results, setResults] = useState<SearchResultsData>({
     query: '',
@@ -48,6 +80,7 @@ export function useSearchResults(
 
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastQueryRef = useRef('');
 
   /**
    * Fetches positions from /api/positions and filters by the search query.
@@ -57,7 +90,7 @@ export function useSearchResults(
       const response = await fetch('/api/positions', { signal });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch positions: ${response.statusText}`);
+        throw new Error(`Failed to fetch positions: ${response.status}`);
       }
 
       const data = await response.json() as Record<string, unknown>;
@@ -138,6 +171,7 @@ export function useSearchResults(
 
       // Empty query resets state
       if (!query.trim()) {
+        lastQueryRef.current = '';
         setResults({
           query: '',
           state: 'idle',
@@ -147,6 +181,8 @@ export function useSearchResults(
         });
         return;
       }
+
+      lastQueryRef.current = query;
 
       // Set loading state immediately for UX feedback
       setResults((prev) => ({
@@ -189,22 +225,25 @@ export function useSearchResults(
             return;
           }
 
-          const errorMessage =
-            error instanceof Error ? error.message : 'Search failed. Please try again.';
-
           setResults((prev) => ({
             ...prev,
             state: 'error',
-            error: {
-              message: errorMessage,
-              source: 'all',
-            },
+            error: toSearchError(error),
           }));
         }
       }, debounceDelay);
     },
     [debounceDelay, searchTransactions, fetchPositions]
   );
+
+  /**
+   * Re-run the last search query (for retry UX after transient 5xx failures).
+   */
+  const retry = useCallback(() => {
+    const query = lastQueryRef.current;
+    if (!query.trim()) return;
+    search(query);
+  }, [search]);
 
   /**
    * Cleanup on unmount.
@@ -220,7 +259,7 @@ export function useSearchResults(
     };
   }, []);
 
-  return { results, search };
+  return { results, search, retry };
 }
 
 /**

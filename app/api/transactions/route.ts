@@ -4,10 +4,7 @@ import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
 import { withIdempotency } from '@/lib/api/idempotency';
 import { fetchTransactionRecords, filterTransactions, paginateTransactionsByCursor } from '@/lib/transactions/repository';
-import {
-  transactionBodySchema,
-  transactionQuerySchema,
-} from '@/lib/validation/schemas/transactions';
+import { transactionQuerySchema, transactionBodySchema } from '@/lib/validation/schemas/transactions';
 
 export const runtime = 'nodejs';
 
@@ -34,21 +31,7 @@ function firstSchemaError(error: { issues: Array<{ message: string }> }): string
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-
-  const parsed = transactionQuerySchema.safeParse({
-    page: searchParams.get('page') ?? undefined,
-    pageSize: searchParams.get('pageSize') ?? undefined,
-    asset: searchParams.get('asset') ?? undefined,
-    type: searchParams.get('type') ?? undefined,
-    status: searchParams.get('status') ?? undefined,
-    search: searchParams.get('search') ?? undefined,
-    dateFrom: searchParams.get('dateFrom') ?? undefined,
-    dateTo: searchParams.get('dateTo') ?? undefined,
-    sortBy: searchParams.get('sortBy') ?? undefined,
-    sortDir: searchParams.get('sortDir') ?? undefined,
-    cursor: searchParams.get('cursor') ?? undefined,
-    limit: searchParams.get('limit') ?? undefined,
-  });
+  const parsed = transactionQuerySchema.safeParse(Object.fromEntries(searchParams));
 
   if (!parsed.success) {
     return NextResponse.json({ error: firstSchemaError(parsed.error) }, { status: 400 });
@@ -80,7 +63,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const allTransactions = await fetchTransactionRecords();
-  let transactions = filterTransactions(allTransactions as Transaction[], {
+  let transactions = filterTransactions(allTransactions as any, {
     search: search ?? undefined,
     status: status ?? undefined,
     dateFrom: dateFrom ?? undefined,
@@ -125,7 +108,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const total = transactions.length;
-  const sorted = sortTransactions(transactions, sortBy, sortDir);
+  const sorted = sortTransactions(transactions as any, sortBy, sortDir);
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return NextResponse.json({ transactions: paginated, total });
@@ -165,4 +148,4 @@ async function handlePostTransactions(req: NextRequest) {
 }
 
 export const GET = withRequestLogging('/api/transactions', handleGetTransactions);
-export const POST = withRequestLogging('/api/transactions', (req: NextRequest) => withIdempotency(req, handlePostTransactions));
+export const POST = withRequestLogging('/api/transactions', async (req: NextRequest) => (await withIdempotency(req, handlePostTransactions)) as NextResponse);

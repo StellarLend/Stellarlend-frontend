@@ -42,6 +42,30 @@ describe('account audit events', () => {
     expect(deleted[0].type).toBe('account.deleted');
   });
 
+  it('truncates oversized metadata before storing it', () => {
+    const oversizedMetadata = {
+      message: 'x'.repeat(6_000),
+      nested: {
+        detail: 'y'.repeat(6_000),
+      },
+    };
+
+    const event = emitAccountAuditEvent('account.deleted', 'user-2', oversizedMetadata);
+    const stored = getAccountAuditEvents({ userId: 'user-2' }).find((e) => e.id === event.id);
+
+    expect(stored).toBeDefined();
+    expect(stored?.metadata).not.toEqual(oversizedMetadata);
+    expect(stored?.metadata).toEqual(
+      expect.objectContaining({
+        __truncated: true,
+        __reason: 'audit payload exceeded maximum size',
+        __originalSizeBytes: expect.any(Number),
+        preview: expect.any(String),
+      }),
+    );
+    expect((stored?.metadata.preview as string).length).toBeLessThanOrEqual(1_024);
+  });
+
   it('filters by since timestamp', () => {
     clearAuditLog();
     const past = new Date(Date.now() - 10_000).toISOString();

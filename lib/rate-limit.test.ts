@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { rateLimit, clearRateLimitCache } from './rate-limit';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { rateLimit, clearRateLimitCache, triggerCleanup, stopCleanupTimer } from './rate-limit';
 
 describe('rateLimit utility', () => {
   const identifier = 'test-ip';
@@ -9,6 +9,11 @@ describe('rateLimit utility', () => {
   beforeEach(() => {
     clearRateLimitCache();
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    stopCleanupTimer();
   });
 
   it('should allow requests within the limit', () => {
@@ -49,3 +54,26 @@ describe('rateLimit utility', () => {
     expect(res.reset).toBeGreaterThanOrEqual(startTime + windowMs);
   });
 });
+
+  it('should clean up expired entries during quiet periods', () => {
+    // Create multiple rate limit entries
+    rateLimit('user1', limit, windowMs);
+    rateLimit('user2', limit, windowMs);
+    rateLimit('user3', limit, windowMs);
+    
+    // Advance time past the window expiration
+    vi.advanceTimersByTime(windowMs + 100);
+    
+    // Manually trigger cleanup (simulating what setInterval would do)
+    triggerCleanup();
+    
+    // Now verify that new requests start fresh (indicating old entries were cleaned)
+    const res1 = rateLimit('user1', limit, windowMs);
+    expect(res1.remaining).toBe(1); // Should be reset, not continuing from old count
+    
+    const res2 = rateLimit('user2', limit, windowMs);
+    expect(res2.remaining).toBe(1);
+    
+    const res3 = rateLimit('user3', limit, windowMs);
+    expect(res3.remaining).toBe(1);
+  });

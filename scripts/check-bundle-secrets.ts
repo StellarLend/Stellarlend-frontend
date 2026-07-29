@@ -18,7 +18,7 @@ import {
   getPatternsBySeverity
 } from '../lib/security/secret-patterns';
 
-interface SecretMatch {
+export interface SecretMatch {
   pattern: string;
   file: string;
   line: number;
@@ -64,7 +64,7 @@ function scanDirectory(dir: string, extensions: string[]): string[] {
 /**
  * Scan a single file for secret patterns
  */
-function scanFile(filePath: string, patterns: SecretPattern[]): SecretMatch[] {
+export function scanFile(filePath: string, patterns: SecretPattern[]): SecretMatch[] {
   const matches: SecretMatch[] = [];
   
   try {
@@ -277,5 +277,7 @@ function main(): void {
   process.exit(0);
 }
 
-// Run the scanner
-main();
+// Run the scanner (skip when imported by tests)
+if (process.env.VITEST !== 'true') {
+  main();
+}

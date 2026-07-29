@@ -161,6 +161,68 @@ describe('SearchResults Component', () => {
       const errorIcon = container.querySelector('svg');
       expect(errorIcon).toBeInTheDocument();
     });
+
+    it('surfaces a 500 server error as a distinct retryable state, not empty results', () => {
+      const onRetry = vi.fn();
+
+      render(
+        <SearchResults
+          results={{
+            ...mockResultsBase,
+            query: 'xlm',
+            state: 'error',
+            error: {
+              message: 'Server error while searching. Please try again.',
+              source: 'all',
+              statusCode: 500,
+              retryable: true,
+            },
+            results: {
+              transactions: [],
+              positions: [],
+            },
+            total: 0,
+          }}
+          isOpen={true}
+          onRetry={onRetry}
+        />
+      );
+
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByTestId('search-results-error')).toBeInTheDocument();
+      expect(screen.getByText('Search Error')).toBeInTheDocument();
+      expect(
+        screen.getByText('Server error while searching. Please try again.')
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/No results found/i)).not.toBeInTheDocument();
+
+      const retryButton = screen.getByRole('button', { name: /try again/i });
+      expect(retryButton).toBeInTheDocument();
+      fireEvent.click(retryButton);
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not show a retry control when the error is not retryable', () => {
+      render(
+        <SearchResults
+          results={{
+            ...mockResultsBase,
+            state: 'error',
+            error: {
+              message: 'Invalid search query',
+              source: 'all',
+              statusCode: 400,
+              retryable: false,
+            },
+          }}
+          isOpen={true}
+          onRetry={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Search Error')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    });
   });
 
   describe('Empty State', () => {
@@ -444,6 +506,50 @@ describe('SearchResults Component', () => {
 
       const firstResult = results[0] as HTMLElement;
       expect(firstResult).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('should cycle through all results forward and backward with wraparound for 3+ items', () => {
+      const { container } = render(
+        <SearchResults
+          results={{
+            ...mockResultsBase,
+            state: 'success',
+            results: {
+              transactions: [
+                mockTransaction,
+                { ...mockTransaction, id: 'TXN124', title: 'Withdrawal - XLM' },
+                { ...mockTransaction, id: 'TXN125', title: 'Deposit - USDC' },
+              ],
+              positions: [],
+            },
+            total: 3,
+          }}
+          isOpen={true}
+        />
+      );
+
+      const options = container.querySelectorAll('[role="option"]');
+      expect(options).toHaveLength(3);
+
+      // ArrowDown: 0→1→2→0
+      fireEvent.keyDown(options[0], { key: 'ArrowDown' });
+      expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[1], { key: 'ArrowDown' });
+      expect(options[2]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[2], { key: 'ArrowDown' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowUp: 0→2→1→0
+      fireEvent.keyDown(options[0], { key: 'ArrowUp' });
+      expect(options[2]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[2], { key: 'ArrowUp' });
+      expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(options[1], { key: 'ArrowUp' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
     });
 
     it('should call onResultSelect on Enter key', () => {

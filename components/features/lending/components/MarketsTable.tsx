@@ -295,7 +295,7 @@ function MarketsTableSkeleton() {
 /** Mobile skeleton cards */
 function MarketsCardSkeleton() {
   return (
-    <div className="md:hidden space-y-4">
+    <div className="md:hidden space-y-4" aria-busy="true" aria-label="Loading markets">
       {Array.from({ length: 4 }, (_, i) => (
         <div
           key={i}
@@ -493,6 +493,7 @@ export function MarketsTable({ apiUrl = "/api/markets" }: MarketsTableProps) {
           description={error}
           actionLabel="Retry"
           onAction={fetchMarkets}
+          tone="error"
         />
       </div>
     );

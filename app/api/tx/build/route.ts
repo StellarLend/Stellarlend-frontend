@@ -15,6 +15,11 @@ import {
   extractUnsignedXdr,
   isTxBuildRequest,
 } from '@/lib/soroban/tx';
+import {
+  isSorobanRpcErrorResponse,
+  SorobanRpcResponseSchema,
+  type SorobanRpcResponse,
+} from '@/lib/soroban/types';
 
 export const runtime = 'nodejs';
 
@@ -96,18 +101,25 @@ export async function POST(request: NextRequest) {
   );
 
   try {
-    const rpcResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
+    const rawResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
     });
 
-    if (typeof rpcResponse === 'object' && rpcResponse && 'error' in rpcResponse) {
+    const parsedResponse = SorobanRpcResponseSchema.safeParse(rawResponse);
+    if (!parsedResponse.success) {
+      return rpcFailure();
+    }
+
+    const rpcResponse = parsedResponse.data;
+
+    if (isSorobanRpcErrorResponse(rpcResponse)) {
       return NextResponse.json(
-        { error: buildSorobanRpcError((rpcResponse as any).error) },
+        { error: buildSorobanRpcError(rpcResponse.error) },
         { status: 502 },
       );
     }
 
-    const unsignedXdr = extractUnsignedXdr((rpcResponse as any).result ?? rpcResponse);
+    const unsignedXdr = extractUnsignedXdr(rpcResponse.result);
     if (!unsignedXdr) {
       return rpcFailure();
     }

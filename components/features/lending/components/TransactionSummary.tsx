@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from 'react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
+import { Copy } from 'lucide-react';
+import { Toast } from '@/components/shared/common';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -6,91 +11,26 @@ interface TransactionSummaryProps {
   type: 'lend' | 'borrow' | 'repay' | 'withdraw';
 }
 
-import { useCurrencyPreference } from '@/context/CurrencyContext';
-import { formatCurrency } from '@/lib/utils/format';
+async function copyToClipboard(text: string): Promise<{ success: boolean }> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+}
 
 export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
   const { currency } = useCurrencyPreference();
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [toast, setToast] = useState<{ variant: string; title: string; description: string } | null>(null);
 
   const formatValue = (amount: number) => {
     return formatCurrency(amount, 4, currency);
   };
 
-  const formatDate = (daysFromNow: number) => {
-    const date = new Date();
-    date.setDate(date.getDate() + daysFromNow);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
-
-  /**
-   * Serialises the transaction breakdown to plain text
-   * for clipboard export.
-   * 
-   * @security Never includes session tokens, wallet keys,
-   * or any secret values — display values only.
-   */
-  function buildSummaryText(): string {
-    const lines = [
-      'Transaction Summary',
-      '==================',
-      '',
-      `Type:               ${type === 'lend' ? 'Lending' : 'Borrowing'}`,
-      `Asset:              ${data.asset}`,
-      `Amount:             ${formatCurrency(data.amount, data.asset)}`,
-      `Interest Rate:      ${data.interestRate.toFixed(1)}% ${type === 'lend' ? 'APY' : 'APR'}`,
-    ];
-
-    if (type === 'borrow' && data.duration) {
-      lines.push(`Duration:           ${data.duration} days`);
-    }
-
-    lines.push(`Start Date:         ${formatDate(0)}`);
-
-    if (data.duration) {
-      lines.push(`End Date:           ${formatDate(data.duration)}`);
-    }
-
-    if (type === 'borrow' && data.collateral && data.collateralAmount) {
-      lines.push('');
-      lines.push('Collateral');
-      lines.push('----------');
-      lines.push(`Asset:              ${data.collateral}`);
-      lines.push(`Amount:             ${formatCurrency(data.collateralAmount, data.collateral)}`);
-      lines.push(`Ratio:              150%`);
-    }
-
-    if (calculation) {
-      lines.push('');
-      lines.push(type === 'lend' ? 'Expected Returns' : 'Repayment Details');
-      lines.push(type === 'lend' ? '----------------' : '-------------------');
-
-      if (type === 'lend') {
-        lines.push(`Daily Earnings:     ${formatCurrency(calculation.dailyEarnings, data.asset)}`);
-        lines.push(`Total Earnings:     ${formatCurrency(calculation.totalEarnings, data.asset)}`);
-        lines.push(`Total Return:       ${formatCurrency(data.amount + calculation.totalEarnings, data.asset)}`);
-      } else {
-        if (calculation.monthlyPayment) {
-          lines.push(`Monthly Payment:    ${formatCurrency(calculation.monthlyPayment, data.asset)}`);
-        }
-        lines.push(`Total Interest:     ${formatCurrency(calculation.totalEarnings, data.asset)}`);
-        if (calculation.totalRepayment) {
-          lines.push(`Total Repayment:    ${formatCurrency(calculation.totalRepayment, data.asset)}`);
-        }
-      }
-    }
-
-    lines.push('');
-    lines.push(`Exported at:        ${new Date().toISOString()}`);
-
-    return lines.join('\n');
-  }
-
   const handleCopy = async () => {
-    const text = buildSummaryText();
+    const text = buildSummaryText(data, calculation, type);
 
     try {
       const result = await copyToClipboard(text);

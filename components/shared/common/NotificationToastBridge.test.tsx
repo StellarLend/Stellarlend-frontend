@@ -18,13 +18,33 @@ vi.mock("@/hooks/useReducedMotion", () => ({
 vi.mock("@/hooks/useNotificationStream", async () => {
   const ReactActual = await vi.importActual<typeof import("react")>("react");
 
+  function useNotificationStreamMock(options?: {
+    onNotification?: (notification: Notification) => void;
+  }) {
+    streamFn(options);
+
+    ReactActual.useEffect(() => {
+      if (!options?.onNotification) {
+        return;
+      }
+
+      const callback = options.onNotification;
+      streamSubscribers.add(callback);
+      return () => {
+        streamSubscribers.delete(callback);
+      };
+    }, [options?.onNotification]);
+
+    return { unreadCount: 0 };
+  }
+
   return {
-    default: (options?: {
+    default: function useNotificationStreamMock(options?: {
       onNotification?: (notification: Notification) => void;
-    }) => {
+    }) {
       streamFn(options);
 
-      ReactActual.useEffect(() => {
+      (ReactActual.useEffect(() => {
         if (!options?.onNotification) {
           return;
         }
@@ -33,7 +53,7 @@ vi.mock("@/hooks/useNotificationStream", async () => {
         return () => {
           streamSubscribers.delete(options.onNotification);
         };
-      }, [options?.onNotification]);
+      }, [options?.onNotification]));
 
       return { unreadCount: 0 };
     },
