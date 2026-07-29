@@ -20,6 +20,8 @@ jobs:
   server-tests:
     name: Server-side tests with coverage gate
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -51,12 +53,15 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      # Codecov upload requires a CODECOV_TOKEN secret that isn't configured
+      # on this repo (tokenless upload was disabled by Codecov in 2024), so
+      # this step is a no-op without it -- skip cleanly instead of failing
+      # the job on "Token required - not valid tokenless upload".
       - name: Upload LCOV to Codecov
-        if: always()
+        if: always() && env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info
           flags: server
           name: server-coverage
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}

@@ -22,6 +22,13 @@
       "when": 1780790400000,
       "tag": "0002_notification_type_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784060800000,
+      "tag": "0003_transaction_enums",
+      "breakpoints": true
     }
   ]
 }

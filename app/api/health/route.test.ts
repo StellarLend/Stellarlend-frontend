@@ -44,6 +44,7 @@ describe('GET /api/health', () => {
     expect(body.environment).toBe('test');
     expect(body.version).toBe('1.0.0');
     expect(body.checks).toEqual({
+      api: 'healthy',
       database: 'healthy',
       stellar: 'healthy',
     });
