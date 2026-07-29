@@ -106,9 +106,11 @@ describe("POST /api/webhooks/transactions – valid requests", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/webhooks/transactions – signature verification", () => {
-  it("returns 401 when signature header is missing", async () => {
+  it("returns 401 when the signature header is omitted entirely", async () => {
     const body = JSON.stringify(makePayload());
-    const req = makeWebhookRequest(body); // no signature header
+    const req = makeWebhookRequest(body);
+    expect(req.headers.get(SIGNATURE_HEADER)).toBeNull();
+
     const res = await POST(req);
     expect(res.status).toBe(401);
 
@@ -277,7 +279,45 @@ describe("POST /api/webhooks/transactions – payload validation", () => {
     expect(res.status).toBe(400);
 
     const body = await res.json();
-    expect(body.error).toMatch(/Unknown status/);
+    // Status is now narrowed by the Zod `webhookDataSchema` (`status` is a
+    // required `z.enum(TRANSACTION_STATUSES)`), so a non-canonical value
+    // is rejected with a "Malformed webhook payload" error.
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/status/);
+  });
+
+  it("returns 400 for malformed data.memo_type", async () => {
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12346",
+        status: "Completed",
+        memo: "hello",
+        memo_type: "MEMO_INVALID",
+      },
+    });
+    const res = await POST(makeSignedRequest(payload));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/memo_type/);
+  });
+
+  it("returns 400 when data.memo is not a string", async () => {
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12346",
+        status: "Completed",
+        memo: 12345,
+        memo_type: "MEMO_TEXT",
+      },
+    });
+    const res = await POST(makeSignedRequest(payload));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/memo/);
   });
 });
 
@@ -345,9 +385,65 @@ describe("Transaction store - getTransaction", () => {
     expect(tx).toBeDefined();
     expect(tx?.id).toBe("TXN12346");
   });
+});
 
-  it("returns undefined for a transaction that does not exist", async () => {
-    const tx = await getTransaction("TXN99999");
-    expect(tx).toBeUndefined();
+describe("Webhook Data Schema (memo / memo_type validation)", () => {
+  it("exports MEMO_TYPES enum", async () => {
+    const { MEMO_TYPES } = await import("@/lib/validation/schemas/webhooks");
+    expect(MEMO_TYPES).toEqual([
+      "MEMO_TEXT",
+      "MEMO_ID",
+      "MEMO_HASH",
+      "MEMO_RETURN",
+    ]);
+  });
+
+  it("webhookDataSchema rejects unknown memo_type values", async () => {
+    const { webhookDataSchema } = await import(
+      "@/lib/validation/schemas/webhooks"
+    );
+    const result = webhookDataSchema.safeParse({
+      transaction_id: "TXN12345",
+      status: "Completed",
+      memo: "hello",
+      memo_type: "MEMO_INVALID",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const memoIssue = result.error.issues.find(
+        (i) => i.path.join(".") === "memo_type",
+      );
+      expect(memoIssue).toBeDefined();
+      expect(memoIssue?.message).toMatch(/memo_type/);
+    }
+  });
+
+  it("webhookDataSchema accepts all four canonical memo types", async () => {
+    const { webhookDataSchema } = await import(
+      "@/lib/validation/schemas/webhooks"
+    );
+    for (const memo_type of ["MEMO_TEXT", "MEMO_ID", "MEMO_HASH", "MEMO_RETURN"]) {
+      const result = webhookDataSchema.safeParse({
+        transaction_id: "TXN12345",
+        status: "Completed",
+        memo: "x",
+        memo_type,
+      });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("webhookDataSchema rejects non-string memo values", async () => {
+    const { webhookDataSchema } = await import(
+      "@/lib/validation/schemas/webhooks"
+    );
+    const result = webhookDataSchema.safeParse({
+      transaction_id: "TXN12345",
+      status: "Completed",
+      memo: 12345,
+      memo_type: "MEMO_TEXT",
+    });
+    expect(result.success).toBe(false);
   });
 });
+

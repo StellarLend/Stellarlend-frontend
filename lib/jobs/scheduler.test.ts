@@ -32,9 +32,12 @@ class FakeClient {
   released = false;
   queries: string[] = [];
 
-  constructor(private readonly manager: FakeAdvisoryLockManager) {}
+  constructor(
+    private readonly manager: FakeAdvisoryLockManager,
+    private readonly onRelease: () => void,
+  ) {}
 
-  async query(sql: string): Promise<QueryResult> {
+  async query(sql: string, params?: unknown[]): Promise<QueryResult> {
     this.queries.push(sql);
     if (sql.includes("pg_try_advisory_lock")) {
       return { rows: [{ acquired: this.manager.tryAcquire(this) }] };
@@ -50,19 +53,50 @@ class FakeClient {
   }
 
   release(): void {
+    if (this.released) return;
     this.released = true;
+    this.manager.release(this);
+    this.onRelease();
+  }
+
+  disconnect(): void {
+    if (this.released) return;
+    this.released = true;
+    this.manager.release(this);
+    this.onRelease();
   }
 }
 
-function createFakePool(manager: FakeAdvisoryLockManager) {
+function createFakePool(manager: FakeAdvisoryLockManager, maxConnections = Number.POSITIVE_INFINITY) {
   const clients: FakeClient[] = [];
+  const waiting: Array<(client: FakeClient) => void> = [];
+  let activeClients = 0;
+
+  const onRelease = (): void => {
+    activeClients -= 1;
+    if (waiting.length > 0) {
+      const resolve = waiting.shift()!;
+      activeClients += 1;
+      const client = new FakeClient(manager, onRelease);
+      clients.push(client);
+      resolve(client);
+    }
+  };
+
   return {
     clients,
     pool: {
       connect: vi.fn(async () => {
-        const client = new FakeClient(manager);
-        clients.push(client);
-        return client;
+        if (activeClients < maxConnections) {
+          activeClients += 1;
+          const client = new FakeClient(manager, onRelease);
+          clients.push(client);
+          return client;
+        }
+
+        return new Promise<FakeClient>((resolve) => {
+          waiting.push(resolve);
+        });
       }),
     },
   };
@@ -208,6 +242,47 @@ describe("CronScheduler advisory-lock leader election", () => {
       expect(entry.schedule).toHaveBeenCalledTimes(1),
     );
     expect(metrics.collect()).toContain("scheduler_is_leader 1");
+
+    await standby.stop();
+    expect(metrics.collect()).toContain("scheduler_is_leader 0");
+  });
+
+  it("lets a standby process acquire leadership after a crashed leader frees the only pool connection", async () => {
+    const manager = new FakeAdvisoryLockManager();
+    const fake = createFakePool(manager, 1);
+    const leaderEntries = createEntries();
+    const standbyEntries = createEntries();
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+    const leader = new CronScheduler({
+      pool: fake.pool,
+      entries: leaderEntries,
+      logger,
+      electionIntervalMs: 60_000,
+    });
+    await leader.start();
+
+    const standby = new CronScheduler({
+      pool: fake.pool,
+      entries: standbyEntries,
+      logger,
+      electionIntervalMs: 60_000,
+    });
+
+    const standbyPromise = standby.tryBecomeLeader();
+    await Promise.resolve();
+
+    expect(fake.pool.connect).toHaveBeenCalledTimes(2);
+    expect(fake.clients[0].released).toBe(false);
+
+    fake.clients[0].disconnect();
+
+    await expect(standbyPromise).resolves.toBe(true);
+    expect(manager.holder).not.toBe(fake.clients[0]);
+    expect(standby.isLeader).toBe(true);
+    standbyEntries.forEach((entry) =>
+      expect(entry.schedule).toHaveBeenCalledTimes(1),
+    );
 
     await standby.stop();
     expect(metrics.collect()).toContain("scheduler_is_leader 0");

@@ -5,7 +5,14 @@ import { AlertCircle, TrendingUp } from "lucide-react";
 import SupplyApyChart from "./SupplyApyChart";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { CollateralBreakdown } from "./CollateralBreakdown";
+import CollateralRatioHistoryChart from "./CollateralRatioHistoryChart";
 import { useCollateralShares } from "@/hooks/usePositions";
+import {
+  getHealthBand,
+  getHealthLabel,
+  HEALTHY_HEALTH_FACTOR_THRESHOLD,
+  type HealthBand,
+} from "@/lib/lending/health";
 
 interface PositionData {
   suppliedFunds: string;
@@ -19,14 +26,55 @@ interface PositionSummaryProps {
 }
 
 /**
- * Determines health status based on health factor value
- * Health Factor ranges:
- * - >= 2.0: Healthy (comfortable buffer)
- * - 1.0 - 2.0: At Risk (approaching danger zone)
- * - < 1.0: Critical (liquidation risk)
+ * Position-summary-specific visual tokens for each shared health band.
+ * Band thresholds/labels come from `lib/lending/health` (same source as HealthFactorBadge).
+ */
+const POSITION_HEALTH_UI: Record<
+  HealthBand,
+  {
+    description: string;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    iconBgColor: string;
+  }
+> = {
+  healthy: {
+    description: "Your position is well-protected",
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-950",
+    borderColor: "border-emerald-700",
+    iconBgColor: "bg-emerald-900",
+  },
+  "at-risk": {
+    description: "Consider reducing borrowed amount",
+    color: "text-amber-400",
+    bgColor: "bg-amber-950",
+    borderColor: "border-amber-700",
+    iconBgColor: "bg-amber-900",
+  },
+  critical: {
+    description: "Risk of liquidation - take action",
+    color: "text-red-400",
+    bgColor: "bg-red-950",
+    borderColor: "border-red-700",
+    iconBgColor: "bg-red-900",
+  },
+  cleared: {
+    description: "No outstanding debt on this position",
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-950",
+    borderColor: "border-emerald-700",
+    iconBgColor: "bg-emerald-900",
+  },
+};
+
+/**
+ * Resolves health presentation via shared `getHealthBand` / `getHealthLabel`
+ * so PositionSummary cannot drift from HealthFactorBadge / lending thresholds.
  */
 function getHealthStatus(healthFactor: number): {
-  status: "healthy" | "at-risk" | "critical";
+  status: HealthBand;
   label: string;
   description: string;
   color: string;
@@ -34,38 +82,13 @@ function getHealthStatus(healthFactor: number): {
   borderColor: string;
   iconBgColor: string;
 } {
-  if (healthFactor >= 2.0) {
-    return {
-      status: "healthy",
-      label: "Healthy",
-      description: "Your position is well-protected",
-      color: "text-emerald-400",
-      bgColor: "bg-emerald-950",
-      borderColor: "border-emerald-700",
-      iconBgColor: "bg-emerald-900",
-    };
-  }
-
-  if (healthFactor >= 1.0) {
-    return {
-      status: "at-risk",
-      label: "At Risk",
-      description: "Consider reducing borrowed amount",
-      color: "text-amber-400",
-      bgColor: "bg-amber-950",
-      borderColor: "border-amber-700",
-      iconBgColor: "bg-amber-900",
-    };
-  }
+  const status = getHealthBand(healthFactor);
+  const ui = POSITION_HEALTH_UI[status];
 
   return {
-    status: "critical",
-    label: "Critical",
-    description: "Risk of liquidation - take action",
-    color: "text-red-400",
-    bgColor: "bg-red-950",
-    borderColor: "border-red-700",
-    iconBgColor: "bg-red-900",
+    status,
+    label: getHealthLabel(healthFactor),
+    ...ui,
   };
 }
 
@@ -109,21 +132,13 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   isLoading = false,
 }) => {
   const shouldReduceMotion = useReducedMotion();
-  const { shares, isLoading: sharesLoading } = useCollateralShares();
-  const {
-    netPosition,
-    formattedNetPosition,
-    healthStatus,
-    supplied,
-    borrowed,
-  } = useMemo(() => {
+  const { shares, isLoading: sharesLoading, isStale } = useCollateralShares();
+  const { netPosition, formattedNetPosition, healthStatus } = useMemo(() => {
     if (!data || isLoading) {
       return {
         netPosition: 0,
         formattedNetPosition: "$0.00",
         healthStatus: getHealthStatus(0),
-        supplied: 0,
-        borrowed: 0,
       };
     }
 
@@ -135,8 +150,6 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
       netPosition: net,
       formattedNetPosition: formatCurrencyValue(net),
       healthStatus: getHealthStatus(data.healthFactor),
-      supplied: suppliedNum,
-      borrowed: borrowedNum,
     };
   }, [data, isLoading]);
 
@@ -170,7 +183,6 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
   }
 
   const isPositive = netPosition >= 0;
-  const trend = data.healthFactor >= 2.0 ? "improving" : "worsening";
 
   return (
     <div
@@ -179,7 +191,30 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
       }`}
       role="region"
       aria-label="Position summary"
+      data-health-band={healthStatus.status}
+      data-health-trend={
+        data.healthFactor >= HEALTHY_HEALTH_FACTOR_THRESHOLD
+          ? "improving"
+          : "worsening"
+      }
     >
+      {/* Stale Data Warning */}
+      {isStale && (
+        <div
+          className="mb-6 flex items-start gap-3 rounded-lg border border-amber-700 bg-amber-950 p-4"
+          role="alert"
+          aria-label="Stale data warning"
+        >
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="text-amber-400 text-sm font-bold">Data May Be Outdated</h3>
+            <p className="text-[#AAABAB] text-xs mt-1 font-medium">
+              We encountered a network issue. The numbers displayed below might not reflect your current real-time position.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Position Display */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
@@ -277,6 +312,9 @@ export const PositionSummary: React.FC<PositionSummaryProps> = ({
 
       <div className="mt-6">
         <SupplyApyChart className="w-full" />
+      </div>
+      <div className="mt-6">
+        <CollateralRatioHistoryChart className="w-full" />
       </div>
       {/* Collateral Breakdown */}
       <CollateralBreakdown shares={shares} isLoading={sharesLoading} />

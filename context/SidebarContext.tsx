@@ -34,7 +34,7 @@ export const SidebarProvider: FC<SidebarProviderProps> = ({
   initialIsMobile,
 }) => {
   const [isMobile, setIsMobile] = useState<boolean>(initialIsMobile ?? false);
-
+  
   // Safe SSR default: start open unless initial overrides are provided
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(
     initialSidebarOpen ?? true
@@ -73,10 +73,10 @@ export const SidebarProvider: FC<SidebarProviderProps> = ({
   }, [initialSidebarOpen, initialIsMobile]);
 
   // 2. State Actions with Safe Persistence Syncing
-  const toggleSidebar = useCallback(() => {
+  const toggleSidebar = () => {
     setIsSidebarOpen((prev) => {
       const nextState = !prev;
-
+      
       // Only persist configuration state adjustments if executed on desktop viewports
       if (!isMobile && initialSidebarOpen === undefined) {
         try {
@@ -88,9 +88,9 @@ export const SidebarProvider: FC<SidebarProviderProps> = ({
       }
       return nextState;
     });
-  }, [isMobile, initialSidebarOpen]);
+  };
 
-  const closeSidebar = useCallback(() => {
+  const closeSidebar = () => {
     setIsSidebarOpen(false);
     if (!isMobile && initialSidebarOpen === undefined) {
       try {
@@ -100,7 +100,7 @@ export const SidebarProvider: FC<SidebarProviderProps> = ({
         console.warn("Failed to write layout update to localStorage:", error);
       }
     }
-  }, [isMobile, initialSidebarOpen]);
+  };
 
   return (
     <SidebarContext.Provider

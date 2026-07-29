@@ -1,10 +1,40 @@
 import { describe, test, expect, vi } from "vitest";
+
+const mockDbData = vi.hoisted(() => ({
+  selectResult: [] as any[],
+  insertResult: [{}] as any[],
+}));
+
 vi.mock('server-only', () => ({}));
 vi.mock("@/lib/api/handler", () => ({
   withCsrfProtection: (handler: any) => handler,
 }));
+vi.mock('@/lib/db/index', () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(async () => mockDbData.selectResult),
+        })),
+      })),
+    })),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: vi.fn(() => ({
+          returning: vi.fn(async () => mockDbData.insertResult),
+        })),
+      })),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(async () => {}),
+      })),
+    })),
+  },
+}));
+
 import { NextRequest } from "next/server";
-import { GET, PUT } from "@/app/account/profile/route";
+import { GET, PUT } from "@/app/api/account/profile/route";
 import { profileRepository } from "@/lib/account/repository";
 import { signToken, getAuthUser } from "@/lib/auth";
 import { validateProfile } from "@/lib/account/validation";
@@ -154,12 +184,21 @@ describe("validateProfile", () => {
 
 
 describe("InMemoryProfileRepository", () => {
+    beforeEach(() => {
+        mockDbData.selectResult = [];
+        mockDbData.insertResult = [{}];
+    });
+
     test("returns null for an unknown userId", async () => {
         expect(await profileRepository.getByUserId("unknown-99")).toBeNull();
     });
 
     test("upsert creates a new record and getByUserId retrieves it", async () => {
         const data = { displayName: "Carol", bio: "", website: "", timezone: "UTC" };
+        const record = { userId: "user-carol", ...data, updatedAt: new Date() };
+        mockDbData.insertResult = [record];
+        mockDbData.selectResult = [record];
+
         const saved = await profileRepository.upsert("user-carol", data);
         expect(saved.userId).toBe("user-carol");
         expect(saved.displayName).toBe("Carol");
@@ -170,12 +209,18 @@ describe("InMemoryProfileRepository", () => {
     });
 
     test("upsert overwrites an existing record", async () => {
+        const oldRecord = { userId: "user-overwrite", displayName: "Old", bio: "", website: "", timezone: "UTC", updatedAt: new Date() };
+        const newRecord = { userId: "user-overwrite", displayName: "New", bio: "Updated", website: "", timezone: "Europe/London", updatedAt: new Date() };
+
+        mockDbData.insertResult = [oldRecord];
         await profileRepository.upsert("user-overwrite", {
             displayName: "Old",
             bio: "",
             website: "",
             timezone: "UTC",
         });
+
+        mockDbData.insertResult = [newRecord];
         const updated = await profileRepository.upsert("user-overwrite", {
             displayName: "New",
             bio: "Updated",
@@ -189,6 +234,11 @@ describe("InMemoryProfileRepository", () => {
 
 
 describe("GET /api/account/profile", () => {
+    beforeEach(() => {
+        mockDbData.selectResult = [];
+        mockDbData.insertResult = [{}];
+    });
+
     test("returns 401 when unauthenticated", async () => {
         const res = await GET(makeRequest("GET"));
         expect(res.status).toBe(401);
@@ -200,7 +250,6 @@ describe("GET /api/account/profile", () => {
     });
 
     test("returns default profile for a new user", async () => {
-        // Use a unique userId to avoid cross-test contamination
         const token = signToken({ id: "new-user-get", email: "new@example.com" });
         const res = await GET(makeRequest("GET", { token }));
         expect(res.status).toBe(200);
@@ -212,6 +261,9 @@ describe("GET /api/account/profile", () => {
 
     test("returns saved profile when one exists", async () => {
         const userId = "user-get-exists";
+        const record = { userId, displayName: "Dave", bio: "Bio here", website: "https://dave.io", timezone: "Asia/Tokyo", updatedAt: new Date() };
+        mockDbData.insertResult = [record];
+        mockDbData.selectResult = [record];
         await profileRepository.upsert(userId, {
             displayName: "Dave",
             bio: "Bio here",
@@ -237,6 +289,11 @@ describe("PUT /api/account/profile", () => {
         website: "https://alice.dev",
         timezone: "America/New_York",
     };
+
+    beforeEach(() => {
+        mockDbData.selectResult = [];
+        mockDbData.insertResult = [{}];
+    });
 
     test("returns 401 when unauthenticated", async () => {
         const res = await PUT(makeRequest("PUT", { body: validBody }));
@@ -270,6 +327,8 @@ describe("PUT /api/account/profile", () => {
 
     test("returns 200 and persists on valid input", async () => {
         const token = validToken();
+        const record = { userId: USER.id, displayName: "Alice", bio: "Hello world", website: "https://alice.dev", timezone: "America/New_York", updatedAt: new Date() };
+        mockDbData.insertResult = [record];
         const res = await PUT(makeRequest("PUT", { token, body: validBody }));
         expect(res.status).toBe(200);
         const json = await res.json();
@@ -281,6 +340,9 @@ describe("PUT /api/account/profile", () => {
     test("GET after PUT returns the saved data", async () => {
         const userId = "roundtrip-user";
         const token = signToken({ id: userId, email: "rt@example.com" });
+        const record = { userId, displayName: "Roundtrip", bio: "Hello world", website: "https://alice.dev", timezone: "America/New_York", updatedAt: new Date() };
+        mockDbData.insertResult = [record];
+        mockDbData.selectResult = [record];
 
         await PUT(makeRequest("PUT", { token, body: { ...validBody, displayName: "Roundtrip" } }));
         const res = await GET(makeRequest("GET", { token }));
@@ -291,8 +353,13 @@ describe("PUT /api/account/profile", () => {
     test("PUT twice overwrites with latest data", async () => {
         const userId = "overwrite-user";
         const token = signToken({ id: userId, email: "ow@example.com" });
+        const first = { userId, displayName: "First", bio: "Hello world", website: "https://alice.dev", timezone: "America/New_York", updatedAt: new Date() };
+        const second = { userId, displayName: "Second", bio: "Hello world", website: "https://alice.dev", timezone: "America/New_York", updatedAt: new Date() };
 
+        mockDbData.insertResult = [first];
         await PUT(makeRequest("PUT", { token, body: { ...validBody, displayName: "First" } }));
+        mockDbData.insertResult = [second];
+        mockDbData.selectResult = [second];
         await PUT(makeRequest("PUT", { token, body: { ...validBody, displayName: "Second" } }));
 
         const res = await GET(makeRequest("GET", { token }));
@@ -302,6 +369,8 @@ describe("PUT /api/account/profile", () => {
 
     test("accepts profile with empty optional fields", async () => {
         const token = validToken();
+        const record = { userId: USER.id, displayName: "Minimal", bio: "", website: "", timezone: "UTC", updatedAt: new Date() };
+        mockDbData.insertResult = [record];
         const res = await PUT(
             makeRequest("PUT", { token, body: { displayName: "Minimal" } })
         );
@@ -314,6 +383,8 @@ describe("PUT /api/account/profile", () => {
 
     test("displayName is trimmed before persisting", async () => {
         const token = validToken();
+        const record = { userId: USER.id, displayName: "Padded", bio: "", website: "", timezone: "UTC", updatedAt: new Date() };
+        mockDbData.insertResult = [record];
         const res = await PUT(
             makeRequest("PUT", { token, body: { displayName: "  Padded  " } })
         );

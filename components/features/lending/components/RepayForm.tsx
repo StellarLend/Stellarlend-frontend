@@ -454,6 +454,17 @@ export default function RepayForm({
         >
           Review Repayment
         </Button>
+        <WalletGate fallbackText="Connect wallet to review repayment">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={submitStatus === "loading"}
+          >
+            Review Repayment
+          </Button>
+        </WalletGate>
       </form>
     </div>
   );

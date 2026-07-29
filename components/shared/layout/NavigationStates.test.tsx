@@ -1,33 +1,21 @@
 import React from "react";
-import { render, screen, afterEach, waitFor } from "@/test/test-utils";
+import { render, screen, fireEvent, afterEach, waitFor } from "@/test/test-utils";
 import Sidebar from "./Sidebar";
 import NavLink from "./NavLink";
+import { NavigationMenu } from "./NavigationMenu";
 import { SideNav } from "./SideNav";
 import { SidebarProvider } from "@/context/SidebarContext";
+import { NavigationMenu } from "./NavigationMenu";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
+import { clientLog } from "@/lib/utils/client-log";
 
-const mockUsePathname = vi.fn();
+const mockPathname = vi.fn().mockReturnValue("/");
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => mockUsePathname(),
+  usePathname: () => mockPathname(),
+  useRouter: () => ({ push: vi.fn() }),
 }));
-
-vi.mock("next/dynamic", () => ({
-  default: (loader: () => Promise<{ default: React.ComponentType<unknown> }>) => {
-    let Comp: React.ComponentType<unknown> | null = null;
-    loader().then((m) => { Comp = m.default; });
-    return function DynamicResolved(props: unknown) {
-      return Comp
-        ? React.createElement(Comp, props as Record<string, unknown>)
-        : React.createElement("div", null, "Loading…");
-    };
-  },
-}));
-
-afterEach(() => {
-  vi.clearAllMocks();
-});
 
 describe("Navigation UI/UX", () => {
   it("Sidebar renders all nav items with correct roles", () => {
@@ -39,12 +27,13 @@ describe("Navigation UI/UX", () => {
     expect(screen.getByRole("navigation", { name: /sidebar navigation/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Profile Settings/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Password/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Preferences/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Notification/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Verification/i })).toBeInTheDocument();
   });
 
   it("marks active when pathname matches href", () => {
-    mockUsePathname.mockReturnValue("/dashboard");
+    mockPathname.mockReturnValue("/dashboard");
     render(<NavLink href="/dashboard">Dashboard</NavLink>);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("aria-current", "page");
   });
@@ -59,7 +48,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("isActive prop overrides pathname detection", () => {
-    mockUsePathname.mockReturnValue("/other");
+    mockPathname.mockReturnValue("/other");
     render(<NavLink href="/dashboard" isActive>Dashboard</NavLink>);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("aria-current", "page");
   });
@@ -77,7 +66,7 @@ describe("Navigation UI/UX", () => {
   });
 
   it("returns null and warns when href is empty", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(clientLog, "warn").mockImplementation(() => {});
     // @ts-expect-error intentional bad prop
     const { container } = render(<NavLink href="">Bad</NavLink>);
     expect(container.firstChild).toBeNull();
@@ -91,21 +80,89 @@ describe("Navigation UI/UX", () => {
   });
 });
 
+// ─── NavigationMenu ───────────────────────────────────────────────────────────
+describe("NavigationMenu", () => {
+  beforeEach(() => mockPathname.mockReturnValue("/dashboard"));
+
+  it("renders semantic nav > ul > li structure", () => {
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} />);
+    expect(screen.getByRole("navigation", { name: /main navigation/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("marks the current path as aria-current=page", () => {
+    window.history.pushState({}, "", "/dashboard");
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} />);
+    expect(screen.getByText("Dashboard").closest("a")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Settings").closest("a")).not.toHaveAttribute("aria-current");
+  });
+
+  it("uses localStorage for active state on mount", () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    render(<NavigationMenu visibleLinks={["Dashboard"]} />);
+    expect(getItem).toHaveBeenCalledWith("activeLink");
+    getItem.mockRestore();
+  });
+
+  it("writes localStorage on link click", () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} />);
+    fireEvent.click(screen.getByText("Settings").closest("a")!);
+    expect(setItem).toHaveBeenCalledWith("activeLink", "Settings");
+    setItem.mockRestore();
+  });
+
+  it("calls onLinkClick when a link is clicked", () => {
+    const onLinkClick = vi.fn();
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} onLinkClick={onLinkClick} />);
+    fireEvent.click(screen.getByText("Settings").closest("a")!);
+    expect(onLinkClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("all links have focus-visible ring classes", () => {
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} />);
+    screen.getAllByRole("link").forEach((link) => {
+      expect(link.className).toContain("focus-visible:ring-2");
+      expect(link.className).toContain("focus-visible:ring-[#15A350]");
+    });
+  });
+
+  it("all links meet minimum touch-target height (py-3.5)", () => {
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} />);
+    screen.getAllByRole("link").forEach((link) => {
+      expect(link).toHaveClass("py-3.5");
+    });
+  });
+
+  it("renders all links when visibleLinks is omitted", () => {
+    render(<NavigationMenu />);
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(1);
+  });
+});
+
 // ─── SideNav ─────────────────────────────────────────────────────────────────
 describe("SideNav", () => {
   it("renders the close button with aria-label and focus-visible ring", () => {
-    render(<SideNav />);
-    const closeBtn = screen.getByRole("button", { name: /close sidebar/i });
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={true}>
+        <SideNav />
+      </SidebarProvider>
+    );
+    const closeBtn = screen.getByRole("button", { name: /close navigation/i });
     expect(closeBtn).toBeInTheDocument();
-    expect(closeBtn.className).toContain("focus-visible:ring-2");
-    expect(closeBtn.className).toContain("focus-visible:ring-[#15A350]");
+    expect(closeBtn.className).toContain("focus:outline-none");
+    expect(closeBtn.className).toContain("focus:ring-2");
   });
 });
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 describe("Sidebar", () => {
   it("renders with correct navigation role", () => {
-    render(<Sidebar />);
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
     expect(screen.getByRole("navigation", { name: /sidebar navigation/i })).toBeInTheDocument();
   });
 });

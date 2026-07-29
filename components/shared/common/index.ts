@@ -1,10 +1,3 @@
-// SearchBar has been consolidated and moved to components/molecules/SearchBar
-// For backward compatibility, re-export from the new location
-export {
-  default as Searchbar,
-  type SearchBarProps as SearchbarProps,
-} from "@/components/molecules/SearchBar";
-
 export { RecentTransactions } from "./RecentTransactions";
 export { PageHeader } from "./PageHeader";
 export { AlertBanner } from "./AlertBanner";
@@ -19,3 +12,6 @@ export type {
 } from "./NotificationToastBridge";
 export { FeatureGate } from "./FeatureGate";
 export type { FeatureGateProps } from "./FeatureGate";
+export { PriceTicker } from "./PriceTicker";
+export type { PriceTickerProps } from "./PriceTicker";
+export type { PriceDirection } from "@/hooks/usePriceStream";

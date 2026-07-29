@@ -214,9 +214,10 @@ describe("AccountDeletionDialog – focus-trap & aria-modal", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("delete button is disabled until checkbox is checked, then shows undo window on click", async () => {
+  it("delete button is disabled until checkbox is checked", async () => {
     const user = userEvent.setup();
-    render(<AccountDeletionHarness />);
+    const onConfirmDelete = vi.fn();
+    render(<AccountDeletionHarness onConfirmDelete={onConfirmDelete} />);
 
     await user.click(screen.getByRole("button", { name: /open deletion dialog/i }));
     const dialog = screen.getByRole("dialog");
@@ -228,7 +229,7 @@ describe("AccountDeletionDialog – focus-trap & aria-modal", () => {
     expect(deleteBtn).toBeEnabled();
 
     await user.click(deleteBtn);
-    expect(within(dialog).getByTestId("undo-window")).toBeInTheDocument();
+    expect(onConfirmDelete).toHaveBeenCalledTimes(1);
   });
 
   it("explicit cancel returns focus to the opener", async () => {

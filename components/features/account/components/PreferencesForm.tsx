@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Loader2, Save } from "lucide-react";
 import Toast from "@/components/shared/common/Toast";
 import type { ToastVariant } from "@/components/shared/common/Toast";
+import { Button, Input } from "@/components/shared/ui";
 
 const LOCALE_OPTIONS = [
   { value: "en-US", label: "English (US)" },
@@ -48,6 +49,7 @@ interface NotificationPreferences {
 
 interface PreferencesData {
   userId: string;
+  email?: string;
   locale: string;
   displayCurrency: string;
   notifications: NotificationPreferences;
@@ -55,6 +57,7 @@ interface PreferencesData {
 }
 
 interface FormErrors {
+  email?: string;
   locale?: string;
   displayCurrency?: string;
   [key: string]: string | undefined;
@@ -62,6 +65,7 @@ interface FormErrors {
 
 export default function PreferencesForm() {
   const [preferences, setPreferences] = useState<PreferencesData | null>(null);
+  const [email, setEmail] = useState("");
   const [locale, setLocale] = useState("en-US");
   const [displayCurrency, setDisplayCurrency] = useState("USD");
   const [notifications, setNotifications] = useState<NotificationPreferences>({
@@ -97,6 +101,7 @@ export default function PreferencesForm() {
         }
         const data: PreferencesData = await res.json();
         setPreferences(data);
+        setEmail(data.email || "");
         setLocale(data.locale || "en-US");
         setDisplayCurrency(data.displayCurrency || "USD");
         setNotifications(
@@ -125,11 +130,20 @@ export default function PreferencesForm() {
     setSaving(true);
     setErrors({});
 
+    // Inline validation for email
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors((prev) => ({ ...prev, email: "Invalid email address" }));
+      showToast("error", "Validation failed", "Please fix the highlighted fields.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/account/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          email,
           locale,
           displayCurrency,
           notifications,
@@ -149,6 +163,10 @@ export default function PreferencesForm() {
 
       const data: PreferencesData = await res.json();
       setPreferences(data);
+      setEmail(data.email || "");
+      setLocale(data.locale || "en-US");
+      setDisplayCurrency(data.displayCurrency || "USD");
+      setNotifications(data.notifications);
       showToast("success", "Preferences saved", "Your preferences have been updated.");
     } catch {
       showToast("error", "Save failed", "An error occurred while saving your preferences.");
@@ -156,6 +174,33 @@ export default function PreferencesForm() {
       setSaving(false);
     }
   };
+
+  const isDirty = useMemo(() => {
+    if (!preferences) return false;
+    return (
+      email !== (preferences.email || "") ||
+      locale !== (preferences.locale || "en-US") ||
+      displayCurrency !== (preferences.displayCurrency || "USD") ||
+      notifications.email !== (preferences.notifications?.email ?? true) ||
+      notifications.push !== (preferences.notifications?.push ?? true) ||
+      notifications.sms !== (preferences.notifications?.sms ?? false) ||
+      notifications.inApp !== (preferences.notifications?.inApp ?? true)
+    );
+  }, [email, locale, displayCurrency, notifications, preferences]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isDirty]);
 
   if (loading) {
     return (
@@ -173,14 +218,44 @@ export default function PreferencesForm() {
     <div data-testid="preferences-form">
       <div className="mb-8 border-b border-gray-100 pb-4">
         <h2 className="text-xl font-bold text-gray-900">
-          Notification Preferences
+          Account Preferences
         </h2>
         <p className="text-sm text-gray-500 mt-1">
-          Manage your language, currency, and notification settings.
+          Manage your email, language, currency, and notification settings.
         </p>
       </div>
 
       <div className="space-y-8">
+        {/* Email Field */}
+        <div className="bg-white border border-gray-100 rounded-lg p-4 sm:p-6 shadow-sm">
+          <h3 className="text-base font-semibold text-gray-900 mb-1">
+            Contact Information
+          </h3>
+          <p className="text-xs text-gray-500 mb-6">
+            Update the email address where you want to receive account notifications.
+          </p>
+          <div className="max-w-md">
+            <Input
+              label="Notification Email"
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.email;
+                    return next;
+                  });
+                }
+              }}
+              error={errors.email}
+              data-testid="email-input"
+            />
+          </div>
+        </div>
+
         <div className="bg-white border border-gray-100 rounded-lg p-4 sm:p-6 shadow-sm">
           <h3 className="text-base font-semibold text-gray-900 mb-1">
             Language & Currency
@@ -326,25 +401,15 @@ export default function PreferencesForm() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
-          <button
+          <Button
             onClick={handleSave}
-            disabled={saving}
+            isLoading={saving}
             type="button"
-            className="inline-flex items-center justify-center gap-2 sm:px-12 py-2.5 text-sm cursor-pointer bg-[#2600FF] hover:bg-[#1a00cc] disabled:bg-[#2600FF]/50 disabled:cursor-not-allowed text-white rounded-md font-medium shadow-md transition-colors duration-200"
+            leftIcon={<Save className="w-4 h-4" aria-hidden="true" />}
             data-testid="save-preferences-btn"
           >
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" aria-hidden="true" />
-                <span>Save Preferences</span>
-              </>
-            )}
-          </button>
+            Save Preferences
+          </Button>
         </div>
       </div>
 

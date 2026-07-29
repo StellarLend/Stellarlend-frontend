@@ -27,13 +27,11 @@ export function sanitiseString(input: string): string {
  * Only string values are processed; other types are left untouched.
  * This is used for profile data after Zod validation.
  */
-export function sanitiseRecord<T extends Record<string, any>>(record: T): T {
-  const result = { ...record } as T;
-  for (const key of Object.keys(result)) {
-    const value = result[key];
-    if (typeof value === 'string') {
-      result[key] = sanitiseString(value) as any;
-    }
-  }
-  return result;
+export function sanitiseRecord<T extends Record<string, unknown>>(record: T): T {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? sanitiseString(value) : value,
+    ]),
+  ) as T;
 }

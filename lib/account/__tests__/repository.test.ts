@@ -3,18 +3,19 @@ import { profileRepository } from '../repository';
 import { db } from '../../db';
 
 vi.mock('../../db', () => {
-  const mockSelectResult = [] as any[];
   const mockSelect = vi.fn(() => ({
     from: vi.fn(() => ({
       where: vi.fn(() => ({
-        limit: vi.fn(async () => mockSelectResult),
+        limit: vi.fn(async () => []),
       })),
     })),
   }));
 
   const mockInsert = vi.fn(() => ({
     values: vi.fn(() => ({
-      onConflictDoUpdate: vi.fn(async () => ({})),
+      onConflictDoUpdate: vi.fn(() => ({
+        returning: vi.fn(async () => [{}]),
+      })),
     })),
   }));
 
@@ -75,6 +76,22 @@ describe('Drizzle Profile Repository', () => {
       website: 'https://new.com',
       timezone: 'EST',
     };
+
+    const mockInsert = vi.mocked(db.insert);
+    mockInsert.mockReturnValueOnce({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: vi.fn(() => ({
+          returning: vi.fn(async () => [{
+            userId: 'user-1',
+            displayName: 'New Name',
+            bio: 'New Bio',
+            website: 'https://new.com',
+            timezone: 'EST',
+            updatedAt: new Date(),
+          }]),
+        })),
+      })),
+    } as any);
 
     const profile = await profileRepository.upsert('user-1', data);
     expect(profile.userId).toBe('user-1');

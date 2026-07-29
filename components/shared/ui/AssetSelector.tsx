@@ -14,6 +14,8 @@ interface AssetSelectorProps {
   showBalance?: boolean;
   interestRates?: Record<string, number>;
   label?: string;
+  id?: string;
+  onClose?: () => void;
 }
 
 const TOKEN_COLORS: Record<string, string> = {
@@ -35,6 +37,8 @@ export default function AssetSelector({
   showBalance = true,
   interestRates,
   label,
+  id,
+  onClose,
 }: AssetSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

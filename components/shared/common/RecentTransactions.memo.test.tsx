@@ -22,10 +22,17 @@ vi.mock("@headlessui/react", () => ({
   TransitionChild: ({ children }: any) => <>{children}</>,
 }));
 
+vi.mock("@/hooks/useWallet", () => ({
+  useWallet: () => ({ network: "TESTNET" }),
+}));
+
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-const makeTxn = (id: string, overrides: Partial<Transaction> = {}): Transaction => ({
+const makeTxn = (
+  id: string,
+  overrides: Partial<Transaction> = {},
+): Transaction => ({
   id,
   type: "Deposit",
   amount: 100,

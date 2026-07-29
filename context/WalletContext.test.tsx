@@ -3,11 +3,22 @@ import { renderHook, act, waitFor, render, screen } from "@testing-library/react
 import { WalletProvider, useWalletContext } from "./WalletContext";
 import { FC, ReactNode, createElement } from "react";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
 function wrapper({ children }: { children: ReactNode }) {
   return createElement(WalletProvider, null, children);
 }
 
-const TEST_ADDRESS = "GABCDEF1234567890";
+const TEST_ADDRESS = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ";
 
 function mockResponse(ok: boolean, body: any = {}, status = ok ? 200 : 500) {
   return {
@@ -201,6 +212,30 @@ describe("WalletProvider", () => {
       expect(screen.getByTestId("error").textContent).toBe(
         "Stellar wallet provider (Freighter) not detected",
       );
+      expect(screen.getByTestId("address").textContent).toBe("");
+    });
+
+    it("sets status to error when public key has invalid length/prefix", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce(mockResponse(false));
+      (window as any).stellar = {
+        getPublicKey: vi.fn().mockResolvedValue("not-a-valid-key"),
+        signTransaction: vi.fn(),
+      };
+
+      renderApp();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status").textContent).toBe("disconnected");
+      });
+
+      await act(async () => {
+        screen.getByTestId("connect-btn").click();
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("status").textContent).toBe("error");
+      });
+      expect(screen.getByTestId("error").textContent).toBe("Invalid Stellar public key");
       expect(screen.getByTestId("address").textContent).toBe("");
     });
 

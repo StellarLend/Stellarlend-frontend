@@ -35,17 +35,38 @@ function parseEventData(event: MessageEvent): unknown {
 
 /**
  * Hook that connects to the backend SSE stream at /api/notifications/stream
- * and provides the current unread notification count.
- * It reconnects with exponential backoff on errors and cleans up on unmount.
+ * and provides the current unread notification count plus a debounced
+ * connection state for the live notification feed.
  */
+export type NotificationStreamConnectionState = "connected" | "reconnecting" | "offline";
+
+const RECONNECTING_DEBOUNCE_MS = 1500;
+const OFFLINE_DELAY_MS = 5000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+
 export const useNotificationStream = (
   options: UseNotificationStreamOptions = {},
 ) => {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [connectionState, setConnectionState] =
+    useState<NotificationStreamConnectionState>("reconnecting");
   const sourceRef = useRef<EventSource | null>(null);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectingStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offlineStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backoff = useRef<number>(1000); // start at 1s
   const onNotificationRef = useRef(options.onNotification);
+
+  const clearStateTimers = () => {
+    if (reconnectingStateTimeout.current) {
+      clearTimeout(reconnectingStateTimeout.current);
+      reconnectingStateTimeout.current = null;
+    }
+    if (offlineStateTimeout.current) {
+      clearTimeout(offlineStateTimeout.current);
+      offlineStateTimeout.current = null;
+    }
+  };
 
   useEffect(() => {
     onNotificationRef.current = options.onNotification;
@@ -60,9 +81,22 @@ export const useNotificationStream = (
       clearTimeout(reconnectTimeout.current);
       reconnectTimeout.current = null;
     }
+    clearStateTimers();
   };
 
   useEffect(() => {
+    const markDisconnected = () => {
+      clearStateTimers();
+
+      reconnectingStateTimeout.current = setTimeout(() => {
+        setConnectionState("reconnecting");
+      }, RECONNECTING_DEBOUNCE_MS);
+
+      offlineStateTimeout.current = setTimeout(() => {
+        setConnectionState("offline");
+      }, OFFLINE_DELAY_MS);
+    };
+
     const connect = () => {
       const source = new EventSource("/api/notifications/stream");
       sourceRef.current = source;
@@ -85,6 +119,12 @@ export const useNotificationStream = (
         }
       };
 
+      source.onopen = () => {
+        setConnectionState("connected");
+        backoff.current = 1000;
+        clearStateTimers();
+      };
+
       source.onmessage = handleUnreadCount;
       source.addEventListener?.(
         "unreadCount",
@@ -96,16 +136,25 @@ export const useNotificationStream = (
       );
 
       source.onerror = () => {
-        cleanup();
-        // exponential backoff up to 30s
+        if (reconnectTimeout.current) {
+          return;
+        }
+
+        markDisconnected();
+
+        if (sourceRef.current) {
+          sourceRef.current.close();
+          sourceRef.current = null;
+        }
+
         reconnectTimeout.current = setTimeout(() => {
-          backoff.current = Math.min(backoff.current * 2, 30000);
+          reconnectTimeout.current = null;
+          backoff.current = Math.min(
+            backoff.current * 2,
+            MAX_RECONNECT_DELAY_MS,
+          );
           connect();
         }, backoff.current);
-      };
-
-      source.onopen = () => {
-        backoff.current = 1000; // reset backoff
       };
     };
 
@@ -113,7 +162,7 @@ export const useNotificationStream = (
     return () => cleanup();
   }, []);
 
-  return { unreadCount };
+  return { unreadCount, connectionState };
 };
 
 export default useNotificationStream;

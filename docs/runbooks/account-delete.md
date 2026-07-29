@@ -104,6 +104,7 @@ const jobs = getJobsByUserId('<user-id>');
   await startQueueProcessor();
   ```
 - In production, set up a cron job or scheduled task to run the processor periodically
+- Note: each call to `startQueueProcessor()` first calls `pruneTerminalJobs()` with the default 24h window, which removes completed/failed jobs whose `processedAt` is older than the retention window. This bounds in-memory queue growth in long-running processes. Pass a custom `maxAgeMs` to override the window for ad-hoc cleanup.
 
 ### Audit Events Missing
 

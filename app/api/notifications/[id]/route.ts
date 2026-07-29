@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getUser } from '@/lib/auth';
-import { markNotificationRead } from '@/lib/notifications/repository';
-import { withCsrfProtection } from '@/lib/api/handler';
+import { NextRequest, NextResponse } from "next/server";
+import { getUser } from "@/lib/auth";
+import {
+  deleteNotification,
+  markNotificationRead,
+} from "@/lib/notifications/repository";
+import { withCsrfProtection } from "@/lib/api/handler";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
 /** PATCH /api/notifications/:id
  *
@@ -27,21 +30,62 @@ const patchHandler = async (
 ) => {
   const user = await getUser();
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
 
-  if (!id || typeof id !== 'string' || id.trim() === '') {
-    return NextResponse.json({ error: 'Invalid notification id' }, { status: 400 });
+  if (!id || typeof id !== "string" || id.trim() === "") {
+    return NextResponse.json(
+      { error: "Invalid notification id" },
+      { status: 400 },
+    );
   }
 
   const notification = await markNotificationRead(user.id, id.trim());
   if (!notification) {
-    return NextResponse.json({ error: 'Notification not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: "Notification not found" },
+      { status: 404 },
+    );
   }
 
   return NextResponse.json({ notification });
 };
 
 export const PATCH = withCsrfProtection(patchHandler);
+
+/** DELETE /api/notifications/:id
+ *
+ * Deletes a notification for the authenticated user.
+ */
+const deleteHandler = async (
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  const user = await getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  if (!id || typeof id !== "string" || id.trim() === "") {
+    return NextResponse.json(
+      { error: "Invalid notification id" },
+      { status: 400 },
+    );
+  }
+
+  const notification = await deleteNotification(user.id, id.trim());
+  if (!notification) {
+    return NextResponse.json(
+      { error: "Notification not found" },
+      { status: 404 },
+    );
+  }
+
+  return NextResponse.json({ notification });
+};
+
+export const DELETE = withCsrfProtection(deleteHandler);

@@ -31,12 +31,44 @@ import type {
  * // In your component
  * <SearchResults {...results} onResultClick={handleClick} />
  */
+/**
+ * Maps an thrown search failure into a typed SearchError.
+ * 5xx responses are marked retryable so the UI can offer a distinct retry path
+ * instead of treating the failure like an empty result set.
+ */
+export function toSearchError(error: unknown): SearchError {
+  const message =
+    error instanceof Error ? error.message : 'Search failed. Please try again.';
+
+  const statusMatch = message.match(/\b([45]\d{2})\b/);
+  const statusCode = statusMatch ? Number(statusMatch[1]) : undefined;
+  const retryable =
+    typeof statusCode === 'number' ? statusCode >= 500 : true;
+
+  if (statusCode !== undefined && statusCode >= 500) {
+    return {
+      message: 'Server error while searching. Please try again.',
+      source: 'all',
+      statusCode,
+      retryable: true,
+    };
+  }
+
+  return {
+    message,
+    source: 'all',
+    statusCode,
+    retryable,
+  };
+}
+
 export function useSearchResults(
   debounceDelay: number = 300,
   maxResults: number = 5
 ): {
   results: SearchResultsData;
   search: (query: string) => void;
+  retry: () => void;
 } {
   const [results, setResults] = useState<SearchResultsData>({
     query: '',
@@ -48,46 +80,49 @@ export function useSearchResults(
 
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastQueryRef = useRef('');
 
   /**
-   * Parses mock positions data.
-   * TODO: Replace with actual API call to /api/positions when available.
+   * Fetches positions from /api/positions and filters by the search query.
    */
   const fetchPositions = useCallback(
-    async (query: string): Promise<SearchResultPosition[]> => {
-      // Mock positions data - in a real app, this would query /api/positions
-      const mockPositions = [
-        {
-          id: 'pos-xlm-1',
-          asset: 'XLM',
-          balance: '$5,000.00',
-        },
-        {
-          id: 'pos-usdc-1',
-          asset: 'USDC',
-          balance: '$3,750.00',
-        },
-        {
-          id: 'pos-btc-1',
-          asset: 'BTC',
-          balance: '$1,250.00',
-        },
-      ];
+    async (query: string, signal: AbortSignal): Promise<SearchResultPosition[]> => {
+      const response = await fetch('/api/positions', { signal });
 
-      // Filter by search term (asset or ID match)
-      return mockPositions
-        .filter(
-          (pos) =>
-            pos.asset.toLowerCase().includes(query.toLowerCase()) ||
-            pos.id.toLowerCase().includes(query.toLowerCase())
-        )
+      if (!response.ok) {
+        throw new Error(`Failed to fetch positions: ${response.status}`);
+      }
+
+      const data = await response.json() as Record<string, unknown>;
+
+      // Normalise: the route may return { positions: [...] } or a single flat object
+      type RawPosition = { id?: string; asset?: string; availableBalance?: string };
+      let rawList: RawPosition[];
+
+      if (Array.isArray(data.positions) && data.positions.length > 0) {
+        rawList = data.positions as RawPosition[];
+      } else if (data.asset || data.availableBalance) {
+        // Top-level flat object (single-position response)
+        rawList = [data as RawPosition];
+      } else {
+        rawList = [];
+      }
+
+      const lowerQuery = query.toLowerCase();
+
+      return rawList
+        .filter((pos) => {
+          const asset = (pos.asset ?? '').toLowerCase();
+          const id = (pos.id ?? '').toLowerCase();
+          return asset.includes(lowerQuery) || id.includes(lowerQuery);
+        })
         .slice(0, maxResults)
-        .map((pos) => ({
-          id: pos.id,
+        .map((pos, i) => ({
+          id: pos.id ?? `pos-${pos.asset ?? i}`,
           type: 'position' as const,
-          title: `${pos.asset} Position`,
-          subtitle: `Balance: ${pos.balance}`,
-          asset: pos.asset,
+          title: `${pos.asset ?? 'Unknown'} Position`,
+          subtitle: `Balance: ${pos.availableBalance ?? 'N/A'}`,
+          asset: pos.asset ?? '',
         }));
     },
     [maxResults]
@@ -136,6 +171,7 @@ export function useSearchResults(
 
       // Empty query resets state
       if (!query.trim()) {
+        lastQueryRef.current = '';
         setResults({
           query: '',
           state: 'idle',
@@ -145,6 +181,8 @@ export function useSearchResults(
         });
         return;
       }
+
+      lastQueryRef.current = query;
 
       // Set loading state immediately for UX feedback
       setResults((prev) => ({
@@ -163,7 +201,7 @@ export function useSearchResults(
           // Fetch from both sources in parallel
           const [transactions, positions] = await Promise.all([
             searchTransactions(query, controller.signal),
-            fetchPositions(query),
+            fetchPositions(query, controller.signal),
           ]);
 
           if (controller.signal.aborted) {
@@ -187,22 +225,25 @@ export function useSearchResults(
             return;
           }
 
-          const errorMessage =
-            error instanceof Error ? error.message : 'Search failed. Please try again.';
-
           setResults((prev) => ({
             ...prev,
             state: 'error',
-            error: {
-              message: errorMessage,
-              source: 'all',
-            },
+            error: toSearchError(error),
           }));
         }
       }, debounceDelay);
     },
     [debounceDelay, searchTransactions, fetchPositions]
   );
+
+  /**
+   * Re-run the last search query (for retry UX after transient 5xx failures).
+   */
+  const retry = useCallback(() => {
+    const query = lastQueryRef.current;
+    if (!query.trim()) return;
+    search(query);
+  }, [search]);
 
   /**
    * Cleanup on unmount.
@@ -218,7 +259,7 @@ export function useSearchResults(
     };
   }, []);
 
-  return { results, search };
+  return { results, search, retry };
 }
 
 /**

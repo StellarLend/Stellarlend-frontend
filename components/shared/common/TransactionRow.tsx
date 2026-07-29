@@ -2,7 +2,16 @@
 
 import React, { useCallback } from "react";
 import Image from "next/image";
-import { StatusBadge, transactionStatusToVariant } from "@/components/shared/ui/StatusBadge";
+import { ExternalLink } from "lucide-react";
+import {
+  StatusBadge,
+  transactionStatusToVariant,
+} from "@/components/shared/ui/StatusBadge";
+import { useWallet } from "@/hooks/useWallet";
+import {
+  buildStellarExpertTransactionUrl,
+  getTransactionHash,
+} from "@/lib/utils/explorer";
 import type { Transaction } from "@/types/Transaction";
 
 export const rowRenderCounts = new Map<string, number>();
@@ -44,8 +53,12 @@ export interface TransactionRowProps {
   actualIndex: number;
   isFocused: boolean;
   isExpanded: boolean;
+  isPending?: boolean;
   onFocusRow: (index: number) => void;
-  onKeyDownRow: (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => void;
+  onKeyDownRow: (
+    event: React.KeyboardEvent<HTMLTableRowElement>,
+    index: number,
+  ) => void;
   onSelectTxn: (txn: Transaction) => void;
   setRowRef: (index: number, node: HTMLTableRowElement | null) => void;
 }
@@ -56,6 +69,7 @@ export const TransactionRow = React.memo(
     actualIndex,
     isFocused,
     isExpanded,
+    isPending = false,
     onFocusRow,
     onKeyDownRow,
     onSelectTxn,
@@ -65,12 +79,17 @@ export const TransactionRow = React.memo(
       const count = rowRenderCounts.get(txn.id) ?? 0;
       rowRenderCounts.set(txn.id, count + 1);
     }
+    const { network } = useWallet();
+    const transactionHash = getTransactionHash(txn);
+    const explorerUrl = transactionHash
+      ? buildStellarExpertTransactionUrl(transactionHash, network)
+      : null;
 
     const handleRef = useCallback(
       (node: HTMLTableRowElement | null) => {
         setRowRef(actualIndex, node);
       },
-      [actualIndex, setRowRef]
+      [actualIndex, setRowRef],
     );
 
     const handleFocus = useCallback(() => {
@@ -81,7 +100,7 @@ export const TransactionRow = React.memo(
       (event: React.KeyboardEvent<HTMLTableRowElement>) => {
         onKeyDownRow(event, actualIndex);
       },
-      [actualIndex, onKeyDownRow]
+      [actualIndex, onKeyDownRow],
     );
 
     const handleSelect = useCallback(() => {
@@ -96,7 +115,11 @@ export const TransactionRow = React.memo(
         aria-label={`Transaction ${txn.id}`}
         onFocus={handleFocus}
         onKeyDown={handleKeyDown}
-        className={`border-b border-gray-300 whitespace-nowrap last:border-0 hover:bg-gray-50 transition text-black ${isFocused ? "bg-gray-100" : ""}`}
+        className={`border-b whitespace-nowrap last:border-0 transition text-black ${
+          isPending
+            ? "border-dashed border-blue-300 bg-blue-50/50 animate-pulse"
+            : "border-gray-300 hover:bg-gray-50"
+        } ${isFocused && !isPending ? "bg-gray-100" : ""}`}
       >
         <td className="py-3 px-4">
           <div className="font-medium text-black">{txn.type}</div>
@@ -115,9 +138,7 @@ export const TransactionRow = React.memo(
           />
           <span className="ml-1 font-medium ">{txn.asset}</span>
         </td>
-        <td className="py-3 px-4 ">
-          {formatDateTime(txn.date, txn.time)}
-        </td>
+        <td className="py-3 px-4 ">{formatDateTime(txn.date, txn.time)}</td>
         <td className="py-3 px-4">
           <StatusBadge
             variant={transactionStatusToVariant(txn.status)}
@@ -125,6 +146,18 @@ export const TransactionRow = React.memo(
           />
         </td>
         <td className="py-3 px-4">
+          {explorerUrl && (
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mr-4 inline-flex items-center gap-1 text-blue-600 hover:underline"
+              aria-label={`View transaction ${txn.id} on Stellar Expert`}
+            >
+              Explorer
+              <ExternalLink aria-hidden="true" size={14} />
+            </a>
+          )}
           <button
             onClick={handleSelect}
             className="text-blue-600 hover:underline"
@@ -136,29 +169,39 @@ export const TransactionRow = React.memo(
         </td>
       </tr>
     );
-  }
+  },
 );
 TransactionRow.displayName = "TransactionRow";
 
 export interface TransactionMobileRowProps {
   txn: Transaction;
   isExpanded: boolean;
+  isPending?: boolean;
   onSelectTxn: (txn: Transaction) => void;
 }
 
 export const TransactionMobileRow = React.memo(
-  ({ txn, isExpanded, onSelectTxn }: TransactionMobileRowProps) => {
+  ({ txn, isExpanded, isPending = false, onSelectTxn }: TransactionMobileRowProps) => {
     if (txn.id) {
       const count = mobileRowRenderCounts.get(txn.id) ?? 0;
       mobileRowRenderCounts.set(txn.id, count + 1);
     }
+    const { network } = useWallet();
+    const transactionHash = getTransactionHash(txn);
+    const explorerUrl = transactionHash
+      ? buildStellarExpertTransactionUrl(transactionHash, network)
+      : null;
 
     const handleSelect = useCallback(() => {
       onSelectTxn(txn);
     }, [txn, onSelectTxn]);
 
     return (
-      <div className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+      <div className={`p-4 rounded-xl shadow-sm transition-shadow ${
+        isPending
+          ? "border border-dashed border-blue-300 bg-blue-50/50 animate-pulse"
+          : "border border-gray-200 bg-white hover:shadow-md"
+      }`}>
         <div className="flex justify-between items-start mb-3">
           <div className="flex flex-col">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
@@ -211,17 +254,31 @@ export const TransactionMobileRow = React.memo(
               {formatDateTime(txn.date, txn.time)}
             </div>
           </div>
-          <button
-            onClick={handleSelect}
-            className="mt-2 text-blue-600 hover:underline"
-            aria-expanded={isExpanded}
-            aria-controls="transaction-detail-drawer"
-          >
-            Details
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            {explorerUrl && (
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                aria-label={`View transaction ${txn.id} on Stellar Expert`}
+              >
+                Explorer
+                <ExternalLink aria-hidden="true" size={14} />
+              </a>
+            )}
+            <button
+              onClick={handleSelect}
+              className="text-blue-600 hover:underline"
+              aria-expanded={isExpanded}
+              aria-controls="transaction-detail-drawer"
+            >
+              Details
+            </button>
+          </div>
         </div>
       </div>
     );
-  }
+  },
 );
 TransactionMobileRow.displayName = "TransactionMobileRow";

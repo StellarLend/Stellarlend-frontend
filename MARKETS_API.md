@@ -47,3 +47,7 @@ Requests with an `Authorization` header, `session` or `token` cookie, or `x-user
 Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
 X-Cache: BYPASS
 ```
+
+## Consumer notes
+
+The borrowing form consumes `borrowApr` from this endpoint and uses the local fallback rates only when the request is loading, fails, or returns no usable market entry for the selected asset. The live rate is surfaced in the UI with a subtle "rates as of … • live" status indicator when it is available.

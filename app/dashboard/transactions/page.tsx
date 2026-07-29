@@ -1,27 +1,32 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { IconPlaceholder } from "@/components";
 import { DashboardLayout } from "@/components";
+import { TransactionExportButton } from "@/components/features/dashboard/components/TransactionExportButton";
+import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
+import { TransactionsSummaryHeader } from "@/components/features/dashboard/components";
 import { Transactions } from "@/components/shared/common/Transaction";
 import { PageHeader } from "@/components/shared/common";
-import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
-import { TransactionExportButton, TransactionsSummaryHeader } from "@/components/features/dashboard/components";
 import { useTransactionSummary } from "@/hooks/useTransactionSummary";
+
+const IconPlaceholder = () => <span className="inline-block w-4 h-4 bg-slate-200 animate-pulse rounded" />;
+
+// Lazy load Bank icon to reduce initial bundle size
+const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod => ({ default: mod.Bank })), {
+  loading: () => <IconPlaceholder />,
+  ssr: true,
+});
 
 export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const { inflow, outflow, net, isLoading } = useTransactionSummary();
   const searchParams = useSearchParams();
-
-  const filters = useMemo(() => ({
-    asset: searchParams.get("asset") ?? undefined,
-    type: searchParams.get("type") ?? undefined,
-    status: searchParams.get("status") ?? undefined,
-    search: searchParams.get("search") ?? undefined,
-    dateFrom: searchParams.get("fromDate") ?? undefined,
-    dateTo: searchParams.get("toDate") ?? undefined,
-  }), [searchParams]);
+  const filters = {
+    status: searchParams.get('status') ?? undefined,
+    type: searchParams.get('type') ?? undefined,
+    search: searchParams.get('search') ?? undefined,
+  };
 
   return (
     <DashboardLayout>
@@ -40,3 +45,4 @@ export default function TransactionsPage() {
     </DashboardLayout>
   );
 }
+

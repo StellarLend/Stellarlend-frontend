@@ -7,7 +7,7 @@ malicious `returnUrl` parameter.
 ## Architecture
 
 To find the core validation logic visit
-[safe-redirect.ts](safe-redirect.ts).
+[safe-redirect.ts](file:///lib/security/safe-redirect.ts).
 
 The helper `safeRedirectPath()` accepts a raw redirect candidate string from
 any source (URL query parameter, API response, cookie) and returns either
@@ -42,8 +42,8 @@ encoding (throwing on decode) also defaults to `/`.
 ### Wallet connect
 
 After a successful wallet connection in
-[context/WalletContext.tsx](../../context/WalletContext.tsx) and
-[hooks/useWallet.tsx](../../hooks/useWallet.tsx), the `connect()` function
+[context/WalletContext.tsx](file:///context/WalletContext.tsx) and
+[hooks/useWallet.tsx](file:///hooks/useWallet.tsx), the `connect()` function
 reads `returnUrl` from the current page's URL search params, validates it
 through `safeRedirectPath()`, and navigates to the safe result if present.
 
@@ -55,7 +55,7 @@ from the page URL, validates it, and navigates.
 ### Server-side (defence in depth)
 
 The logout API route at
-[app/api/auth/logout/route.ts](../../app/api/auth/logout/route.ts) also
+[app/api/auth/logout/route.ts](file:///app/api/auth/logout/route.ts) also
 validates any `returnUrl` query parameter server-side so that even if
 someone calls the endpoint directly with a crafted parameter, the response
 only contains a safe `redirectTo` value.

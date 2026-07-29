@@ -7,14 +7,10 @@ vi.mock('@/lib/config', () => ({
 }));
 
 import { GET } from './route';
-import { SimpleCache } from '@/lib/cache';
 
 describe('GET /api/tx/status/[hash]', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    // clear internal cache between tests
-    const cacheModule = require('@/lib/cache');
-    if (cacheModule && cacheModule.default) cacheModule.default.prototype.clear?.call(cacheModule.default.prototype);
   });
 
   afterEach(() => {
@@ -22,7 +18,7 @@ describe('GET /api/tx/status/[hash]', () => {
   });
 
   it('rejects non-hex hash', async () => {
-    const response = await GET(new Request('http://localhost/api/tx/status/zz'), { params: { hash: 'zz' } } as any);
+    const response = await GET(new Request('http://localhost/api/tx/status/zz') as any, { params: Promise.resolve({ hash: 'zz' }) });
     expect(response.status).toBe(400);
     const json = await response.json();
     expect(json.error.code).toBe('INVALID_INPUT');
@@ -34,7 +30,7 @@ describe('GET /api/tx/status/[hash]', () => {
     );
     vi.stubGlobal('fetch', mockFetch);
 
-    const response = await GET(new Request('http://localhost/api/tx/status/abc'), { params: { hash: 'abc' } } as any);
+    const response = await GET(new Request('http://localhost/api/tx/status/abc') as any, { params: Promise.resolve({ hash: 'abc' }) });
     expect(response.status).toBe(200);
     const json = await response.json();
     expect(json.status).toBe('NOT_FOUND');
@@ -46,13 +42,13 @@ describe('GET /api/tx/status/[hash]', () => {
     );
     vi.stubGlobal('fetch', mockFetch);
 
-    const first = await GET(new Request('http://localhost/api/tx/status/aa11'), { params: { hash: 'aa11' } } as any);
+    const first = await GET(new Request('http://localhost/api/tx/status/aa11') as any, { params: Promise.resolve({ hash: 'aa11' }) });
     expect(first.status).toBe(200);
     const j1 = await first.json();
     expect(j1.status).toBe('SUCCESS');
     expect(j1.cached).toBe(false);
 
-    const second = await GET(new Request('http://localhost/api/tx/status/aa11'), { params: { hash: 'aa11' } } as any);
+    const second = await GET(new Request('http://localhost/api/tx/status/aa11') as any, { params: Promise.resolve({ hash: 'aa11' }) });
     expect(second.status).toBe(200);
     const j2 = await second.json();
     expect(j2.status).toBe('SUCCESS');
@@ -67,7 +63,7 @@ describe('GET /api/tx/status/[hash]', () => {
     );
     vi.stubGlobal('fetch', mockFetch);
 
-    const res = await GET(new Request('http://localhost/api/tx/status/bb22'), { params: { hash: 'bb22' } } as any);
+    const res = await GET(new Request('http://localhost/api/tx/status/bb22') as any, { params: Promise.resolve({ hash: 'bb22' }) });
     expect(res.status).toBe(200);
     const j = await res.json();
     expect(j.status).toBe('FAILED');
@@ -80,7 +76,7 @@ describe('GET /api/tx/status/[hash]', () => {
     );
     vi.stubGlobal('fetch', mockFetch);
 
-    const res = await GET(new Request('http://localhost/api/tx/status/cc33'), { params: { hash: 'cc33' } } as any);
+    const res = await GET(new Request('http://localhost/api/tx/status/cc33') as any, { params: Promise.resolve({ hash: 'cc33' }) });
     expect(res.status).toBe(502);
     const j = await res.json();
     expect(j.error.code).toBe(500);

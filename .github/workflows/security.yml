@@ -11,15 +11,25 @@ on:
 jobs:
   security-scan:
     runs-on: ubuntu-latest
-    
+    # This repo's default workflow token permissions are read-only, but the
+    # CodeQL analyze step below needs security-events: write to upload its
+    # SARIF results (code scanning is free for public repos, it just needs
+    # the permission grant here).
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -38,12 +48,12 @@ jobs:
         continue-on-error: true
 
       - name: Run CodeQL Analysis
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: javascript
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
 
       - name: Run OWASP ZAP scan
         uses: zaproxy/action-full-scan@v0.8.0
@@ -60,3 +70,4 @@ jobs:
             snyk-report.json
             zap-report.html
           retention-days: 30
+          if-no-files-found: ignore

@@ -1,45 +1,46 @@
-import 'server-only';
+import config from '@/lib/config';
 
-export interface GetTransactionResult {
-  status: 'SUCCESS' | 'FAILED' | 'NOT_FOUND' | 'PENDING';
+export interface SorobanTransactionStatus {
+  status: 'SUCCESS' | 'FAILED' | 'NOT_FOUND' | 'PENDING' | string;
   raw?: unknown;
 }
 
-/**
- * Query the Soroban RPC for the status of a submitted transaction by hash.
- */
-export default async function getTransaction(hash: string): Promise<GetTransactionResult> {
-  const rpcUrl = process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
-
-  const body = JSON.stringify({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'getTransaction',
-    params: { hash },
-  });
-
-  const res = await fetch(rpcUrl, {
+export async function getTransaction(hash: string): Promise<SorobanTransactionStatus> {
+  const rpcUrl = config.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
+  const response = await fetch(rpcUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 'get_transaction',
+      method: 'getTransaction',
+      params: [hash],
+    }),
   });
 
-  if (!res.ok) {
-    throw new Error(`Soroban RPC request failed: ${res.status} ${res.statusText}`);
+  if (!response.ok) {
+    throw { code: response.status, message: `RPC request failed with HTTP ${response.status}` };
   }
 
-  const json = await res.json();
+  const data = await response.json();
 
-  if (json.error) {
-    throw new Error(json.error.message ?? 'Soroban RPC error');
+  if (data.error) {
+    throw data.error;
   }
 
-  const result = json.result as { status?: string; [key: string]: unknown } | undefined;
-  const status = result?.status?.toUpperCase();
+  const result = data.result;
+  if (!result) {
+    return { status: 'NOT_FOUND', raw: null };
+  }
 
-  if (status === 'SUCCESS') return { status: 'SUCCESS', raw: result };
-  if (status === 'FAILED') return { status: 'FAILED', raw: result };
-  if (status === 'NOT_FOUND') return { status: 'NOT_FOUND', raw: result };
+  const rawStatus = (result.status || '').toUpperCase();
+  let status = 'NOT_FOUND';
+  if (rawStatus === 'SUCCESS') status = 'SUCCESS';
+  else if (rawStatus === 'FAILED') status = 'FAILED';
+  else if (rawStatus === 'NOT_FOUND') status = 'NOT_FOUND';
+  else if (rawStatus) status = rawStatus;
 
-  return { status: 'PENDING', raw: result };
+  return { status, raw: result };
 }
+
+export default getTransaction;

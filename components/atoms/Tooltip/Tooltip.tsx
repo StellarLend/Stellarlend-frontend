@@ -2,29 +2,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
 
 export interface TooltipProps {
-  /**
-   * The content to display in the tooltip
-   */
   content: string;
-  /**
-   * The trigger element (usually an IconButton)
-   */
   children: React.ReactElement;
-  /**
-   * Position of the tooltip
-   */
   position?: "top" | "bottom" | "left" | "right";
-  /**
-   * Delay in milliseconds before showing tooltip
-   */
   delay?: number;
-  /**
-   * Additional CSS classes for the tooltip bubble
-   */
   className?: string;
-  /**
-   * CSS classes for the trigger wrapper element
-   */
   wrapperClassName?: string;
 }
 
@@ -51,26 +33,25 @@ export const Tooltip: React.FC<TooltipProps> = ({
   wrapperClassName,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [timeoutId, setTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const showTooltip = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
-    const id = setTimeout(() => setIsVisible(true), delay);
-    setTimeoutId(id);
+    timeoutRef.current = setTimeout(() => setIsVisible(true), delay);
   };
 
   const hideTooltip = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
     setIsVisible(false);
   };
 
-  // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -87,16 +68,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, [isVisible]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-  }, [timeoutId]);
+  }, []);
 
-  // Clone the child and add event handlers
   const triggerElement = React.cloneElement(children, {
     onMouseEnter: showTooltip,
     onMouseLeave: hideTooltip,

@@ -1,9 +1,9 @@
+"use client";
+
 import { useState } from 'react';
-import { Copy } from 'lucide-react';
 import type { LendingData, CalculationResult } from '@/lib/lending/types';
-import { copyToClipboard } from '@/lib/utils/clipboard';
+import { Copy } from 'lucide-react';
 import { Toast } from '@/components/shared/common';
-import { formatCurrency as formatCurrencyUtil } from '@/lib/utils/format';
 
 interface TransactionSummaryProps {
   data: LendingData;
@@ -11,93 +11,26 @@ interface TransactionSummaryProps {
   type: 'lend' | 'borrow' | 'repay' | 'withdraw';
 }
 
-export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const [toast, setToast] = useState<{
-    variant: 'success' | 'error';
-    title: string;
-    description: string;
-  } | null>(null);
-
-  const formatCurrency = (amount: number, currency: string) => {
-    return `${formatCurrencyUtil(amount, 4)} ${currency}`;
-  };
-
-  const formatDate = (daysFromNow: number) => {
-    const date = new Date();
-    date.setDate(date.getDate() + daysFromNow);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
-
-  /**
-   * Serialises the transaction breakdown to plain text
-   * for clipboard export.
-   * 
-   * @security Never includes session tokens, wallet keys,
-   * or any secret values — display values only.
-   */
-  function buildSummaryText(): string {
-    const lines = [
-      'Transaction Summary',
-      '==================',
-      '',
-      `Type:               ${type === 'lend' ? 'Lending' : 'Borrowing'}`,
-      `Asset:              ${data.asset}`,
-      `Amount:             ${formatCurrency(data.amount, data.asset)}`,
-      `Interest Rate:      ${data.interestRate.toFixed(1)}% ${type === 'lend' ? 'APY' : 'APR'}`,
-    ];
-
-    if (type === 'borrow' && data.duration) {
-      lines.push(`Duration:           ${data.duration} days`);
-    }
-
-    lines.push(`Start Date:         ${formatDate(0)}`);
-
-    if (data.duration) {
-      lines.push(`End Date:           ${formatDate(data.duration)}`);
-    }
-
-    if (type === 'borrow' && data.collateral && data.collateralAmount) {
-      lines.push('');
-      lines.push('Collateral');
-      lines.push('----------');
-      lines.push(`Asset:              ${data.collateral}`);
-      lines.push(`Amount:             ${formatCurrency(data.collateralAmount, data.collateral)}`);
-      lines.push(`Ratio:              150%`);
-    }
-
-    if (calculation) {
-      lines.push('');
-      lines.push(type === 'lend' ? 'Expected Returns' : 'Repayment Details');
-      lines.push(type === 'lend' ? '----------------' : '-------------------');
-
-      if (type === 'lend') {
-        lines.push(`Daily Earnings:     ${formatCurrency(calculation.dailyEarnings, data.asset)}`);
-        lines.push(`Total Earnings:     ${formatCurrency(calculation.totalEarnings, data.asset)}`);
-        lines.push(`Total Return:       ${formatCurrency(data.amount + calculation.totalEarnings, data.asset)}`);
-      } else {
-        if (calculation.monthlyPayment) {
-          lines.push(`Monthly Payment:    ${formatCurrency(calculation.monthlyPayment, data.asset)}`);
-        }
-        lines.push(`Total Interest:     ${formatCurrency(calculation.totalEarnings, data.asset)}`);
-        if (calculation.totalRepayment) {
-          lines.push(`Total Repayment:    ${formatCurrency(calculation.totalRepayment, data.asset)}`);
-        }
-      }
-    }
-
-    lines.push('');
-    lines.push(`Exported at:        ${new Date().toISOString()}`);
-
-    return lines.join('\n');
+async function copyToClipboard(text: string): Promise<{ success: boolean }> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return { success: true };
+  } catch {
+    return { success: false };
   }
+}
+
+export default function TransactionSummary({ data, calculation, type }: TransactionSummaryProps) {
+  const { currency } = useCurrencyPreference();
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [toast, setToast] = useState<{ variant: string; title: string; description: string } | null>(null);
+
+  const formatValue = (amount: number) => {
+    return formatCurrency(amount, 4, currency);
+  };
 
   const handleCopy = async () => {
-    const text = buildSummaryText();
+    const text = buildSummaryText(data, calculation, type);
 
     try {
       const result = await copyToClipboard(text);
@@ -233,7 +166,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
             </span>
           </div>
           <div className="text-2xl font-bold text-gray-900">
-            {formatCurrency(data.amount, data.asset)}
+            {formatValue(data.amount)}
           </div>
         </div>
 
@@ -283,7 +216,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount</span>
                 <span className="font-medium">
-                  {formatCurrency(data.collateralAmount, data.collateral)}
+                  {formatValue(data.collateralAmount)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -306,19 +239,19 @@ export default function TransactionSummary({ data, calculation, type }: Transact
                 <div className="flex justify-between">
                   <span className="text-gray-600">Daily Earnings</span>
                   <span className="font-medium text-green-600">
-                    +{formatCurrency(calculation.dailyEarnings, data.asset)}
+                    +{formatValue(calculation.dailyEarnings)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Earnings</span>
                   <span className="font-semibold text-green-600">
-                    +{formatCurrency(calculation.totalEarnings, data.asset)}
+                    +{formatValue(calculation.totalEarnings)}
                   </span>
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="font-medium">Total Return</span>
                   <span className="font-semibold text-lg">
-                    {formatCurrency(data.amount + calculation.totalEarnings, data.asset)}
+                    {formatValue(data.amount + calculation.totalEarnings)}
                   </span>
                 </div>
               </div>
@@ -328,21 +261,21 @@ export default function TransactionSummary({ data, calculation, type }: Transact
                   <div className="flex justify-between">
                     <span className="text-gray-600">Monthly Payment</span>
                     <span className="font-medium text-blue-600">
-                      {formatCurrency(calculation.monthlyPayment, data.asset)}
+                      {formatValue(calculation.monthlyPayment)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Interest</span>
                   <span className="font-medium text-red-500">
-                    {formatCurrency(calculation.totalEarnings, data.asset)}
+                    {formatValue(calculation.totalEarnings)}
                   </span>
                 </div>
                 {calculation.totalRepayment && (
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-medium">Total Repayment</span>
                     <span className="font-semibold text-lg">
-                      {formatCurrency(calculation.totalRepayment, data.asset)}
+                      {formatValue(calculation.totalRepayment)}
                     </span>
                   </div>
                 )}
@@ -364,15 +297,15 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <tbody>
                 <tr>
                   <td className="px-2 py-1">Principal</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(data.amount, data.asset)}</td>
+                  <td className="px-2 py-1 text-right">{formatValue(data.amount)}</td>
                 </tr>
                 <tr>
                   <td className="px-2 py-1">Total Interest</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalEarnings, data.asset)}</td>
+                  <td className="px-2 py-1 text-right">{formatValue(calculation.totalEarnings)}</td>
                 </tr>
                 <tr className="font-medium border-t border-gray-200">
                   <td className="px-2 py-1">Total Repayment</td>
-                  <td className="px-2 py-1 text-right">{formatCurrency(calculation.totalRepayment, data.asset)}</td>
+                  <td className="px-2 py-1 text-right">{formatValue(calculation.totalRepayment)}</td>
                 </tr>
               </tbody>
             </table>
@@ -401,7 +334,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Repaid</span>
                 <span className="font-medium text-orange-600">
-                  {formatCurrency(data.amount, data.asset)}
+                  {formatValue(data.amount)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -409,7 +342,7 @@ export default function TransactionSummary({ data, calculation, type }: Transact
                 <span className="font-medium">
                   {(data.remainingDebt ?? 0) === 0
                     ? <span className="text-green-600">Debt cleared</span>
-                    : formatCurrency(data.remainingDebt ?? 0, data.asset)}
+                    : formatValue(data.remainingDebt ?? 0)}
                 </span>
               </div>
               <div className="flex justify-between border-t pt-2">
@@ -434,13 +367,13 @@ export default function TransactionSummary({ data, calculation, type }: Transact
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Redeemed</span>
                 <span className="font-medium text-purple-600">
-                  {formatCurrency(data.amount, data.asset)}
+                  {formatValue(data.amount)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Remaining Supply</span>
                 <span className="font-medium">
-                  {formatCurrency(data.remainingDebt ?? 0, data.asset)}
+                  {formatValue(data.remainingDebt ?? 0)}
                 </span>
               </div>
               {(data.outstandingDebt ?? 0) > 0 && (
