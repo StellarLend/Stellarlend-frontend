@@ -20,6 +20,8 @@ jobs:
   server-tests:
     name: Server-side tests with coverage gate
     runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - name: Checkout code
@@ -56,7 +58,7 @@ jobs:
       # this step is a no-op without it -- skip cleanly instead of failing
       # the job on "Token required - not valid tokenless upload".
       - name: Upload LCOV to Codecov
-        if: always() && secrets.CODECOV_TOKEN != ''
+        if: always() && env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info

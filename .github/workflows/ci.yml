@@ -9,7 +9,9 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
-    
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,4 +57,4 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
-        if: always() && secrets.CODECOV_TOKEN != ''
+        if: always() && env.CODECOV_TOKEN != ''
