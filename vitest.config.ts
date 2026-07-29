@@ -100,6 +100,7 @@ export default defineConfig({
         test: {
           name: "server-unit",
           environment: "node",
+          setupFiles: "./vitest.setup.ts",
 
           include: [
             "types/enums.test.ts",
@@ -115,6 +116,7 @@ export default defineConfig({
             "lib/streams/**/*.test.ts",
             "lib/soroban/**/*.test.ts",
             "lib/indexer/**/*.test.ts",
+            "lib/db/**/*.test.ts",
             "lib/configValidation.test.ts",
             "scripts/**/*.test.ts",
           ],
