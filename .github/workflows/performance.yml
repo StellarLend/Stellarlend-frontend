@@ -9,7 +9,14 @@ on:
 jobs:
   lighthouse:
     runs-on: ubuntu-latest
-    
+    # This repo's default workflow token permissions are read-only, but the
+    # "Comment PR with performance results" step below needs pull-requests:
+    # write to post its comment (it was failing with 403 "Resource not
+    # accessible by integration" without this).
+    permissions:
+      contents: read
+      pull-requests: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
