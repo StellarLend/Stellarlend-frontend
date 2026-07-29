@@ -1,3 +1,5 @@
+"use client";
+
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import TopNav from "@/components/shared/layout/TopNav";
 import { SideNav } from "./SideNav";

@@ -248,14 +248,21 @@ function usePositionsData(): {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  function usePositionsData(): {
-    data: PositionsData | null;
-    isLoading: boolean;
-    error: Error | null;
-  } {
-    const [data, setData] = useState<PositionsData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/positions");
+      if (!res.ok)
+        throw new Error(`Failed to fetch positions: ${res.statusText}`);
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -278,16 +285,19 @@ export default function MetricsCards() {
     }
   }, []);
 
-    const allAssets = useMemo(() => {
-      try {
-        return getAssets();
-      } catch {
-        return [];
-      }
-    }, []);
+  const filteredAssets = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    if (!q) return allAssets;
+    return allAssets.filter(
+      (a) =>
+        a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q),
+    );
+  }, [allAssets, filterQuery]);
 
   if (isLoading || !data) {
-    return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
+    return (
+      <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>
+    );
   }
 
   if (error) {
@@ -298,94 +308,86 @@ export default function MetricsCards() {
     );
   }
 
-    if (!data)
-      return (
-        <div className="text-white p-4 text-sm font-medium">
-          Loading metrics…
-        </div>
-      );
-
-    return (
-      <div>
-        <ScrollCues
-          className="w-full"
-          role="region"
-          aria-label="Scrollable metrics"
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <MetricCard
-              isPrimary
-              icon={
-                <img
-                  src="/icons/piggy.svg"
-                  alt="Wallet Icon"
-                  className="w-6 h-6"
-                />
-              }
-              label="Available Balance"
-              value={data.availableBalance}
-              copyValue={data.copyAddress}
-            />
-            <MetricCard
-              icon={
-                <img
-                  src="/icons/Icon-11.svg"
-                  alt="Dollar Icon"
-                  className="w-6 h-6"
-                />
-              }
-              label="Total Borrowed Amount"
-              value={data.borrowedAmount}
-              subLabel="Next Due Payment"
-              subValue={data.nextDue}
-            />
-            <MetricCard
-              icon={
-                <img
-                  src="/icons/Icon-11.svg"
-                  alt="Dollar Icon"
-                  className="w-6 h-6"
-                />
-              }
-              label={`Total Supplied (Health Factor: ${data.healthFactor})`}
-              value={data.suppliedFunds}
-              subLabel="Earnings from Lending"
-              subValue={data.earnings}
-            />
-          </div>
-        </ScrollCues>
-
-        {/* Asset filter + breakdown */}
-        <div className="mt-6">
-          <AssetFilterBar
-            query={filterQuery}
-            onChange={setFilterQuery}
-            showing={filteredAssets.length}
-            total={allAssets.length}
+  return (
+    <div>
+      <ScrollCues
+        className="w-full"
+        role="region"
+        aria-label="Scrollable metrics"
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <MetricCard
+            isPrimary
+            icon={
+              <img
+                src="/icons/piggy.svg"
+                alt="Wallet Icon"
+                className="w-6 h-6"
+              />
+            }
+            label="Available Balance"
+            value={data.availableBalance}
+            copyValue={data.copyAddress}
           />
-
-          {filteredAssets.length === 0 ? (
-            <div
-              role="status"
-              className="text-[#AAABAB] text-sm py-6 text-center"
-            >
-              No assets match &ldquo;{filterQuery}&rdquo;.{" "}
-              <button
-                onClick={() => setFilterQuery("")}
-                className="underline text-[#71B48D] hover:text-white"
-              >
-                Clear filter
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {filteredAssets.map((asset) => (
-                <AssetCard key={asset.symbol} asset={asset} />
-              ))}
-            </div>
-          )}
+          <MetricCard
+            icon={
+              <img
+                src="/icons/Icon-11.svg"
+                alt="Dollar Icon"
+                className="w-6 h-6"
+              />
+            }
+            label="Total Borrowed Amount"
+            value={data.borrowedAmount}
+            subLabel="Next Due Payment"
+            subValue={data.nextDue}
+          />
+          <MetricCard
+            icon={
+              <img
+                src="/icons/Icon-11.svg"
+                alt="Dollar Icon"
+                className="w-6 h-6"
+              />
+            }
+            label={`Total Supplied (Health Factor: ${data.healthFactor})`}
+            value={data.suppliedFunds}
+            subLabel="Earnings from Lending"
+            subValue={data.earnings}
+          />
         </div>
+      </ScrollCues>
+
+      {/* Asset filter + breakdown */}
+      <div className="mt-6">
+        <AssetFilterBar
+          query={filterQuery}
+          onChange={setFilterQuery}
+          showing={filteredAssets.length}
+          total={allAssets.length}
+        />
+
+        {filteredAssets.length === 0 ? (
+          <div
+            role="status"
+            className="text-[#AAABAB] text-sm py-6 text-center"
+          >
+            No assets match &ldquo;{filterQuery}&rdquo;.{" "}
+            <button
+              onClick={() => setFilterQuery("")}
+              className="underline text-[#71B48D] hover:text-white"
+            >
+              Clear filter
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {filteredAssets.map((asset) => (
+              <AssetCard key={asset.symbol} asset={asset} />
+            ))}
+          </div>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
 }

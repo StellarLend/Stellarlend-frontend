@@ -22,25 +22,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Wait for deployment
-        if: github.event_name == 'pull_request'
-        uses: fountainhead/action-wait-for-check@v1.1.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checkName: deploy-staging
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run Lighthouse CI
-        uses: treosh/lighthouse-ci-action@v12
-        with:
-          urls: |
-            https://stellarlend-staging.vercel.app
-            https://stellarlend-staging.vercel.app/lending
-            https://stellarlend-staging.vercel.app/dashboard
-          uploadArtifacts: true
-          temporaryPublicStorage: true
-          configPath: './lighthouserc.json'
-
+      # The "Wait for deployment" + "Run Lighthouse CI" steps that used to
+      # live here targeted https://stellarlend-staging.vercel.app, a Vercel
+      # staging deployment this repo has no working deploy pipeline/secrets
+      # for. That URL 404s, which reliably failed Lighthouse's navigation
+      # and took this whole job down before it ever got to the self-
+      # contained bundle-size check below. Disabled until a real staging
+      # deployment (and the checkName it waits on) exists in CI.
       - name: Bundle size analysis
         run: |
           npm ci
@@ -54,10 +42,10 @@ jobs:
           script: |
             const fs = require('fs');
             let comment = '## 📊 Performance Report\n\n';
-            comment += '✅ Lighthouse CI completed successfully!\n';
             comment += '📦 Bundle size analysis completed!\n\n';
-            comment += 'Check the full report in the Actions tab.';
-            
+            comment += 'Check the full report in the Actions tab.\n\n';
+            comment += '_Lighthouse CI is currently disabled: it targets a staging deployment (stellarlend-staging.vercel.app) this repo does not have a working deploy pipeline for._';
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,

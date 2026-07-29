@@ -14,7 +14,6 @@ import TxProgressStepper, {
 import { PageHeader } from "@/components/shared/common";
 import { Skeleton } from "@/components/shared/common/Skeleton";
 import type { LendingActionType } from "@/lib/lending/types";
-import { PriceTicker } from "@/components/shared/common";
 
 export type { LendingData, CalculationResult } from "@/lib/lending/types";
 import type { LendingData, CalculationResult } from "@/lib/lending/types";

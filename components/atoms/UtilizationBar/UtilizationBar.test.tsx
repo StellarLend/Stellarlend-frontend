@@ -151,8 +151,8 @@ describe("UtilizationBar", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("45.6%"))).toBeInTheDocument();
-      expect(screen.getByText("91.2%"))).toBeInTheDocument();
+      expect(screen.getByText("45.6%")).toBeInTheDocument();
+      expect(screen.getByText("91.2%")).toBeInTheDocument();
     });
 
     expect(fetch).toHaveBeenCalledTimes(1);
