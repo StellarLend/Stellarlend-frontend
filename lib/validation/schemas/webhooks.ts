@@ -46,9 +46,11 @@ export const webhookDataSchema = z.object({
   memo: z
     .string({ error: "data.memo must be a string when provided" })
     .optional(),
-  memo_type: z.enum(MEMO_TYPES, {
-    error: `data.memo_type must be one of: ${MEMO_TYPES.join(", ")}`,
-  }),
+  memo_type: z
+    .enum(MEMO_TYPES, {
+      error: `data.memo_type must be one of: ${MEMO_TYPES.join(", ")}`,
+    })
+    .optional(),
 });
 
 export type WebhookDataInput = z.infer<typeof webhookDataSchema>;
