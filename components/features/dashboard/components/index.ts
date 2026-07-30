@@ -7,4 +7,5 @@ export { default as NextPaymentDue } from './NextPaymentDue';
 export { default as TransactionDetail } from './TransactionDetail';
 export { default as TransactionReceipt } from './TransactionReceipt';
 export { default as NetWorthTrend } from './NetWorthTrend';
+export { default as FilterPresets } from './FilterPresets';
 export type { TimeWindow } from '@/hooks/usePositionHistory';
