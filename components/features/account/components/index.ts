@@ -6,4 +6,5 @@ export { default as NotificationPreferences } from './NotificationPreferences';
 export { default as AccountDeletion } from './AccountDeletion';
 export { default as AccountDeletionUndo } from './AccountDeletionUndo';
 export { default as SessionsList } from './SessionsList';
+export { default as AccountDeletionPanel } from './AccountDeletionPanel';
 
