@@ -83,6 +83,7 @@ The dashboard is the most component-heavy authenticated route. Its route-specifi
 - **RecentTransactions / TransactionDetail / TransactionReceipt** — full transaction history with detail modals
 - **NotificationBell** — SSE-connected live notification badge
 - **LiquidationsPanel / SupplyApyChart** — charting and risk metrics
+  - *LiquidationsPanel memoisation (issue #686):* each table row is a `memo()`-wrapped `LiquidationRowView` with per-row `useMemo` for severity/alert id/labels and a stable alert-toggle `useCallback`. Unchanged rows skip re-render when the live price stream ticks; measured as 12 → 0 `formatCurrency` calls on a single-row toggle in `LiquidationsPanel.test.tsx`.
 - **Headless UI dialogs** — modal primitives for transaction detail and export
 
 The dashboard TypeScript source totals ~104 KB (raw, before minification). The lending route totals ~40 KB raw and is budgeted at 150 KB after minification. Applying the same minification ratio (~3.5×) to the dashboard source gives an expected output of ~30 KB, but the dashboard pulls in additional runtime dependencies (chart helpers, Headless UI) that lending does not. A budget of **200 KB** gives ~25 % headroom over a realistic minified output while being tight enough to catch accidental heavy imports or missing `next/dynamic` lazy splits.

@@ -296,6 +296,7 @@ export default function ConfirmModal({
               )}
 
               {(() => {
+                // Withdraw has no protocol fee schedule in fee-calculator.
                 if (type === "withdraw") return null;
                 try {
                   const feeResult = calculateProtocolFee(
@@ -303,15 +304,47 @@ export default function ConfirmModal({
                     type,
                     data.amount,
                   );
+                  const gross = data.amount;
+                  const fee = feeResult.feeAmount;
+                  // Net is the amount that actually settles after the protocol cut.
+                  // Zero-amount actions short-circuit to zero fee inside the calculator.
+                  const net = Math.max(0, gross - fee);
                   return (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Protocol Fee</span>
-                      <span className="font-medium">
-                        {formatCurrency(feeResult.feeAmount, data.asset)}
-                      </span>
+                    <div
+                      className="space-y-2 border-t pt-3"
+                      data-testid="fee-breakdown"
+                      aria-label="Fee breakdown"
+                    >
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Gross Amount</span>
+                        <span className="font-medium">
+                          {formatCurrency(gross, data.asset)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">
+                          Protocol Fee
+                          {feeResult.feeBps > 0 ? (
+                            <span className="text-gray-400">
+                              {" "}
+                              ({feeResult.feeBps} bps)
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(fee, data.asset)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="font-medium">Net Amount</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatCurrency(net, data.asset)}
+                        </span>
+                      </div>
                     </div>
                   );
                 } catch {
+                  // Unknown market / action — omit the breakdown rather than block confirm.
                   return null;
                 }
               })()}
