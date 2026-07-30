@@ -22,6 +22,7 @@ snapshots at `drizzle/meta/`.
 | `accounts` | `lib/db/schema/accounts.ts` | Per-user profile data (display name, bio, website, timezone). |
 | `sessions` | `lib/db/schema/sessions.ts` | Server-side session records keyed by `id`, with an `expires_at` and `user_id` foreign reference. |
 | `notifications` | `lib/db/schema/notifications.ts` | Per-user notification feed (title, message, read flag, type). |
+| `notification_preferences` | `lib/db/schema/notification_preferences.ts` | Per-user opt-in matrix of `(channel, event_type)` → enabled, with a composite primary key. |
 | `transactions` | `lib/db/schema/transactions.ts` | Transaction history rows (id, type, amount, asset, date, time, status) with a composite `(date, id)` index for ordered listing. |
 | `audit_events` | `lib/db/schema/audit_events.ts` | Append-only audit log of actor, action, target entity, and a free-form `details` JSON payload. |
 
@@ -39,6 +40,8 @@ accounts (user_id PK)
   │ user_id (FK by convention; no DB-level constraint)
   ├── sessions          (1 account → N sessions)
   ├── notifications     (1 account → N notifications)
+  ├── notification_preferences
+  │                     (1 account → N rows, one per (channel, event_type) pair)
   └── audit_events      (1 account → N events; user_id is nullable for anonymous actor)
 
 transactions          (standalone — no account FK; rows are identified by
@@ -92,7 +95,28 @@ accompanied by a matching index in the same PR.
 | `message` | `text` | |
 | `read` | `boolean` | Defaults to `false`. |
 | `created_at` | `timestamp` | Defaults to `now()`. |
-| `type` | `text` | One of `'info' | 'success' | 'warning' | 'error'`. Defaults to `'info'`. |
+| `type` | `notification_type` enum | One of `'info' | 'success' | 'warning' | 'error'`. Defaults to `'info'`. |
+
+The `type` column is backed by a Postgres enum (`notificationTypeEnum`), not a
+free-text column — adding a value requires a migration that alters the enum, so
+it cannot be introduced by an application-side change alone.
+
+### `notification_preferences` — `lib/db/schema/notification_preferences.ts`
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | `text` | Owning account. Part of the composite PK. |
+| `channel` | `text` | Delivery channel the preference applies to. Part of the composite PK. |
+| `event_type` | `text` | Event the preference applies to. Part of the composite PK. |
+| `enabled` | `boolean` | Defaults to `true` — preferences are opt-out. |
+| `updated_at` | `timestamp` | Defaults to `now()`. |
+
+The primary key is the composite `(user_id, channel, event_type)`, so there is
+at most one row per user per channel per event. There is no surrogate `id`
+column: upserts key on the composite tuple.
+
+Because `enabled` defaults to `true`, an absent row means "enabled" rather than
+"unset" — a user who has never touched their preferences receives everything.
 
 ### `transactions` — `lib/db/schema/transactions.ts`
 

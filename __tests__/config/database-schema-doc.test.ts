@@ -105,22 +105,25 @@ describe('docs/database-schema.md', () => {
     expect(doc).toContain(indexName);
   });
 
-  it('enumerates the notification type union in source', () => {
+  it('enumerates the notification type enum in source', () => {
     const doc = readDoc();
     const notifications = readFileSync(
       resolve(SCHEMA_DIR, 'notifications.ts'),
       'utf8',
     );
 
-    // The `type` column has an inline union comment in the schema. The
-    // doc must list every value so it stays accurate.
-    const match = notifications.match(/\/\/\s*'([^']+)'/);
-    expect(match).not.toBeNull();
+    // The `type` column is backed by a pgEnum, which is the authoritative
+    // list of accepted values. Parse it out of the source so adding a value
+    // without documenting it fails here.
+    const match = notifications.match(/pgEnum\(\s*'[^']+'\s*,\s*\[([^\]]+)\]/);
+    expect(match, 'could not find the notification pgEnum in schema source').not.toBeNull();
+
     const types = match![1]
-      .split('|')
-      .map((t) => t.trim().replace(/['\s]/g, ''))
+      .split(',')
+      .map((t) => t.trim().replace(/['"]/g, ''))
       .filter(Boolean);
 
+    expect(types.length).toBeGreaterThan(0);
     for (const t of types) {
       expect(doc, `doc missing notification type "${t}"`).toContain(t);
     }
