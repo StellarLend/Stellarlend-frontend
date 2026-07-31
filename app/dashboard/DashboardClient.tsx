@@ -6,6 +6,7 @@ import MetricsCards from "@/components/features/dashboard/components/MetricsCard
 import LiquidationsPanel from "@/components/features/dashboard/components/LiquidationsPanel";
 import NextPaymentDue from "@/components/features/dashboard/components/NextPaymentDue";
 import NetWorthTrend from "@/components/features/dashboard/components/NetWorthTrend";
+import PositionsOverviewGrid from "@/components/features/dashboard/components/PositionsOverviewGrid";
 import { AlertBanner, PageHeader } from "@/components/shared/common";
 import { RecentTransactions } from "@/components/shared/common/RecentTransactions";
 import type { AlertBannerSeverity } from "@/components/shared/common/AlertBanner";
@@ -183,6 +184,9 @@ export default function DashboardClient() {
          <NetWorthTrend />
          <MetricsCards />
         <NextPaymentDue />
+        <div className="mt-6">
+          <PositionsOverviewGrid />
+        </div>
         <div className="mt-6">
           <LiquidationsPanel />
         </div>
