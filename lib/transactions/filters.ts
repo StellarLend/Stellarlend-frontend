@@ -18,8 +18,22 @@ export interface TransactionFilter {
 }
 
 const ALLOWED_TYPES = new Set<string>(TRANSACTION_TYPES);
-const ALLOWED_STATUSES = new Set(['completed', 'pending', 'processing', 'failed']);
+const ALLOWED_STATUSES = new Set(['completed', 'pending', 'processing', 'failed', 'all']);
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}Z)?$/;
+
+/** Max span between fromDate and toDate (inclusive window). */
+export const MAX_DATE_RANGE_DAYS = 366 * 5; // 5 years
+
+/**
+ * Parse a validated fromDate/toDate string into epoch ms.
+ * Date-only values are treated as UTC midnight for stable comparison.
+ */
+export function dateFilterToMs(value: string): number {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return Date.parse(`${value}T00:00:00Z`);
+  }
+  return Date.parse(value);
+}
 
 export interface FilterValidationResult {
   valid: boolean;
@@ -81,7 +95,9 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
     filter.asset = asset.toUpperCase();
   }
 
-  const fromDate = params.get('fromDate');
+  // Accept both the established fromDate/toDate keys and the shorter from/to
+  // aliases used by some clients / the GrantFox issue wording.
+  const fromDate = params.get('fromDate') ?? params.get('from');
   if (fromDate) {
     if (!ISO_DATE_RE.test(fromDate)) {
       return { valid: false, filter, error: `Invalid fromDate: ${fromDate}` };
@@ -89,12 +105,42 @@ export function parseTransactionFilter(params: URLSearchParams): FilterValidatio
     filter.fromDate = fromDate;
   }
 
-  const toDate = params.get('toDate');
+  const toDate = params.get('toDate') ?? params.get('to');
   if (toDate) {
     if (!ISO_DATE_RE.test(toDate)) {
       return { valid: false, filter, error: `Invalid toDate: ${toDate}` };
     }
     filter.toDate = toDate;
+  }
+
+  if (filter.fromDate && filter.toDate) {
+    const fromMs = dateFilterToMs(filter.fromDate);
+    const toMs = dateFilterToMs(filter.toDate);
+
+    if (Number.isNaN(fromMs) || Number.isNaN(toMs)) {
+      return {
+        valid: false,
+        filter,
+        error: 'Invalid date range: unparseable fromDate or toDate',
+      };
+    }
+
+    if (fromMs > toMs) {
+      return {
+        valid: false,
+        filter,
+        error: `Invalid date range: fromDate (${filter.fromDate}) is after toDate (${filter.toDate})`,
+      };
+    }
+
+    const spanDays = (toMs - fromMs) / (1000 * 60 * 60 * 24);
+    if (spanDays > MAX_DATE_RANGE_DAYS) {
+      return {
+        valid: false,
+        filter,
+        error: `Invalid date range: span exceeds ${MAX_DATE_RANGE_DAYS} days`,
+      };
+    }
   }
 
   const search = params.get('search');

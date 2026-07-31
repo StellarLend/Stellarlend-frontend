@@ -38,6 +38,30 @@ export default function MyTransactionsPage() {
 }
 ```
 
+## Date range parameters
+
+| Query key | Alias | Format | Notes |
+| --- | --- | --- | --- |
+| `fromDate` | `from` | `YYYY-MM-DD` or `YYYY-MM-DDTHH:mm:ssZ` | Inclusive lower bound |
+| `toDate` | `to` | same | Inclusive upper bound |
+
+Validation (in `parseTransactionFilter`):
+
+- Malformed strings → 400 (`Invalid fromDate` / `Invalid toDate`)
+- `fromDate > toDate` → 400 inverted-range error
+- Span longer than **5 years** (`MAX_DATE_RANGE_DAYS`) → 400
+- Single-day ranges (`from === to`) and open ranges (only one bound) are allowed
+- Date-only values compare at UTC midnight so timezone boundaries stay stable
+
+### UI
+
+`TransactionFilters` mounts two `react-datepicker` inputs (From / To) that:
+
+- Round-trip through the URL as `fromDate` / `toDate` (`yyyy-MM-dd`)
+- Constrain each other (`maxDate` on From, `minDate` on To)
+- Announce the selected range via an `aria-live="polite"` status region
+- Group under a shared "Date Range" label for assistive tech
+
 ## Adding a New Filter
 To add a new filter:
 1. Ensure the backend API route supports it.

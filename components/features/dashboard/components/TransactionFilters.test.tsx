@@ -28,8 +28,9 @@ describe('TransactionFilters', () => {
   it('renders correctly with default state', () => {
     render(<TransactionFilters totalCount={0} />);
     
-    expect(screen.getByText('Showing')).toBeInTheDocument();
+    expect(screen.getByText(/Showing/i)).toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText(/results/i)).toBeInTheDocument();
     
     expect(screen.getByLabelText(/Asset/i)).toHaveValue('');
     expect(screen.getByLabelText(/Type/i)).toHaveValue('');
@@ -38,6 +39,9 @@ describe('TransactionFilters', () => {
     
     // Clear all button should not be visible when no filters are applied
     expect(screen.queryByText('Clear All')).not.toBeInTheDocument();
+
+    // Date range is announced for assistive tech.
+    expect(screen.getByText(/No date range selected/i)).toBeInTheDocument();
   });
 
   it('restores state from URL params on load', () => {
