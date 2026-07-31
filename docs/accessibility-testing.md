@@ -25,6 +25,8 @@ To provide an optimal and non-distracting user experience for all users, includi
 - **AlertBanner**: Dismiss button transitions are disabled when reduced motion is preferred.
 - **PositionSummary**: Loading skeleton `animate-pulse` animations and hover transitions are disabled when reduced motion is preferred.
 - **MetricsCards**: Card scaling and transform effects on hover are disabled when reduced motion is preferred.
+- **Hero** (`components/marketing/Hero.tsx`): Framer Motion entrance animations collapse to zero-duration when `useReducedMotion()` is true. CTA buttons expose `focus-visible` rings. Muted copy uses `#D1D5DB` for WCAG AA contrast on the green gradient. Tests: `Hero.test.tsx` (axe + reduced-motion).
+- **HowItWorks** (`components/marketing/HowItWorks.tsx`): Hover transitions are suppressed under reduced motion; step cards respond to keyboard focus; step numbers and body copy use higher-contrast tokens. Tests: `HowItWorks.test.tsx` (axe + reduced-motion).
 
 ---
 
