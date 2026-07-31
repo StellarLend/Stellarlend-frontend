@@ -2,7 +2,7 @@
 
 import { DashboardLayout } from "@/components";
 import { PageHeader } from "@/components/shared/common";
-import NotificationCenter from "@/components/features/notifications/NotificationCenter";
+import NotificationsFeed from "@/components/features/notifications/NotificationsFeed";
 
 export default function NotificationsPage() {
   return (
@@ -10,12 +10,10 @@ export default function NotificationsPage() {
       <div className="md:pt-10 md:border-t px-6 md:px-12 flex flex-col gap-6 pb-12">
         <PageHeader
           title="Notifications"
-          description="Review alerts, payment reminders, and system messages for your account."
+          description="Review alerts, payment reminders, and system messages for your account. Filter by type and browse by day."
         />
 
-        <div className="bg-white/5 rounded-xl p-6">
-          <NotificationCenter />
-        </div>
+        <NotificationsFeed />
       </div>
     </DashboardLayout>
   );
