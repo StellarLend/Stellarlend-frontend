@@ -7,6 +7,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { Menu, WalletCards } from "lucide-react";
 import NotificationBell from "@/components/shared/layout/NotificationBell";
 import StreamStatusIndicator from "./StreamStatusIndicator";
+import ThemeToggle from "@/components/shared/layout/ThemeToggle";
 import { useWallet } from "@/hooks/useWallet";
 import {
   fetchWalletBalances,
@@ -111,6 +112,7 @@ const TopNav = () => {
       </div>
 
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         <div className="hidden md:flex gap-4 items-center">
           <button
             type="button"

@@ -3,6 +3,10 @@
 /* app/globals.css — Tailwind v4 theme wiring */
 @import "tailwindcss";
 
+/* Class-based dark mode so the TopNav ThemeToggle can force light/dark.
+   System mode still works via the no-flash script + useTheme media listener. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* ── Colors ── */
   --color-green-50:  #E6F5EE;
@@ -100,11 +104,26 @@
   --color-brand: #15a350;
 }
 
+/* System preference when no explicit class has been applied yet
+   (e.g. first paint before the no-flash script, or storage unavailable). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+/* Explicit class overrides (ThemeToggle / no-flash script). */
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  color-scheme: dark;
+}
+
+html.light {
+  --background: #ffffff;
+  --foreground: #171717;
+  color-scheme: light;
 }
 
 body {
