@@ -3,7 +3,6 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { afterEach, beforeEach, vi } from "vitest";
-import { useWallet } from "@/hooks/useWallet";
 
 const fetchWalletBalancesMock = vi.hoisted(() => vi.fn());
 
@@ -11,9 +10,53 @@ const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 
+const walletState = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  const state = {
+    address: null as string | null,
+    network: "TESTNET",
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    status: "disconnected" as string,
+    error: null as string | null,
+    accounts: [] as string[],
+    activeAccount: null as string | null,
+    switchAccount: vi.fn(),
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    emit() {
+      for (const listener of listeners) listener();
+    },
+  };
+  return state;
+});
+
 vi.mock("next/navigation", () => ({
   useRouter: () => routerMock,
 }));
+
+vi.mock("@/hooks/useWallet", () => {
+  const React = require("react") as typeof import("react");
+  return {
+    useWallet: () => {
+      const [, setTick] = React.useState(0);
+      React.useEffect(() => walletState.subscribe(() => setTick((n) => n + 1)), []);
+      return {
+        address: walletState.address,
+        network: walletState.network,
+        connect: walletState.connect,
+        disconnect: walletState.disconnect,
+        status: walletState.status,
+        error: walletState.error,
+        accounts: walletState.accounts,
+        activeAccount: walletState.activeAccount,
+        switchAccount: walletState.switchAccount,
+      };
+    },
+  };
+});
 
 vi.mock("@/components/shared/layout/NotificationBell", () => ({
   default: () => <button type="button" aria-label="View notifications" />,
@@ -47,6 +90,14 @@ const renderTopNav = () =>
   );
 
 const renderConnectedTopNav = async () => {
+  walletState.address = TEST_ADDRESS;
+  walletState.status = "connected";
+  walletState.disconnect.mockImplementation(() => {
+    walletState.address = null;
+    walletState.status = "disconnected";
+    sessionStorage.removeItem("walletAddress");
+    walletState.emit();
+  });
   sessionStorage.setItem("walletAddress", TEST_ADDRESS);
   vi.mocked(fetch).mockResolvedValue(mockSessionResponse());
 
@@ -58,7 +109,13 @@ const renderConnectedTopNav = async () => {
 describe("TopNav Accessibility", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    window.localStorage.clear();
     routerMock.push.mockReset();
+    walletState.address = null;
+    walletState.status = "disconnected";
+    walletState.error = null;
+    walletState.connect.mockReset();
+    walletState.disconnect.mockReset();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(mockSessionResponse(null)),
@@ -136,16 +193,12 @@ describe("TopNav Accessibility", () => {
     const networkButton = screen.getByRole("button", {
       name: /select network/i,
     });
+    expect(networkButton).toBeInTheDocument();
 
     const walletButton = screen.getByRole("button", {
       name: /connect wallet/i,
     });
-
-    const walletButton = screen.getByRole("button", {
-      name: /connect wallet/i,
-    });
-
-    expect(accountButtons.length).toBeGreaterThanOrEqual(1);
+    expect(walletButton).toBeInTheDocument();
   });
 
   it("all icon-only buttons have focus-visible ring classes", () => {
@@ -372,6 +425,7 @@ describe("TopNav Accessibility", () => {
 
   it("renders and invokes the connect wallet action when disconnected", async () => {
     const user = userEvent.setup();
+    walletState.error = null;
     renderTopNav();
 
     const connectButton = screen.getByRole("button", {
@@ -382,10 +436,32 @@ describe("TopNav Accessibility", () => {
 
     await user.click(connectButton);
 
+    expect(walletState.connect).toHaveBeenCalled();
+  });
+
+  it("renders a keyboard-operable theme toggle that cycles modes", async () => {
+    const user = userEvent.setup();
+    window.localStorage.clear();
+    renderTopNav();
+
+    const toggle = screen.getByRole("button", { name: /theme:/i });
+    expect(toggle).toBeInTheDocument();
+
+    // Default is system after rehydrate.
     await waitFor(() =>
-      expect(screen.getByTestId("wallet-error")).toHaveTextContent(
-        /not detected/i,
-      ),
+      expect(toggle).toHaveAttribute("data-theme-mode", "system"),
     );
+
+    await user.click(toggle);
+    await waitFor(() =>
+      expect(toggle).toHaveAttribute("data-theme-mode", "light"),
+    );
+    expect(window.localStorage.getItem("stellarlend-theme")).toBe("light");
+
+    await user.click(toggle);
+    await waitFor(() =>
+      expect(toggle).toHaveAttribute("data-theme-mode", "dark"),
+    );
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 });

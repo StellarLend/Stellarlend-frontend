@@ -29,6 +29,17 @@ export default async function RootLayout({
          * This prevents sensitive URL parameters from leaking to third parties.
          */}
         <meta name="referrer" content="strict-origin-when-cross-origin" />
+        {/*
+         * Theme no-flash bootstrap. Reads localStorage before first paint so
+         * the page never flashes the wrong scheme. Mirrors hooks/useTheme.ts.
+         * See docs/theming.md.
+         */}
+        <script
+          nonce={nonce}
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var k='stellarlend-theme';var m=localStorage.getItem(k);if(m!=='light'&&m!=='dark'&&m!=='system')m='system';var dark=m==='dark'||(m==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.classList.toggle('light',!dark);r.style.colorScheme=dark?'dark':'light';r.dataset.theme=dark?'dark':'light';}catch(e){}})();`,
+          }}
+        />
       </head>
       <body className="antialiased">
         {/* Top progress bar */}
