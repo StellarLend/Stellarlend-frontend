@@ -1,14 +1,17 @@
 name: Application Monitoring
 
 on:
-  schedule:
-    - cron: ''  # Every 5 minutes
+  # Previously: `cron: ''` which is invalid GitHub Actions syntax and caused
+  # "workflow file issue" failures (0 jobs) whenever workflows were
+  # re-evaluated on push/PR. Keep manual runs only until real health
+  # endpoints + SLACK_WEBHOOK_URL are provisioned; then restore a valid
+  # schedule such as: schedule: - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
   health-check:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Check staging health
         id: staging-check
@@ -40,10 +43,10 @@ jobs:
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           text: |
             🚨 **ALERT: Staging Environment Down**
-            
+
             The Stellarlend staging environment is not responding.
             URL: https://stellarlend-staging.vercel.app
-            
+
             Please investigate immediately.
 
       - name: Alert on production failure
@@ -54,10 +57,10 @@ jobs:
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           text: |
             🚨 **CRITICAL ALERT: Production Environment Down**
-            
+
             The Stellarlend production environment is not responding.
             URL: https://stellarlend.com
-            
+
             **IMMEDIATE ACTION REQUIRED**
 
       - name: Performance monitoring
@@ -65,10 +68,10 @@ jobs:
           # Check response times
           staging_time=$(curl -o /dev/null -s -w "%{time_total}" https://stellarlend-staging.vercel.app || echo "0")
           production_time=$(curl -o /dev/null -s -w "%{time_total}" https://stellarlend.com || echo "0")
-          
+
           echo "Staging response time: ${staging_time}s"
           echo "Production response time: ${production_time}s"
-          
+
           # Alert if response time > 5 seconds
           if (( $(echo "$production_time > 5.0" | bc -l) )); then
             echo "Production response time is too slow: ${production_time}s"
