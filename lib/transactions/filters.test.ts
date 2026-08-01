@@ -192,5 +192,50 @@ describe('parseTransactionFilter', () => {
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Invalid toDate: bad-date');
     });
+
+    it('rejects inverted range where fromDate is after toDate', () => {
+      const result = parse('fromDate=2026-06-30&toDate=2026-01-01');
+      expect(result.valid).toBe(false);
+      expect(result.error).toMatch(/fromDate .* is after toDate/i);
+    });
+
+    it('rejects an absurd multi-decade range', () => {
+      const result = parse('fromDate=2000-01-01&toDate=2026-01-01');
+      expect(result.valid).toBe(false);
+      expect(result.error).toMatch(/span exceeds/i);
+    });
+  });
+
+  describe('date range edges', () => {
+    it('accepts a single-day range (from === to)', () => {
+      const result = parse('fromDate=2026-03-15&toDate=2026-03-15');
+      expect(result.valid).toBe(true);
+      expect(result.filter.fromDate).toBe('2026-03-15');
+      expect(result.filter.toDate).toBe('2026-03-15');
+    });
+
+    it('accepts only fromDate or only toDate (open range)', () => {
+      expect(parse('fromDate=2026-01-01').valid).toBe(true);
+      expect(parse('toDate=2026-06-30').valid).toBe(true);
+    });
+
+    it('accepts the short from/to query aliases', () => {
+      const result = parse('from=2026-01-01&to=2026-02-01');
+      expect(result.valid).toBe(true);
+      expect(result.filter.fromDate).toBe('2026-01-01');
+      expect(result.filter.toDate).toBe('2026-02-01');
+    });
+
+    it('compares full ISO datetimes by absolute time', () => {
+      const ok = parse(
+        'fromDate=2026-01-15T12:00:00Z&toDate=2026-01-15T18:00:00Z',
+      );
+      expect(ok.valid).toBe(true);
+
+      const inverted = parse(
+        'fromDate=2026-01-15T18:00:00Z&toDate=2026-01-15T12:00:00Z',
+      );
+      expect(inverted.valid).toBe(false);
+    });
   });
 });

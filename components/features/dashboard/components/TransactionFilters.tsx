@@ -114,11 +114,19 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
     // Create query string
     const query = params.toString();
 
+    // Skip no-op replaces (initial mount with empty filters, or values that
+    // already match the URL) so consumers and tests aren't flooded with
+    // identical router.replace calls.
+    if (query === searchParams.toString()) {
+      prevParamsRef.current = query;
+      return;
+    }
+
     // Record the URL we're about to push so Effect 1 knows it's our own change
     prevParamsRef.current = query;
 
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
-  }, [asset, type, status, dateFromObj, dateToObj, pathname, router]);
+  }, [asset, type, status, dateFromObj, dateToObj, pathname, router, searchParams]);
 
   // Handle Search separately with debounce or on Enter
   const handleSearchBlur = () => {
@@ -203,9 +211,19 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
           </div>
 
           <div className="flex flex-col">
-            <label className="text-xs font-semibold text-gray-500 mb-1">Date Range</label>
-            <div className="flex items-center gap-2">
+            <span
+              id="filter-date-range-label"
+              className="text-xs font-semibold text-gray-500 mb-1"
+            >
+              Date Range
+            </span>
+            <div
+              className="flex items-center gap-2"
+              role="group"
+              aria-labelledby="filter-date-range-label"
+            >
               <DatePicker
+                id="filter-from-date"
                 selected={dateFromObj}
                 onChange={(date: Date | null) => setDateFromObj(date)}
                 customInput={
@@ -217,12 +235,16 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
                   />
                 }
                 dateFormat="MM-dd-yyyy"
-                maxDate={new Date()}
+                maxDate={dateToObj ?? new Date()}
                 isClearable
                 placeholderText="From Date"
+                ariaLabelledBy="filter-date-range-label"
               />
-              <span className="text-gray-400 text-sm">-</span>
+              <span className="text-gray-400 text-sm" aria-hidden="true">
+                -
+              </span>
               <DatePicker
+                id="filter-to-date"
                 selected={dateToObj}
                 onChange={(date: Date | null) => setDateToObj(date)}
                 customInput={
@@ -235,11 +257,22 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
                 }
                 dayClassName={(date) => (date < new Date() ? "text-gray-400" : "")}
                 dateFormat="MM-dd-yyyy"
+                minDate={dateFromObj ?? undefined}
                 maxDate={new Date()}
                 isClearable
                 placeholderText="To Date"
+                ariaLabelledBy="filter-date-range-label"
               />
             </div>
+            <p className="sr-only" aria-live="polite" id="filter-date-range-status">
+              {dateFromObj && dateToObj
+                ? `Date range selected from ${format(dateFromObj, "MMMM d, yyyy")} to ${format(dateToObj, "MMMM d, yyyy")}`
+                : dateFromObj
+                  ? `From date selected: ${format(dateFromObj, "MMMM d, yyyy")}. To date not set.`
+                  : dateToObj
+                    ? `To date selected: ${format(dateToObj, "MMMM d, yyyy")}. From date not set.`
+                    : "No date range selected."}
+            </p>
           </div>
         </div>
 
