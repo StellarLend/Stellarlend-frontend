@@ -142,6 +142,16 @@ call `get_reserve_data(asset_address)` on the Soroban lending pool contract
 
 CSV export, filtering helpers, and validation used by `/api/transactions/export`.
 
+### lib/rate-limit.ts & lib/rate-limit/account-bucket.ts — Rate limiting
+
+Two independent in-memory limiters protect `/api/*`:
+
+- **IP bucket** — `rateLimit()` in [`lib/rate-limit.ts`](../lib/rate-limit.ts), applied in `middleware.ts` for requests without a session cookie.
+- **Account bucket** — `accountBucketRateLimit()` in [`lib/rate-limit/account-bucket.ts`](../lib/rate-limit/account-bucket.ts), opt-in inside sensitive route handlers.
+
+Strategy, headers (`X-RateLimit-*`, `Retry-After`), 429 body shape, and tuning
+notes: **[docs/rate-limiting.md](./rate-limiting.md)**.
+
 ### lib/api/etag.ts — ETag utilities
 
 `generateETag(data)` — deterministic ETag for conditional GET (`If-None-Match`).

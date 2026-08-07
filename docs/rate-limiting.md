@@ -51,3 +51,109 @@ cookie do not have this gap, since the IP bucket still applies in that case.
 See [`lib/rate-limit-interaction.test.ts`](../test/server/rate-limit-interaction.test.ts)
 for an integration test exercising both limiters together against
 `/api/account/delete/challenge`.
+
+---
+
+## Global IP limiter (`rateLimit`)
+
+Source: [`lib/rate-limit.ts`](../lib/rate-limit.ts)
+
+Fixed-window counter keyed by an opaque string (middleware uses
+`api-ratelimit:<ip>`).
+
+```ts
+rateLimit(identifier: string, limit: number, windowMs: number): RateLimitResult
+// RateLimitResult = { success, limit, remaining, reset }
+```
+
+| Field | Meaning |
+|---|---|
+| `success` | `false` when the window count exceeds `limit` |
+| `limit` | Configured max requests per window |
+| `remaining` | Requests left in this window (floored at 0) |
+| `reset` | Epoch **ms** when the window resets (middleware converts to seconds for headers) |
+
+Defaults come from app config (`appConfig.rateLimit.max` / `.window`) as used in
+`middleware.ts`. Tuning the global limit means changing that config (or the
+arguments at the `rateLimit(...)` call site) — there is no per-route override in
+middleware today; every unauthenticated `/api/*` request shares the same IP
+bucket.
+
+Test helpers: `clearRateLimitCache()`, `stopCleanupTimer()`, `triggerCleanup()`.
+
+---
+
+## Per-account token bucket (`accountBucketRateLimit`)
+
+Source: [`lib/rate-limit/account-bucket.ts`](../lib/rate-limit/account-bucket.ts)
+
+```ts
+accountBucketRateLimit(
+  walletAddress: string,
+  options: AccountBucketOptions, // { limit, windowMs, burst }
+): AccountBucketResult
+// AccountBucketResult extends RateLimitResult with retryAfter (seconds)
+```
+
+| `AccountBucketOptions` field | Role |
+|---|---|
+| `limit` | Steady-state requests allowed per `windowMs` (refill rate = `limit / windowMs` tokens per ms) |
+| `windowMs` | Refill window |
+| `burst` | Maximum tokens held (spike capacity) |
+
+Wallet keys are normalized with `trim().toLowerCase()`. Empty wallet throws
+`TypeError`.
+
+**Where it is applied:** opt-in inside route handlers (e.g. account delete
+challenge, other sensitive mutations). Unlike the IP limiter, it is **not**
+automatic for every route — each handler must call it with route-appropriate
+`limit` / `windowMs` / `burst`.
+
+### Tuning guidance
+
+1. Start with a small `burst` (2–5) and a `limit` that matches expected human UX
+   (e.g. a few actions per minute).
+2. Raise `burst` only for flows that legitimately fan out (batch export, multi-
+   step wizards).
+3. Keep destructive routes stricter than read routes.
+4. Remember session-cookie requests skip the IP bucket — account limits are the
+   only throttle for browser sessions.
+
+Test helper: `clearAccountBucketCache()`.
+
+---
+
+## 429 response shape and headers (middleware IP path)
+
+When the IP limiter denies a request, `middleware.ts` returns:
+
+**Status:** `429 Too Many Requests`
+
+**JSON body:**
+
+```json
+{
+  "error": "Too Many Requests",
+  "message": "Rate limit exceeded. Please try again later."
+}
+```
+
+**Headers (set on both allow and deny for the IP path):**
+
+| Header | Value |
+|---|---|
+| `X-RateLimit-Limit` | Configured limit |
+| `X-RateLimit-Remaining` | Remaining in window |
+| `X-RateLimit-Reset` | Unix epoch **seconds** (`Math.floor(reset / 1000)`) |
+| `Retry-After` | Seconds until reset (**only** when denied) |
+
+Account-bucket routes should mirror a similar public contract when they return
+429 (use `retryAfter` from `AccountBucketResult`). Exact JSON may vary per route;
+prefer the same `error` / `message` keys for client consistency.
+
+---
+
+## Related docs
+
+- Backend overview: [`docs/backend-architecture.md`](./backend-architecture.md)
+- Auth / session cookie name: env `NEXT_PUBLIC_SESSION_COOKIE` (default `session`)
