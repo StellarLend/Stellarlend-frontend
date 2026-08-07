@@ -7,10 +7,10 @@ import { eq } from "drizzle-orm";
 const MOCK_TRANSACTIONS: Transaction[] = [
   { id: 'TXN12345', type: 'Lend Funds',   amount:  1250,   asset: 'XLM',  date: '2025-03-15', time: '02:30PM', status: 'Completed'  },
   { id: 'TXN12346', type: 'Loan Payment', amount:  -250,    asset: 'BTC',  date: '2025-03-10', time: '11:15AM', status: 'Processing' },
-  { id: 'TXN12347', type: 'Withdrawal',   amount:  -7500,   asset: 'STRK', date: '2025-02-28', time: '04:45PM', status: 'Completed'  },
+  { id: 'TXN12347', type: 'Withdrawal',   amount:  -7500,   asset: 'USDC', date: '2025-02-28', time: '04:45PM', status: 'Completed'  },
   { id: 'TXN12348', type: 'Lend Funds',   amount:  -1500,   asset: 'XLM',  date: '2025-01-05', time: '08:00AM', status: 'Completed'  },
   { id: 'TXN12349', type: 'Lend Funds',   amount:  -607.87, asset: 'BTC',  date: '2024-12-20', time: '10:20PM', status: 'Failed'     },
-  { id: 'TXN12350', type: 'Deposit',      amount:  20000,   asset: 'STRK', date: '2024-11-15', time: '01:05PM', status: 'Completed'  },
+  { id: 'TXN12350', type: 'Deposit',      amount:  20000,   asset: 'ETH',  date: '2024-11-15', time: '01:05PM', status: 'Completed'  },
 ];
 
 const inMemoryStore = new Map<string, Transaction>(
