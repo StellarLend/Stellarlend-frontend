@@ -125,6 +125,7 @@ export default defineConfig({
             "lib/db/**/*.test.ts",
             "lib/configValidation.test.ts",
             "lib/lending/markets.test.ts",
+            "lib/fee-calculator.test.ts",
             "scripts/**/*.test.ts",
           ],
         },
