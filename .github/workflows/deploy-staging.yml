@@ -4,12 +4,16 @@ on:
   push:
     branches: [develop]
 
-environment: staging
-
 jobs:
   deploy-staging:
     runs-on: ubuntu-latest
-    
+    # `environment` must live on the job (not the workflow root). A top-level
+    # `environment:` key is invalid GHA schema and makes GitHub report
+    # "This run likely failed because of a workflow file issue" with 0 jobs
+    # on every push/PR that re-evaluates workflows — even though this file
+    # only triggers on push to develop.
+    environment: staging
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
