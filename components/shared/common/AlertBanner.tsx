@@ -64,14 +64,25 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
       return;
     }
 
-    const dismissed = window.localStorage.getItem(dismissKey) === "dismissed";
-    setIsDismissed(dismissed);
+    // Mirror SidebarContext: localStorage can throw (private mode, policies,
+    // embedded webviews). Default to "not dismissed" so the banner still shows.
+    try {
+      const dismissed = window.localStorage.getItem(dismissKey) === "dismissed";
+      setIsDismissed(dismissed);
+    } catch (error) {
+      console.warn("Failed to read alert dismiss state from localStorage:", error);
+      setIsDismissed(false);
+    }
     setIsReady(true);
   }, [dismissKey]);
 
   const handleDismiss = () => {
     if (dismissKey) {
-      window.localStorage.setItem(dismissKey, "dismissed");
+      try {
+        window.localStorage.setItem(dismissKey, "dismissed");
+      } catch (error) {
+        console.warn("Failed to persist alert dismiss state to localStorage:", error);
+      }
     }
     setIsDismissed(true);
     onDismiss?.();
