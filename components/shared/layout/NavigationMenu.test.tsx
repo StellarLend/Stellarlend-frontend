@@ -27,8 +27,10 @@ vi.mock("next/link", () => ({
 
 // Mutable pathname for usePathname
 let mockPathname = "/dashboard";
+const mockReplace = vi.fn();
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
+  useRouter: () => ({ replace: mockReplace, push: vi.fn(), prefetch: vi.fn() }),
 }));
 
 // ─── NavigationMenu ───────────────────────────────────────────────────────────
@@ -131,30 +133,65 @@ describe("NavigationMenu", () => {
     });
   });
 
-  describe("non-route links (click-based active state)", () => {
-    it("sets active on click for link without path", async () => {
-      mockPathname = "/dashboard";
+  describe("real routes (no dead href=#)", () => {
+    it("Fundwallet points at /dashboard/wallet", () => {
+      render(<NavigationMenu visibleLinks={["Fundwallet"]} />);
+      expect(screen.getByRole("link", { name: /fundwallet/i })).toHaveAttribute(
+        "href",
+        "/dashboard/wallet",
+      );
+    });
+
+    it("Lending points at /lending", () => {
+      render(<NavigationMenu visibleLinks={["Lending"]} />);
+      expect(screen.getByRole("link", { name: /lending/i })).toHaveAttribute("href", "/lending");
+    });
+
+    it("marks Fundwallet active via pathname", () => {
+      mockPathname = "/dashboard/wallet";
       render(<NavigationMenu visibleLinks={["Fundwallet", "Dashboard"]} />);
-      const fundwalletLink = screen.getByText("Fundwallet").closest("a")!;
-      expect(fundwalletLink).not.toHaveAttribute("aria-current");
-      await userEvent.click(fundwalletLink);
-      await waitFor(() => expect(fundwalletLink).toHaveAttribute("aria-current", "page"));
+      expect(screen.getByText("Fundwallet").closest("a")).toHaveAttribute("aria-current", "page");
     });
 
     it("persists active state to localStorage on click", async () => {
-      mockPathname = "/";
-      render(<NavigationMenu visibleLinks={["Fundwallet"]} />);
-      await userEvent.click(screen.getByText("Fundwallet").closest("a")!);
-      expect(localStorage.getItem("activeLink")).toBe("Fundwallet");
+      mockPathname = "/dashboard";
+      render(<NavigationMenu visibleLinks={["Dashboard"]} />);
+      await userEvent.click(screen.getByText("Dashboard").closest("a")!);
+      expect(localStorage.getItem("activeLink")).toBe("Dashboard");
     });
+  });
 
-    it("restores active state from localStorage on mount", async () => {
-      localStorage.setItem("activeLink", "Fundwallet");
-      mockPathname = "/";
-      render(<NavigationMenu visibleLinks={["Fundwallet", "Dashboard"]} />);
-      await waitFor(() =>
-        expect(screen.getByText("Fundwallet").closest("a")).toHaveAttribute("aria-current", "page")
-      );
+  describe("Log Out action", () => {
+    it("renders a button (not href=#) and POSTs /api/auth/logout", async () => {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/api/auth/logout")) {
+          return { ok: true, status: 200 } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({}),
+        } as Response;
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      render(<NavigationMenu visibleLinks={["Log Out"]} />);
+      const logoutBtn = screen.getByRole("button", { name: /log out/i });
+      expect(logoutBtn.tagName.toLowerCase()).toBe("button");
+      // Must not be a dead link
+      expect(screen.queryByRole("link", { name: /log out/i })).not.toBeInTheDocument();
+
+      await userEvent.click(logoutBtn);
+
+      await waitFor(() => {
+        const logoutCall = fetchMock.mock.calls.find((c) =>
+          String(c[0]).includes("/api/auth/logout"),
+        );
+        expect(logoutCall).toBeTruthy();
+        expect(logoutCall![1]?.method).toBe("POST");
+        expect(logoutCall![1]?.credentials).toBe("same-origin");
+      });
     });
   });
 

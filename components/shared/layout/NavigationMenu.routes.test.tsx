@@ -19,11 +19,12 @@ import fs from "node:fs";
 
 // ── Inline the routed links ────────────────────────────────────────────────
 // Keep in sync with the `links` array in NavigationMenu.tsx.
-// Items without a `path` (Fundwallet, Lending, Log Out) are excluded here
-// because they intentionally have no dedicated route.
+// Log Out is an action (POST /api/auth/logout), not a page route.
 const ROUTED_NAV_LINKS = [
   { link: "Dashboard", path: "/dashboard" },
+  { link: "Fundwallet", path: "/dashboard/wallet" },
   { link: "Loan", path: "/dashboard/loan" },
+  { link: "Lending", path: "/lending" },
   { link: "Cash and receipt", path: "/dashboard/cash" },
   { link: "Transactions", path: "/dashboard/transactions" },
   { link: "Notification", path: "/dashboard/notifications" },

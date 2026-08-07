@@ -1,9 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { navClasses, navTokens } from "@/constants/design-tokens";
+import { usePathname, useRouter } from "next/navigation";
 import { IconPlaceholder } from "../ui/icons/IconPlaceholder";
 
 // Lazy load icons to reduce initial bundle size
@@ -11,9 +10,6 @@ const Notification = dynamic(() => import("../ui/icons/Notification").then(mod =
   loading: () => <IconPlaceholder />,
 });
 const LoginCircleFill = dynamic(() => import("../ui/icons/LoginCircleFill").then(mod => ({ default: mod.LoginCircleFill })), {
-  loading: () => <IconPlaceholder />,
-});
-const ArrowLeftRightLine = dynamic(() => import("../ui/icons/ArrowLeftRightLine").then(mod => ({ default: mod.ArrowLeftRightLine })), {
   loading: () => <IconPlaceholder />,
 });
 const DashboardFill = dynamic(() => import("../ui/icons/DashboardFill").then(mod => ({ default: mod.DashboardFill })), {
@@ -38,11 +34,30 @@ const TransactionIcon = dynamic(() => import("../ui/icons/TransactionIcon").then
   loading: () => <IconPlaceholder />,
 });
 
+type NavLink = {
+  link: string;
+  path?: string;
+  /** When true, click posts /api/auth/logout instead of navigating. */
+  action?: "logout";
+  icon: (color: string) => React.ReactNode;
+};
+
 type NavigationMenuProps = {
   visibleLinks?: string[];
   onLinkClick?: () => void;
   isCollapsed?: boolean;
 };
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const parts = document.cookie.split(";").map((c) => c.trim());
+  for (const part of parts) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq) === name) return decodeURIComponent(part.slice(eq + 1));
+  }
+  return null;
+}
 
 export const NavigationMenu = ({
   visibleLinks,
@@ -50,14 +65,20 @@ export const NavigationMenu = ({
   isCollapsed = false,
 }: NavigationMenuProps) => {
   const pathname = usePathname();
+  const router = useRouter();
   const [activeLink, setActiveLink] = useState("dashboard");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    const savedLink = localStorage.getItem("activeLink");
-    if (savedLink) setActiveLink(savedLink);
+    try {
+      const savedLink = localStorage.getItem("activeLink");
+      if (savedLink) setActiveLink(savedLink);
+    } catch {
+      // storage blocked — keep default
+    }
   }, []);
 
-  const links = [
+  const links: NavLink[] = [
     {
       link: "Dashboard",
       path: "/dashboard",
@@ -65,6 +86,7 @@ export const NavigationMenu = ({
     },
     {
       link: "Fundwallet",
+      path: "/dashboard/wallet",
       icon: (color: string) => <WalletFill color={color} />,
     },
     {
@@ -74,6 +96,7 @@ export const NavigationMenu = ({
     },
     {
       link: "Lending",
+      path: "/lending",
       icon: (color: string) => <CoinIcon color={color} />,
     },
     {
@@ -98,6 +121,7 @@ export const NavigationMenu = ({
     },
     {
       link: "Log Out",
+      action: "logout",
       icon: (color: string) => <LoginCircleFill color={color} />,
     },
   ];
@@ -106,9 +130,60 @@ export const NavigationMenu = ({
     ? links.filter((l) => visibleLinks.includes(l.link))
     : links;
 
-  const handleClick = (linkName: string) => {
+  const persistActive = (linkName: string) => {
     setActiveLink(linkName);
-    localStorage.setItem("activeLink", linkName);
+    try {
+      localStorage.setItem("activeLink", linkName);
+    } catch {
+      // ignore storage failures
+    }
+  };
+
+  const handleLogout = useCallback(
+    async (event: React.MouseEvent) => {
+      event.preventDefault();
+      if (loggingOut) return;
+      setLoggingOut(true);
+      persistActive("Log Out");
+      onLinkClick?.();
+
+      try {
+        const csrf = readCookie("csrf-token");
+        const headers: Record<string, string> = { Accept: "application/json" };
+        if (csrf) headers["x-csrf-token"] = csrf;
+
+        const response = await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "same-origin",
+          headers,
+        });
+
+        // Treat 401 as already signed out.
+        if (response.ok || response.status === 401) {
+          if (typeof window !== "undefined") {
+            window.location.assign("/");
+          } else {
+            router.replace("/");
+          }
+          return;
+        }
+      } catch {
+        // Fall through — still leave the app shell so the user is not stuck.
+      } finally {
+        setLoggingOut(false);
+      }
+
+      if (typeof window !== "undefined") {
+        window.location.assign("/");
+      } else {
+        router.replace("/");
+      }
+    },
+    [loggingOut, onLinkClick, router],
+  );
+
+  const handleClick = (linkName: string) => {
+    persistActive(linkName);
     onLinkClick?.();
   };
 
@@ -122,13 +197,44 @@ export const NavigationMenu = ({
             : activeLink.toLowerCase() === link.link.toLowerCase();
           const iconColor = isActive ? "#15A350" : "#AAABAB";
 
+          if (link.action === "logout") {
+            return (
+              <li
+                key={link.link}
+                className={`w-full ${isCollapsed ? "flex justify-center" : ""}`}
+              >
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className={`
+                    group py-3.5 ${isCollapsed ? "px-0" : "px-4"} w-full relative rounded-lg flex ${
+                      isCollapsed ? "justify-center" : "justify-between"
+                    } items-center transition-all duration-200
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black
+                    text-[#AAABAB] hover:bg-white/5 hover:text-white
+                    disabled:opacity-60
+                  `}
+                  aria-label={link.link}
+                >
+                  <div className={`flex items-center gap-3 relative z-20 ${isCollapsed ? "justify-center" : ""}`}>
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5">
+                      {link.icon(iconColor)}
+                    </span>
+                    <span className={isCollapsed ? "sr-only" : ""}>{link.link}</span>
+                  </div>
+                </button>
+              </li>
+            );
+          }
+
           return (
             <li
               key={link.path ? `${link.path}-${link.link}` : link.link}
               className={`w-full ${isCollapsed ? "flex justify-center" : ""}`}
             >
               <Link
-                href={link.path || "#"}
+                href={link.path || "/"}
                 onClick={() => handleClick(link.link)}
                 className={
                   `
