@@ -24,20 +24,44 @@ function read(path: string): string {
   return readFileSync(path, 'utf8');
 }
 
-/** Exported function / const names from a TS module (simple regex, good enough for this surface). */
+/** Exported declaration and named re-export names from a TS module. */
 function exportedNames(source: string): string[] {
   const names = new Set<string>();
-  const re =
-    /export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)|export\s+const\s+([A-Za-z0-9_]+)|export\s+interface\s+([A-Za-z0-9_]+)|export\s+type\s+([A-Za-z0-9_]+)/g;
+  const declarationRe =
+    /export\s+(?:(?:declare|abstract)\s+)*(?:async\s+)?(?:function|const|let|var|interface|type|class|enum)\s+([A-Za-z_$][\w$]*)/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(source)) !== null) {
-    const name = m[1] || m[2] || m[3] || m[4];
-    if (name) names.add(name);
+  while ((m = declarationRe.exec(source)) !== null) {
+    names.add(m[1]);
+  }
+
+  const namedExportRe = /export\s*{([^}]+)}/g;
+  while ((m = namedExportRe.exec(source)) !== null) {
+    for (const specifier of m[1].split(',')) {
+      const normalized = specifier.trim().replace(/^type\s+/, '');
+      const exportedName = normalized.split(/\s+as\s+/i).at(-1)?.trim();
+      if (exportedName) names.add(exportedName);
+    }
   }
   return [...names].sort();
 }
 
 describe('docs/rate-limiting.md stays in sync with limiter exports', () => {
+  it('detects classes, enums, and named re-exports', () => {
+    const source = `
+      export class Limiter {}
+      export enum LimitMode { Fixed }
+      const internalLimit = 1;
+      export { internalLimit, Limiter as PublicLimiter };
+    `;
+
+    expect(exportedNames(source)).toEqual([
+      'LimitMode',
+      'Limiter',
+      'PublicLimiter',
+      'internalLimit',
+    ]);
+  });
+
   it('exists and is non-empty', () => {
     const doc = read(DOC_PATH);
     expect(doc.length).toBeGreaterThan(400);

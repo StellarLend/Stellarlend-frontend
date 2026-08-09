@@ -92,7 +92,8 @@ accountBucketRateLimit(
   walletAddress: string,
   options: AccountBucketOptions, // { limit, windowMs, burst }
 ): AccountBucketResult
-// AccountBucketResult extends RateLimitResult with retryAfter (seconds)
+// AccountBucketResult extends RateLimitResult with retryAfter (seconds),
+// but its reset value is Unix epoch seconds rather than milliseconds.
 ```
 
 | `AccountBucketOptions` field | Role |
@@ -100,6 +101,12 @@ accountBucketRateLimit(
 | `limit` | Steady-state requests allowed per `windowMs` (refill rate = `limit / windowMs` tokens per ms) |
 | `windowMs` | Refill window |
 | `burst` | Maximum tokens held (spike capacity) |
+
+`AccountBucketResult.reset` is Unix epoch **seconds**, while the global
+`RateLimitResult.reset` returned by `rateLimit()` is epoch **milliseconds**.
+`AccountBucketResult.retryAfter` is also expressed in seconds. Callers must not
+apply the middleware's millisecond-to-second conversion to account-bucket
+results.
 
 Wallet keys are normalized with `trim().toLowerCase()`. Empty wallet throws
 `TypeError`.

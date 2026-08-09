@@ -144,7 +144,7 @@ CSV export, filtering helpers, and validation used by `/api/transactions/export`
 
 ### lib/rate-limit.ts & lib/rate-limit/account-bucket.ts — Rate limiting
 
-Two independent in-memory limiters protect `/api/*`:
+Two independent in-memory limiters are available for `/api/*` traffic:
 
 - **IP bucket** — `rateLimit()` in [`lib/rate-limit.ts`](../lib/rate-limit.ts), applied in `middleware.ts` for requests without a session cookie.
 - **Account bucket** — `accountBucketRateLimit()` in [`lib/rate-limit/account-bucket.ts`](../lib/rate-limit/account-bucket.ts), opt-in inside sensitive route handlers.
