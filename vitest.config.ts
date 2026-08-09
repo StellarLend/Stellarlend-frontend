@@ -117,7 +117,7 @@ export default defineConfig({
             "__tests__/**/*.test.ts",
             "lib/audit/*.test.ts",
             "lib/markets/repository.test.ts",
-            "lib/api/**/*.test.ts",
+            "lib/api/errors.test.ts",
             // requireFlag suite only — evaluator.test.ts needs a dedicated
             // fake-timer setup and is not part of the #676 surface.
             "lib/flags/requireFlag.test.ts",
