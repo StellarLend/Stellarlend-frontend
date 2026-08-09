@@ -38,11 +38,10 @@ jobs:
       # dedicated `bundle-size` job below, so no inline step is needed here.
       # Note: fork PRs receive a read-only GITHUB_TOKEN that cannot create
       # issue comments (403 "Resource not accessible by integration"), even
-      # with permissions.pull-requests: write on the job. Swallow that so the
-      # Performance Test check stays green — the real gate is bundle-size.
+      # with permissions.pull-requests: write on the job. Handle that expected
+      # denial while surfacing every other failure.
       - name: Comment PR with performance results
         if: github.event_name == 'pull_request'
-        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -64,10 +63,12 @@ jobs:
                 body: comment,
               });
             } catch (err) {
-              // Expected on PRs from forks: token cannot write comments.
-              core.warning(
-                `Skipping performance PR comment (${err.status || 'error'}): ${err.message}`,
-              );
+              if (err?.status === 403) {
+                // Expected on PRs from forks: token cannot write comments.
+                core.warning(`Skipping performance PR comment (403): ${err.message}`);
+                return;
+              }
+              throw err;
             }
 
   bundle-size:
