@@ -42,7 +42,6 @@ jobs:
       # Performance Test check stays green — the real gate is bundle-size.
       - name: Comment PR with performance results
         if: github.event_name == 'pull_request'
-        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -64,10 +63,12 @@ jobs:
                 body: comment,
               });
             } catch (err) {
-              // Expected on PRs from forks: token cannot write comments.
-              core.warning(
-                `Skipping performance PR comment (${err.status || 'error'}): ${err.message}`,
-              );
+              if (err?.status === 403) {
+                // Expected on PRs from forks: token cannot write comments.
+                core.warning(`Skipping performance PR comment (403): ${err.message}`);
+                return;
+              }
+              throw err;
             }
 
   bundle-size:

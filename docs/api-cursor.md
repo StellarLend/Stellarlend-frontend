@@ -38,7 +38,8 @@ base64url( JSON.stringify(cursor) )
 
 1. Rejects empty string.
 2. base64url-decodes and `JSON.parse`s; on failure throws a generic
-   “base64url-encoded JSON” error (no stack / raw buffer leak).
+   “base64url-encoded JSON” error whose message excludes the raw cursor and
+   decoded payload.
 3. Re-validates version, date, id, direction.
 
 Malformed, truncated, wrong-version, or tampered payloads **throw** `Error`.

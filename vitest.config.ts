@@ -118,8 +118,8 @@ export default defineConfig({
             "lib/audit/*.test.ts",
             "lib/markets/repository.test.ts",
             "lib/api/**/*.test.ts",
-            // requireFlag suite only — evaluator.test.ts needs a dedicated
-            // fake-timer setup and is not part of the #676 surface.
+            // Keep the flag-guard suite in server-unit; evaluator.test.ts
+            // requires a separate fake-timer setup.
             "lib/flags/requireFlag.test.ts",
             "lib/account/**/*.test.ts",
             "lib/streams/**/*.test.ts",
