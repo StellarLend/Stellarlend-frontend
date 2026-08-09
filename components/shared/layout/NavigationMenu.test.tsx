@@ -43,6 +43,7 @@ describe("NavigationMenu", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   describe("link rendering", () => {
@@ -163,6 +164,7 @@ describe("NavigationMenu", () => {
 
   describe("Log Out action", () => {
     it("renders a button (not href=#) and POSTs /api/auth/logout", async () => {
+      localStorage.setItem("activeLink", "Dashboard");
       const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.includes("/api/auth/logout")) {
@@ -183,6 +185,8 @@ describe("NavigationMenu", () => {
       expect(screen.queryByRole("link", { name: /log out/i })).not.toBeInTheDocument();
 
       await userEvent.click(logoutBtn);
+
+      expect(localStorage.getItem("activeLink")).toBeNull();
 
       await waitFor(() => {
         const logoutCall = fetchMock.mock.calls.find((c) =>

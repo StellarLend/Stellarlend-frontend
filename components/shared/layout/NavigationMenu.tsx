@@ -144,7 +144,12 @@ export const NavigationMenu = ({
       event.preventDefault();
       if (loggingOut) return;
       setLoggingOut(true);
-      persistActive("Log Out");
+      setActiveLink("");
+      try {
+        localStorage.removeItem("activeLink");
+      } catch {
+        // ignore storage failures
+      }
       onLinkClick?.();
 
       try {
