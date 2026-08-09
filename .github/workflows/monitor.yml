@@ -5,7 +5,9 @@ on:
   # "workflow file issue" failures (0 jobs) whenever workflows were
   # re-evaluated on push/PR. Keep manual runs only until real health
   # endpoints + SLACK_WEBHOOK_URL are provisioned; then restore a valid
-  # schedule such as: schedule: - cron: '*/5 * * * *'
+  # schedule such as:
+  # schedule:
+  #   - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
