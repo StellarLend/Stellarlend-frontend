@@ -1,4 +1,3 @@
-import 'server-only';
 import serverConfig from '@/lib/server-config';
 
 export interface SorobanTransactionStatus {

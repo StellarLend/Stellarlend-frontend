@@ -18,14 +18,12 @@ vi.mock('@/lib/request-id', () => ({
 import { rateLimit } from '@/lib/rate-limit';
 const mockRateLimit = vi.mocked(rateLimit);
 
-function req(path: string, options: { method?: string; headers?: Record<string, string>; cookies?: string } = {}) {
-  const { method = 'GET', headers = {}, cookies } = options;
-  const init: RequestInit = { method, headers };
-  const r = new NextRequest(`http://localhost${path}`, init);
-  if (cookies) {
-    Object.defineProperty(r, 'cookies', { value: { has: (name: string) => cookies.includes(name) } });
-  }
-  return r;
+function req(path: string, options: { method?: string; headers?: Record<string, string>; withSession?: boolean } = {}) {
+  const { method = 'GET', headers = {}, withSession } = options;
+  const allHeaders: Record<string, string> = { ...headers };
+  // NextRequest.cookies is backed by the Cookie header — set it directly
+  if (withSession) allHeaders['cookie'] = 'session=test-session-token';
+  return new NextRequest(`http://localhost${path}`, { method, headers: allHeaders });
 }
 
 describe('middleware', () => {
@@ -141,10 +139,8 @@ describe('middleware', () => {
     });
 
     it('skips rate limiting for authenticated requests', async () => {
-      const authenticated = req('/api/positions');
-      Object.defineProperty(authenticated, 'cookies', { value: { has: () => true } });
       mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
-      const res = await middleware(authenticated);
+      const res = await middleware(req('/api/positions', { withSession: true }));
       expect(res.status).toBe(200);
       expect(mockRateLimit).not.toHaveBeenCalled();
     });

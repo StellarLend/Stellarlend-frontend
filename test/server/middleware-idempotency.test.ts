@@ -13,8 +13,15 @@ vi.mock('@/lib/config', () => ({
   },
 }));
 
+const mockRateLimitFn = vi.fn(() => ({
+  success: true,
+  limit: 100,
+  remaining: 99,
+  reset: Date.now() + 60_000,
+}));
+
 vi.mock('@/lib/rate-limit', () => ({
-  rateLimit: vi.fn(() => ({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60_000 })),
+  rateLimit: (...args: unknown[]) => mockRateLimitFn(...args),
   clearRateLimitCache: vi.fn(),
 }));
 
@@ -22,7 +29,10 @@ function request(method: string, path: string, headers: Record<string, string> =
   return new NextRequest(`http://localhost${path}`, { method, headers });
 }
 
-beforeEach(() => clearRateLimitCache());
+beforeEach(() => {
+  clearRateLimitCache();
+  mockRateLimitFn.mockReturnValue({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60_000 });
+});
 afterEach(() => vi.restoreAllMocks());
 
 describe('middleware idempotency enforcement', () => {
@@ -79,22 +89,18 @@ describe('middleware idempotency enforcement', () => {
   });
 
   it('Retry-After header is never negative when the window resets mid-response', () => {
-    vi.mock('@/lib/rate-limit', () => ({
-      rateLimit: vi.fn(() => ({
-        success: false,
-        limit: 1,
-        remaining: 0,
-        // reset in the past — simulates window rolling over between call and header write
-        reset: Date.now() - 500,
-      })),
-      clearRateLimitCache: vi.fn(),
-    }));
+    // Simulate rate limit window expiring between the rateLimit() call and header write
+    mockRateLimitFn.mockReturnValueOnce({
+      success: false,
+      limit: 1,
+      remaining: 0,
+      reset: Date.now() - 500,
+    });
 
     const res = middleware(request('GET', '/api/transactions'));
-    const retryAfter = parseInt(res.headers.get('Retry-After') ?? '-1', 10);
-    // Must be 0 or absent (not negative)
-    if (retryAfter !== null) {
-      expect(retryAfter).toBeGreaterThanOrEqual(0);
+    const retryAfterHeader = res.headers.get('Retry-After');
+    if (retryAfterHeader !== null) {
+      expect(parseInt(retryAfterHeader, 10)).toBeGreaterThanOrEqual(0);
     }
   });
 });
