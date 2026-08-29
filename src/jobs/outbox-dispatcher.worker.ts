@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 
 const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
+const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
 
 // Redis connection options (pulled from environment)
 const connection = {
@@ -32,6 +33,18 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
     throw new Error('Outbox event is missing required fields');
   }
 
+  if (!VALID_OUTBOX_TYPES.has(event.type)) {
+    await db
+      .update(outboxEvents)
+      .set({
+        status: 'FAILED',
+        attempts: Math.min(getAttempts(event) + 1, MAX_OUTBOX_RETRY_ATTEMPTS),
+        lastError: `Unknown event type: ${event.type}`,
+      })
+      .where(eq(outboxEvents.id, event.id));
+    return;
+  }
+
   const attempts = getAttempts(event);
   if (attempts >= MAX_OUTBOX_RETRY_ATTEMPTS) {
     await db
@@ -46,6 +59,9 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
 
   try {
     const payload = JSON.parse(event.payload);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error('Outbox payload must be a JSON object');
+    }
 
     if (event.type === 'notification') {
       await notificationQueue.add('send_notification', payload, {
@@ -55,8 +71,6 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
       await auditQueue.add('log_audit', payload, {
         jobId: event.id,
       });
-    } else {
-      throw new Error(`Unknown event type: ${event.type}`);
     }
 
     await db
@@ -64,6 +78,7 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
       .set({
         status: 'COMPLETED',
         processedAt: new Date(),
+        attempts: Math.max(attempts, 0),
         lastError: null,
       })
       .where(eq(outboxEvents.id, event.id));
@@ -111,6 +126,19 @@ export async function processOutbox() {
       if (pending.length === 0) return [];
 
       for (const event of pending) {
+        const attempts = getAttempts(event);
+        if (attempts >= MAX_OUTBOX_RETRY_ATTEMPTS && event.status === 'FAILED') {
+          tx
+            .update(outboxEvents)
+            .set({
+              status: 'FAILED',
+              lastError: 'Retry limit reached',
+            })
+            .where(eq(outboxEvents.id, event.id))
+            .run();
+          continue;
+        }
+
         tx
           .update(outboxEvents)
           .set({

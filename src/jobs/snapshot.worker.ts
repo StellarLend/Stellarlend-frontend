@@ -18,11 +18,15 @@ import { PositionSnapshot, generateMockSnapshots } from '@/lib/positions/snapsho
 import { logger } from '@/lib/logger';
 
 const MAX_SNAPSHOT_HISTORY = 365;
+const SNAPSHOT_ID_RE = /^[A-Za-z0-9._:-]+$/;
 
 function normalizeWalletAddress(walletAddress: string): string {
   const normalized = walletAddress.trim();
   if (!normalized) {
     throw new Error('walletAddress is required');
+  }
+  if (!/^[A-Za-z0-9]+$/.test(normalized)) {
+    throw new Error('walletAddress is invalid');
   }
   return normalized;
 }
@@ -43,9 +47,15 @@ function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snaps
   if (!walletAddress) {
     throw new Error('snapshot.walletAddress is required');
   }
+  if (!/^[A-Za-z0-9]+$/.test(walletAddress)) {
+    throw new Error('snapshot.walletAddress is invalid');
+  }
 
   if (typeof snapshot.id !== 'string' || snapshot.id.trim().length === 0) {
     throw new Error('snapshot.id is required');
+  }
+  if (!SNAPSHOT_ID_RE.test(snapshot.id.trim())) {
+    throw new Error('snapshot.id is invalid');
   }
 
   isFiniteNumber(snapshot.timestamp, 'snapshot.timestamp');
@@ -129,8 +139,36 @@ export async function recordSnapshot(snapshot: PositionSnapshot): Promise<void> 
     createdAt: Number(snapshot.createdAt),
   };
 
-  const walletSnapshots = [...(snapshotStore.get(walletAddress) || []), sanitizedSnapshot]
+  const existingSnapshots = [...(snapshotStore.get(walletAddress) || [])]
     .filter((item) => item && typeof item === 'object')
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  const newestSnapshot = existingSnapshots[existingSnapshots.length - 1];
+  const duplicateById = existingSnapshots.some((item) => item.id === sanitizedSnapshot.id);
+  const duplicateByTimestamp = existingSnapshots.some(
+    (item) => item.timestamp === sanitizedSnapshot.timestamp,
+  );
+
+  if (duplicateById || duplicateByTimestamp) {
+    logger.info('snapshot duplicate skipped', '/jobs/snapshot.worker.ts', {
+      walletAddress,
+      snapshotId: sanitizedSnapshot.id,
+      timestamp: sanitizedSnapshot.timestamp,
+    });
+    return;
+  }
+
+  if (newestSnapshot && sanitizedSnapshot.timestamp < newestSnapshot.timestamp) {
+    logger.info('snapshot stale skipped', '/jobs/snapshot.worker.ts', {
+      walletAddress,
+      snapshotId: sanitizedSnapshot.id,
+      incomingTimestamp: sanitizedSnapshot.timestamp,
+      newestTimestamp: newestSnapshot.timestamp,
+    });
+    return;
+  }
+
+  const walletSnapshots = [...existingSnapshots, sanitizedSnapshot]
     .sort((a, b) => a.timestamp - b.timestamp);
 
   if (walletSnapshots.length > MAX_SNAPSHOT_HISTORY) {
@@ -172,8 +210,11 @@ export interface SnapshotJobResult {
 
 export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<SnapshotJobResult> {
   const startTime = Date.now();
-  const now = Number.isFinite(jobData.timestamp) ? jobData.timestamp : Date.now();
+  if (!Number.isFinite(jobData.timestamp)) {
+    throw new Error('jobData.timestamp must be a finite number');
+  }
 
+  const now = jobData.timestamp;
   initializeStore();
 
   const normalizedWalletAddress =
@@ -194,8 +235,13 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
       }
 
       const lastSnapshot = existingSnapshots[existingSnapshots.length - 1];
+      const expectedSnapshotId = `snapshot-${walletAddress}-${now}`;
+      if (lastSnapshot.id === expectedSnapshotId || lastSnapshot.timestamp >= now) {
+        continue;
+      }
+
       const newSnapshot: PositionSnapshot = {
-        id: `snapshot-${walletAddress}-${now}`,
+        id: expectedSnapshotId,
         walletAddress,
         timestamp: now,
         supplied: Number(lastSnapshot.supplied) * (0.95 + Math.random() * 0.1),

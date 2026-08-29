@@ -21,7 +21,7 @@ import {
 import { PositionSnapshot } from '@/lib/positions/snapshot';
 
 describe('src/jobs/snapshot.worker', () => {
-  const testWallet = 'GBTEST123';
+  let testWallet = 'GBTEST123';
   const now = Date.now();
 
   const createTestSnapshot = (
@@ -41,8 +41,10 @@ describe('src/jobs/snapshot.worker', () => {
   });
 
   beforeEach(() => {
-    // Clear snapshots before each test
+    // Clear snapshots before each test and use a unique wallet to avoid stale
+    // snapshots from earlier tests leaking into later assertions.
     vi.clearAllMocks();
+    testWallet = `GBTEST${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   });
 
   describe('recordSnapshot', () => {
