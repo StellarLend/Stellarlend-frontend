@@ -4,13 +4,30 @@ const path = require('path');
 const SECRETS = [
   'PRICE_ORACLE_API_KEY',
   'AUTH_SIGNING_SECRET',
-  'SERVER_TOKEN'
+  'SERVER_TOKEN',
+  'SOROBAN_RPC_URL',
+  'WEBHOOK_SECRET',
+  'STELLAR_SIGNING_SECRET',
 ];
 
 const FORBIDDEN_IMPORTS = [
   'lib/server-config',
   '@/lib/server-config'
 ];
+
+// Directories that are always server-side or generated — never scan them.
+const SKIP_DIRS = new Set([
+  'app/api',
+  'node_modules',
+  '.next',
+  '.git',
+]);
+
+// Files that legitimately define secret names as string constants for detection/validation purposes.
+const ALLOWLIST_PATHS = new Set([
+  'lib/security/secret-patterns.ts',
+  'scripts/check-client-secrets.js',
+]);
 
 let hasErrors = false;
 
@@ -20,9 +37,8 @@ function scanDir(dir) {
     const fullPath = path.join(dir, file);
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
-      // Skip app/api directory since it runs server-side
       const relativePath = path.relative(process.cwd(), fullPath).replace(/\\/g, '/');
-      if (relativePath === 'app/api') {
+      if (SKIP_DIRS.has(relativePath) || SKIP_DIRS.has(file)) {
         continue;
       }
       scanDir(fullPath);
@@ -35,17 +51,20 @@ function scanDir(dir) {
 function checkFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const relativePath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
-  
-  // Check for forbidden imports
+
+  if (ALLOWLIST_PATHS.has(relativePath)) {
+    return;
+  }
+
   for (const forbidden of FORBIDDEN_IMPORTS) {
-    const importRegex = new RegExp(`from\\s+['"\"]([^'\"\"]*${forbidden}[^'\"\"]*)['\"\"]`, 'i');
+    // Match: from 'lib/server-config' or from "lib/server-config"
+    const importRegex = new RegExp(`from\\s+['"]([^'"]*${forbidden.replace('/', '\\/')}[^'"]*)['"]`, 'i');
     if (importRegex.test(content)) {
       console.error(`❌ Error in ${relativePath}: Cannot import server-config in client/shared code.`);
       hasErrors = true;
     }
   }
 
-  // Check for usage of secrets
   for (const secret of SECRETS) {
     const secretRegex = new RegExp(`process\\.env\\.${secret}\\b`);
     if (secretRegex.test(content)) {
@@ -57,7 +76,7 @@ function checkFile(filePath) {
 
 console.log('🔍 Checking client-side code for server secrets and config leakage...');
 
-const targetDirs = ['app', 'components', 'context', 'utils', 'constants', 'types'];
+const targetDirs = ['app', 'components', 'context', 'hooks', 'utils', 'constants', 'types'];
 
 for (const dirName of targetDirs) {
   const dirPath = path.join(process.cwd(), dirName);

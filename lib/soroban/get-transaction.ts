@@ -1,4 +1,5 @@
-import config from '@/lib/config';
+import 'server-only';
+import serverConfig from '@/lib/server-config';
 
 export interface SorobanTransactionStatus {
   status: 'SUCCESS' | 'FAILED' | 'NOT_FOUND' | 'PENDING' | string;
@@ -6,7 +7,7 @@ export interface SorobanTransactionStatus {
 }
 
 export async function getTransaction(hash: string): Promise<SorobanTransactionStatus> {
-  const rpcUrl = config.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
+  const rpcUrl = serverConfig.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
   const response = await fetch(rpcUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
