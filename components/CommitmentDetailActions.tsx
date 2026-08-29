@@ -298,7 +298,14 @@ export default function CommitmentDetailActions({
           className={`${baseClasses} ${
             isDisabled ? disabledClasses : variantClasses[config.variant]
           } w-full`}
-          aria-label={config.label}
+          aria-label={
+            state === "loading"
+              ? `Processing ${config.label}`
+              : state === "success"
+                ? `${config.label} completed`
+                : config.label
+          }
+          aria-describedby={error ? `${action}-error` : `${action}-desc`}
           aria-busy={state === "loading"}
         >
           <span className="flex items-center justify-center gap-2">
@@ -338,7 +345,9 @@ export default function CommitmentDetailActions({
           </span>
         </button>
 
-        <p className="text-xs text-slate-600">{config.description}</p>
+        <p id={`${action}-desc`} className="text-xs text-slate-600">
+          {config.description}
+        </p>
 
         {!isAvailable && authorization && !authorization.allowed && (
           <p className="text-xs text-amber-700 font-medium" role="alert">
@@ -347,7 +356,12 @@ export default function CommitmentDetailActions({
         )}
 
         {error && (
-          <p className="text-xs text-red-700 font-medium" role="alert">
+          <p
+            id={`${action}-error`}
+            className="text-xs text-red-700 font-medium"
+            role="alert"
+            aria-live="polite"
+          >
             Error: {error}
           </p>
         )}
