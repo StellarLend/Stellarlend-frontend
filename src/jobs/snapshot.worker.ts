@@ -12,10 +12,30 @@
  *   { repeat: { pattern: '0 0 * * *' } } // Daily at midnight UTC
  * );
  * ```
+ *
+ * Boundary invariants (enforced via `lib/validation/snapshots.ts`):
+ * - Wallet identity: every wallet address must be a valid Stellar account ID.
+ * - Numeric values: supplied/borrowed must be finite non-negative amounts and
+ *   APYs must be finite within a sane range (NaN/Infinity/tampered values are
+ *   rejected).
+ * - Timestamps must be positive integers within a plausible range.
+ * - Job data and snapshot records are parsed strictly: unknown fields are
+ *   treated as tampering and rejected.
  */
 
 import { PositionSnapshot, generateMockSnapshots } from '@/lib/positions/snapshot';
 import { logger } from '@/lib/logger';
+import {
+  assertValidWalletAddress,
+  parsePositionSnapshot,
+  parseSnapshotJobData,
+  SnapshotValidationError,
+} from '@/lib/validation/snapshots';
+
+const ROUTE = '/jobs/snapshot.worker.ts';
+
+export const MAX_SNAPSHOTS_PER_WALLET = 365;
+export const SNAPSHOT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
 
 /**
  * In-memory store for position snapshots
@@ -24,37 +44,43 @@ import { logger } from '@/lib/logger';
 const snapshotStore = new Map<string, PositionSnapshot[]>();
 
 /**
+ * Valid Stellar testnet account IDs used to seed the demo store.
+ */
+const DEMO_WALLETS = [
+  'GC7TCOMWMSK6LPQBVXRGR3Q23VVS3ZRS7QWYBUCYH4375CG6X4I4MFSZ',
+  'GDS2KKVQY62J2BNA3MQPQGNMVKQR6MB2OOMJBIORQSYLOJPQKOKPOHKD',
+  'GAAI6S3WG746MDGDTNYQ2VNL2DAOUS2FCH4H4MV23H7NQSZANN6KMQT6',
+];
+
+/**
  * Initialize snapshot store with sample data for demo purposes
  * In production, this would query the database
  */
 function initializeStore(): void {
   if (snapshotStore.size > 0) return;
 
-  // Generate mock data for common demo wallets
-  const demoWallets = [
-    'GBBD47UZQ5STVBDFRBGC5VMIIXC3YPXIXXLWHQK44SLSQASBQU5YRPY',
-    'GAILQ7XLMZQJ2AZSQKNXSGX2JSQXGMTZEFNQLWVMVXSYFXTXWCZVDCA',
-    'GA7NQHQE4P4TAQLLNKWQHQGJ42B3RFXXQZ3RDBX2QKHZGN7T62XQHDE',
-  ];
-
   const now = Date.now();
   const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
 
-  for (const wallet of demoWallets) {
+  for (const wallet of DEMO_WALLETS) {
     const snapshots = generateMockSnapshots(wallet, ninetyDaysAgo, now, 90);
     snapshotStore.set(wallet, snapshots);
   }
 
-  logger.info('snapshot store initialized', '/jobs/snapshot.worker.ts', {
-    walletCount: demoWallets.length,
+  logger.info('snapshot store initialized', ROUTE, {
+    walletCount: DEMO_WALLETS.length,
     snapshotsPerWallet: 90,
   });
 }
 
 /**
  * Get all snapshots for a wallet
+ *
+ * The wallet address is validated at the boundary; malformed identities are
+ * rejected rather than silently returning data.
  */
 export async function getWalletSnapshots(walletAddress: string): Promise<PositionSnapshot[]> {
+  assertValidWalletAddress(walletAddress);
   initializeStore();
   return snapshotStore.get(walletAddress) || [];
 }
@@ -62,28 +88,33 @@ export async function getWalletSnapshots(walletAddress: string): Promise<Positio
 /**
  * Record a new position snapshot for a wallet
  * Called by the daily snapshot job
+ *
+ * The snapshot record is validated at the boundary so tampered or malformed
+ * records (NaN, negative balances, invalid wallets, unknown fields) are
+ * rejected instead of polluting the store.
  */
 export async function recordSnapshot(snapshot: PositionSnapshot): Promise<void> {
+  const validated = parsePositionSnapshot(snapshot);
   initializeStore();
 
-  const walletSnapshots = snapshotStore.get(snapshot.walletAddress) || [];
-  walletSnapshots.push(snapshot);
+  const walletSnapshots = snapshotStore.get(validated.walletAddress) || [];
+  walletSnapshots.push(validated);
 
   // Keep sorted by timestamp
   walletSnapshots.sort((a, b) => a.timestamp - b.timestamp);
 
   // Keep only the last 365 snapshots per wallet
-  if (walletSnapshots.length > 365) {
-    walletSnapshots.splice(0, walletSnapshots.length - 365);
+  if (walletSnapshots.length > MAX_SNAPSHOTS_PER_WALLET) {
+    walletSnapshots.splice(0, walletSnapshots.length - MAX_SNAPSHOTS_PER_WALLET);
   }
 
-  snapshotStore.set(snapshot.walletAddress, walletSnapshots);
+  snapshotStore.set(validated.walletAddress, walletSnapshots);
 
-  logger.info('snapshot recorded', '/jobs/snapshot.worker.ts', {
-    walletAddress: snapshot.walletAddress,
-    timestamp: snapshot.timestamp,
-    supplied: snapshot.supplied,
-    borrowed: snapshot.borrowed,
+  logger.info('snapshot recorded', ROUTE, {
+    walletAddress: validated.walletAddress,
+    timestamp: validated.timestamp,
+    supplied: validated.supplied,
+    borrowed: validated.borrowed,
   });
 }
 
@@ -112,13 +143,26 @@ export interface SnapshotJobResult {
 
 export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<SnapshotJobResult> {
   const startTime = Date.now();
-  const now = Date.now();
 
+  // Boundary: validate the job payload (timestamp, optional wallet identity,
+  // and unknown-field rejection) before performing any work. Hostile or
+  // malformed job data fails loudly instead of producing garbage snapshots.
+  let validatedJobData;
+  try {
+    validatedJobData = parseSnapshotJobData(jobData);
+  } catch (error) {
+    logger.error('snapshot job rejected invalid data', ROUTE, {
+      error: error instanceof SnapshotValidationError ? error.message : String(error),
+    });
+    throw error;
+  }
+
+  const now = validatedJobData.timestamp;
   initializeStore();
 
   let snapshotsTaken = 0;
-  const walletsToProcess = jobData.walletAddress
-    ? [jobData.walletAddress]
+  const walletsToProcess = validatedJobData.walletAddress
+    ? [validatedJobData.walletAddress]
     : Array.from(snapshotStore.keys());
 
   try {
@@ -153,7 +197,7 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
 
     const duration = Date.now() - startTime;
 
-    logger.info('snapshot job completed', '/jobs/snapshot.worker.ts', {
+    logger.info('snapshot job completed', ROUTE, {
       snapshotsTaken,
       walletsProcessed: walletsToProcess.length,
       duration,
@@ -167,7 +211,7 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    logger.error('snapshot job failed', '/jobs/snapshot.worker.ts', {
+    logger.error('snapshot job failed', ROUTE, {
       error: error instanceof Error ? error.message : String(error),
       duration,
     });
@@ -180,7 +224,7 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
  * Can be called as a maintenance job
  */
 export async function purgeOldSnapshots(): Promise<{ deleted: number }> {
-  const cutoffTime = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  const cutoffTime = Date.now() - SNAPSHOT_RETENTION_MS;
   let deleted = 0;
 
   for (const [wallet, snapshots] of snapshotStore.entries()) {
@@ -195,7 +239,7 @@ export async function purgeOldSnapshots(): Promise<{ deleted: number }> {
     }
   }
 
-  logger.info('old snapshots purged', '/jobs/snapshot.worker.ts', { deleted });
+  logger.info('old snapshots purged', ROUTE, { deleted });
   return { deleted };
 }
 

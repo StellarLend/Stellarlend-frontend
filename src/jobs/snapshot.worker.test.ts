@@ -20,8 +20,14 @@ import {
 } from './snapshot.worker';
 import { PositionSnapshot } from '@/lib/positions/snapshot';
 
+// Valid Stellar testnet account IDs (StrKey-validated).
+const VALID_WALLET_A = 'GATTYSMDCYWYAWNJZXY2RGNHDZ7ZDEKRGJY4JOMHMDU6LANVFCI2U45X';
+const VALID_WALLET_B = 'GC7TCOMWMSK6LPQBVXRGR3Q23VVS3ZRS7QWYBUCYH4375CG6X4I4MFSZ';
+const VALID_WALLET_C = 'GDS2KKVQY62J2BNA3MQPQGNMVKQR6MB2OOMJBIORQSYLOJPQKOKPOHKD';
+const VALID_WALLET_UNUSED = 'GD5OYF2O3YDKBUCC3ZUGZEQCAYVFXBCLIF4YVZ3ZDK6SUKRQD2QDMMZP';
+
 describe('src/jobs/snapshot.worker', () => {
-  const testWallet = 'GBTEST123';
+  const testWallet = VALID_WALLET_A;
   const now = Date.now();
 
   const createTestSnapshot = (
@@ -81,8 +87,8 @@ describe('src/jobs/snapshot.worker', () => {
     });
 
     it('supports multiple wallets independently', async () => {
-      const wallet1 = 'GBWALLET1';
-      const wallet2 = 'GBWALLET2';
+      const wallet1 = VALID_WALLET_B;
+      const wallet2 = VALID_WALLET_C;
 
       const snap1 = createTestSnapshot(wallet1, now);
       const snap2 = createTestSnapshot(wallet2, now);
@@ -100,7 +106,7 @@ describe('src/jobs/snapshot.worker', () => {
 
   describe('getWalletSnapshots', () => {
     it('returns empty array for non-existent wallet', async () => {
-      const snapshots = await getWalletSnapshots('GBNONEXISTENT');
+      const snapshots = await getWalletSnapshots(VALID_WALLET_UNUSED);
       expect(Array.isArray(snapshots)).toBe(true);
     });
 
@@ -158,7 +164,7 @@ describe('src/jobs/snapshot.worker', () => {
     });
 
     it('can process snapshot for specific wallet', async () => {
-      const wallet = 'GBSPECIFIC';
+      const wallet = VALID_WALLET_B;
       const snapshot = createTestSnapshot(wallet, now - 1000);
       await recordSnapshot(snapshot);
 
@@ -255,6 +261,76 @@ describe('src/jobs/snapshot.worker', () => {
           expect(stats.oldestSnapshot).toBeLessThanOrEqual(stats.newestSnapshot);
         }
       }
+    });
+  });
+
+  describe('Authorization & hostile-input boundary', () => {
+    it('rejects invalid wallet addresses in getWalletSnapshots', async () => {
+      await expect(getWalletSnapshots('GBTEST123')).rejects.toThrow(/Invalid wallet address/i);
+      await expect(getWalletSnapshots('not-an-address')).rejects.toThrow(/Invalid wallet address/i);
+      await expect(getWalletSnapshots('')).rejects.toThrow(/Invalid wallet address/i);
+    });
+
+    it('rejects tampered snapshots with NaN amounts', async () => {
+      const bad = createTestSnapshot(testWallet, now);
+      (bad as any).supplied = NaN;
+      await expect(recordSnapshot(bad)).rejects.toThrow(/invalid snapshot/i);
+    });
+
+    it('rejects snapshots with negative balances', async () => {
+      const bad = createTestSnapshot(testWallet, now);
+      (bad as any).borrowed = -1;
+      await expect(recordSnapshot(bad)).rejects.toThrow(/invalid snapshot/i);
+    });
+
+    it('rejects snapshots with non-finite APY values', async () => {
+      const bad = createTestSnapshot(testWallet, now);
+      (bad as any).effectiveSupplyApy = Infinity;
+      await expect(recordSnapshot(bad)).rejects.toThrow(/invalid snapshot/i);
+    });
+
+    it('rejects snapshots with invalid wallet identity', async () => {
+      const bad = createTestSnapshot('GBTEST123', now);
+      await expect(recordSnapshot(bad)).rejects.toThrow(/invalid snapshot/i);
+    });
+
+    it('rejects snapshots with impossible timestamps (tampering/replay)', async () => {
+      const future = createTestSnapshot(testWallet, now + 100 * 24 * 60 * 60 * 1000);
+      await expect(recordSnapshot(future)).rejects.toThrow(/invalid snapshot/i);
+
+      const ancient = createTestSnapshot(testWallet, Date.UTC(1999, 0, 1));
+      await expect(recordSnapshot(ancient)).rejects.toThrow(/invalid snapshot/i);
+    });
+
+    it('rejects snapshots with unknown fields (tampering)', async () => {
+      const bad: any = { ...createTestSnapshot(testWallet, now), network: 'mainnet' };
+      await expect(recordSnapshot(bad)).rejects.toThrow(/invalid snapshot/i);
+    });
+
+    it('rejects malformed snapshot job data', async () => {
+      await expect(handleSnapshotJob({} as any)).rejects.toThrow(/invalid snapshot job data/i);
+      await expect(handleSnapshotJob({ timestamp: 'now' } as any)).rejects.toThrow(
+        /invalid snapshot job data/i
+      );
+      await expect(
+        handleSnapshotJob({ timestamp: now, walletAddress: 'GBTEST123' })
+      ).rejects.toThrow(/invalid snapshot job data/i);
+      await expect(
+        handleSnapshotJob({ timestamp: now, extra: true } as any)
+      ).rejects.toThrow(/invalid snapshot job data/i);
+    });
+
+    it('accepts a valid snapshot job for a specific wallet', async () => {
+      const wallet = VALID_WALLET_C;
+      await recordSnapshot(createTestSnapshot(wallet, now - 1000));
+
+      const result = await handleSnapshotJob({
+        timestamp: now,
+        walletAddress: wallet,
+      });
+
+      expect(result.walletsProcessed).toBe(1);
+      expect(result.snapshotsTaken).toBe(1);
     });
   });
 });
