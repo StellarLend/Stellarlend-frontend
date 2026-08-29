@@ -17,6 +17,45 @@
 import { PositionSnapshot, generateMockSnapshots } from '@/lib/positions/snapshot';
 import { logger } from '@/lib/logger';
 
+const MAX_SNAPSHOT_HISTORY = 365;
+
+function normalizeWalletAddress(walletAddress: string): string {
+  const normalized = walletAddress.trim();
+  if (!normalized) {
+    throw new Error('walletAddress is required');
+  }
+  return normalized;
+}
+
+function isFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${fieldName} must be a finite number`);
+  }
+  return value;
+}
+
+function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snapshot is PositionSnapshot {
+  if (!snapshot || typeof snapshot !== 'object') {
+    throw new Error('snapshot payload is required');
+  }
+
+  const walletAddress = typeof snapshot.walletAddress === 'string' ? snapshot.walletAddress.trim() : '';
+  if (!walletAddress) {
+    throw new Error('snapshot.walletAddress is required');
+  }
+
+  if (typeof snapshot.id !== 'string' || snapshot.id.trim().length === 0) {
+    throw new Error('snapshot.id is required');
+  }
+
+  isFiniteNumber(snapshot.timestamp, 'snapshot.timestamp');
+  isFiniteNumber(snapshot.supplied, 'snapshot.supplied');
+  isFiniteNumber(snapshot.borrowed, 'snapshot.borrowed');
+  isFiniteNumber(snapshot.effectiveSupplyApy, 'snapshot.effectiveSupplyApy');
+  isFiniteNumber(snapshot.effectiveBorrowApy, 'snapshot.effectiveBorrowApy');
+  isFiniteNumber(snapshot.createdAt, 'snapshot.createdAt');
+}
+
 /**
  * In-memory store for position snapshots
  * In production, replace with database queries (Drizzle/PostgreSQL)
@@ -56,7 +95,17 @@ function initializeStore(): void {
  */
 export async function getWalletSnapshots(walletAddress: string): Promise<PositionSnapshot[]> {
   initializeStore();
-  return snapshotStore.get(walletAddress) || [];
+
+  if (typeof walletAddress !== 'string') {
+    return [];
+  }
+
+  const normalized = normalizeWalletAddress(walletAddress);
+  const snapshots = snapshotStore.get(normalized) || [];
+
+  return snapshots
+    .filter((snapshot) => Boolean(snapshot && typeof snapshot === 'object'))
+    .sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /**
@@ -65,25 +114,36 @@ export async function getWalletSnapshots(walletAddress: string): Promise<Positio
  */
 export async function recordSnapshot(snapshot: PositionSnapshot): Promise<void> {
   initializeStore();
+  assertValidSnapshot(snapshot);
 
-  const walletSnapshots = snapshotStore.get(snapshot.walletAddress) || [];
-  walletSnapshots.push(snapshot);
+  const walletAddress = normalizeWalletAddress(snapshot.walletAddress);
+  const sanitizedSnapshot: PositionSnapshot = {
+    ...snapshot,
+    walletAddress,
+    id: snapshot.id.trim(),
+    timestamp: Number(snapshot.timestamp),
+    supplied: Number(snapshot.supplied),
+    borrowed: Number(snapshot.borrowed),
+    effectiveSupplyApy: Number(snapshot.effectiveSupplyApy),
+    effectiveBorrowApy: Number(snapshot.effectiveBorrowApy),
+    createdAt: Number(snapshot.createdAt),
+  };
 
-  // Keep sorted by timestamp
-  walletSnapshots.sort((a, b) => a.timestamp - b.timestamp);
+  const walletSnapshots = [...(snapshotStore.get(walletAddress) || []), sanitizedSnapshot]
+    .filter((item) => item && typeof item === 'object')
+    .sort((a, b) => a.timestamp - b.timestamp);
 
-  // Keep only the last 365 snapshots per wallet
-  if (walletSnapshots.length > 365) {
-    walletSnapshots.splice(0, walletSnapshots.length - 365);
+  if (walletSnapshots.length > MAX_SNAPSHOT_HISTORY) {
+    walletSnapshots.splice(0, walletSnapshots.length - MAX_SNAPSHOT_HISTORY);
   }
 
-  snapshotStore.set(snapshot.walletAddress, walletSnapshots);
+  snapshotStore.set(walletAddress, walletSnapshots);
 
   logger.info('snapshot recorded', '/jobs/snapshot.worker.ts', {
-    walletAddress: snapshot.walletAddress,
-    timestamp: snapshot.timestamp,
-    supplied: snapshot.supplied,
-    borrowed: snapshot.borrowed,
+    walletAddress,
+    timestamp: sanitizedSnapshot.timestamp,
+    supplied: sanitizedSnapshot.supplied,
+    borrowed: sanitizedSnapshot.borrowed,
   });
 }
 
@@ -112,43 +172,41 @@ export interface SnapshotJobResult {
 
 export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<SnapshotJobResult> {
   const startTime = Date.now();
-  const now = Date.now();
+  const now = Number.isFinite(jobData.timestamp) ? jobData.timestamp : Date.now();
 
   initializeStore();
 
+  const normalizedWalletAddress =
+    typeof jobData.walletAddress === 'string' && jobData.walletAddress.trim().length > 0
+      ? normalizeWalletAddress(jobData.walletAddress)
+      : undefined;
+
   let snapshotsTaken = 0;
-  const walletsToProcess = jobData.walletAddress
-    ? [jobData.walletAddress]
+  const walletsToProcess = normalizedWalletAddress
+    ? [normalizedWalletAddress]
     : Array.from(snapshotStore.keys());
 
   try {
     for (const walletAddress of walletsToProcess) {
-      // In production:
-      // 1. Fetch positions from smart contract
-      // 2. Fetch market data for APY calculations
-      // 3. Create PositionSnapshot record
-      // 4. Insert into database
-
-      // For now, generate a mock snapshot
       const existingSnapshots = await getWalletSnapshots(walletAddress);
-      if (existingSnapshots.length > 0) {
-        const lastSnapshot = existingSnapshots[existingSnapshots.length - 1];
-
-        // Create a new snapshot with slightly varied data
-        const newSnapshot: PositionSnapshot = {
-          id: `snapshot-${walletAddress}-${now}`,
-          walletAddress,
-          timestamp: now,
-          supplied: lastSnapshot.supplied * (0.95 + Math.random() * 0.1),
-          borrowed: lastSnapshot.borrowed * (0.95 + Math.random() * 0.1),
-          effectiveSupplyApy: lastSnapshot.effectiveSupplyApy + (Math.random() - 0.5) * 0.2,
-          effectiveBorrowApy: lastSnapshot.effectiveBorrowApy + (Math.random() - 0.5) * 0.2,
-          createdAt: now,
-        };
-
-        await recordSnapshot(newSnapshot);
-        snapshotsTaken++;
+      if (existingSnapshots.length === 0) {
+        continue;
       }
+
+      const lastSnapshot = existingSnapshots[existingSnapshots.length - 1];
+      const newSnapshot: PositionSnapshot = {
+        id: `snapshot-${walletAddress}-${now}`,
+        walletAddress,
+        timestamp: now,
+        supplied: Number(lastSnapshot.supplied) * (0.95 + Math.random() * 0.1),
+        borrowed: Number(lastSnapshot.borrowed) * (0.95 + Math.random() * 0.1),
+        effectiveSupplyApy: Number(lastSnapshot.effectiveSupplyApy) + (Math.random() - 0.5) * 0.2,
+        effectiveBorrowApy: Number(lastSnapshot.effectiveBorrowApy) + (Math.random() - 0.5) * 0.2,
+        createdAt: now,
+      };
+
+      await recordSnapshot(newSnapshot);
+      snapshotsTaken++;
     }
 
     const duration = Date.now() - startTime;
@@ -184,7 +242,12 @@ export async function purgeOldSnapshots(): Promise<{ deleted: number }> {
   let deleted = 0;
 
   for (const [wallet, snapshots] of snapshotStore.entries()) {
-    const filtered = snapshots.filter((s) => s.timestamp > cutoffTime);
+    const filtered = snapshots.filter((snapshot) => {
+      if (!snapshot || typeof snapshot !== 'object') {
+        return false;
+      }
+      return Number.isFinite(snapshot.timestamp) && snapshot.timestamp > cutoffTime;
+    });
     const removedCount = snapshots.length - filtered.length;
     deleted += removedCount;
 

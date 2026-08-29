@@ -46,6 +46,22 @@ describe('src/jobs/snapshot.worker', () => {
   });
 
   describe('recordSnapshot', () => {
+    it('rejects invalid snapshot payloads', async () => {
+      await expect(recordSnapshot({} as any)).rejects.toThrow('snapshot.walletAddress is required');
+      await expect(
+        recordSnapshot({
+          id: 'bad-snapshot',
+          walletAddress: '   ',
+          timestamp: now,
+          supplied: 5000,
+          borrowed: 2000,
+          effectiveSupplyApy: 2.5,
+          effectiveBorrowApy: 8.5,
+          createdAt: now,
+        })
+      ).rejects.toThrow('snapshot.walletAddress is required');
+    });
+
     it('records a new snapshot', async () => {
       const snapshot = createTestSnapshot(testWallet, now);
       await recordSnapshot(snapshot);
