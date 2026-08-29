@@ -30,7 +30,18 @@ export default function LendingForm({
   onSubmit,
   initialData,
 }: LendingFormProps) {
-  const [formData, setFormData] = useState<LendingData>(initialData);
+  const [formData, setFormData] = useState<LendingData>(() => {
+    if (typeof window === "undefined") return initialData;
+    try {
+      const saved = localStorage.getItem("lending-draft");
+      if (saved) {
+        return { ...initialData, ...JSON.parse(saved) };
+      }
+    } catch {
+      // Ignore malformed or inaccessible drafts.
+    }
+    return initialData;
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -54,6 +65,16 @@ export default function LendingForm({
       setFormData((prev) => ({ ...prev, interestRate: rates.default }));
     }
   }, [formData.asset, rates]);
+
+  // Persist draft to localStorage whenever form data changes, so users can
+  // resume a partially completed commitment later.
+  useEffect(() => {
+    try {
+      localStorage.setItem("lending-draft", JSON.stringify(formData));
+    } catch {
+      // Ignore quota/security errors; draft persistence is best-effort.
+    }
+  }, [formData]);
 
   // Debounced authoritative quote preview from /api/quote with a local
   // fallback computed via calculateQuote(). Aborts in-flight requests so
@@ -111,6 +132,10 @@ export default function LendingForm({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
+    if (!rates) {
+      newErrors.asset = "Unsupported asset selected.";
+    }
+
     if (!formData.amount || formData.amount <= 0) {
       newErrors.amount = "Please enter a valid amount";
     } else if (selectedAsset && formData.amount > selectedAsset.balance) {
@@ -118,9 +143,10 @@ export default function LendingForm({
     }
 
     if (
-      !formData.interestRate ||
-      formData.interestRate < rates.min ||
-      formData.interestRate > rates.max
+      rates &&
+      (!formData.interestRate ||
+        formData.interestRate < rates.min ||
+        formData.interestRate > rates.max)
     ) {
       newErrors.interestRate = `Interest rate must be between ${rates.min}% and ${rates.max}%`;
     }
@@ -131,6 +157,7 @@ export default function LendingForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatus("idle");
     setSubmitMessage("");
     if (validateForm()) {
@@ -141,6 +168,11 @@ export default function LendingForm({
         setStatus("success");
         setSubmitMessage("Details validated successfully.");
         onSubmit(formData);
+        try {
+          localStorage.removeItem("lending-draft");
+        } catch {
+          // Ignore storage cleanup errors.
+        }
       } catch (err) {
         setStatus("error");
         setSubmitMessage("An error occurred during validation.");
@@ -150,6 +182,7 @@ export default function LendingForm({
     } else {
       setStatus("error");
       setSubmitMessage("Please fix the errors in the form before continuing.");
+      e.currentTarget.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
     }
   };
 
@@ -201,6 +234,11 @@ export default function LendingForm({
               }}
             />
           </div>
+          {errors.asset && (
+            <p className="text-xs text-red-500 font-medium" role="alert">
+              {errors.asset}
+            </p>
+          )}
         </div>
 
         {/* Amount Input */}
@@ -239,7 +277,7 @@ export default function LendingForm({
         {/* Interest Rate */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700 flex items-center">
+            <label htmlFor="interest-rate" className="text-sm font-medium text-gray-700 flex items-center">
               Interest Rate (% APY)
               <Tooltip content="Annual Percentage Yield (APR) is the annual rate of return, including compounding.">
                 <IconButton aria-label="Help" size="sm" variant="ghost" />
@@ -252,6 +290,7 @@ export default function LendingForm({
 
           <div className="px-1">
             <input
+              id="interest-rate"
               type="range"
               min={rates.min}
               max={rates.max}
@@ -263,6 +302,10 @@ export default function LendingForm({
                   interestRate: parseFloat(e.target.value),
                 }))
               }
+              aria-label="Interest rate"
+              aria-valuetext={`${formData.interestRate.toFixed(1)}% APY`}
+              aria-invalid={!!errors.interestRate}
+              aria-describedby={errors.interestRate ? "interest-rate-error" : undefined}
               className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
             />
             <div className="flex justify-between text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">
@@ -274,6 +317,7 @@ export default function LendingForm({
 
           {errors.interestRate && (
             <p
+              id="interest-rate-error"
               className="text-xs text-red-500 font-medium"
               role="alert"
               aria-live="polite"
@@ -314,6 +358,7 @@ export default function LendingForm({
             className="bg-blue-50 border border-blue-200 rounded-xl p-5"
             data-testid="lending-quote-preview"
             aria-live="polite"
+            aria-busy={preview.loading}
           >
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider">
