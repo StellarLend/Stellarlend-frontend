@@ -125,6 +125,7 @@ export default defineConfig({
             "lib/db/**/*.test.ts",
             "lib/configValidation.test.ts",
             "lib/lending/markets.test.ts",
+            "lib/validation/*.test.ts",
             "scripts/**/*.test.ts",
           ],
         },
@@ -139,6 +140,7 @@ export default defineConfig({
           include: [
             "test/server/**/*.test.ts",
             "app/api/**/*.test.ts",
+            "src/jobs/**/*.test.ts",
           ],
           alias: {
             "@": path.resolve(dirname, "."),

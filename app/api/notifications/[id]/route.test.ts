@@ -141,6 +141,65 @@ describe("PATCH /api/notifications/[id]", () => {
     expect(response.status).toBe(404);
     expect(mockMarkNotificationRead).toHaveBeenCalledWith("user-2", "notif-1");
   });
+
+  describe("hostile input boundary", () => {
+    it("rejects path traversal attempt in notification id", async () => {
+      mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+
+      const response = await PATCH(
+        patchRequest("..%2F..%2Fetc%2Fpasswd"),
+        routeContext("../../../etc/passwd"),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toEqual({ error: "Invalid notification id" });
+      expect(mockMarkNotificationRead).not.toHaveBeenCalled();
+    });
+
+    it("rejects notification id with SQL injection pattern", async () => {
+      mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+
+      const response = await PATCH(
+        patchRequest("'; DROP TABLE--"),
+        routeContext("'; DROP TABLE--"),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toEqual({ error: "Invalid notification id" });
+      expect(mockMarkNotificationRead).not.toHaveBeenCalled();
+    });
+
+    it("rejects notification id exceeding maximum length", async () => {
+      mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+
+      const longId = "a".repeat(129);
+      const response = await PATCH(
+        patchRequest(longId),
+        routeContext(longId),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toEqual({ error: "Invalid notification id" });
+      expect(mockMarkNotificationRead).not.toHaveBeenCalled();
+    });
+
+    it("rejects notification id with HTML/script content", async () => {
+      mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+
+      const response = await PATCH(
+        patchRequest("<script>alert(1)</script>"),
+        routeContext("<script>alert(1)</script>"),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toEqual({ error: "Invalid notification id" });
+      expect(mockMarkNotificationRead).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("DELETE /api/notifications/[id]", () => {
@@ -213,5 +272,50 @@ describe("DELETE /api/notifications/[id]", () => {
     expect(response.status).toBe(404);
     expect(body).toEqual({ error: "Notification not found" });
     expect(mockDeleteNotification).toHaveBeenCalledWith("user-2", "notif-1");
+  });
+
+  describe("hostile input boundary", () => {
+    it("rejects path traversal attempt in notification id", async () => {
+      mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+
+      const response = await DELETE(
+        deleteRequest("../../../etc/passwd"),
+        routeContext("../../../etc/passwd"),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toEqual({ error: "Invalid notification id" });
+      expect(mockDeleteNotification).not.toHaveBeenCalled();
+    });
+
+    it("rejects notification id with SQL injection pattern", async () => {
+      mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+
+      const response = await DELETE(
+        deleteRequest("'; DROP TABLE--"),
+        routeContext("'; DROP TABLE--"),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toEqual({ error: "Invalid notification id" });
+      expect(mockDeleteNotification).not.toHaveBeenCalled();
+    });
+
+    it("rejects notification id exceeding maximum length", async () => {
+      mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+
+      const longId = "a".repeat(129);
+      const response = await DELETE(
+        deleteRequest(longId),
+        routeContext(longId),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toEqual({ error: "Invalid notification id" });
+      expect(mockDeleteNotification).not.toHaveBeenCalled();
+    });
   });
 });
