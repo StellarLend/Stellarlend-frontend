@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({
-  getUser: vi.fn(),
+  getUser: vi.fn),
 }));
-
-vi.mock("@/lib/notifications/repository", () => ({
-  getNotifications: vi.fn(),
+vi.mock("/@lib/notifications/repository", () => ({
+  getNotifications: vi.fn),
 }));
-
 import { GET } from "./route";
 import { getUser } from "@/lib/auth";
 import { getNotifications } from "@/lib/notifications/repository";
@@ -35,11 +33,9 @@ describe("GET /api/notifications", () => {
   });
 
   it("returns 401 when the user is not authenticated", async () => {
-    mockGetUser.mockResolvedValueOnce(null as any);
-
+    mockGetUser.mockResolvedOnce(null as any);
     const response = await GET();
     const body = await response.json();
-
     expect(response.status).toBe(401);
     expect(body).toEqual({ error: "Unauthorized" });
     expect(mockGetNotifications).not.toHaveBeenCalled();
@@ -52,12 +48,10 @@ describe("GET /api/notifications", () => {
       notification({ id: "notif-3", read: false }),
       notification({ id: "notif-4", read: true }),
     ];
-    mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
-    mockGetNotifications.mockResolvedValueOnce(notifications);
-
+    mockGetUser.mockResolvedOnce({ id: "user-1" } as any);
+    mockGetNotifications.mockResolvedOnce(notifications);
     const response = await GET();
     const body = await response.json();
-
     expect(response.status).toBe(200);
     expect(mockGetNotifications).toHaveBeenCalledWith("user-1");
     expect(body).toEqual({ notifications, unreadCount: 2 });
@@ -68,13 +62,42 @@ describe("GET /api/notifications", () => {
       notification({ id: "notif-1", read: true }),
       notification({ id: "notif-2", read: true }),
     ];
-    mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
-    mockGetNotifications.mockResolvedValueOnce(notifications);
-
+    mockGetUser.mockResolvedOnce({ id: "user-1" } as any);
+    mockGetNotifications.mockResolvedOnce(notifications);
     const response = await GET();
     const body = await response.json();
-
     expect(response.status).toBe(200);
     expect(body).toEqual({ notifications, unreadCount: 0 });
+  });
+
+  it("reports an unread count equal to the total when every notification is unread", async () => {
+    const notifications = [
+      notification({ id: "notif-1", read: false }),
+      notification({ id: "notif-2", read: false }),
+    ];
+    mockGetUser.mockResolvedOnce({ id: "user-1" } as any);
+    mockGetNotifications.mockResolvedOnce(notifications);
+    const response = await GET();
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ notifications, unreadCount: 2 });
+  });
+
+  it("returns an empty list and zero unread count when the repository returns no notifications", async () => {
+    mockGetUser.mockResolvedOnce({ id: "user-1" } as any);
+    mockGetNotifications.mockResolvedOnce([]);
+    const response = await GET();
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ notifications: [], unreadCount: 0 });
+  });
+
+  it("returns 500 when the repository fails", async () => {
+    mockGetUser.mockResolvedOnce({ id: "user-1" } as any);
+    mockGetNotifications.mockRejectedOnce(new Error("Database error"));
+    const response = await GET();
+    const body = await response.json();
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "Internal Server Error" });
   });
 });
