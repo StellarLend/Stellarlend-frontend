@@ -1,183 +1,390 @@
-import React, { useEffect, useRef, useState } from "react";
+/**
+ * CommitmentDetailActions component
+ * Implements bounded action state machine with authorization and telemetry
+ */
 
-export type ActionType = "fund" | "dispute" | "earlyExit" | "settle";
+"use client";
 
-export enum ActionState {
-  Idle = "Idle",
-  IntentRecorded = "IntentRecorded",
-  Executing = "Executing",
-  PendingOnChain = "PendingOnChain",
-  Confirmed = "Confirmed",
-  Failed = "Failed",
-  Cancelled = "Cancelled",
+import { useState, useCallback, useMemo } from "react";
+import type {
+  Commitment,
+  CommitmentActionType,
+  ActionState,
+  ActionAuthorization,
+  TelemetryEvent,
+  CommitmentActionResponse,
+} from "@/types/commitment";
+import { COMMITMENT_STATE_MACHINE, COMMITMENT_BOUNDS } from "@/types/commitment";
+
+interface CommitmentDetailActionsProps {
+  commitment: Commitment;
+  canPerformActions: Record<CommitmentActionType, ActionAuthorization>;
+  onActionComplete?: (action: CommitmentActionType, newStatus: string) => void;
+  onTelemetry?: (event: TelemetryEvent) => void;
 }
 
-interface PersistedIntent {
-  action: ActionType;
-  requestId: string;
-  state: ActionState;
-  txHash?: string;
-}
-
-function genRequestId() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-const STORAGE_PREFIX = "commitment_action:";
-
-async function postAction(commitmentId: string, action: ActionType, requestId: string) {
-  const res = await fetch(`/api/commitments/${commitmentId}/action`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action, requestId }),
-  });
-  return res.json();
-}
-
-async function txStatus(txHash: string) {
-  const res = await fetch(`/api/txs/status?txHash=${encodeURIComponent(txHash)}`);
-  return res.json();
-}
-
+/**
+ * Action button states based on commitment status and authorization
+ * Follows explicit state machine transitions defined in COMMITMENT_STATE_MACHINE
+ */
 export default function CommitmentDetailActions({
-  commitmentId,
-  initialStatus,
-  canAct = true,
-}: {
-  commitmentId: string;
-  initialStatus?: string;
-  canAct?: boolean;
-}) {
-  const [state, setState] = useState<ActionState>(ActionState.Idle);
-  const [currentAction, setCurrentAction] = useState<ActionType | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const currentRequestRef = useRef<string | null>(null);
+  commitment,
+  canPerformActions,
+  onActionComplete,
+  onTelemetry,
+}: CommitmentDetailActionsProps) {
+  const [actionStates, setActionStates] = useState<Record<CommitmentActionType, ActionState>>({
+    fund: "idle",
+    dispute: "idle",
+    early_exit: "idle",
+    settle: "idle",
+  });
 
-  // Load persisted intent on mount to recover interrupted operations
-  useEffect(() => {
-    const key = STORAGE_PREFIX + commitmentId;
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed: PersistedIntent = JSON.parse(raw);
-        currentRequestRef.current = parsed.requestId;
-        setCurrentAction(parsed.action);
-        setTxHash(parsed.txHash ?? null);
-        setState(parsed.state === ActionState.PendingOnChain ? ActionState.PendingOnChain : parsed.state);
+  const [actionErrors, setActionErrors] = useState<
+    Partial<Record<CommitmentActionType, string>>
+  >({});
+
+  // Emit telemetry event
+  const emitTelemetry = useCallback(
+    (event: Omit<TelemetryEvent, "timestamp" | "commitmentId">) => {
+      if (onTelemetry) {
+        onTelemetry({
+          ...event,
+          timestamp: Date.now(),
+          commitmentId: commitment.id,
+        });
       }
-    } catch (e) {
-      // ignore
-    }
-  }, [commitmentId]);
+    },
+    [commitment.id, onTelemetry],
+  );
 
-  // Persist whenever key pieces change
-  useEffect(() => {
-    const key = STORAGE_PREFIX + commitmentId;
-    if (state === ActionState.Idle || state === ActionState.Confirmed || state === ActionState.Cancelled) {
-      localStorage.removeItem(key);
-      return;
-    }
-    const payload: PersistedIntent = {
-      action: currentAction as ActionType,
-      requestId: currentRequestRef.current as string,
-      state,
-      txHash: txHash ?? undefined,
-    };
-    localStorage.setItem(key, JSON.stringify(payload));
-  }, [state, currentAction, txHash, commitmentId]);
+  // Get allowed actions based on current commitment status
+  const allowedActions = useMemo(
+    () => COMMITMENT_STATE_MACHINE[commitment.status] || [],
+    [commitment.status],
+  );
 
-  // Poll tx status when pending
-  useEffect(() => {
-    let cancelled = false;
-    let timer: number | undefined;
-    async function poll() {
-      if (!txHash) return;
-      try {
-        const status = await txStatus(txHash);
-        if (cancelled) return;
-        if (status?.status === "confirmed") {
-          setState(ActionState.Confirmed);
-          currentRequestRef.current = null;
-          setTxHash(null);
-        } else if (status?.status === "failed") {
-          setState(ActionState.Failed);
-        } else {
-          timer = window.setTimeout(poll, 1500);
-        }
-      } catch (e) {
-        if (cancelled) return;
-        timer = window.setTimeout(poll, 2000);
-      }
-    }
-    if (state === ActionState.PendingOnChain && txHash) poll();
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [state, txHash]);
+  // Check if an action is available (allowed by state machine and authorized)
+  const isActionAvailable = useCallback(
+    (action: CommitmentActionType): boolean => {
+      return allowedActions.includes(action) && canPerformActions[action]?.allowed === true;
+    },
+    [allowedActions, canPerformActions],
+  );
 
-  async function handleAction(action: ActionType) {
-    if (!canAct) return;
-    // Prevent duplicate submissions
-    if (state === ActionState.Executing || state === ActionState.PendingOnChain) return;
-
-    const requestId = genRequestId();
-    currentRequestRef.current = requestId;
-    setCurrentAction(action);
-    setState(ActionState.Executing);
-
-    try {
-      const resp = await postAction(commitmentId, action, requestId);
-      // Ensure response matches current requestId to avoid stale updates
-      if (resp?.requestId !== currentRequestRef.current) {
-        // Stale response — ignore
+  // Execute action with timeout and error handling
+  const executeAction = useCallback(
+    async (action: CommitmentActionType) => {
+      // Pre-flight checks
+      if (!isActionAvailable(action)) {
+        const reason = canPerformActions[action]?.reason || "Action not allowed in current state";
+        setActionErrors((prev) => ({ ...prev, [action]: reason }));
+        emitTelemetry({
+          type: "action_failed",
+          action,
+          status: commitment.status,
+          errorType: "authorization_failed",
+          errorMessage: reason,
+        });
         return;
       }
-      if (resp?.status === "accepted" && resp?.txHash) {
-        setTxHash(resp.txHash);
-        setState(ActionState.PendingOnChain);
-      } else if (resp?.status === "completed") {
-        setState(ActionState.Confirmed);
-        currentRequestRef.current = null;
-      } else {
-        setState(ActionState.Failed);
-      }
-    } catch (e) {
-      setState(ActionState.Failed);
-    }
-  }
 
-  function renderButtons() {
-    const disabled = !canAct || state === ActionState.Executing || state === ActionState.PendingOnChain;
+      // Prevent concurrent execution of same action
+      if (actionStates[action] === "loading") {
+        return;
+      }
+
+      const startTime = Date.now();
+
+      setActionStates((prev) => ({ ...prev, [action]: "loading" }));
+      setActionErrors((prev) => {
+        const next = { ...prev };
+        delete next[action];
+        return next;
+      });
+
+      emitTelemetry({
+        type: "action_initiated",
+        action,
+        status: commitment.status,
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, COMMITMENT_BOUNDS.REQUEST_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(`/api/commitments/${commitment.id}/actions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action,
+            commitmentId: commitment.id,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const latency = Date.now() - startTime;
+        emitTelemetry({
+          type: "api_latency",
+          action,
+          latencyMs: latency,
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            throw new Error("Rate limited. Please try again later.");
+          }
+          if (response.status === 403) {
+            throw new Error("Not authorized to perform this action.");
+          }
+          if (response.status === 409) {
+            throw new Error("Action conflicts with current commitment state.");
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data: CommitmentActionResponse = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error?.message || "Action failed");
+        }
+
+        setActionStates((prev) => ({ ...prev, [action]: "success" }));
+
+        emitTelemetry({
+          type: "action_completed",
+          action,
+          status: data.newStatus,
+          latencyMs: Date.now() - startTime,
+          metadata: {
+            transactionHash: data.transactionHash ? "[PRESENT]" : "[ABSENT]",
+          },
+        });
+
+        // Track state transition
+        if (data.newStatus && data.newStatus !== commitment.status) {
+          emitTelemetry({
+            type: "state_transition",
+            status: data.newStatus as any,
+            metadata: {
+              previousStatus: commitment.status,
+              newStatus: data.newStatus,
+              triggeredBy: action,
+            },
+          });
+        }
+
+        // Notify parent component
+        if (onActionComplete && data.newStatus) {
+          onActionComplete(action, data.newStatus);
+        }
+
+        // Reset to idle after success animation
+        setTimeout(() => {
+          setActionStates((prev) => ({ ...prev, [action]: "idle" }));
+        }, 2000);
+      } catch (err) {
+        const error = err as Error;
+
+        // Sanitize error message (remove potential secrets)
+        const sanitizedMessage = error.message.replace(/[a-f0-9]{64}/gi, "[REDACTED]");
+
+        setActionStates((prev) => ({ ...prev, [action]: "error" }));
+        setActionErrors((prev) => ({ ...prev, [action]: sanitizedMessage }));
+
+        emitTelemetry({
+          type: "action_failed",
+          action,
+          status: commitment.status,
+          errorType: error.name,
+          errorMessage: sanitizedMessage,
+          latencyMs: Date.now() - startTime,
+        });
+
+        // Reset to idle after error display
+        setTimeout(() => {
+          setActionStates((prev) => ({ ...prev, [action]: "idle" }));
+        }, 3000);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    },
+    [
+      commitment.id,
+      commitment.status,
+      isActionAvailable,
+      canPerformActions,
+      actionStates,
+      emitTelemetry,
+      onActionComplete,
+    ],
+  );
+
+  // Action button configurations
+  const actionConfig: Record<
+    CommitmentActionType,
+    {
+      label: string;
+      description: string;
+      variant: "primary" | "secondary" | "danger" | "warning";
+      icon?: string;
+    }
+  > = {
+    fund: {
+      label: "Fund Commitment",
+      description: "Transfer funds to activate this commitment",
+      variant: "primary",
+      icon: "💰",
+    },
+    dispute: {
+      label: "Raise Dispute",
+      description: "Challenge the terms or execution of this commitment",
+      variant: "warning",
+      icon: "⚠️",
+    },
+    early_exit: {
+      label: "Request Early Exit",
+      description: "Exit this commitment before maturity (may incur penalties)",
+      variant: "secondary",
+      icon: "🚪",
+    },
+    settle: {
+      label: "Settle Commitment",
+      description: "Complete this commitment and release collateral",
+      variant: "primary",
+      icon: "✅",
+    },
+  };
+
+  // Render action button
+  const renderActionButton = (action: CommitmentActionType) => {
+    const config = actionConfig[action];
+    const state = actionStates[action];
+    const error = actionErrors[action];
+    const isAvailable = isActionAvailable(action);
+    const isAllowed = allowedActions.includes(action);
+    const authorization = canPerformActions[action];
+
+    if (!isAllowed) {
+      return null; // Don't show buttons for actions not allowed by state machine
+    }
+
+    const baseClasses =
+      "relative rounded-lg px-6 py-3 font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
+
+    const variantClasses = {
+      primary: "bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500",
+      secondary: "bg-slate-600 text-white hover:bg-slate-700 focus:ring-slate-500",
+      danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
+      warning: "bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500",
+    };
+
+    const disabledClasses = "opacity-50 cursor-not-allowed bg-slate-300 text-slate-500";
+
+    const isDisabled = !isAvailable || state === "loading";
+
     return (
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => handleAction("fund")} disabled={disabled}>
-          Fund
+      <div key={action} className="space-y-2">
+        <button
+          type="button"
+          onClick={() => executeAction(action)}
+          disabled={isDisabled}
+          className={`${baseClasses} ${
+            isDisabled ? disabledClasses : variantClasses[config.variant]
+          } w-full`}
+          aria-label={config.label}
+          aria-busy={state === "loading"}
+        >
+          <span className="flex items-center justify-center gap-2">
+            {state === "loading" && (
+              <svg
+                className="h-5 w-5 animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            )}
+            {state === "success" && <span aria-hidden="true">✓</span>}
+            {state === "error" && <span aria-hidden="true">✗</span>}
+            <span>{config.icon}</span>
+            <span>
+              {state === "loading"
+                ? "Processing..."
+                : state === "success"
+                  ? "Success!"
+                  : config.label}
+            </span>
+          </span>
         </button>
-        <button onClick={() => handleAction("dispute")} disabled={disabled}>
-          Dispute
-        </button>
-        <button onClick={() => handleAction("earlyExit")} disabled={disabled}>
-          Early Exit
-        </button>
-        <button onClick={() => handleAction("settle")} disabled={disabled}>
-          Settle
-        </button>
+
+        <p className="text-xs text-slate-600">{config.description}</p>
+
+        {!isAvailable && authorization && !authorization.allowed && (
+          <p className="text-xs text-amber-700 font-medium" role="alert">
+            ⓘ {authorization.reason}
+          </p>
+        )}
+
+        {error && (
+          <p className="text-xs text-red-700 font-medium" role="alert">
+            Error: {error}
+          </p>
+        )}
       </div>
     );
-  }
+  };
 
   return (
-    <div>
-      <div>Commitment status: {initialStatus ?? "unknown"}</div>
-      <div>Action state: {state}</div>
-      {state === ActionState.PendingOnChain && txHash && (
-        <div>
-          Pending on-chain: <a href={`https://explorer/tx/${txHash}`}>{txHash}</a>
-        </div>
-      )}
-      {state === ActionState.Failed && <div style={{ color: "crimson" }}>Action failed — please retry or inspect transaction</div>}
-      {renderButtons()}
+    <div className="space-y-4">
+      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-semibold text-slate-900">Available Actions</h3>
+
+        {allowedActions.length === 0 ? (
+          <div className="rounded-md bg-slate-50 p-4 text-center">
+            <p className="text-sm text-slate-600">
+              No actions available for commitment status: <strong>{commitment.status}</strong>
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {(["fund", "dispute", "early_exit", "settle"] as CommitmentActionType[]).map(
+              (action) => renderActionButton(action),
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Status information */}
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <h4 className="mb-2 text-sm font-semibold text-slate-700">Current Status</h4>
+        <p className="text-sm text-slate-600">
+          Status: <span className="font-mono font-semibold">{commitment.status}</span>
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Last updated: {new Date(commitment.updatedAt).toLocaleString()}
+        </p>
+      </div>
     </div>
   );
 }
