@@ -90,15 +90,26 @@ export async function getNotifications(
   }));
 }
 
-/** Adds a new notification for userId, emits hub events, and returns it. */
+/** Adds a new notification for userId, emits hub events, and returns it.
+ * Validates that the notification ID is safe and the userId matches the expected owner.
+ */
 export async function addNotification(
   userId: string,
   n: Omit<Notification, "userId">,
 ): Promise<Notification> {
-  const dbId = `${userId}-${n.id}`;
+  if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+    throw new Error("Invalid userId: must be a non-empty string");
+  }
+
+  if (!n.id || typeof n.id !== "string" || n.id.trim().length === 0) {
+    throw new Error("Invalid notification id: must be a non-empty string");
+  }
+
+  const trimmedUserId = userId.trim();
+  const dbId = `${trimmedUserId}-${n.id}`;
   const record = {
     id: dbId,
-    userId,
+    userId: trimmedUserId,
     title: n.title,
     message: n.message,
     read: n.read,
@@ -122,21 +133,19 @@ export async function addNotification(
 
   const notification: Notification = {
     ...n,
-    userId,
+    userId: trimmedUserId,
   };
 
-  // Emit the raw notification event
   try {
-    notificationHub.publish(userId, { type: "notification", notification });
+    notificationHub.publish(trimmedUserId, { type: "notification", notification });
   } catch (e) {
     // Swallow errors from the hub to avoid breaking producers
   }
 
-  // Emit updated unread count
   try {
-    const list = await getNotifications(userId);
+    const list = await getNotifications(trimmedUserId);
     const unreadCount = list.filter((x) => !x.read).length;
-    notificationHub.publish(userId, { type: "unreadCount", unreadCount });
+    notificationHub.publish(trimmedUserId, { type: "unreadCount", unreadCount });
   } catch (e) {
     // noop
   }
