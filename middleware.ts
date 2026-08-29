@@ -9,6 +9,45 @@ function generateNonce(): string {
   return btoa(String.fromCharCode(...array));
 }
 
+function sanitizeCookieName(value: string | undefined): string {
+  const normalized = (value ?? 'session').trim();
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(normalized)) {
+    return 'session';
+  }
+  return normalized;
+}
+
+function getSafeClientIp(request: NextRequest): string {
+  const rawIp =
+    request.headers.get('x-forwarded-for') ??
+    request.headers.get('x-real-ip') ??
+    '127.0.0.1';
+
+  const firstCandidate = rawIp
+    .split(',')[0]
+    .trim()
+    .replace(/\[|\]|\s+/g, '');
+
+  if (!firstCandidate || firstCandidate === 'unknown') {
+    return '127.0.0.1';
+  }
+
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(firstCandidate)) {
+    const octets = firstCandidate.split('.');
+    const valid = octets.every((octet) => {
+      const value = Number(octet);
+      return Number.isInteger(value) && value >= 0 && value <= 255;
+    });
+    return valid ? firstCandidate : '127.0.0.1';
+  }
+
+  if (/^[0-9A-Fa-f:.]+$/.test(firstCandidate) && firstCandidate.includes(':')) {
+    return firstCandidate;
+  }
+
+  return '127.0.0.1';
+}
+
 function getRequestIdHeaders(request: NextRequest) {
   const { requestId } = getOrCreateRequestId(request.headers);
   const requestHeaders = new Headers(request.headers);
@@ -28,9 +67,10 @@ function setRequestIdHeader(response: NextResponse, requestId: string): NextResp
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const safePathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
 
   // 1. Path Filter: Only apply to API routes
-  if (!pathname.startsWith('/api')) {
+  if (!safePathname.startsWith('/api')) {
     // For non‑API routes, still set CSP header with nonce for inline scripts
     const nonce = generateNonce();
     const response = NextResponse.next();
@@ -43,7 +83,7 @@ export function middleware(request: NextRequest) {
   const { requestId, requestHeaders, nonce } = getRequestIdHeaders(request);
 
   // 2. Exemption: Health checks should never be rate limited
-  if (pathname === '/api/health') {
+  if (safePathname === '/api/health') {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
     response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -51,7 +91,9 @@ export function middleware(request: NextRequest) {
   }
 
   // 3. Exemption: Authenticated internal calls
-  const sessionCookieName = appConfig.rateLimit ? (process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session') : 'session';
+  const sessionCookieName = sanitizeCookieName(
+    appConfig.rateLimit ? process.env.NEXT_PUBLIC_SESSION_COOKIE : undefined,
+  );
   const isAuth = request.cookies.has(sessionCookieName);
 
   if (isAuth) {
@@ -62,7 +104,7 @@ export function middleware(request: NextRequest) {
   }
 
   // 4. Identification (IP-based for anonymous requests)
-  const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+  const ip = getSafeClientIp(request);
   const identifier = `api-ratelimit:${ip}`;
 
   const { success, limit, remaining, reset } = rateLimit(
