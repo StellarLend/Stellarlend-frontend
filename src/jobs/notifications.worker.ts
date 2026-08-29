@@ -10,6 +10,11 @@ import {
   queueNames,
   registerQueueShutdownHooks,
 } from '@/lib/queue';
+import {
+  validateNotificationPayload,
+  sanitizeNotificationId,
+  sanitizeUserId,
+} from '@/lib/validation/notifications';
 
 const ROUTE = 'jobs/notifications.worker';
 const redisUrl = serverConfig.redisUrl;
@@ -18,6 +23,7 @@ export interface NotificationJobResult {
   delivered: boolean;
   duplicate: boolean;
   attempts: number;
+  validationError?: string;
 }
 
 export interface NotificationJobOptions {
@@ -38,17 +44,51 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function validateJobPayload(
+  notification: NotificationsJobPayload & { id?: string },
+): { valid: boolean; error?: string; sanitized?: NotificationsJobPayload & { id?: string } } {
+  const validation = validateNotificationPayload({
+    userId: notification.userId,
+    title: notification.title,
+    message: notification.message,
+    type: notification.type,
+    id: notification.id,
+  });
+
+  if (!validation.valid) {
+    return { valid: false, error: validation.error };
+  }
+
+  const sanitized: NotificationsJobPayload & { id?: string } = {
+    userId: sanitizeUserId(notification.userId as string),
+    title: (notification.title as string).trim(),
+    message: (notification.message as string).trim(),
+    type: notification.type,
+  };
+
+  if (notification.id !== undefined) {
+    sanitized.id = sanitizeNotificationId(notification.id as string);
+  }
+
+  return { valid: true, sanitized };
+}
+
 export async function handleNotificationJob(
   notification: NotificationsJobPayload & { id?: string },
   options: NotificationJobOptions = {},
 ): Promise<NotificationJobResult> {
-  const { userId, title, message, type, id } = notification;
+  const validation = validateJobPayload(notification);
+  if (!validation.valid || !validation.sanitized) {
+    logger.warn('Invalid notification job payload rejected', ROUTE, {
+      error: validation.error,
+      userId: String(notification.userId).slice(0, 50),
+    });
+    return { delivered: false, duplicate: false, attempts: 0, validationError: validation.error };
+  }
+
+  const { userId, title, message, type, id } = validation.sanitized;
   const maxAttempts = options.maxAttempts ?? 3;
   const backoffMs = options.backoffMs ?? 1_000;
-
-  if (!userId || !title || !message || !type) {
-    throw new Error('Missing required notification fields: userId, title, message, type');
-  }
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
