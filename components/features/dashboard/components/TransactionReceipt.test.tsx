@@ -5,6 +5,7 @@ import {
   fireEvent,
   waitFor,
 } from "@/test/test-utils";
+import userEvent from "@testing-library/user-event";
 import TransactionReceipt from "./TransactionReceipt";
 import type { Transaction } from "@/types/Transaction";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -89,7 +90,7 @@ describe("TransactionReceipt Component", () => {
         <TransactionReceipt transaction={buildTransaction({ amount: 250 })} />,
       );
 
-      const amountElement = screen.getByText("+$250");
+      const amountElement = screen.getByText("+$250.00");
       expect(amountElement).toBeInTheDocument();
       expect(amountElement.className).toContain("text-green-600");
     });
@@ -99,7 +100,7 @@ describe("TransactionReceipt Component", () => {
         <TransactionReceipt transaction={buildTransaction({ amount: -75.5 })} />,
       );
 
-      const amountElement = screen.getByText("-$75.5");
+      const amountElement = screen.getByText("-$75.50");
       expect(amountElement).toBeInTheDocument();
       expect(amountElement.className).toContain("text-red-600");
     });
@@ -256,7 +257,7 @@ describe("TransactionReceipt Component", () => {
       );
 
       expect(screen.getByText("Deposit")).toBeInTheDocument();
-      expect(screen.getByText("+$500")).toBeInTheDocument();
+      expect(screen.getByText("+$500.00")).toBeInTheDocument();
     });
 
     it("handles Withdrawal transaction type", () => {
@@ -267,7 +268,7 @@ describe("TransactionReceipt Component", () => {
       );
 
       expect(screen.getByText("Withdrawal")).toBeInTheDocument();
-      expect(screen.getByText("-$200")).toBeInTheDocument();
+      expect(screen.getByText("-$200.00")).toBeInTheDocument();
     });
 
     it("handles Lend Funds transaction type", () => {
@@ -278,7 +279,7 @@ describe("TransactionReceipt Component", () => {
       );
 
       expect(screen.getByText("Lend Funds")).toBeInTheDocument();
-      expect(screen.getByText("+$1000")).toBeInTheDocument();
+      expect(screen.getByText("+$1,000.00")).toBeInTheDocument();
     });
 
     it("handles Loan Payment transaction type", () => {
@@ -289,7 +290,7 @@ describe("TransactionReceipt Component", () => {
       );
 
       expect(screen.getByText("Loan Payment")).toBeInTheDocument();
-      expect(screen.getByText("-$350")).toBeInTheDocument();
+      expect(screen.getByText("-$350.00")).toBeInTheDocument();
     });
   });
 
@@ -360,14 +361,15 @@ describe("TransactionReceipt Component", () => {
       expect(mockPrint).toHaveBeenCalledTimes(1);
     });
 
-    it("Print Receipt button is keyboard accessible", () => {
+    it("Print Receipt button is keyboard accessible", async () => {
+      const user = userEvent.setup();
       render(<TransactionReceipt transaction={buildTransaction()} />);
 
       const printButton = screen.getByRole("button", { name: /print receipt/i });
-      printButton.focus();
+      await user.tab();
       expect(printButton).toHaveFocus();
 
-      fireEvent.keyDown(printButton, { key: "Enter", code: "Enter" });
+      await user.keyboard("{Enter}");
       expect(mockPrint).toHaveBeenCalled();
     });
 
@@ -423,7 +425,8 @@ describe("TransactionReceipt Component", () => {
       expect(onBackMock).toHaveBeenCalledTimes(1);
     });
 
-    it("Back button is keyboard accessible", () => {
+    it("Back button is keyboard accessible", async () => {
+      const user = userEvent.setup();
       const onBackMock = vi.fn();
       render(
         <TransactionReceipt
@@ -435,10 +438,10 @@ describe("TransactionReceipt Component", () => {
       const backButton = screen.getByRole("button", {
         name: /back to transaction details/i,
       });
-      backButton.focus();
+      await user.tab();
       expect(backButton).toHaveFocus();
 
-      fireEvent.keyDown(backButton, { key: "Enter", code: "Enter" });
+      await user.keyboard("{Enter}");
       expect(onBackMock).toHaveBeenCalled();
     });
   });
@@ -530,8 +533,8 @@ describe("TransactionReceipt Component", () => {
         <TransactionReceipt transaction={buildTransaction({ amount: 0 })} />,
       );
 
-      // Zero should not have a sign prefix in the current implementation
-      expect(screen.getByText("+$0")).toBeInTheDocument();
+      // `amount > 0` is false for zero, so it takes the negative-sign branch
+      expect(screen.getByText("-$0.00")).toBeInTheDocument();
     });
 
     it("handles very long transaction ID", () => {
@@ -576,17 +579,33 @@ describe("TransactionReceipt Component", () => {
   });
 
   describe("Security Requirements", () => {
-    it("does not expose session or secret values", () => {
+    it("only renders memo content that was explicitly passed via props", () => {
       const { container } = render(
         <TransactionReceipt
           transaction={buildTransaction()}
-          details={{ memo: "session_token=abc123" }}
+          details={{ memo: "Payment for invoice #12345" }}
         />,
       );
 
-      // Transaction receipt should display memo but not contain actual sensitive session values
-      // (In a real scenario, the backend should filter these, but we verify display here)
+      // The receipt must reflect only the explicit memo prop, not ambient
+      // session/cookie state that happens to be present on the page.
+      expect(container.innerHTML).toContain("Payment for invoice #12345");
       expect(container.innerHTML).not.toContain("session_token=");
+    });
+
+    it("does not read from document.cookie when rendering", () => {
+      const originalCookie = document.cookie;
+      document.cookie = "session_token=super-secret-value";
+
+      const { container } = render(
+        <TransactionReceipt transaction={buildTransaction()} details={null} />,
+      );
+
+      expect(container.innerHTML).not.toContain("super-secret-value");
+
+      // Reset cookies for subsequent tests.
+      document.cookie = "session_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      void originalCookie;
     });
 
     it("does not include navigation or chrome elements", () => {
