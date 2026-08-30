@@ -8,6 +8,8 @@ import { isAccountId } from '@/lib/validation/stellar';
 import { withIdempotency } from "@/lib/api/idempotency";
 import { withCsrfProtection } from "@/lib/api/handler";
 import { generateCsrfToken, setCsrfCookie } from "@/lib/security/csrf";
+import { normalizeStellarNetwork } from "@/lib/auth/session-boundary";
+import config from "@/lib/config";
 
 // Fall back to "no claim available" (null) instead of the epoch when the
 // JWT payload omitted iat/exp. lib/auth.ts:getSession falls back to
@@ -153,11 +155,19 @@ export async function GET(request: NextRequest) {
     }
 
     const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
+    const network = normalizeStellarNetwork(config.stellar.network);
+    if (!network) {
+      return NextResponse.json(
+        { error: "Invalid Stellar network configuration" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       session: {
         active: true,
         cookie: cookieName,
+        network,
         user: session.user,
         issuedAt: toIsoOrNull(session.issuedAt),
         expiresAt: toIsoOrNull(session.expiresAt),

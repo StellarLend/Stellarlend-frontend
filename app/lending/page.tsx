@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import useTxStatus from "@/lib/tx/useTxStatus";
@@ -74,6 +74,21 @@ const ConfirmModal = dynamic(
 
 const VALID_TABS: LendingActionType[] = ["lend", "borrow", "repay", "withdraw"];
 
+const DRAFT_STORAGE_KEY = "lending-form-draft";
+
+type DraftState = {
+  activeTab: LendingActionType;
+  data: LendingData;
+};
+
+function clearStoredDraft() {
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 function parseTab(value: string | null): LendingActionType {
   return VALID_TABS.includes(value as LendingActionType)
     ? (value as LendingActionType)
@@ -142,6 +157,8 @@ export default function LendingPage() {
   const [calculationResult, setCalculationResult] =
     useState<CalculationResult | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [draft, setDraft] = useState<DraftState | null>(null);
+  const isSubmittingRef = useRef(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txProgressState, setTxProgressState] =
     useState<TxProgressState | null>(null);
@@ -189,13 +206,87 @@ export default function LendingPage() {
     return () => controller.abort();
   }, []);
 
+  // Restore a previously saved draft once on mount.
+  useEffect(() => {
+    let saved: DraftState | null = null;
+
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          activeTab?: unknown;
+          data?: unknown;
+        };
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          typeof parsed.activeTab === "string" &&
+          VALID_TABS.includes(parsed.activeTab as LendingActionType) &&
+          parsed.data &&
+          typeof parsed.data === "object" &&
+          typeof (parsed.data as { asset?: unknown }).asset === "string" &&
+          typeof (parsed.data as { amount?: unknown }).amount === "number"
+        ) {
+          saved = {
+            activeTab: parsed.activeTab as LendingActionType,
+            data: parsed.data as LendingData,
+          };
+        }
+      }
+    } catch {
+      // Ignore malformed or inaccessible storage.
+    }
+
+    if (saved) {
+      setDraft(saved);
+    } else {
+      clearStoredDraft();
+    }
+  }, []);
+
+  const saveDraft = (data: LendingData, activeTab: LendingActionType) => {
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({ activeTab, data }),
+      );
+    } catch {
+      // Persistence is best-effort; the flow remains usable without it.
+    }
+  };
+
+  const discardDraft = () => {
+    setDraft(null);
+    clearStoredDraft();
+  };
+
+  const resumeDraft = () => {
+    if (!draft) return;
+
+    handleTabChange(draft.activeTab);
+    if (draft.activeTab === "lend") {
+      setLendingData(draft.data);
+    } else if (draft.activeTab === "borrow") {
+      setBorrowingData(draft.data);
+    } else if (draft.activeTab === "repay") {
+      setRepayData(draft.data);
+    } else {
+      setWithdrawData(draft.data);
+    }
+
+    setCalculationResult(null);
+    setDraft(null);
+  };
+
   const handleLendingSubmit = (data: LendingData) => {
     setLendingData(data);
+    saveDraft(data, "lend");
     setShowConfirmModal(true);
   };
 
   const handleBorrowingSubmit = (data: LendingData) => {
     setBorrowingData(data);
+    saveDraft(data, "borrow");
     setShowConfirmModal(true);
   };
 
@@ -205,15 +296,20 @@ export default function LendingPage() {
   ) => {
     setRepayData(data);
     setCalculationResult(quote);
+    saveDraft(data, "repay");
     setShowConfirmModal(true);
   };
 
   const handleWithdrawSubmit = (data: LendingData) => {
     setWithdrawData(data);
+    saveDraft(data, "withdraw");
     setShowConfirmModal(true);
   };
 
   const handleConfirm = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
     setShowConfirmModal(false);
     setTxHash(null);
     setTxProgressState("building");
@@ -254,6 +350,7 @@ export default function LendingPage() {
 
       const json = await res.json();
       if (res.ok && json?.status === "submitted" && json?.hash) {
+        discardDraft();
         setTxHash(json.hash);
         setTxProgressState("submitted");
         setToast({
@@ -276,6 +373,8 @@ export default function LendingPage() {
         title: "Submission error",
         description: String(err),
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -346,6 +445,41 @@ export default function LendingPage() {
       />
 
       <div className="relative mx-auto max-w-7xl space-y-6">
+        {draft && (
+          <div
+            role="region"
+            aria-labelledby="resume-draft-title"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") discardDraft();
+            }}
+            className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+          >
+            <h2 id="resume-draft-title" className="text-sm font-semibold text-amber-900">
+              Resume saved draft
+            </h2>
+            <p className="mt-1 text-sm text-amber-800">
+              You have a saved {draft.activeTab} draft. Resume where you left off or discard it.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={resumeDraft}
+                className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+              >
+                Resume
+              </button>
+              <button
+                type="button"
+                onClick={discardDraft}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
         <section className="overflow-hidden rounded-[32px] border border-emerald-100 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
           <div className="h-2 bg-gradient-to-r from-green-600 via-emerald-500 to-black" />
           <div className="p-6 sm:p-8">

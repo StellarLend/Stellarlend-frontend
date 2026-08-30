@@ -40,6 +40,8 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({
 }) => {
   const { state } = useChartHistory(HISTORY_URL, { fetcher });
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [errorKind, setErrorKind] = useState<"network" | "forbidden" | "unavailable">("network");
 
   useEffect(() => {
     const media =
@@ -154,7 +156,14 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({
         role="alert"
       >
         <p className="text-sm font-medium text-[#D4F3E6]">Supply APY trend</p>
-        <p className="mt-2 text-sm text-[#AAABAB]">Trend data unavailable</p>
+        <p className="mt-2 text-sm text-[#AAABAB]">{message}</p>
+        <button
+          type="button"
+          onClick={() => setRetryCount((count) => count + 1)}
+          className="mt-3 rounded-md bg-[#71B48D] px-3 py-1.5 text-xs font-semibold text-[#072815] transition-colors hover:bg-[#8FD0A8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4F3E6] motion-reduce:transition-none"
+        >
+          Try again
+        </button>
       </div>
     );
   }

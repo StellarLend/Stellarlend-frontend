@@ -124,12 +124,12 @@ export function CollateralRatioHistoryChart({
 
     return {
       linePath: buildSvgPath(mappedPoints),
-      thresholdY: yForRatio(liquidationThreshold),
+      thresholdY: yForRatio(threshold),
       latestPoint,
       latestSvgPoint: mappedPoints[mappedPoints.length - 1],
       firstLabel: formatDate(ratioPoints[0].timestamp),
       lastLabel: formatDate(latestPoint.timestamp),
-      isBelowThreshold: latestPoint.ratio <= liquidationThreshold,
+      isBelowThreshold: latestPoint.ratio <= threshold,
       summary: formatCollateralRatioSummary(
         latestPoint.ratio,
         ratioPoints[0].ratio,
@@ -165,6 +165,13 @@ export function CollateralRatioHistoryChart({
         <p className="mt-2 text-sm text-[#AAABAB]">
           No collateral ratio history available
         </p>
+        <button
+          type="button"
+          onClick={() => setRetryCount((count) => count + 1)}
+          className="mt-3 text-sm font-medium text-[#71B48D] underline underline-offset-2 hover:text-[#D4F3E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#71B48D]"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -180,8 +187,17 @@ export function CollateralRatioHistoryChart({
           Collateral ratio history
         </p>
         <p className="mt-2 text-sm text-[#AAABAB]">
-          Collateral ratio history unavailable
+          {isPermissionDenied
+            ? "You don't have permission to view collateral ratio history"
+            : "Collateral ratio history unavailable"}
         </p>
+        <button
+          type="button"
+          onClick={() => setRetryCount((count) => count + 1)}
+          className="mt-3 text-sm font-medium text-[#71B48D] underline underline-offset-2 hover:text-[#D4F3E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#71B48D]"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -225,7 +241,7 @@ export function CollateralRatioHistoryChart({
             Collateral ratio history
           </p>
           <p className="text-xs text-[#AAABAB]">
-            Threshold reference: {formatRatio(liquidationThreshold)}
+            Threshold reference: {formatRatio(threshold)}
           </p>
         </div>
         <div className="text-right">
@@ -249,7 +265,7 @@ export function CollateralRatioHistoryChart({
         role="img"
         aria-label={`Collateral ratio history chart. Latest ratio ${formatRatio(
           chart.latestPoint.ratio,
-        )}; liquidation threshold ${formatRatio(liquidationThreshold)}.`}
+        )}; liquidation threshold ${formatRatio(threshold)}.`}
         className="h-28 w-full"
         style={shouldReduceMotion ? { transition: "none" } : undefined}
       >
