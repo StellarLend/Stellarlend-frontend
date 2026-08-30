@@ -2,8 +2,8 @@ import React from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SidebarProvider } from "@/context/SidebarContext";
+import { WalletProvider } from "@/context/WalletContext";
 import { afterEach, beforeEach, vi } from "vitest";
-import { useWallet } from "@/hooks/useWallet";
 
 const fetchWalletBalancesMock = vi.hoisted(() => vi.fn());
 
@@ -31,19 +31,30 @@ vi.mock("@/lib/wallet/balances", () => ({
 
 import TopNav from "./TopNav";
 
-const TEST_ADDRESS = "GABCD1234567890EFGH";
+const TEST_ADDRESS = "GAUFVBMULU2CJRE5IGVPEOXRYZGU5YDAOSQ3UQTBM3Y7ARUPFSXZUHN5";
 
 const mockSessionResponse = (walletAddress: string | null = TEST_ADDRESS) => ({
   ok: Boolean(walletAddress),
   json: async () =>
-    walletAddress ? { session: { user: { walletAddress } } } : {},
+    walletAddress
+      ? {
+          session: {
+            active: true,
+            network: "TESTNET",
+            user: { walletAddress },
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          },
+        }
+      : {},
 });
 
 const renderTopNav = () =>
   render(
-    <SidebarProvider>
-      <TopNav />
-    </SidebarProvider>,
+    <WalletProvider>
+      <SidebarProvider>
+        <TopNav />
+      </SidebarProvider>
+    </WalletProvider>,
   );
 
 const renderConnectedTopNav = async () => {
@@ -141,10 +152,7 @@ describe("TopNav Accessibility", () => {
       name: /connect wallet/i,
     });
 
-    const walletButton = screen.getByRole("button", {
-      name: /connect wallet/i,
-    });
-
+    const accountButtons = [networkButton, walletButton];
     expect(accountButtons.length).toBeGreaterThanOrEqual(1);
   });
 

@@ -3,7 +3,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { connectWallet, isValidStellarAddress } from "./connectHandshake";
 
-const VALID_ADDRESS = "GBRPAME4HFAIMDOM4VES2SO24TEY246NNSUHE4WR37GBTT5CXYABXL7R";
+const VALID_ADDRESS = "GAUFVBMULU2CJRE5IGVPEOXRYZGU5YDAOSQ3UQTBM3Y7ARUPFSXZUHN5";
+const OTHER_VALID_ADDRESS = "GBCKQ7BCF4O7SWKH3GF7G2KRPSURA2HU5WQJRHMIFR3P6DBGVT45XLR3";
 
 function mockResponse(ok: boolean, body: any = {}, status = ok ? 200 : 500) {
   return {
@@ -96,5 +97,33 @@ describe("connectWallet", () => {
       .mockResolvedValueOnce(mockResponse(false, { error: "Invalid signature" }, 400));
 
     await expect(connectWallet("TESTNET")).rejects.toThrow("Invalid signature");
+  });
+
+  it("throws when verification returns a malformed wallet address", async () => {
+    (window as any).stellar = {
+      getPublicKey: vi.fn().mockResolvedValue(VALID_ADDRESS),
+      signTransaction: vi.fn().mockResolvedValue("signed-xdr"),
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(mockResponse(true, { transaction: "challenge-xdr" }))
+      .mockResolvedValueOnce(mockResponse(true, { walletAddress: "not-a-wallet" }));
+
+    await expect(connectWallet("TESTNET")).rejects.toThrow(
+      "Verification returned an invalid wallet address",
+    );
+  });
+
+  it("throws when verification returns a different wallet address", async () => {
+    (window as any).stellar = {
+      getPublicKey: vi.fn().mockResolvedValue(VALID_ADDRESS),
+      signTransaction: vi.fn().mockResolvedValue("signed-xdr"),
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(mockResponse(true, { transaction: "challenge-xdr" }))
+      .mockResolvedValueOnce(mockResponse(true, { walletAddress: OTHER_VALID_ADDRESS }));
+
+    await expect(connectWallet("TESTNET")).rejects.toThrow(
+      "Verified wallet does not match the connected wallet",
+    );
   });
 });
