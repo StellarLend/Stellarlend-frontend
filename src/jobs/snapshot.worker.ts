@@ -135,6 +135,45 @@ function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snaps
   isFiniteNumber(snapshot.createdAt, 'snapshot.createdAt');
 }
 
+const MAX_SNAPSHOT_HISTORY = 365;
+
+function normalizeWalletAddress(walletAddress: string): string {
+  const normalized = walletAddress.trim();
+  if (!normalized) {
+    throw new Error('walletAddress is required');
+  }
+  return normalized;
+}
+
+function isFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${fieldName} must be a finite number`);
+  }
+  return value;
+}
+
+function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snapshot is PositionSnapshot {
+  if (!snapshot || typeof snapshot !== 'object') {
+    throw new Error('snapshot payload is required');
+  }
+
+  const walletAddress = typeof snapshot.walletAddress === 'string' ? snapshot.walletAddress.trim() : '';
+  if (!walletAddress) {
+    throw new Error('snapshot.walletAddress is required');
+  }
+
+  if (typeof snapshot.id !== 'string' || snapshot.id.trim().length === 0) {
+    throw new Error('snapshot.id is required');
+  }
+
+  isFiniteNumber(snapshot.timestamp, 'snapshot.timestamp');
+  isFiniteNumber(snapshot.supplied, 'snapshot.supplied');
+  isFiniteNumber(snapshot.borrowed, 'snapshot.borrowed');
+  isFiniteNumber(snapshot.effectiveSupplyApy, 'snapshot.effectiveSupplyApy');
+  isFiniteNumber(snapshot.effectiveBorrowApy, 'snapshot.effectiveBorrowApy');
+  isFiniteNumber(snapshot.createdAt, 'snapshot.createdAt');
+}
+
 /**
  * In-memory store for position snapshots
  * In production, replace with database queries (Drizzle/PostgreSQL)
@@ -219,36 +258,8 @@ export async function recordSnapshot(snapshot: PositionSnapshot): Promise<void> 
     createdAt: Number(snapshot.createdAt),
   };
 
-  const existingSnapshots = [...(snapshotStore.get(walletAddress) || [])]
+  const walletSnapshots = [...(snapshotStore.get(walletAddress) || []), sanitizedSnapshot]
     .filter((item) => item && typeof item === 'object')
-    .sort((a, b) => a.timestamp - b.timestamp);
-
-  const newestSnapshot = existingSnapshots[existingSnapshots.length - 1];
-  const duplicateById = existingSnapshots.some((item) => item.id === sanitizedSnapshot.id);
-  const duplicateByTimestamp = existingSnapshots.some(
-    (item) => item.timestamp === sanitizedSnapshot.timestamp,
-  );
-
-  if (duplicateById || duplicateByTimestamp) {
-    logger.info('snapshot duplicate skipped', '/jobs/snapshot.worker.ts', {
-      walletAddress,
-      snapshotId: sanitizedSnapshot.id,
-      timestamp: sanitizedSnapshot.timestamp,
-    });
-    return;
-  }
-
-  if (newestSnapshot && sanitizedSnapshot.timestamp < newestSnapshot.timestamp) {
-    logger.info('snapshot stale skipped', '/jobs/snapshot.worker.ts', {
-      walletAddress,
-      snapshotId: sanitizedSnapshot.id,
-      incomingTimestamp: sanitizedSnapshot.timestamp,
-      newestTimestamp: newestSnapshot.timestamp,
-    });
-    return;
-  }
-
-  const walletSnapshots = [...existingSnapshots, sanitizedSnapshot]
     .sort((a, b) => a.timestamp - b.timestamp);
 
   if (walletSnapshots.length > MAX_SNAPSHOT_HISTORY) {
@@ -290,9 +301,7 @@ export interface SnapshotJobResult {
 
 export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<SnapshotJobResult> {
   const startTime = Date.now();
-  if (!Number.isFinite(jobData.timestamp)) {
-    throw new Error('jobData.timestamp must be a finite number');
-  }
+  const now = Number.isFinite(jobData.timestamp) ? jobData.timestamp : Date.now();
 
   const now = jobData.timestamp;
   initializeStore();
@@ -315,13 +324,8 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
       }
 
       const lastSnapshot = existingSnapshots[existingSnapshots.length - 1];
-      const expectedSnapshotId = `snapshot-${walletAddress}-${now}`;
-      if (lastSnapshot.id === expectedSnapshotId || lastSnapshot.timestamp >= now) {
-        continue;
-      }
-
       const newSnapshot: PositionSnapshot = {
-        id: expectedSnapshotId,
+        id: `snapshot-${walletAddress}-${now}`,
         walletAddress,
         timestamp: now,
         supplied: Number(lastSnapshot.supplied) * (0.95 + Math.random() * 0.1),

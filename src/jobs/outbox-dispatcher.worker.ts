@@ -21,6 +21,8 @@ const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
 const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
 const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
 
+const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
+
 // Redis connection options (pulled from environment)
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -70,18 +72,6 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
     throw new Error('Outbox event is missing required fields');
   }
 
-  if (!VALID_OUTBOX_TYPES.has(event.type)) {
-    await db
-      .update(outboxEvents)
-      .set({
-        status: 'FAILED',
-        attempts: Math.min(getAttempts(event) + 1, MAX_OUTBOX_RETRY_ATTEMPTS),
-        lastError: `Unknown event type: ${event.type}`,
-      })
-      .where(eq(outboxEvents.id, event.id));
-    return;
-  }
-
   const attempts = getAttempts(event);
   if (attempts >= MAX_OUTBOX_RETRY_ATTEMPTS) {
     await db
@@ -116,7 +106,6 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
       .set({
         status: 'COMPLETED',
         processedAt: new Date(),
-        attempts: Math.max(attempts, 0),
         lastError: null,
       })
       .where(eq(outboxEvents.id, event.id));
