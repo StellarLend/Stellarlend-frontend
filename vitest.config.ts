@@ -119,6 +119,7 @@ export default defineConfig({
             "lib/markets/repository.test.ts",
             "lib/api/errors.test.ts",
             "lib/account/**/*.test.ts",
+            "lib/notifications/**/*.test.ts",
             "lib/streams/**/*.test.ts",
             "lib/soroban/**/*.test.ts",
             "lib/indexer/**/*.test.ts",

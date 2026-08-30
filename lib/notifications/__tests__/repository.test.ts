@@ -1,20 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getNotifications,
+  getUnreadCount,
   addNotification,
   markNotificationRead,
   clearStore,
 } from '../repository';
 import { db } from '../../db';
 
-vi.mock('../../db', () => {
-  const mockSelect = vi.fn(() => ({
+function mockSelectChain(rows: unknown[]) {
+  return {
     from: vi.fn(() => ({
       where: vi.fn(() => ({
-        orderBy: vi.fn(async () => []),
+        orderBy: vi.fn(() => ({
+          limit: vi.fn(() => ({
+            offset: vi.fn(async () => rows),
+          })),
+        })),
+        // getUnreadCount selects without orderBy/limit/offset, so `where(...)`
+        // itself must be awaitable and resolve to the row array.
+        then: (resolve: (v: unknown[]) => void) => resolve(rows),
       })),
     })),
-  }));
+  };
+}
+
+vi.mock('../../db', () => {
+  const mockSelect = vi.fn(() => mockSelectChain([]));
 
   const mockInsert = vi.fn(() => ({
     values: vi.fn(() => ({
@@ -46,20 +58,15 @@ vi.mock('../../db', () => {
 describe('Drizzle Notifications Repository', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(db.select).mockImplementation(() => mockSelectChain([]) as any);
   });
 
   it('seeds notifications if database is empty', async () => {
-    const mockSelect = vi.mocked(db.select);
-    mockSelect.mockReturnValueOnce({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          orderBy: vi.fn(async () => []), // empty db
-        })),
-      })),
-    } as any);
+    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain([]) as any);
 
-    const list = await getNotifications('user-1');
-    expect(list.length).toBe(3); // Seed size is 3
+    const page = await getNotifications('user-1');
+    expect(page.notifications.length).toBe(3); // Seed size is 3
+    expect(page.hasMore).toBe(false);
     expect(db.insert).toHaveBeenCalled();
   });
 
@@ -74,18 +81,57 @@ describe('Drizzle Notifications Repository', () => {
       type: 'info',
     };
 
-    const mockSelect = vi.mocked(db.select);
-    mockSelect.mockReturnValueOnce({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          orderBy: vi.fn(async () => [mockRow]),
-        })),
-      })),
-    } as any);
+    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain([mockRow]) as any);
 
-    const list = await getNotifications('user-1');
-    expect(list.length).toBe(1);
-    expect(list[0].id).toBe('notif-123'); // Unmapped prefix
+    const page = await getNotifications('user-1');
+    expect(page.notifications.length).toBe(1);
+    expect(page.notifications[0].id).toBe('notif-123'); // Unmapped prefix
+    expect(page.hasMore).toBe(false);
+  });
+
+  it('bounds the requested page size to the hard maximum', async () => {
+    const rows = Array.from({ length: 101 }, (_, i) => ({
+      id: `user-1-notif-${i}`,
+      userId: 'user-1',
+      title: `Notif ${i}`,
+      message: 'Body',
+      read: false,
+      createdAt: new Date(),
+      type: 'info',
+    }));
+
+    // Even if the caller asks for 1000, the repo caps the fetch and result.
+    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain(rows) as any);
+
+    const page = await getNotifications('user-1', { limit: 1000 });
+    expect(page.notifications.length).toBeLessThanOrEqual(100);
+    expect(page.hasMore).toBe(true);
+  });
+
+  it('reports hasMore=false when the page is not full', async () => {
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      id: `user-1-notif-${i}`,
+      userId: 'user-1',
+      title: `Notif ${i}`,
+      message: 'Body',
+      read: false,
+      createdAt: new Date(),
+      type: 'info',
+    }));
+
+    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain(rows) as any);
+
+    const page = await getNotifications('user-1', { limit: 50 });
+    expect(page.notifications.length).toBe(5);
+    expect(page.hasMore).toBe(false);
+  });
+
+  it('computes unread count independently of pagination', async () => {
+    const unreadRows = [{ id: 'user-1-notif-1' }, { id: 'user-1-notif-2' }];
+    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain(unreadRows) as any);
+
+    const count = await getUnreadCount('user-1');
+    expect(count).toBe(2);
   });
 
   it('adds a notification successfully', async () => {

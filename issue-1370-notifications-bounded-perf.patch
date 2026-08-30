@@ -1,0 +1,692 @@
+diff --git a/app/api/notifications/route.test.ts b/app/api/notifications/route.test.ts
+index fc3655c..85025eb 100644
+--- a/app/api/notifications/route.test.ts
++++ b/app/api/notifications/route.test.ts
+@@ -6,15 +6,17 @@ vi.mock("@/lib/auth", () => ({
+ 
+ vi.mock("@/lib/notifications/repository", () => ({
+   getNotifications: vi.fn(),
++  getUnreadCount: vi.fn(),
+ }));
+ 
+ import { GET } from "./route";
+ import { getUser } from "@/lib/auth";
+-import { getNotifications } from "@/lib/notifications/repository";
++import { getNotifications, getUnreadCount } from "@/lib/notifications/repository";
+ import type { Notification } from "@/lib/notifications/types";
+ 
+ const mockGetUser = vi.mocked(getUser);
+ const mockGetNotifications = vi.mocked(getNotifications);
++const mockGetUnreadCount = vi.mocked(getUnreadCount);
+ 
+ function notification(overrides: Partial<Notification> = {}): Notification {
+   return {
+@@ -29,6 +31,10 @@ function notification(overrides: Partial<Notification> = {}): Notification {
+   };
+ }
+ 
++function makeRequest(url = "http://localhost/api/notifications") {
++  return new Request(url) as any;
++}
++
+ describe("GET /api/notifications", () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
+@@ -37,7 +43,7 @@ describe("GET /api/notifications", () => {
+   it("returns 401 when the user is not authenticated", async () => {
+     mockGetUser.mockResolvedValueOnce(null as any);
+ 
+-    const response = await GET();
++    const response = await GET(makeRequest());
+     const body = await response.json();
+ 
+     expect(response.status).toBe(401);
+@@ -45,7 +51,7 @@ describe("GET /api/notifications", () => {
+     expect(mockGetNotifications).not.toHaveBeenCalled();
+   });
+ 
+-  it("returns the caller's notifications with an unread count computed from a mixed fixture", async () => {
++  it("returns the caller's notifications with an unread count computed independently of the page", async () => {
+     const notifications = [
+       notification({ id: "notif-1", read: false }),
+       notification({ id: "notif-2", read: true }),
+@@ -53,14 +59,16 @@ describe("GET /api/notifications", () => {
+       notification({ id: "notif-4", read: true }),
+     ];
+     mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+-    mockGetNotifications.mockResolvedValueOnce(notifications);
++    mockGetNotifications.mockResolvedValueOnce({ notifications, hasMore: false });
++    mockGetUnreadCount.mockResolvedValueOnce(2);
+ 
+-    const response = await GET();
++    const response = await GET(makeRequest());
+     const body = await response.json();
+ 
+     expect(response.status).toBe(200);
+-    expect(mockGetNotifications).toHaveBeenCalledWith("user-1");
+-    expect(body).toEqual({ notifications, unreadCount: 2 });
++    expect(mockGetNotifications).toHaveBeenCalledWith("user-1", { limit: 50, offset: 0 });
++    expect(mockGetUnreadCount).toHaveBeenCalledWith("user-1");
++    expect(body).toEqual({ notifications, unreadCount: 2, hasMore: false });
+   });
+ 
+   it("reports a zero unread count when every notification is read", async () => {
+@@ -69,12 +77,33 @@ describe("GET /api/notifications", () => {
+       notification({ id: "notif-2", read: true }),
+     ];
+     mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
+-    mockGetNotifications.mockResolvedValueOnce(notifications);
++    mockGetNotifications.mockResolvedValueOnce({ notifications, hasMore: false });
++    mockGetUnreadCount.mockResolvedValueOnce(0);
+ 
+-    const response = await GET();
++    const response = await GET(makeRequest());
+     const body = await response.json();
+ 
+     expect(response.status).toBe(200);
+-    expect(body).toEqual({ notifications, unreadCount: 0 });
++    expect(body).toEqual({ notifications, unreadCount: 0, hasMore: false });
++  });
++
++  it("clamps an out-of-range limit to the maximum page size", async () => {
++    mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
++    mockGetNotifications.mockResolvedValueOnce({ notifications: [], hasMore: false });
++    mockGetUnreadCount.mockResolvedValueOnce(0);
++
++    await GET(makeRequest("http://localhost/api/notifications?limit=99999&offset=-5"));
++
++    expect(mockGetNotifications).toHaveBeenCalledWith("user-1", { limit: 100, offset: 0 });
++  });
++
++  it("falls back to defaults for non-numeric pagination params", async () => {
++    mockGetUser.mockResolvedValueOnce({ id: "user-1" } as any);
++    mockGetNotifications.mockResolvedValueOnce({ notifications: [], hasMore: false });
++    mockGetUnreadCount.mockResolvedValueOnce(0);
++
++    await GET(makeRequest("http://localhost/api/notifications?limit=abc&offset=xyz"));
++
++    expect(mockGetNotifications).toHaveBeenCalledWith("user-1", { limit: 50, offset: 0 });
+   });
+ });
+diff --git a/app/api/notifications/route.ts b/app/api/notifications/route.ts
+index a6c2d5f..0dfaca0 100644
+--- a/app/api/notifications/route.ts
++++ b/app/api/notifications/route.ts
+@@ -1,28 +1,43 @@
+-import { NextResponse } from 'next/server';
++import { NextRequest, NextResponse } from 'next/server';
+ import { getUser } from '@/lib/auth';
+-import { getNotifications } from '@/lib/notifications/repository';
++import { getNotifications, getUnreadCount } from '@/lib/notifications/repository';
++import { parseNotificationsPagination } from '@/lib/validation/notifications';
+ 
+ export const runtime = 'nodejs';
+ 
+-/** GET /api/notifications
++/** GET /api/notifications?limit=&offset=
+  *
+  *  Requires an authenticated session (session cookie).
+- *  Returns the caller's notifications list and unread count.
++ *  Returns a bounded page of the caller's notifications plus the total
++ *  unread count (computed independently of the page so it stays accurate
++ *  even when the unread items fall outside the current page).
++ *
++ *  `limit` defaults to 50 and is clamped to a maximum of 100.
++ *  `offset` defaults to 0. Invalid values fall back to the defaults rather
++ *  than erroring, since these only affect a read-only listing.
+  *
+  *  Response shape:
+- *    { notifications: Notification[], unreadCount: number }
++ *    { notifications: Notification[], unreadCount: number, hasMore: boolean }
+  *
+  *  Errors:
+  *    401  – no valid session
+  */
+-export async function GET() {
++export async function GET(request: NextRequest) {
+   const user = await getUser();
+   if (!user) {
+     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+   }
+ 
+-  const notifications = await getNotifications(user.id);
+-  const unreadCount = notifications.filter((n) => !n.read).length;
++  const { searchParams } = new URL(request.url);
++  const { limit, offset } = parseNotificationsPagination({
++    limit: searchParams.get('limit'),
++    offset: searchParams.get('offset'),
++  });
++
++  const [{ notifications, hasMore }, unreadCount] = await Promise.all([
++    getNotifications(user.id, { limit, offset }),
++    getUnreadCount(user.id),
++  ]);
+ 
+-  return NextResponse.json({ notifications, unreadCount });
++  return NextResponse.json({ notifications, unreadCount, hasMore });
+ }
+diff --git a/components/features/notifications/NotificationCenter.test.tsx b/components/features/notifications/NotificationCenter.test.tsx
+index e29a912..ed6f4b9 100644
+--- a/components/features/notifications/NotificationCenter.test.tsx
++++ b/components/features/notifications/NotificationCenter.test.tsx
+@@ -386,5 +386,67 @@ describe("NotificationCenter", () => {
+         expect(screen.getByTestId("live-region")).toHaveTextContent("New notification: Live Update");
+       });
+     });
++
++    it("caps the in-memory notification list so it cannot grow without bound", async () => {
++      mockFetchSuccess([]);
++      render(<NotificationCenter />);
++      await screen.findByRole("button", { name: /no unread/i });
++
++      // Stream in far more notifications than the client-side cap.
++      act(() => {
++        for (let i = 0; i < 150; i += 1) {
++          capturedOnNotification?.(
++            makeNotification({ id: `live-${i}`, title: `Live ${i}`, read: true }),
++          );
++        }
++      });
++
++      const trigger = screen.getByRole("button", { name: /notification/i });
++      fireEvent.click(trigger);
++      const items = screen.getAllByTestId(/notification-item-/);
++      expect(items.length).toBeLessThanOrEqual(100);
++      // The most recent event should still be present (oldest ones drop off).
++      expect(screen.getByText("Live 149")).toBeInTheDocument();
++    });
++
++    it("caps the initial fetch result to the client-side maximum as a defensive measure", async () => {
++      const manyNotifications = Array.from({ length: 120 }, (_, i) =>
++        makeNotification({ id: `n${i}`, title: `Notif ${i}`, read: true }),
++      );
++      mockFetchSuccess(manyNotifications);
++      render(<NotificationCenter />);
++      const trigger = await screen.findByRole("button", { name: /notification/i });
++      fireEvent.click(trigger);
++      const items = screen.getAllByTestId(/notification-item-/);
++      expect(items.length).toBeLessThanOrEqual(100);
++    });
++  });
++
++  describe("degraded stream visibility", () => {
++    it("shows a reconnecting indicator when the SSE connection reports offline", async () => {
++      streamFn.mockImplementation((opts?: { onNotification?: (n: Notification) => void }) => {
++        capturedOnNotification = opts?.onNotification;
++        return { unreadCount: 0, connectionState: "offline" };
++      });
++      mockFetchSuccess([]);
++      render(<NotificationCenter />);
++      const trigger = await screen.findByRole("button", { name: /no unread/i });
++      fireEvent.click(trigger);
++
++      expect(screen.getByTestId("notification-stream-offline")).toBeInTheDocument();
++    });
++
++    it("does not show a reconnecting indicator while connected", async () => {
++      streamFn.mockImplementation((opts?: { onNotification?: (n: Notification) => void }) => {
++        capturedOnNotification = opts?.onNotification;
++        return { unreadCount: 0, connectionState: "connected" };
++      });
++      mockFetchSuccess([]);
++      render(<NotificationCenter />);
++      const trigger = await screen.findByRole("button", { name: /no unread/i });
++      fireEvent.click(trigger);
++
++      expect(screen.queryByTestId("notification-stream-offline")).not.toBeInTheDocument();
++    });
+   });
+ });
+diff --git a/components/features/notifications/NotificationCenter.tsx b/components/features/notifications/NotificationCenter.tsx
+index 78aab74..0d91814 100644
+--- a/components/features/notifications/NotificationCenter.tsx
++++ b/components/features/notifications/NotificationCenter.tsx
+@@ -16,6 +16,14 @@ const typeColors: Record<Notification["type"], string> = {
+   error: "bg-red-100 text-red-700",
+ };
+ 
++// Upper bound on how many notifications the panel keeps in memory. The
++// initial fetch is already server-paginated (see /api/notifications), but
++// this also caps unbounded growth from live SSE events arriving over a
++// long-lived session (a user who leaves a tab open for days shouldn't
++// accumulate an ever-growing in-memory list).
++const MAX_CLIENT_NOTIFICATIONS = 100;
++const INITIAL_FETCH_LIMIT = 50;
++
+ const NotificationCenter = () => {
+   const [notifications, setNotifications] = useState<Notification[]>([]);
+   const [isOpen, setIsOpen] = useState(false);
+@@ -29,7 +37,7 @@ const NotificationCenter = () => {
+   const displayCount = unreadCount > 99 ? "99+" : String(unreadCount);
+ 
+   useEffect(() => {
+-    fetch("/api/notifications")
++    fetch(`/api/notifications?limit=${INITIAL_FETCH_LIMIT}`)
+       .then((res) => {
+         if (res.status === 401) {
+           setHidden(true);
+@@ -40,7 +48,7 @@ const NotificationCenter = () => {
+       })
+       .then((data) => {
+         if (data?.notifications) {
+-          setNotifications(data.notifications);
++          setNotifications(data.notifications.slice(0, MAX_CLIENT_NOTIFICATIONS));
+         }
+       })
+       .catch(() => {});
+@@ -49,12 +57,17 @@ const NotificationCenter = () => {
+   const handleNewNotification = useCallback((notification: Notification) => {
+     setNotifications((prev) => {
+       if (prev.some((n) => n.id === notification.id)) return prev;
+-      return [notification, ...prev];
++      // Bound the in-memory list so a long-running session with many live
++      // events can't grow this array without limit; oldest items fall off.
++      return [notification, ...prev].slice(0, MAX_CLIENT_NOTIFICATIONS);
+     });
+     setAriaMessage(`New notification: ${notification.title}`);
+   }, []);
+ 
+-  useNotificationStream({ onNotification: handleNewNotification });
++  const { connectionState } = useNotificationStream({
++    onNotification: handleNewNotification,
++  });
++  const isDegraded = connectionState === "offline";
+ 
+   const handleMarkRead = useCallback(async (id: string) => {
+     setNotifications((prev) =>
+@@ -168,8 +181,17 @@ const NotificationCenter = () => {
+           data-testid="notification-panel"
+           className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+         >
+-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-sm font-semibold text-gray-900 dark:text-gray-100">
+-            Notifications
++          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between gap-2">
++            <span>Notifications</span>
++            {isDegraded && (
++              <span
++                data-testid="notification-stream-offline"
++                className="text-[10px] font-normal normal-case text-amber-600 dark:text-amber-400"
++                role="status"
++              >
++                Live updates paused — reconnecting…
++              </span>
++            )}
+           </div>
+ 
+           {notifications.length === 0 ? (
+diff --git a/lib/notifications/__tests__/repository.test.ts b/lib/notifications/__tests__/repository.test.ts
+index 467a309..80dbf0c 100644
+--- a/lib/notifications/__tests__/repository.test.ts
++++ b/lib/notifications/__tests__/repository.test.ts
+@@ -1,20 +1,32 @@
+ import { describe, it, expect, vi, beforeEach } from 'vitest';
+ import {
+   getNotifications,
++  getUnreadCount,
+   addNotification,
+   markNotificationRead,
+   clearStore,
+ } from '../repository';
+ import { db } from '../../db';
+ 
+-vi.mock('../../db', () => {
+-  const mockSelect = vi.fn(() => ({
++function mockSelectChain(rows: unknown[]) {
++  return {
+     from: vi.fn(() => ({
+       where: vi.fn(() => ({
+-        orderBy: vi.fn(async () => []),
++        orderBy: vi.fn(() => ({
++          limit: vi.fn(() => ({
++            offset: vi.fn(async () => rows),
++          })),
++        })),
++        // getUnreadCount selects without orderBy/limit/offset, so `where(...)`
++        // itself must be awaitable and resolve to the row array.
++        then: (resolve: (v: unknown[]) => void) => resolve(rows),
+       })),
+     })),
+-  }));
++  };
++}
++
++vi.mock('../../db', () => {
++  const mockSelect = vi.fn(() => mockSelectChain([]));
+ 
+   const mockInsert = vi.fn(() => ({
+     values: vi.fn(() => ({
+@@ -46,20 +58,15 @@ vi.mock('../../db', () => {
+ describe('Drizzle Notifications Repository', () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
++    vi.mocked(db.select).mockImplementation(() => mockSelectChain([]) as any);
+   });
+ 
+   it('seeds notifications if database is empty', async () => {
+-    const mockSelect = vi.mocked(db.select);
+-    mockSelect.mockReturnValueOnce({
+-      from: vi.fn(() => ({
+-        where: vi.fn(() => ({
+-          orderBy: vi.fn(async () => []), // empty db
+-        })),
+-      })),
+-    } as any);
++    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain([]) as any);
+ 
+-    const list = await getNotifications('user-1');
+-    expect(list.length).toBe(3); // Seed size is 3
++    const page = await getNotifications('user-1');
++    expect(page.notifications.length).toBe(3); // Seed size is 3
++    expect(page.hasMore).toBe(false);
+     expect(db.insert).toHaveBeenCalled();
+   });
+ 
+@@ -74,18 +81,57 @@ describe('Drizzle Notifications Repository', () => {
+       type: 'info',
+     };
+ 
+-    const mockSelect = vi.mocked(db.select);
+-    mockSelect.mockReturnValueOnce({
+-      from: vi.fn(() => ({
+-        where: vi.fn(() => ({
+-          orderBy: vi.fn(async () => [mockRow]),
+-        })),
+-      })),
+-    } as any);
++    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain([mockRow]) as any);
++
++    const page = await getNotifications('user-1');
++    expect(page.notifications.length).toBe(1);
++    expect(page.notifications[0].id).toBe('notif-123'); // Unmapped prefix
++    expect(page.hasMore).toBe(false);
++  });
++
++  it('bounds the requested page size to the hard maximum', async () => {
++    const rows = Array.from({ length: 101 }, (_, i) => ({
++      id: `user-1-notif-${i}`,
++      userId: 'user-1',
++      title: `Notif ${i}`,
++      message: 'Body',
++      read: false,
++      createdAt: new Date(),
++      type: 'info',
++    }));
++
++    // Even if the caller asks for 1000, the repo caps the fetch and result.
++    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain(rows) as any);
++
++    const page = await getNotifications('user-1', { limit: 1000 });
++    expect(page.notifications.length).toBeLessThanOrEqual(100);
++    expect(page.hasMore).toBe(true);
++  });
++
++  it('reports hasMore=false when the page is not full', async () => {
++    const rows = Array.from({ length: 5 }, (_, i) => ({
++      id: `user-1-notif-${i}`,
++      userId: 'user-1',
++      title: `Notif ${i}`,
++      message: 'Body',
++      read: false,
++      createdAt: new Date(),
++      type: 'info',
++    }));
++
++    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain(rows) as any);
++
++    const page = await getNotifications('user-1', { limit: 50 });
++    expect(page.notifications.length).toBe(5);
++    expect(page.hasMore).toBe(false);
++  });
++
++  it('computes unread count independently of pagination', async () => {
++    const unreadRows = [{ id: 'user-1-notif-1' }, { id: 'user-1-notif-2' }];
++    vi.mocked(db.select).mockReturnValueOnce(mockSelectChain(unreadRows) as any);
+ 
+-    const list = await getNotifications('user-1');
+-    expect(list.length).toBe(1);
+-    expect(list[0].id).toBe('notif-123'); // Unmapped prefix
++    const count = await getUnreadCount('user-1');
++    expect(count).toBe(2);
+   });
+ 
+   it('adds a notification successfully', async () => {
+diff --git a/lib/notifications/repository.ts b/lib/notifications/repository.ts
+index a79fc49..9b7b291 100644
+--- a/lib/notifications/repository.ts
++++ b/lib/notifications/repository.ts
+@@ -65,29 +65,81 @@ async function seedUser(userId: string): Promise<Notification[]> {
+   }));
+ }
+ 
+-/** Returns all notifications for `userId`, seeding demo data on first access. */
++export interface GetNotificationsOptions {
++  /** Max rows to return. Callers should pass an already-clamped value
++   * (see `parseNotificationsPagination`) — this is a last-line defensive cap. */
++  limit?: number;
++  offset?: number;
++}
++
++export interface NotificationsPage {
++  notifications: Notification[];
++  /** True when more rows exist beyond this page (limit+offset < total). */
++  hasMore: boolean;
++}
++
++const HARD_MAX_PAGE_SIZE = 100;
++
++/**
++ * Returns a bounded page of notifications for `userId`, most recent first,
++ * seeding demo data on first access. Unbounded reads are never issued
++ * against the notifications table to keep response size and memory
++ * bounded regardless of caller input.
++ */
+ export async function getNotifications(
+   userId: string,
+-): Promise<Notification[]> {
++  options: GetNotificationsOptions = {},
++): Promise<NotificationsPage> {
++  const limit = Math.max(
++    1,
++    Math.min(options.limit ?? HARD_MAX_PAGE_SIZE, HARD_MAX_PAGE_SIZE),
++  );
++  const offset = Math.max(0, options.offset ?? 0);
++
+   const rows = await db
+     .select()
+     .from(notificationsTable)
+     .where(eq(notificationsTable.userId, userId))
+-    .orderBy(desc(notificationsTable.createdAt));
+-
+-  if (rows.length === 0) {
+-    return await seedUser(userId);
++    .orderBy(desc(notificationsTable.createdAt))
++    // Fetch one extra row to cheaply determine hasMore without a count query.
++    .limit(limit + 1)
++    .offset(offset);
++
++  if (rows.length === 0 && offset === 0) {
++    const seeded = await seedUser(userId);
++    return { notifications: seeded.slice(0, limit), hasMore: seeded.length > limit };
+   }
+ 
+-  return rows.map((r) => ({
+-    id: r.id.replace(`${userId}-`, ""),
+-    userId: r.userId,
+-    title: r.title,
+-    message: r.message,
+-    read: r.read,
+-    createdAt: r.createdAt.toISOString(),
+-    type: r.type,
+-  }));
++  const hasMore = rows.length > limit;
++  const page = hasMore ? rows.slice(0, limit) : rows;
++
++  return {
++    notifications: page.map((r) => ({
++      id: r.id.replace(`${userId}-`, ""),
++      userId: r.userId,
++      title: r.title,
++      message: r.message,
++      read: r.read,
++      createdAt: r.createdAt.toISOString(),
++      type: r.type,
++    })),
++    hasMore,
++  };
++}
++
++/** Returns the count of unread notifications for `userId` without loading
++ * the full notification list into memory. */
++export async function getUnreadCount(userId: string): Promise<number> {
++  const rows = await db
++    .select({ id: notificationsTable.id })
++    .from(notificationsTable)
++    .where(
++      and(
++        eq(notificationsTable.userId, userId),
++        eq(notificationsTable.read, false),
++      ),
++    );
++  return rows.length;
+ }
+ 
+ /** Adds a new notification for userId, emits hub events, and returns it.
+@@ -143,8 +195,7 @@ export async function addNotification(
+   }
+ 
+   try {
+-    const list = await getNotifications(trimmedUserId);
+-    const unreadCount = list.filter((x) => !x.read).length;
++    const unreadCount = await getUnreadCount(trimmedUserId);
+     notificationHub.publish(trimmedUserId, { type: "unreadCount", unreadCount });
+   } catch (e) {
+     // noop
+diff --git a/lib/validation/notifications.test.ts b/lib/validation/notifications.test.ts
+index 3406121..76ddd79 100644
+--- a/lib/validation/notifications.test.ts
++++ b/lib/validation/notifications.test.ts
+@@ -7,6 +7,10 @@ import {
+   validateNotificationPayload,
+   sanitizeNotificationId,
+   sanitizeUserId,
++  parseNotificationsPagination,
++  DEFAULT_NOTIFICATIONS_PAGE_SIZE,
++  MAX_NOTIFICATIONS_PAGE_SIZE,
++  MAX_NOTIFICATIONS_OFFSET,
+ } from '@/lib/validation/notifications';
+ 
+ describe('lib/validation/notifications', () => {
+@@ -226,4 +230,59 @@ describe('lib/validation/notifications', () => {
+       expect(sanitizeUserId('  user-123  ')).toBe('user-123');
+     });
+   });
++
++  describe('parseNotificationsPagination', () => {
++    it('defaults limit and offset when nothing is provided', () => {
++      expect(parseNotificationsPagination({})).toEqual({
++        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
++        offset: 0,
++      });
++    });
++
++    it('honors an in-range limit and offset', () => {
++      expect(
++        parseNotificationsPagination({ limit: '10', offset: '20' }),
++      ).toEqual({ limit: 10, offset: 20 });
++    });
++
++    it('clamps a limit above the maximum page size', () => {
++      expect(
++        parseNotificationsPagination({ limit: '999999' }),
++      ).toEqual({ limit: MAX_NOTIFICATIONS_PAGE_SIZE, offset: 0 });
++    });
++
++    it('clamps an offset above the maximum offset', () => {
++      expect(
++        parseNotificationsPagination({ offset: '999999999' }),
++      ).toEqual({ limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE, offset: MAX_NOTIFICATIONS_OFFSET });
++    });
++
++    it('falls back to defaults for non-numeric or non-positive values', () => {
++      expect(parseNotificationsPagination({ limit: 'abc', offset: 'xyz' })).toEqual({
++        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
++        offset: 0,
++      });
++      expect(parseNotificationsPagination({ limit: '-5', offset: '-1' })).toEqual({
++        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
++        offset: 0,
++      });
++      expect(parseNotificationsPagination({ limit: '0' })).toEqual({
++        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
++        offset: 0,
++      });
++    });
++
++    it('floors fractional values', () => {
++      expect(parseNotificationsPagination({ limit: '10.9', offset: '5.9' })).toEqual({
++        limit: 10,
++        offset: 5,
++      });
++    });
++
++    it('treats null values (missing query params) as defaults', () => {
++      expect(
++        parseNotificationsPagination({ limit: null, offset: null }),
++      ).toEqual({ limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE, offset: 0 });
++    });
++  });
+ });
+diff --git a/lib/validation/notifications.ts b/lib/validation/notifications.ts
+index 3ceea6c..59c7f93 100644
+--- a/lib/validation/notifications.ts
++++ b/lib/validation/notifications.ts
+@@ -6,6 +6,37 @@ const MAX_USER_ID_LENGTH = 256;
+ const VALID_NOTIFICATION_TYPES: NotificationType[] = ['info', 'success', 'warning', 'error'];
+ const NOTIFICATION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+ 
++/** Default and hard-cap page sizes for notification list pagination. */
++export const DEFAULT_NOTIFICATIONS_PAGE_SIZE = 50;
++export const MAX_NOTIFICATIONS_PAGE_SIZE = 100;
++export const MAX_NOTIFICATIONS_OFFSET = 10_000;
++
++/**
++ * Parses and clamps untrusted `limit`/`offset` query params into safe,
++ * bounded pagination values. Never throws: invalid or out-of-range input
++ * falls back to the defaults/bounds rather than rejecting the request,
++ * since these are read-only display params.
++ */
++export function parseNotificationsPagination(params: {
++  limit?: string | null;
++  offset?: string | null;
++}): { limit: number; offset: number } {
++  const rawLimit = Number(params.limit);
++  const rawOffset = Number(params.offset);
++
++  const limit =
++    Number.isFinite(rawLimit) && rawLimit > 0
++      ? Math.min(Math.floor(rawLimit), MAX_NOTIFICATIONS_PAGE_SIZE)
++      : DEFAULT_NOTIFICATIONS_PAGE_SIZE;
++
++  const offset =
++    Number.isFinite(rawOffset) && rawOffset > 0
++      ? Math.min(Math.floor(rawOffset), MAX_NOTIFICATIONS_OFFSET)
++      : 0;
++
++  return { limit, offset };
++}
++
+ export interface ValidationResult {
+   valid: boolean;
+   error?: string;
+diff --git a/vitest.config.ts b/vitest.config.ts
+index 63ce061..bc72e2c 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -119,6 +119,7 @@ export default defineConfig({
+             "lib/markets/repository.test.ts",
+             "lib/api/errors.test.ts",
+             "lib/account/**/*.test.ts",
++            "lib/notifications/**/*.test.ts",
+             "lib/streams/**/*.test.ts",
+             "lib/soroban/**/*.test.ts",
+             "lib/indexer/**/*.test.ts",

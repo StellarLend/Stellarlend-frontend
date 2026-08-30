@@ -16,6 +16,14 @@ const typeColors: Record<Notification["type"], string> = {
   error: "bg-red-100 text-red-700",
 };
 
+// Upper bound on how many notifications the panel keeps in memory. The
+// initial fetch is already server-paginated (see /api/notifications), but
+// this also caps unbounded growth from live SSE events arriving over a
+// long-lived session (a user who leaves a tab open for days shouldn't
+// accumulate an ever-growing in-memory list).
+const MAX_CLIENT_NOTIFICATIONS = 100;
+const INITIAL_FETCH_LIMIT = 50;
+
 const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -29,7 +37,7 @@ const NotificationCenter = () => {
   const displayCount = unreadCount > 99 ? "99+" : String(unreadCount);
 
   useEffect(() => {
-    fetch("/api/notifications")
+    fetch(`/api/notifications?limit=${INITIAL_FETCH_LIMIT}`)
       .then((res) => {
         if (res.status === 401) {
           setHidden(true);
@@ -40,7 +48,7 @@ const NotificationCenter = () => {
       })
       .then((data) => {
         if (data?.notifications) {
-          setNotifications(data.notifications);
+          setNotifications(data.notifications.slice(0, MAX_CLIENT_NOTIFICATIONS));
         }
       })
       .catch(() => {});
@@ -49,12 +57,17 @@ const NotificationCenter = () => {
   const handleNewNotification = useCallback((notification: Notification) => {
     setNotifications((prev) => {
       if (prev.some((n) => n.id === notification.id)) return prev;
-      return [notification, ...prev];
+      // Bound the in-memory list so a long-running session with many live
+      // events can't grow this array without limit; oldest items fall off.
+      return [notification, ...prev].slice(0, MAX_CLIENT_NOTIFICATIONS);
     });
     setAriaMessage(`New notification: ${notification.title}`);
   }, []);
 
-  useNotificationStream({ onNotification: handleNewNotification });
+  const { connectionState } = useNotificationStream({
+    onNotification: handleNewNotification,
+  });
+  const isDegraded = connectionState === "offline";
 
   const handleMarkRead = useCallback(async (id: string) => {
     setNotifications((prev) =>
@@ -168,8 +181,17 @@ const NotificationCenter = () => {
           data-testid="notification-panel"
           className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
         >
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-sm font-semibold text-gray-900 dark:text-gray-100">
-            Notifications
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between gap-2">
+            <span>Notifications</span>
+            {isDegraded && (
+              <span
+                data-testid="notification-stream-offline"
+                className="text-[10px] font-normal normal-case text-amber-600 dark:text-amber-400"
+                role="status"
+              >
+                Live updates paused — reconnecting…
+              </span>
+            )}
           </div>
 
           {notifications.length === 0 ? (

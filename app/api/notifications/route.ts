@@ -1,28 +1,43 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
-import { getNotifications } from '@/lib/notifications/repository';
+import { getNotifications, getUnreadCount } from '@/lib/notifications/repository';
+import { parseNotificationsPagination } from '@/lib/validation/notifications';
 
 export const runtime = 'nodejs';
 
-/** GET /api/notifications
+/** GET /api/notifications?limit=&offset=
  *
  *  Requires an authenticated session (session cookie).
- *  Returns the caller's notifications list and unread count.
+ *  Returns a bounded page of the caller's notifications plus the total
+ *  unread count (computed independently of the page so it stays accurate
+ *  even when the unread items fall outside the current page).
+ *
+ *  `limit` defaults to 50 and is clamped to a maximum of 100.
+ *  `offset` defaults to 0. Invalid values fall back to the defaults rather
+ *  than erroring, since these only affect a read-only listing.
  *
  *  Response shape:
- *    { notifications: Notification[], unreadCount: number }
+ *    { notifications: Notification[], unreadCount: number, hasMore: boolean }
  *
  *  Errors:
  *    401  – no valid session
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   const user = await getUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const notifications = await getNotifications(user.id);
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const { searchParams } = new URL(request.url);
+  const { limit, offset } = parseNotificationsPagination({
+    limit: searchParams.get('limit'),
+    offset: searchParams.get('offset'),
+  });
 
-  return NextResponse.json({ notifications, unreadCount });
+  const [{ notifications, hasMore }, unreadCount] = await Promise.all([
+    getNotifications(user.id, { limit, offset }),
+    getUnreadCount(user.id),
+  ]);
+
+  return NextResponse.json({ notifications, unreadCount, hasMore });
 }
