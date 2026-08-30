@@ -28,6 +28,7 @@ describe('GET /api/positions/history', () => {
   beforeEach(() => {
     globalCache.clear();
     vi.clearAllMocks();
+    vi.mocked(auth.getUser).mockResolvedValue(createMockUser());
   });
 
   afterEach(() => {
@@ -110,7 +111,6 @@ describe('GET /api/positions/history', () => {
       const to = now;
 
       globalCache.clear();
-      vi.clearAllMocks();
       vi.mocked(auth.getUser).mockResolvedValueOnce(createMockUser());
       vi.mocked(snapshotWorker.getWalletSnapshots).mockResolvedValueOnce([]);
 

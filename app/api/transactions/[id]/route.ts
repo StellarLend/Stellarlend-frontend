@@ -27,7 +27,7 @@ async function handleGetTransactionDetail(
     return NextResponse.json(
       {
         error: 'Invalid transaction ID format',
-        details: validationResult.error.errors[0].message,
+        details: validationResult.error.issues[0]?.message || 'Invalid ID',
       },
       { status: 400 }
     );

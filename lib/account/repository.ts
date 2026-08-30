@@ -1,5 +1,5 @@
-import { db } from '@/lib/db/client';
-import { profiles } from '@/lib/db/schema';
+import { db } from '@/lib/db/index';
+import { accounts } from '@/lib/db/schema/accounts';
 import { eq } from 'drizzle-orm';
 
 export interface ProfileRecord {
@@ -12,49 +12,43 @@ export interface ProfileRecord {
 }
 
 export interface ProfileRepository {
-    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null>;
+    getByUserId(userId: string, tx?: any): Promise<ProfileRecord | null>;
 
     upsert(
         userId: string,
         data: Omit<ProfileRecord, "userId" | "updatedAt">,
         tx?: any
-    ): ProfileRecord | Promise<ProfileRecord>;
+    ): Promise<ProfileRecord>;
 }
 
 const ANONYMIZED_MARKER = '[deleted]';
 
 class DrizzleProfileRepository implements ProfileRepository {
-    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null> {
+    async getByUserId(userId: string, tx?: any): Promise<ProfileRecord | null> {
         const client = tx || db;
-        const query = client
+        const [result] = await client
             .select()
-            .from(profiles)
-            .where(eq(profiles.userId, userId))
+            .from(accounts)
+            .where(eq(accounts.userId, userId))
             .limit(1);
-
-        if (tx) {
-            const results = query.all();
-            return results[0] ?? null;
-        } else {
-            return query.then((results: any[]) => results[0] ?? null);
-        }
+        return result ?? null;
     }
 
-    upsert(
+    async upsert(
         userId: string,
         data: Omit<ProfileRecord, "userId" | "updatedAt">,
         tx?: any
-    ): ProfileRecord | Promise<ProfileRecord> {
+    ): Promise<ProfileRecord> {
         const client = tx || db;
-        const query = client
-            .insert(profiles)
+        const [result] = await client
+            .insert(accounts)
             .values({
                 userId,
                 ...data,
                 updatedAt: new Date(),
             })
             .onConflictDoUpdate({
-                target: profiles.userId,
+                target: accounts.userId,
                 set: {
                     displayName: data.displayName,
                     bio: data.bio,
@@ -64,13 +58,7 @@ class DrizzleProfileRepository implements ProfileRepository {
                 },
             })
             .returning();
-
-        if (tx) {
-            const results = query.all();
-            return results[0];
-        } else {
-            return query.then((results: any[]) => results[0]);
-        }
+        return result;
     }
 
     async anonymizeByUserId(userId: string): Promise<boolean> {
@@ -78,7 +66,7 @@ class DrizzleProfileRepository implements ProfileRepository {
         if (!existing) return false;
 
         await db
-            .update(profiles)
+            .update(accounts)
             .set({
                 displayName: ANONYMIZED_MARKER,
                 bio: "",
@@ -86,7 +74,7 @@ class DrizzleProfileRepository implements ProfileRepository {
                 timezone: "UTC",
                 updatedAt: new Date(),
             })
-            .where(eq(profiles.userId, userId));
+            .where(eq(accounts.userId, userId));
         return true;
     }
 }

@@ -1,5 +1,18 @@
 "use client";
 
+/**
+ * Accessibility announcement component for lending action statuses.
+ *
+ * Every lending action form (lend / borrow / repay / withdraw) MUST render
+ * this component with its corresponding `type` prop so that screen-reader
+ * users receive live feedback when a form transitions through
+ * idle -> submitting -> success / error states.
+ *
+ * If a new lending action type is added to the app, both the `type` union
+ * below and each form that implements that action must include a
+ * `<StatusAnnouncer>` instance.
+ */
+
 import React, { useEffect, useState } from "react";
 
 export type AnnouncerStatus = "idle" | "submitting" | "success" | "error";
@@ -7,7 +20,7 @@ export type AnnouncerStatus = "idle" | "submitting" | "success" | "error";
 interface StatusAnnouncerProps {
   status: AnnouncerStatus;
   message?: string;
-  type: "lend" | "borrow" | "repay";
+  type: "lend" | "borrow" | "repay" | "withdraw";
 }
 
 export default function StatusAnnouncer({
@@ -41,6 +54,7 @@ export default function StatusAnnouncer({
       role="status"
       aria-live="polite"
       aria-atomic="true"
+      data-testid="status-announcer"
     >
       {announcement}
     </div>

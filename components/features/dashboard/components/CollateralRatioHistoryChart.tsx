@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import type { SnapshotHistoryResponse } from "@/lib/positions/snapshot";
+import { buildSvgPath } from "@/lib/utils/svg";
 
 interface CollateralRatioPoint {
   timestamp: number;
@@ -34,21 +35,40 @@ function formatDate(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
+function getDateRangeText(firstTimestamp: number, lastTimestamp: number): string {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const elapsedDays = Math.round((lastTimestamp - firstTimestamp) / msPerDay);
+
+  if (elapsedDays <= 0) {
+    return `as of ${formatDate(lastTimestamp)}`;
+  }
+
+  if (elapsedDays === 1) {
+    return "over the last day";
+  }
+
+  return `over the last ${elapsedDays} days`;
+}
+
+function formatCollateralRatioSummary(
+  latestRatio: number,
+  firstRatio: number,
+  firstTimestamp: number,
+  lastTimestamp: number,
+): string {
+  const change = latestRatio - firstRatio;
+  const direction = change > 0 ? "up" : change < 0 ? "down" : "unchanged";
+  const changeText = change === 0 ? "unchanged" : `trending ${direction} ${Math.abs(change).toFixed(2)}x`;
+  const rangeText = getDateRangeText(firstTimestamp, lastTimestamp);
+
+  return `Collateral ratio is ${formatRatio(latestRatio)}, ${changeText} ${rangeText}.`;
+}
+
 function buildPath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) {
     return "";
   }
-
-  if (points.length === 1) {
-    return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-  }
-
-  return points
-    .map((point, index) => {
-      const command = index === 0 ? "M" : "L";
-      return `${command} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
-    })
-    .join(" ");
+  return buildSvgPath(points);
 }
 
 function toCollateralRatioPoints(
@@ -158,13 +178,19 @@ export function CollateralRatioHistoryChart({
     const latestPoint = points[points.length - 1];
 
     return {
-      linePath: buildPath(mappedPoints),
+      linePath: buildSvgPath(mappedPoints),
       thresholdY: yForRatio(liquidationThreshold),
       latestPoint,
       latestSvgPoint: mappedPoints[mappedPoints.length - 1],
       firstLabel: formatDate(points[0].timestamp),
       lastLabel: formatDate(latestPoint.timestamp),
       isBelowThreshold: latestPoint.ratio <= liquidationThreshold,
+      summary: formatCollateralRatioSummary(
+        latestPoint.ratio,
+        points[0].ratio,
+        points[0].timestamp,
+        latestPoint.timestamp,
+      ),
     };
   }, [liquidationThreshold, points]);
 
@@ -242,6 +268,8 @@ export function CollateralRatioHistoryChart({
           </p>
         </div>
       </div>
+
+      <div className="sr-only">{chart.summary}</div>
 
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}

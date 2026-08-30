@@ -35,12 +35,56 @@ describe('InMemoryCache', () => {
 
   it('should return null for completely expired keys on getEntry', () => {
     cache.set('key1', 'value1', { ttl: 1000, swr: 2000 });
-    
+
     // Manually age the entry to be completely expired (e.g. 3500ms old)
     const entry = cache.getEntry('key1')!;
     entry.createdAt = Date.now() - 3500;
-    
+
     expect(cache.getEntry('key1')).toBeNull();
+  });
+
+  it('should evict a fully expired entry from the internal map when read via get', () => {
+    cache.set('key1', 'value1', { ttl: 1000, swr: 2000 });
+    expect(cache.size()).toBe(1);
+
+    // Manually age the entry to be completely expired (e.g. 3500ms old)
+    const entry = cache.getEntry('key1')!;
+    entry.createdAt = Date.now() - 3500;
+
+    expect(cache.get('key1')).toBeNull();
+    expect(cache.size()).toBe(0);
+  });
+
+  it('should evict a fully expired entry from the internal map when read via getEntry', () => {
+    cache.set('key1', 'value1', { ttl: 1000, swr: 2000 });
+    expect(cache.size()).toBe(1);
+
+    // Manually age the entry to be completely expired (e.g. 3500ms old)
+    const entry = cache.getEntry('key1')!;
+    entry.createdAt = Date.now() - 3500;
+
+    expect(cache.getEntry('key1')).toBeNull();
+    expect(cache.size()).toBe(0);
+  });
+
+  it('should not evict a fresh entry', () => {
+    cache.set('key1', 'value1', { ttl: 1000, swr: 2000 });
+
+    expect(cache.get('key1')).toBe('value1');
+    expect(cache.size()).toBe(1);
+  });
+
+  it('should not evict an entry that is stale but still within the SWR window', () => {
+    cache.set('key1', 'value1', { ttl: 1000, swr: 2000 });
+
+    // Age the entry into the SWR window but not past it (e.g. 1500ms old)
+    const entry = cache.getEntry('key1')!;
+    entry.createdAt = Date.now() - 1500;
+
+    expect(cache.get('key1')).toBe('value1');
+    expect(cache.size()).toBe(1);
+    expect(cache.getEntry('key1')).not.toBeNull();
+    expect(cache.size()).toBe(1);
   });
 
   it('should support manual deletion and clearing', () => {

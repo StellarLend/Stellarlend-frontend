@@ -24,6 +24,8 @@ jobs:
   rollback:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
     steps:
       - name: Checkout code
@@ -102,6 +104,7 @@ jobs:
             });
 
       - name: Notify team of rollback
+        if: always() && env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: success

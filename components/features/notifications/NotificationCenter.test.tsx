@@ -197,6 +197,39 @@ describe("NotificationCenter", () => {
       expect(screen.queryByTestId("notification-panel")).not.toBeInTheDocument();
     });
 
+    it("closes panel when clicking outside of it", async () => {
+      render(<NotificationCenter />);
+      const trigger = await screen.findByRole("button", { name: /notification/i });
+      fireEvent.click(trigger);
+      expect(screen.getByTestId("notification-panel")).toBeInTheDocument();
+
+      fireEvent.mouseDown(document.body);
+
+      expect(screen.queryByTestId("notification-panel")).not.toBeInTheDocument();
+    });
+
+    it("does not close the panel when clicking inside it", async () => {
+      render(<NotificationCenter />);
+      const trigger = await screen.findByRole("button", { name: /notification/i });
+      fireEvent.click(trigger);
+      const panel = screen.getByTestId("notification-panel");
+
+      fireEvent.mouseDown(panel);
+
+      expect(screen.getByTestId("notification-panel")).toBeInTheDocument();
+    });
+
+    it("does not close the panel when clicking the trigger itself (toggle owns that)", async () => {
+      render(<NotificationCenter />);
+      const trigger = await screen.findByRole("button", { name: /notification/i });
+      fireEvent.click(trigger);
+      expect(screen.getByTestId("notification-panel")).toBeInTheDocument();
+
+      fireEvent.mouseDown(trigger);
+
+      expect(screen.getByTestId("notification-panel")).toBeInTheDocument();
+    });
+
     it("closes panel on Escape key", async () => {
       render(<NotificationCenter />);
       const trigger = await screen.findByRole("button", { name: /notification/i });

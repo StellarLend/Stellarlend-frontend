@@ -8,6 +8,19 @@ import {
   simulateSorobanTransaction,
   SorobanSimulationError,
 } from './simulate';
+import {
+  HttpError,
+  NetworkError,
+  RetryExhaustedError,
+  TimeoutError,
+  UpstreamHttpError,
+} from '@/lib/http/errors';
+
+vi.mock('@/lib/http/client', () => ({
+  httpPost: vi.fn(),
+}));
+
+import { httpPost } from '@/lib/http/client';
 
 describe('simulateSorobanTransaction', () => {
   beforeEach(() => {
@@ -19,15 +32,7 @@ describe('simulateSorobanTransaction', () => {
   });
 
   it('returns normalized fee, auth, and footprint metadata on success', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(simulateSuccessFixture), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      ),
-    );
+    vi.mocked(httpPost).mockResolvedValue(simulateSuccessFixture);
 
     await expect(
       simulateSorobanTransaction('https://soroban-testnet.stellar.org', 'unsigned-xdr'),
@@ -43,15 +48,7 @@ describe('simulateSorobanTransaction', () => {
   });
 
   it('throws a restore-required error when restore preamble is present', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(simulateRestoreRequiredFixture), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      ),
-    );
+    vi.mocked(httpPost).mockResolvedValue(simulateRestoreRequiredFixture);
 
     try {
       await simulateSorobanTransaction('https://soroban-testnet.stellar.org', 'unsigned-xdr');
@@ -72,15 +69,7 @@ describe('simulateSorobanTransaction', () => {
   });
 
   it('maps auth-related RPC failures to a safe API error', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(simulateAuthRequiredFixture), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      ),
-    );
+    vi.mocked(httpPost).mockResolvedValue(simulateAuthRequiredFixture);
 
     try {
       await simulateSorobanTransaction('https://soroban-testnet.stellar.org', 'unsigned-xdr');
@@ -97,9 +86,8 @@ describe('simulateSorobanTransaction', () => {
   });
 
   it('sanitizes transport-level simulation failures', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1')),
+    vi.mocked(httpPost).mockRejectedValue(
+      new NetworkError('https://private-rpc.test', new Error('connect ECONNREFUSED 127.0.0.1')),
     );
 
     try {
@@ -114,6 +102,78 @@ describe('simulateSorobanTransaction', () => {
       expect(JSON.stringify(buildSorobanSimulationApiError(error))).not.toContain(
         'private-rpc.test',
       );
+    }
+  });
+
+  it('produces a sane fallback message for a plain TypeError not matching any instanceof check', async () => {
+    vi.mocked(httpPost).mockRejectedValue(
+      new TypeError("Cannot read properties of undefined (reading 'foo')"),
+    );
+
+    try {
+      await simulateSorobanTransaction('https://private-rpc.test', 'unsigned-xdr');
+      throw new Error('Expected fallback simulation error from TypeError.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SorobanSimulationError);
+      const simError = error as SorobanSimulationError;
+      expect(simError.code).toBe('SIMULATION_FAILED');
+      expect(simError.message).toBe(
+        'Transaction simulation failed. Review the transaction details and try again.',
+      );
+      expect(simError.message.trim().length).toBeGreaterThan(0);
+      expect(simError.status).toBe(422);
+      expect(simError.cause).toBeInstanceOf(TypeError);
+      expect(buildSorobanSimulationApiError(error)).toEqual({
+        code: 'SIMULATION_FAILED',
+        message: 'Transaction simulation failed. Review the transaction details and try again.',
+      });
+    }
+  });
+
+  it('produces a sane fallback message when a non-Error string is thrown', async () => {
+    vi.mocked(httpPost).mockRejectedValue('raw string thrown as error');
+
+    try {
+      await simulateSorobanTransaction('https://private-rpc.test', 'unsigned-xdr');
+      throw new Error('Expected fallback simulation error from thrown string.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SorobanSimulationError);
+      const simError = error as SorobanSimulationError;
+      expect(simError.code).toBe('SIMULATION_FAILED');
+      expect(simError.message).toBe(
+        'Transaction simulation failed. Review the transaction details and try again.',
+      );
+      expect(simError.message.trim().length).toBeGreaterThan(0);
+      expect(simError.status).toBe(422);
+      expect(simError.cause).toBe('raw string thrown as error');
+      expect(buildSorobanSimulationApiError(error)).toEqual({
+        code: 'SIMULATION_FAILED',
+        message: 'Transaction simulation failed. Review the transaction details and try again.',
+      });
+    }
+  });
+
+  it('produces a sane fallback message when a plain object is thrown', async () => {
+    const thrownObject = { unexpected: true, detail: 'some weird value' };
+    vi.mocked(httpPost).mockRejectedValue(thrownObject);
+
+    try {
+      await simulateSorobanTransaction('https://private-rpc.test', 'unsigned-xdr');
+      throw new Error('Expected fallback simulation error from thrown plain object.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SorobanSimulationError);
+      const simError = error as SorobanSimulationError;
+      expect(simError.code).toBe('SIMULATION_FAILED');
+      expect(simError.message).toBe(
+        'Transaction simulation failed. Review the transaction details and try again.',
+      );
+      expect(simError.message.trim().length).toBeGreaterThan(0);
+      expect(simError.status).toBe(422);
+      expect(simError.cause).toBe(thrownObject);
+      expect(buildSorobanSimulationApiError(error)).toEqual({
+        code: 'SIMULATION_FAILED',
+        message: 'Transaction simulation failed. Review the transaction details and try again.',
+      });
     }
   });
 });

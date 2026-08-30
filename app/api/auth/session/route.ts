@@ -3,6 +3,7 @@
 // This shows how to set session cookies after user authentication
 
 import { NextResponse, NextRequest } from "next/server";
+import { getSession } from "@/lib/auth";
 import { isAccountId } from '@/lib/validation/stellar';
 import { withIdempotency } from "@/lib/api/idempotency";
 import { withCsrfProtection } from "@/lib/api/handler";
@@ -43,8 +44,8 @@ interface CreateSessionRequest {
  *   })
  * });
  */
-const postHandler = async (request: NextRequest) => {
-  return withIdempotency(request, async (request) => {
+const postHandler = async (request: NextRequest): Promise<NextResponse> => {
+  const res = await withIdempotency(request, async (request) => {
     try {
       const body: CreateSessionRequest = await request.json();
 // Validate wallet address if provided
@@ -124,6 +125,7 @@ if (body.walletAddress && !isAccountId(body.walletAddress)) {
       );
     }
   });
+  return res as NextResponse;
 };
 
 export const POST = withCsrfProtection(postHandler);
@@ -176,8 +178,8 @@ export async function GET(request: NextRequest) {
  * Usage:
  * await fetch("/api/auth/session", { method: "DELETE" });
  */
-const deleteHandler = async (request: NextRequest) => {
-  return withIdempotency(request, async () => {
+const deleteHandler = async (request: NextRequest): Promise<NextResponse> => {
+  const res = await withIdempotency(request, async () => {
     try {
       const response = NextResponse.json({
         success: true,
@@ -201,6 +203,7 @@ const deleteHandler = async (request: NextRequest) => {
       );
     }
   });
+  return res as NextResponse;
 };
 
 export const DELETE = withCsrfProtection(deleteHandler);

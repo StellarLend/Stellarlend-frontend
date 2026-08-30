@@ -35,9 +35,8 @@ export class CircuitBreaker {
     return stats;
   }
 
-  /** Returns true if the request should proceed. Skips breaker for health probes. */
+  /** Returns true if the request should proceed. All paths are subject to breaker protection. */
   shouldAllow(host: string, path: string): boolean {
-    if (path.startsWith('/api/health')) return true;
     const stats = this.getStats(host);
     this.transitionIfNeeded(stats);
     return stats.state !== CircuitState.OPEN;

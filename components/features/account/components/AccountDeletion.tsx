@@ -3,25 +3,41 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AccountDeletionDialog from "@/components/shared/common/AccountDeletionDialog";
-import Toast, { ToastVariant } from "@/components/shared/common/Toast";
+import { useToast } from "@/components/shared/common/Toast";
 
-type ToastState = {
-  variant: ToastVariant;
-  title: string;
-  description?: string;
-} | null;
+/**
+ * Map known server error codes to fixed, reviewed user-facing messages.
+ * Any unrecognised code falls through to `null` so callers use a
+ * generic fallback instead of echoing raw server strings to the user.
+ */
+function mapChallengeError(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const d = data as Record<string, unknown>;
+  const code = typeof d.code === "string" ? d.code : null;
+  const status = typeof d.status === "number" ? d.status : null;
+
+  const messages: Record<string, string> = {
+    CHALLENGE_EXPIRED: "Your deletion request has expired. Please try again.",
+    CHALLENGE_RATE_LIMITED: "Too many attempts. Please wait a moment and try again.",
+    ACCOUNT_NOT_FOUND: "Account not found. It may have already been deleted.",
+    UNAUTHORIZED: "You are not authorised to perform this action. Please sign in again.",
+  };
+
+  if (code && messages[code]) return messages[code];
+
+  // Fall back to HTTP status for well-known codes
+  if (status === 429) return "Too many requests. Please try again later.";
+  if (status === 401) return "Your session has expired. Please sign in again.";
+
+  return null;
+}
 
 export default function AccountDeletion() {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [challenge, setChallenge] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
-  const [toast, setToast] = useState<ToastState>(null);
-
-  const showToast = (variant: ToastVariant, title: string, description?: string) => {
-    setToast({ variant, title, description });
-    setTimeout(() => setToast(null), 5000);
-  };
+  const { showToast } = useToast();
 
   const handleInitiate = async () => {
     if (fetching) return;
@@ -30,25 +46,26 @@ export default function AccountDeletion() {
       const res = await fetch("/api/account/delete/challenge");
       const data = await res.json();
       if (!res.ok) {
+        const mapped = mapChallengeError(data);
         if (res.status === 429) {
-          showToast(
-            "error",
-            "Rate limit exceeded",
-            data.error?.message || "Too many requests. Please try again later.",
-          );
+          showToast({
+            variant: "error",
+            title: "Rate limit exceeded",
+            description: mapped ?? "Too many requests. Please try again later.",
+          });
         } else {
-          showToast(
-            "error",
-            "Challenge failed",
-            data.error?.message || data.error || "Could not start deletion. Please try again.",
-          );
+          showToast({
+            variant: "error",
+            title: "Challenge failed",
+            description: mapped ?? "Could not start deletion. Please try again.",
+          });
         }
         return;
       }
       setChallenge(data.challenge);
       setDialogOpen(true);
     } catch {
-      showToast("error", "Network error", "Could not reach the server. Check your connection.");
+      showToast({ variant: "error", title: "Network error", description: "Could not reach the server. Check your connection." });
     } finally {
       setFetching(false);
     }
@@ -97,14 +114,6 @@ export default function AccountDeletion() {
         onCancel={handleCancel}
         onConfirmDelete={handleConfirmDelete}
       />
-
-      {toast && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          variant={toast.variant}
-        />
-      )}
     </>
   );
 }

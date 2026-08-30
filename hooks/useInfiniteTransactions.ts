@@ -31,7 +31,7 @@ export function useInfiniteTransactions(
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(!skip);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);

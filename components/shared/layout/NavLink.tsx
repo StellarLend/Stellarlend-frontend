@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navClasses } from "@/constants/design-tokens";
+import { clientLog } from "@/lib/utils/client-log";
 
 interface NavLinkProps {
   href: string;
@@ -22,7 +23,12 @@ const ActiveBar = ({ active }: { active: boolean }) => (
   />
 );
 
-const NavLink = ({ href, children, className = "", isActive: isActiveProp }: NavLinkProps) => {
+const NavLink = ({
+  href,
+  children,
+  className = "",
+  isActive: isActiveProp,
+}: NavLinkProps) => {
   const pathname = usePathname();
 
   if (!href) {
@@ -36,7 +42,11 @@ const NavLink = ({ href, children, className = "", isActive: isActiveProp }: Nav
 
   if (href.startsWith("#")) {
     return (
-      <a href={href} className={linkClasses} aria-current={isActive ? "page" : undefined}>
+      <a
+        href={href}
+        className={linkClasses}
+        aria-current={isActive ? "page" : undefined}
+      >
         <ActiveBar active={isActive} />
         {children}
       </a>
@@ -44,7 +54,11 @@ const NavLink = ({ href, children, className = "", isActive: isActiveProp }: Nav
   }
 
   return (
-    <Link href={href} className={linkClasses} aria-current={isActive ? "page" : undefined}>
+    <Link
+      href={href}
+      className={linkClasses}
+      aria-current={isActive ? "page" : undefined}
+    >
       <ActiveBar active={isActive} />
       {children}
     </Link>

@@ -1,13 +1,19 @@
-interface GlobalProps {
+import type { SVGProps } from "react";
+interface GlobalProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
+  title?: string;
 }
 
 export const Global = ({
   className = "",
   width = "40",
   height = "40",
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: GlobalProps) => {
   return (
     <svg
@@ -17,7 +23,12 @@ export const Global = ({
       viewBox="0 0 40 40"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         d="M36.6666 19.9999C36.6666 10.7952 29.2046 3.33325 19.9999 3.33325C10.7952 3.33325 3.33325 10.7952 3.33325 19.9999C3.33325 29.2046 10.7952 36.6666 19.9999 36.6666C29.2046 36.6666 36.6666 29.2046 36.6666 19.9999Z"
         stroke="currentColor"

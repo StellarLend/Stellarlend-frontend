@@ -49,7 +49,7 @@ import { signToken } from '@/lib/auth';
 import { profileRepository } from '@/lib/account/repository';
 import { getNotifications, removeNotificationsByUserId, clearStore } from '@/lib/notifications/repository';
 import { getAuditEvents, clearAuditLog, emitAuditEvent } from '@/lib/audit/events';
-import { getJobsByUserId, clearJobQueue, enqueueCleanupJob, processJob, getQueueStats } from '@/lib/queue/cleanup-queue';
+import { getJobsByUserId, clearJobQueue, enqueueCleanupJob, processJob, getQueueStats, pruneTerminalJobs, startQueueProcessor } from '@/lib/queue/cleanup-queue';
 import { clearChallengeStore, getChallengeCount } from '@/lib/account/challenge-store';
 import { deleteAccount } from '@/lib/account/delete';
 
@@ -140,6 +140,14 @@ describe('DELETE /api/account/delete', () => {
       makeRequest('DELETE', 'http://localhost/api/account/delete', { body: { challenge: 'test' } })
     );
     expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json).toEqual({ error: 'Unauthorized' });
+  });
+
+  test('does not throw an unhandled exception when unauthenticated', async () => {
+    await expect(
+      DeleteDELETE(makeRequest('DELETE', 'http://localhost/api/account/delete'))
+    ).resolves.toBeDefined();
   });
 
   test('returns 401 for invalid token', async () => {
@@ -150,6 +158,8 @@ describe('DELETE /api/account/delete', () => {
       })
     );
     expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json).toEqual({ error: 'Unauthorized' });
   });
 
   test('returns 400 when challenge is missing', async () => {
@@ -437,6 +447,20 @@ describe('DELETE /api/account/delete', () => {
     );
     expect(res2.status).toBe(401);
   });
+
+  test('unexpected runtime errors propagate correctly', async () => {
+    const authMod = await import('@/lib/auth');
+    const spy = vi.spyOn(authMod, 'requireAuth').mockImplementation(() => {
+      throw new Error('unexpected auth failure');
+    });
+
+    const res = await DeleteDELETE(
+      makeRequest('DELETE', 'http://localhost/api/account/delete', { body: { challenge: 'test' } })
+    );
+    expect(res.status).toBe(500);
+
+    spy.mockRestore();
+  });
 });
 
 describe('lib/account/challenge-store', () => {
@@ -649,6 +673,125 @@ describe('lib/queue/cleanup-queue', () => {
 
     clearJobQueue();
     expect(getQueueStats().total).toBe(0);
+  });
+
+  describe('pruneTerminalJobs (bounded queue growth)', () => {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+    test('removes only stale terminal jobs; leaves pending and recent jobs intact', () => {
+      clearJobQueue();
+
+      const oldCompleted = enqueueCleanupJob('clear-cache-entries', 'prune-user-old-completed');
+      const oldFailed = enqueueCleanupJob('remove-derived-data', 'prune-user-old-failed');
+      const recentCompleted = enqueueCleanupJob('clear-cache-entries', 'prune-user-recent');
+      const pending = enqueueCleanupJob('anonymize-backups', 'prune-user-pending');
+
+      processJob(oldCompleted.id);
+      processJob(oldFailed.id, 'transient error');
+      processJob(recentCompleted.id);
+      // `pending` stays pending — never pruned regardless of age.
+
+      // enqueueCleanupJob returns the live job reference, so we can mutate
+      // processedAt in place to simulate aged terminal jobs.
+      const oldIso = new Date(Date.now() - 2 * ONE_DAY_MS).toISOString();
+      oldCompleted.processedAt = oldIso;
+      oldFailed.processedAt = oldIso;
+
+      const removed = pruneTerminalJobs(ONE_DAY_MS);
+
+      expect(removed).toBe(2);
+      expect(getJobsByUserId('prune-user-old-completed').length).toBe(0);
+      expect(getJobsByUserId('prune-user-old-failed').length).toBe(0);
+      expect(getJobsByUserId('prune-user-recent').length).toBe(1);
+      expect(getJobsByUserId('prune-user-pending').length).toBe(1);
+
+      const stats = getQueueStats();
+      expect(stats.total).toBe(2);
+      expect(stats.completed).toBe(1);
+      expect(stats.failed).toBe(0);
+      expect(stats.pending).toBe(1);
+    });
+
+    test('bounds queue growth: 100 terminal jobs aged past the window are pruned', () => {
+      clearJobQueue();
+
+      const jobs = Array.from({ length: 100 }, (_, i) =>
+        enqueueCleanupJob('clear-cache-entries', `prune-bulk-user-${i}`),
+      );
+
+      jobs.forEach((job, i) => {
+        if (i % 2 === 0) {
+          processJob(job.id);
+        } else {
+          processJob(job.id, 'simulated failure');
+        }
+      });
+
+      expect(getQueueStats().total).toBe(100);
+
+      // Age every terminal job well past the retention window.
+      const iso = new Date(Date.now() - 7 * ONE_DAY_MS).toISOString();
+      jobs.forEach((job) => {
+        const live = getJobsByUserId(job.userId).find((j) => j.id === job.id);
+        if (live?.processedAt) {
+          live.processedAt = iso;
+        }
+      });
+
+      const removed = pruneTerminalJobs(ONE_DAY_MS);
+
+      expect(removed).toBe(100);
+      expect(getQueueStats().total).toBe(0);
+    });
+
+    test('keeps terminal jobs that are still within the retention window', () => {
+      clearJobQueue();
+
+      const job = enqueueCleanupJob('clear-cache-entries', 'prune-fresh-user');
+      processJob(job.id);
+
+      // Just-processed: well within the 24h window.
+      const removed = pruneTerminalJobs(ONE_DAY_MS);
+
+      expect(removed).toBe(0);
+      expect(getJobsByUserId('prune-fresh-user').length).toBe(1);
+    });
+
+    test('uses default retention window when no maxAgeMs is provided', () => {
+      clearJobQueue();
+
+      const oldJob = enqueueCleanupJob('clear-cache-entries', 'prune-default-user');
+      processJob(oldJob.id);
+      const live = getJobsByUserId('prune-default-user')[0];
+      // 25 hours ago — past the default 24h window but not absurdly old.
+      live.processedAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+
+      expect(pruneTerminalJobs()).toBe(1);
+      expect(getJobsByUserId('prune-default-user').length).toBe(0);
+    });
+
+    test('rejects negative or non-finite maxAgeMs', () => {
+      expect(() => pruneTerminalJobs(-1)).toThrow(/finite/);
+      expect(() => pruneTerminalJobs(Number.NaN)).toThrow(/finite/);
+      expect(() => pruneTerminalJobs(Number.POSITIVE_INFINITY)).toThrow(/finite/);
+    });
+  });
+
+  describe('startQueueProcessor pruning behaviour', () => {
+    test('prunes stale terminal jobs before processing new ones', async () => {
+      clearJobQueue();
+
+      const stale = enqueueCleanupJob('clear-cache-entries', 'processor-stale-user');
+      processJob(stale.id);
+      stale.processedAt = new Date(
+        Date.now() - 7 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+
+      await startQueueProcessor();
+
+      expect(getJobsByUserId('processor-stale-user').length).toBe(0);
+      expect(getQueueStats().total).toBe(0);
+    });
   });
 });
 

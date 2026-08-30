@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
 import type { LendingActionType } from "@/lib/lending/types";
 import { cn } from "@/lib/utils/cn";
+import { calculateProtocolFee } from "@/lib/fee-calculator";
+import TermsModal from "./TermsModal";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasAgreed, setHasAgreed] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "success" | "error"
   >("idle");
@@ -37,6 +40,7 @@ export default function ConfirmModal({
       setSubmitStatus("idle");
       setSubmitMessage("");
       setHasAgreed(false);
+      setIsTermsOpen(false);
     }
   }, [isOpen]);
 
@@ -139,6 +143,7 @@ export default function ConfirmModal({
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
@@ -290,6 +295,60 @@ export default function ConfirmModal({
                 </>
               )}
 
+              {(() => {
+                // Withdraw has no protocol fee schedule in fee-calculator.
+                if (type === "withdraw") return null;
+                try {
+                  const feeResult = calculateProtocolFee(
+                    data.asset,
+                    type,
+                    data.amount,
+                  );
+                  const gross = data.amount;
+                  const fee = feeResult.feeAmount;
+                  // Net is the amount that actually settles after the protocol cut.
+                  // Zero-amount actions short-circuit to zero fee inside the calculator.
+                  const net = Math.max(0, gross - fee);
+                  return (
+                    <div
+                      className="space-y-2 border-t pt-3"
+                      data-testid="fee-breakdown"
+                      aria-label="Fee breakdown"
+                    >
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Gross Amount</span>
+                        <span className="font-medium">
+                          {formatCurrency(gross, data.asset)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">
+                          Protocol Fee
+                          {feeResult.feeBps > 0 ? (
+                            <span className="text-gray-400">
+                              {" "}
+                              ({feeResult.feeBps} bps)
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(fee, data.asset)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="font-medium">Net Amount</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatCurrency(net, data.asset)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                } catch {
+                  // Unknown market / action — omit the breakdown rather than block confirm.
+                  return null;
+                }
+              })()}
+
               {calculation && type !== "repay" && (
                 <>
                   {type === "lend" ? (
@@ -420,7 +479,11 @@ export default function ConfirmModal({
               />
               <span className="text-sm text-gray-700">
                 I understand and agree to the{" "}
-                <button className="text-green-600 hover:text-green-700 underline">
+                <button
+                  type="button"
+                  onClick={() => setIsTermsOpen(true)}
+                  className="text-green-600 hover:text-green-700 underline"
+                >
                   terms and conditions
                 </button>
                 {type === "borrow" && (
@@ -509,5 +572,7 @@ export default function ConfirmModal({
         </div>
       </div>
     </div>
+    <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
+    </>
   );
 }

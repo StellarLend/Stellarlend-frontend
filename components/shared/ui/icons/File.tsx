@@ -1,13 +1,19 @@
-interface FileProps {
+import type { SVGProps } from "react";
+interface FileProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
+  title?: string;
 }
 
 export const File = ({
   className = "",
   width = "41",
   height = "40",
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: FileProps) => {
   return (
     <svg
@@ -17,7 +23,12 @@ export const File = ({
       viewBox="0 0 41 40"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         d="M13.6665 11.6667H26.9998"
         stroke="currentColor"

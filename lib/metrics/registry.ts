@@ -117,6 +117,9 @@ class Registry {
   // gauge for circuit breaker state per host (0=closed,1=open,2=half_open)
   circuitState = new Gauge('circuit_state', 'Circuit breaker state per host');
 
+  deletionsTotal = new Counter('retention_deletions_total', 'Rows deleted by retention worker per table');
+  httpRetryTotal = new Counter('http_retry_total', 'HTTP requests retried per method and reason');
+
   collect(): string {
     let out = '';
     out += this.httpRequests.collect();
@@ -127,7 +130,13 @@ class Registry {
     out += this.outboundRequests.collect();
     out += this.outboundRequestDuration.collect();
     out += this.horizonSelections.collect();
+    if (!this.schedulerIsLeader.collect().includes('scheduler_is_leader ')) {
+      this.schedulerIsLeader.set(0);
+    }
+    out += this.schedulerIsLeader.collect();
     out += this.circuitState.collect();
+    out += this.deletionsTotal.collect();
+    out += this.httpRetryTotal.collect();
     return out;
   }
 }
