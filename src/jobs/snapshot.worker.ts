@@ -174,6 +174,45 @@ function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snaps
   isFiniteNumber(snapshot.createdAt, 'snapshot.createdAt');
 }
 
+const MAX_SNAPSHOT_HISTORY = 365;
+
+function normalizeWalletAddress(walletAddress: string): string {
+  const normalized = walletAddress.trim();
+  if (!normalized) {
+    throw new Error('walletAddress is required');
+  }
+  return normalized;
+}
+
+function isFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${fieldName} must be a finite number`);
+  }
+  return value;
+}
+
+function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snapshot is PositionSnapshot {
+  if (!snapshot || typeof snapshot !== 'object') {
+    throw new Error('snapshot payload is required');
+  }
+
+  const walletAddress = typeof snapshot.walletAddress === 'string' ? snapshot.walletAddress.trim() : '';
+  if (!walletAddress) {
+    throw new Error('snapshot.walletAddress is required');
+  }
+
+  if (typeof snapshot.id !== 'string' || snapshot.id.trim().length === 0) {
+    throw new Error('snapshot.id is required');
+  }
+
+  isFiniteNumber(snapshot.timestamp, 'snapshot.timestamp');
+  isFiniteNumber(snapshot.supplied, 'snapshot.supplied');
+  isFiniteNumber(snapshot.borrowed, 'snapshot.borrowed');
+  isFiniteNumber(snapshot.effectiveSupplyApy, 'snapshot.effectiveSupplyApy');
+  isFiniteNumber(snapshot.effectiveBorrowApy, 'snapshot.effectiveBorrowApy');
+  isFiniteNumber(snapshot.createdAt, 'snapshot.createdAt');
+}
+
 /**
  * In-memory store for position snapshots
  * In production, replace with database queries (Drizzle/PostgreSQL)
