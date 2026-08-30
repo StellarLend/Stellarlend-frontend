@@ -75,20 +75,17 @@ function toCollateralRatioPoints(
   snapshots: SnapshotHistoryResponse["snapshots"],
 ): CollateralRatioPoint[] {
   return snapshots
-    .map((snapshot) => {
-      if (
-        !isFinitePositive(snapshot.supplied) ||
-        !isFinitePositive(snapshot.borrowed)
-      ) {
-        return null;
-      }
-
-      return {
-        timestamp: snapshot.timestamp,
-        ratio: snapshot.supplied / snapshot.borrowed,
-      };
-    })
-    .filter((point): point is CollateralRatioPoint => point !== null);
+    .filter(
+      (snapshot) =>
+        isFinitePositive(snapshot.supplied) &&
+        isFinitePositive(snapshot.borrowed) &&
+        Number.isFinite(snapshot.timestamp),
+    )
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((snapshot) => ({
+      timestamp: snapshot.timestamp,
+      ratio: snapshot.supplied / snapshot.borrowed,
+    }));
 }
 
 export function CollateralRatioHistoryChart({
@@ -96,16 +93,22 @@ export function CollateralRatioHistoryChart({
   liquidationThreshold = DEFAULT_LIQUIDATION_THRESHOLD,
 }: CollateralRatioHistoryChartProps) {
   const shouldReduceMotion = useReducedMotion();
+  const threshold = isFinitePositive(liquidationThreshold)
+    ? liquidationThreshold
+    : DEFAULT_LIQUIDATION_THRESHOLD;
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">(
     "loading",
   );
   const [points, setPoints] = useState<CollateralRatioPoint[]>([]);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isPermissionDenied, setIsPermissionDenied] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
 
     async function loadHistory() {
       setStatus("loading");
+      setIsPermissionDenied(false);
 
       try {
         const response = await fetch("/api/positions/history?interval=1d", {
@@ -116,7 +119,11 @@ export function CollateralRatioHistoryChart({
         });
 
         if (!response.ok) {
-          throw new Error("Position history request failed");
+          const error = new Error("Position history request failed") as Error & {
+            status?: number;
+          };
+          error.status = response.status;
+          throw error;
         }
 
         const payload = (await response.json()) as SnapshotHistoryResponse;
@@ -138,6 +145,13 @@ export function CollateralRatioHistoryChart({
           return;
         }
 
+        if (error instanceof Error && "status" in error) {
+          const httpStatus = (error as Error & { status?: number }).status;
+          if (httpStatus === 401 || httpStatus === 403) {
+            setIsPermissionDenied(true);
+          }
+        }
+
         setPoints([]);
         setStatus("error");
       }
@@ -146,7 +160,7 @@ export function CollateralRatioHistoryChart({
     loadHistory();
 
     return () => controller.abort();
-  }, []);
+  }, [retryCount]);
 
   const chart = useMemo(() => {
     if (points.length === 0) {
@@ -154,8 +168,8 @@ export function CollateralRatioHistoryChart({
     }
 
     const ratioValues = points.map((point) => point.ratio);
-    const minValue = Math.min(...ratioValues, liquidationThreshold);
-    const maxValue = Math.max(...ratioValues, liquidationThreshold);
+    const minValue = Math.min(...ratioValues, threshold);
+    const maxValue = Math.max(...ratioValues, threshold);
     const range = maxValue - minValue || 1;
     const lowerBound = Math.max(0, minValue - range * 0.18);
     const upperBound = maxValue + range * 0.18;
@@ -179,12 +193,12 @@ export function CollateralRatioHistoryChart({
 
     return {
       linePath: buildSvgPath(mappedPoints),
-      thresholdY: yForRatio(liquidationThreshold),
+      thresholdY: yForRatio(threshold),
       latestPoint,
       latestSvgPoint: mappedPoints[mappedPoints.length - 1],
       firstLabel: formatDate(points[0].timestamp),
       lastLabel: formatDate(latestPoint.timestamp),
-      isBelowThreshold: latestPoint.ratio <= liquidationThreshold,
+      isBelowThreshold: latestPoint.ratio <= threshold,
       summary: formatCollateralRatioSummary(
         latestPoint.ratio,
         points[0].ratio,
@@ -192,7 +206,7 @@ export function CollateralRatioHistoryChart({
         latestPoint.timestamp,
       ),
     };
-  }, [liquidationThreshold, points]);
+  }, [threshold, points]);
 
   if (status === "loading") {
     return (
@@ -218,6 +232,13 @@ export function CollateralRatioHistoryChart({
         <p className="mt-2 text-sm text-[#AAABAB]">
           No collateral ratio history available
         </p>
+        <button
+          type="button"
+          onClick={() => setRetryCount((count) => count + 1)}
+          className="mt-3 text-sm font-medium text-[#71B48D] underline underline-offset-2 hover:text-[#D4F3E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#71B48D]"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -232,8 +253,17 @@ export function CollateralRatioHistoryChart({
           Collateral ratio history
         </p>
         <p className="mt-2 text-sm text-[#AAABAB]">
-          Collateral ratio history unavailable
+          {isPermissionDenied
+            ? "You don't have permission to view collateral ratio history"
+            : "Collateral ratio history unavailable"}
         </p>
+        <button
+          type="button"
+          onClick={() => setRetryCount((count) => count + 1)}
+          className="mt-3 text-sm font-medium text-[#71B48D] underline underline-offset-2 hover:text-[#D4F3E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#71B48D]"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -248,7 +278,7 @@ export function CollateralRatioHistoryChart({
             Collateral ratio history
           </p>
           <p className="text-xs text-[#AAABAB]">
-            Threshold reference: {formatRatio(liquidationThreshold)}
+            Threshold reference: {formatRatio(threshold)}
           </p>
         </div>
         <div className="text-right">
@@ -276,7 +306,7 @@ export function CollateralRatioHistoryChart({
         role="img"
         aria-label={`Collateral ratio history chart. Latest ratio ${formatRatio(
           chart.latestPoint.ratio,
-        )}; liquidation threshold ${formatRatio(liquidationThreshold)}.`}
+        )}; liquidation threshold ${formatRatio(threshold)}.`}
         className="h-28 w-full"
         style={shouldReduceMotion ? { transition: "none" } : undefined}
       >
