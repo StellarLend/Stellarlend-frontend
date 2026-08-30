@@ -7,10 +7,12 @@ import { buildSvgPath } from "@/lib/utils/svg";
 import {
   useChartHistory,
   isChartLoading,
+  isChartUnauthorized,
   getSnapshots,
   type NormalizedSnapshot,
   type UseChartHistoryOptions,
 } from "@/hooks/useChartHistory";
+import { useWalletContext } from "@/context/WalletContext";
 
 const HISTORY_URL = "/api/positions/history?interval=1d";
 
@@ -84,10 +86,13 @@ export function CollateralRatioHistoryChart({
   fetcher,
 }: CollateralRatioHistoryChartProps) {
   const shouldReduceMotion = useReducedMotion();
-  const { state } = useChartHistory(HISTORY_URL, { fetcher });
+  const { address, status, network } = useWalletContext();
+  const authContext = { walletAddress: address, status, network };
+  const { state, refetch } = useChartHistory(HISTORY_URL, { fetcher, authContext });
 
   const loading = isChartLoading(state);
   const isStale = state.status === "loading-stale" || state.status === "error";
+  const isUnauthorized = isChartUnauthorized(state);
 
   // Derive ratio points from whatever snapshots are available (may be stale)
   const ratioPoints: CollateralRatioPoint[] = useMemo(
@@ -116,7 +121,7 @@ export function CollateralRatioHistoryChart({
       x:
         CHART_PADDING +
         (ratioPoints.length === 1 ? 0.5 : index / (ratioPoints.length - 1)) *
-          (CHART_WIDTH - CHART_PADDING * 2),
+        (CHART_WIDTH - CHART_PADDING * 2),
       y: yForRatio(point.ratio),
     }));
 
@@ -124,12 +129,12 @@ export function CollateralRatioHistoryChart({
 
     return {
       linePath: buildSvgPath(mappedPoints),
-      thresholdY: yForRatio(threshold),
+      thresholdY: yForRatio(liquidationThreshold),
       latestPoint,
       latestSvgPoint: mappedPoints[mappedPoints.length - 1],
       firstLabel: formatDate(ratioPoints[0].timestamp),
       lastLabel: formatDate(latestPoint.timestamp),
-      isBelowThreshold: latestPoint.ratio <= threshold,
+      isBelowThreshold: latestPoint.ratio <= liquidationThreshold,
       summary: formatCollateralRatioSummary(
         latestPoint.ratio,
         ratioPoints[0].ratio,
@@ -138,6 +143,26 @@ export function CollateralRatioHistoryChart({
       ),
     };
   }, [ratioPoints, liquidationThreshold]);
+
+  // ── Unauthorized (disconnected wallet, forbidden, or wrong account) ──────────
+  if (isUnauthorized) {
+    return (
+      <div
+        className={`rounded-xl border border-[#71B48D33] bg-[#072815] p-4 ${className ?? ""}`}
+        role="alert"
+        aria-label="Collateral ratio history unavailable"
+      >
+        <p className="text-sm font-medium text-[#D4F3E6]">
+          Collateral ratio history
+        </p>
+        <p className="mt-2 text-sm text-[#AAABAB]">
+          {state.reason === "disconnected-wallet"
+            ? "Connect your wallet to view collateral ratio history"
+            : "You don't have permission to view this data"}
+        </p>
+      </div>
+    );
+  }
 
   // ── Loading (no stale data yet) ──────────────────────────────────────────────
   if (loading && state.status === "loading") {
@@ -167,7 +192,7 @@ export function CollateralRatioHistoryChart({
         </p>
         <button
           type="button"
-          onClick={() => setRetryCount((count) => count + 1)}
+          onClick={refetch}
           className="mt-3 text-sm font-medium text-[#71B48D] underline underline-offset-2 hover:text-[#D4F3E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#71B48D]"
         >
           Retry
@@ -187,13 +212,13 @@ export function CollateralRatioHistoryChart({
           Collateral ratio history
         </p>
         <p className="mt-2 text-sm text-[#AAABAB]">
-          {isPermissionDenied
+          {isUnauthorized
             ? "You don't have permission to view collateral ratio history"
             : "Collateral ratio history unavailable"}
         </p>
         <button
           type="button"
-          onClick={() => setRetryCount((count) => count + 1)}
+          onClick={refetch}
           className="mt-3 text-sm font-medium text-[#71B48D] underline underline-offset-2 hover:text-[#D4F3E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#71B48D]"
         >
           Retry
@@ -241,7 +266,7 @@ export function CollateralRatioHistoryChart({
             Collateral ratio history
           </p>
           <p className="text-xs text-[#AAABAB]">
-            Threshold reference: {formatRatio(threshold)}
+            Threshold reference: {formatRatio(liquidationThreshold)}
           </p>
         </div>
         <div className="text-right">
@@ -265,7 +290,7 @@ export function CollateralRatioHistoryChart({
         role="img"
         aria-label={`Collateral ratio history chart. Latest ratio ${formatRatio(
           chart.latestPoint.ratio,
-        )}; liquidation threshold ${formatRatio(threshold)}.`}
+        )}; liquidation threshold ${formatRatio(liquidationThreshold)}.`}
         className="h-28 w-full"
         style={shouldReduceMotion ? { transition: "none" } : undefined}
       >

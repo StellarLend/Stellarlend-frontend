@@ -6,9 +6,11 @@ import { buildSvgPath } from "@/lib/utils/svg";
 import {
   useChartHistory,
   isChartLoading,
+  isChartUnauthorized,
   getSnapshots,
   type UseChartHistoryOptions,
 } from "@/hooks/useChartHistory";
+import { useWalletContext } from "@/context/WalletContext";
 
 const HISTORY_URL = "/api/positions/history?interval=1d";
 
@@ -38,15 +40,15 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({
   className,
   fetcher,
 }) => {
-  const { state } = useChartHistory(HISTORY_URL, { fetcher });
+  const { address, status, network } = useWalletContext();
+  const authContext = { walletAddress: address, status, network };
+  const { state } = useChartHistory(HISTORY_URL, { fetcher, authContext });
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [errorKind, setErrorKind] = useState<"network" | "forbidden" | "unavailable">("network");
 
   useEffect(() => {
     const media =
       typeof window !== "undefined" &&
-      typeof window.matchMedia === "function"
+        typeof window.matchMedia === "function"
         ? window.matchMedia("(prefers-reduced-motion: reduce)")
         : null;
 
@@ -76,7 +78,7 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({
       const x =
         CHART_PADDING +
         (points.length === 1 ? 0.5 : index / (points.length - 1)) *
-          (CHART_WIDTH - CHART_PADDING * 2);
+        (CHART_WIDTH - CHART_PADDING * 2);
       const normalized =
         (point.supplyApy - lowerBound) / (upperBound - lowerBound || 1);
       const y =
@@ -122,6 +124,24 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({
     };
   }, [points]);
 
+  // ── Unauthorized (disconnected wallet, forbidden, or wrong account) ──────────
+  if (isChartUnauthorized(state)) {
+    return (
+      <div
+        className={`rounded-xl border border-[#71B48D33] bg-[#072815] p-4 ${className ?? ""}`}
+        role="alert"
+        aria-label="Supply APY trend unavailable"
+      >
+        <p className="text-sm font-medium text-[#D4F3E6]">Supply APY trend</p>
+        <p className="mt-2 text-sm text-[#AAABAB]">
+          {state.reason === "disconnected-wallet"
+            ? "Connect your wallet to view supply APY history"
+            : "You don't have permission to view this data"}
+        </p>
+      </div>
+    );
+  }
+
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading && state.status === "loading") {
     return (
@@ -156,14 +176,7 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({
         role="alert"
       >
         <p className="text-sm font-medium text-[#D4F3E6]">Supply APY trend</p>
-        <p className="mt-2 text-sm text-[#AAABAB]">{message}</p>
-        <button
-          type="button"
-          onClick={() => setRetryCount((count) => count + 1)}
-          className="mt-3 rounded-md bg-[#71B48D] px-3 py-1.5 text-xs font-semibold text-[#072815] transition-colors hover:bg-[#8FD0A8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4F3E6] motion-reduce:transition-none"
-        >
-          Try again
-        </button>
+        <p className="mt-2 text-sm text-[#AAABAB]">Trend data unavailable</p>
       </div>
     );
   }
