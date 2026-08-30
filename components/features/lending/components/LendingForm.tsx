@@ -26,6 +26,33 @@ const INTEREST_RATES = {
   ETH: { min: 3.5, max: 9.0, default: 6.0 },
 };
 
+const SUPPORTED_ASSETS = new Set(Object.keys(INTEREST_RATES));
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isLendingAsset(value: string): value is keyof typeof INTEREST_RATES {
+  return SUPPORTED_ASSETS.has(value);
+}
+
+function parseQuoteResponse(payload: unknown): CalculationResult | null {
+  if (!isRecord(payload) || !isRecord(payload.result)) return null;
+  const candidate = payload.result as unknown as CalculationResult;
+  if (
+    !isFiniteNumber(candidate.dailyEarnings) ||
+    !isFiniteNumber(candidate.totalEarnings)
+  ) {
+    return null;
+  }
+  if (candidate.dailyEarnings < 0 || candidate.totalEarnings < 0) return null;
+  if (candidate.dailyEarnings > 1e12 || candidate.totalEarnings > 1e12) return null;
+  return candidate;
+}
 export default function LendingForm({
   onSubmit,
   initialData,
@@ -46,6 +73,10 @@ export default function LendingForm({
   const requestSeqRef = useRef(0);
 
   const { assetsWithBalances } = useWalletBalances();
+  const assetsWithBalancesRef = useRef(assetsWithBalances);
+  useEffect(() => {
+    assetsWithBalancesRef.current = assetsWithBalances;
+  });
   const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
   const rates = INTEREST_RATES[formData.asset as keyof typeof INTEREST_RATES];
 
@@ -59,7 +90,19 @@ export default function LendingForm({
   // fallback computed via calculateQuote(). Aborts in-flight requests so
   // stale responses can never overwrite a fresher preview.
   useEffect(() => {
-    if (!formData.amount || formData.amount <= 0) {
+    if (
+      !formData.amount ||
+      typeof formData.amount !== "number" ||
+      !Number.isFinite(formData.amount) ||
+      formData.amount <= 0 ||
+      !selectedAsset ||
+      formData.amount > selectedAsset.balance ||
+      !rates ||
+      typeof formData.interestRate !== "number" ||
+      !Number.isFinite(formData.interestRate) ||
+      formData.interestRate < rates.min ||
+      formData.interestRate > rates.max
+    ) {
       setPreview({ result: null, source: null, loading: false });
       return;
     }
@@ -79,20 +122,36 @@ export default function LendingForm({
         const response = await fetch("/api/quote", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ type: "lend", data: formData }),
+          body: JSON.stringify({
+            type: "lend",
+            data: {
+              asset: formData.asset,
+              amount: formData.amount,
+              interestRate: formData.interestRate,
+            },
+          }),
           signal: controller.signal,
         });
-        if (!response.ok) return;
-        const payload = (await response.json()) as { result?: CalculationResult };
+        if (!response.ok) {
+          if (seq === requestSeqRef.current) {
+            setPreview((prev) => ({ ...prev, loading: false }));
+          }
+          return;
+        }
+        const payload: unknown = await response.json();
         if (controller.signal.aborted) return;
         // Only apply if this is still the latest in-flight request.
         if (seq !== requestSeqRef.current) return;
-        if (payload.result) {
+        const result = parseQuoteResponse(payload);
+        if (result) {
           setPreview({
-            result: payload.result,
+            result,
             source: "server",
             loading: false,
           });
+        } else {
+          // Malformed or out-of-bounds server response: keep local estimate.
+          setPreview((prev) => ({ ...prev, loading: false }));
         }
       } catch {
         if (controller.signal.aborted) return;
@@ -106,23 +165,38 @@ export default function LendingForm({
       clearTimeout(handle);
       controller.abort();
     };
-  }, [formData.amount, formData.interestRate, formData.asset]);
+  }, [formData.amount, formData.interestRate, formData.asset, selectedAsset?.balance]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.amount || formData.amount <= 0) {
+    if (!isLendingAsset(formData.asset)) {
+      newErrors.asset = "Unsupported asset. Choose an asset from your connected wallet.";
+    } else if (!selectedAsset) {
+      newErrors.asset =
+        assetsWithBalances.length === 0
+          ? "Connect your wallet and choose an available asset."
+          : "Asset is not available in the connected wallet.";
+    }
+
+    if (
+      typeof formData.amount !== "number" ||
+      !Number.isFinite(formData.amount) ||
+      formData.amount <= 0
+    ) {
       newErrors.amount = "Please enter a valid amount";
     } else if (selectedAsset && formData.amount > selectedAsset.balance) {
       newErrors.amount = `Insufficient balance. Maximum available: ${selectedAsset.balance.toLocaleString()} ${formData.asset}`;
     }
 
     if (
-      !formData.interestRate ||
+      !rates ||
+      typeof formData.interestRate !== "number" ||
+      !Number.isFinite(formData.interestRate) ||
       formData.interestRate < rates.min ||
       formData.interestRate > rates.max
     ) {
-      newErrors.interestRate = `Interest rate must be between ${rates.min}% and ${rates.max}%`;
+      newErrors.interestRate = "Interest rate is outside the allowed range.";
     }
 
     setErrors(newErrors);
@@ -136,14 +210,37 @@ export default function LendingForm({
     if (validateForm()) {
       setIsSubmitting(true);
       try {
-        // Simulate validation/processing
+        // Simulate validation/processing; re-check authorization at submit
+        // time so wallet disconnects or balance changes cannot be ignored.
         await new Promise((resolve) => setTimeout(resolve, 800));
+        const currentAsset = assetsWithBalancesRef.current.find(
+          (a) => a.symbol === formData.asset,
+        );
+        if (
+          !currentAsset ||
+          !isLendingAsset(formData.asset) ||
+          typeof formData.amount !== "number" ||
+          !Number.isFinite(formData.amount) ||
+          formData.amount <= 0 ||
+          formData.amount > currentAsset.balance ||
+          !rates ||
+          typeof formData.interestRate !== "number" ||
+          !Number.isFinite(formData.interestRate) ||
+          formData.interestRate < rates.min ||
+          formData.interestRate > rates.max
+        ) {
+          throw new Error("Wallet authorization or available inputs changed.");
+        }
         setStatus("success");
         setSubmitMessage("Details validated successfully.");
         onSubmit(formData);
       } catch (err) {
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "An error occurred during validation.";
         setStatus("error");
-        setSubmitMessage("An error occurred during validation.");
+        setSubmitMessage(message);
       } finally {
         setIsSubmitting(false);
       }
