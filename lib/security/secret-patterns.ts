@@ -91,10 +91,10 @@ export const PRIVATE_KEY_PATTERN: SecretPattern = {
  */
 export const SERVER_ENV_PATTERN: SecretPattern = {
   name: 'Server Environment Variable',
-  pattern: /(?:PRICE_ORACLE_API_KEY|AUTH_SIGNING_SECRET|SERVER_TOKEN)/g,
-  description: 'Server-only environment variable names',
+  pattern: /(?:PRICE_ORACLE_API_KEY|AUTH_SIGNING_SECRET|SERVER_TOKEN|SOROBAN_RPC_URL|WEBHOOK_SECRET|STELLAR_SIGNING_SECRET)/g,
+  description: 'Server-only environment variable names that must never appear in client bundles',
   severity: 'critical',
-  examples: ['PRICE_ORACLE_API_KEY', 'AUTH_SIGNING_SECRET', 'SERVER_TOKEN']
+  examples: ['PRICE_ORACLE_API_KEY', 'AUTH_SIGNING_SECRET', 'SERVER_TOKEN', 'SOROBAN_RPC_URL', 'WEBHOOK_SECRET']
 };
 
 /**

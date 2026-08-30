@@ -1,3 +1,5 @@
+import { isAccountId } from "@/lib/validation/stellar";
+
 export type StellarNetwork = "PUBLIC" | "TESTNET";
 
 declare global {
@@ -12,7 +14,7 @@ declare global {
 }
 
 export function isValidStellarAddress(pubKey: string): boolean {
-  return pubKey.length === 56 && pubKey.startsWith("G");
+  return isAccountId(pubKey);
 }
 
 /**
@@ -65,5 +67,12 @@ export async function connectWallet(network: StellarNetwork): Promise<string> {
   }
 
   const { walletAddress } = await verifyResponse.json();
+  if (!isValidStellarAddress(walletAddress)) {
+    throw new Error("Verification returned an invalid wallet address");
+  }
+  if (walletAddress !== pubKey) {
+    throw new Error("Verified wallet does not match the connected wallet");
+  }
+
   return walletAddress;
 }

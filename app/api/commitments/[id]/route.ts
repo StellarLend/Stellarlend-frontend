@@ -138,9 +138,40 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching commitment:", error);
-    return NextResponse.json(
-      { error: { message: "Failed to fetch commitment" } },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: { message: "Failed to fetch commitment" } }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    if (!isValidId(id)) return NextResponse.json({ error: { message: "Invalid commitment id" } }, { status: 400 });
+    const userRole = request.headers.get("x-user-role");
+    if (userRole !== "borrower") return NextResponse.json({ error: { message: "Forbidden: Only the borrower can update a draft" } }, { status: 403 });
+    const draft = await request.json().catch(() => null);
+    if (!draft || typeof draft !== "object" || Array.isArray(draft)) return NextResponse.json({ error: { message: "Invalid request body" } }, { status: 400 });
+    const commitment = getCommitment(id, "draft");
+    if (!commitment) return NextResponse.json({ error: { message: "Draft commitment not found or not in draft state" } }, { status: 404 });
+    const allowedFields = ["amount", "interestRate", "duration", "collateralAsset", "collateralAmount"] as const;
+    const updates: Partial<Commitment> = {};
+    for (const field of allowedFields) {
+      if (field in draft) {
+        const value = (draft as Record<string, unknown>)[field];
+        if (field === "amount" || field === "collateralAmount" || field === "interestRate" || field === "duration") {
+          if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return NextResponse.json({ error: { message: `Froperty ${field} must be a positive number` } }, { status: 400 });
+        }
+        if (field === "collateralAsset") {
+          if (typeof value !== "string" || value.trim() === "") return NextResponse.json({ error: { message: "collateralAsset must be a non-empty string" } }, { status: 400 });
+        }
+        updates[field] = value as never;
+      }
+    }
+    if (Object.keys(updates).length === 0) return NextResponse.json({ error: { message: "No valid fields to update" } }, { status: 400 });
+    const updated: Commitment = { ...commitment, ...updates, updatedAt: new Date().toISOString() };
+    commitments.set(id, updated);
+    return NextResponse.json({ commitment: updated, canFormActions: buildAuth(updated) }, { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } });
+  } catch (error) {
+    console.error("Error updating commitment:", error);
+    return NextResponse.json({ error: { message: "Failed to update commitment" } }, { status: 500 });
   }
 }

@@ -12,10 +12,79 @@
  *   { repeat: { pattern: '0 0 * * *' } } // Daily at midnight UTC
  * );
  * ```
+ *
+ * Boundary invariants (enforced via `lib/validation/snapshots.ts`):
+ * - Wallet identity: every wallet address must be a valid Stellar account ID.
+ * - Numeric values: supplied/borrowed must be finite non-negative amounts and
+ *   APYs must be finite within a sane range (NaN/Infinity/tampered values are
+ *   rejected).
+ * - Timestamps must be positive integers within a plausible range.
+ * - Job data and snapshot records are parsed strictly: unknown fields are
+ *   treated as tampering and rejected.
  */
 
 import { PositionSnapshot, generateMockSnapshots } from '@/lib/positions/snapshot';
 import { logger } from '@/lib/logger';
+import {
+  assertValidWalletAddress,
+  parsePositionSnapshot,
+  parseSnapshotJobData,
+  SnapshotValidationError,
+} from '@/lib/validation/snapshots';
+
+const ROUTE = '/jobs/snapshot.worker.ts';
+
+export const MAX_SNAPSHOTS_PER_WALLET = 365;
+export const SNAPSHOT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
+
+const MAX_SNAPSHOT_HISTORY = 365;
+const SNAPSHOT_ID_RE = /^[A-Za-z0-9._:-]+$/;
+
+function normalizeWalletAddress(walletAddress: string): string {
+  const normalized = walletAddress.trim();
+  if (!normalized) {
+    throw new Error('walletAddress is required');
+  }
+  if (!/^[A-Za-z0-9]+$/.test(normalized)) {
+    throw new Error('walletAddress is invalid');
+  }
+  return normalized;
+}
+
+function isFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${fieldName} must be a finite number`);
+  }
+  return value;
+}
+
+function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snapshot is PositionSnapshot {
+  if (!snapshot || typeof snapshot !== 'object') {
+    throw new Error('snapshot payload is required');
+  }
+
+  const walletAddress = typeof snapshot.walletAddress === 'string' ? snapshot.walletAddress.trim() : '';
+  if (!walletAddress) {
+    throw new Error('snapshot.walletAddress is required');
+  }
+  if (!/^[A-Za-z0-9]+$/.test(walletAddress)) {
+    throw new Error('snapshot.walletAddress is invalid');
+  }
+
+  if (typeof snapshot.id !== 'string' || snapshot.id.trim().length === 0) {
+    throw new Error('snapshot.id is required');
+  }
+  if (!SNAPSHOT_ID_RE.test(snapshot.id.trim())) {
+    throw new Error('snapshot.id is invalid');
+  }
+
+  isFiniteNumber(snapshot.timestamp, 'snapshot.timestamp');
+  isFiniteNumber(snapshot.supplied, 'snapshot.supplied');
+  isFiniteNumber(snapshot.borrowed, 'snapshot.borrowed');
+  isFiniteNumber(snapshot.effectiveSupplyApy, 'snapshot.effectiveSupplyApy');
+  isFiniteNumber(snapshot.effectiveBorrowApy, 'snapshot.effectiveBorrowApy');
+  isFiniteNumber(snapshot.createdAt, 'snapshot.createdAt');
+}
 
 const MAX_SNAPSHOT_HISTORY = 365;
 const SNAPSHOT_ID_RE = /^[A-Za-z0-9._:-]+$/;
@@ -73,37 +142,43 @@ function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snaps
 const snapshotStore = new Map<string, PositionSnapshot[]>();
 
 /**
+ * Valid Stellar testnet account IDs used to seed the demo store.
+ */
+const DEMO_WALLETS = [
+  'GC7TCOMWMSK6LPQBVXRGR3Q23VVS3ZRS7QWYBUCYH4375CG6X4I4MFSZ',
+  'GDS2KKVQY62J2BNA3MQPQGNMVKQR6MB2OOMJBIORQSYLOJPQKOKPOHKD',
+  'GAAI6S3WG746MDGDTNYQ2VNL2DAOUS2FCH4H4MV23H7NQSZANN6KMQT6',
+];
+
+/**
  * Initialize snapshot store with sample data for demo purposes
  * In production, this would query the database
  */
 function initializeStore(): void {
   if (snapshotStore.size > 0) return;
 
-  // Generate mock data for common demo wallets
-  const demoWallets = [
-    'GBBD47UZQ5STVBDFRBGC5VMIIXC3YPXIXXLWHQK44SLSQASBQU5YRPY',
-    'GAILQ7XLMZQJ2AZSQKNXSGX2JSQXGMTZEFNQLWVMVXSYFXTXWCZVDCA',
-    'GA7NQHQE4P4TAQLLNKWQHQGJ42B3RFXXQZ3RDBX2QKHZGN7T62XQHDE',
-  ];
-
   const now = Date.now();
   const ninetyDaysAgo = now - 90 * 24 * 60 * 60 * 1000;
 
-  for (const wallet of demoWallets) {
+  for (const wallet of DEMO_WALLETS) {
     const snapshots = generateMockSnapshots(wallet, ninetyDaysAgo, now, 90);
     snapshotStore.set(wallet, snapshots);
   }
 
-  logger.info('snapshot store initialized', '/jobs/snapshot.worker.ts', {
-    walletCount: demoWallets.length,
+  logger.info('snapshot store initialized', ROUTE, {
+    walletCount: DEMO_WALLETS.length,
     snapshotsPerWallet: 90,
   });
 }
 
 /**
  * Get all snapshots for a wallet
+ *
+ * The wallet address is validated at the boundary; malformed identities are
+ * rejected rather than silently returning data.
  */
 export async function getWalletSnapshots(walletAddress: string): Promise<PositionSnapshot[]> {
+  assertValidWalletAddress(walletAddress);
   initializeStore();
 
   if (typeof walletAddress !== 'string') {
@@ -121,8 +196,13 @@ export async function getWalletSnapshots(walletAddress: string): Promise<Positio
 /**
  * Record a new position snapshot for a wallet
  * Called by the daily snapshot job
+ *
+ * The snapshot record is validated at the boundary so tampered or malformed
+ * records (NaN, negative balances, invalid wallets, unknown fields) are
+ * rejected instead of polluting the store.
  */
 export async function recordSnapshot(snapshot: PositionSnapshot): Promise<void> {
+  const validated = parsePositionSnapshot(snapshot);
   initializeStore();
   assertValidSnapshot(snapshot);
 
@@ -257,7 +337,7 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
 
     const duration = Date.now() - startTime;
 
-    logger.info('snapshot job completed', '/jobs/snapshot.worker.ts', {
+    logger.info('snapshot job completed', ROUTE, {
       snapshotsTaken,
       walletsProcessed: walletsToProcess.length,
       duration,
@@ -271,7 +351,7 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    logger.error('snapshot job failed', '/jobs/snapshot.worker.ts', {
+    logger.error('snapshot job failed', ROUTE, {
       error: error instanceof Error ? error.message : String(error),
       duration,
     });
@@ -284,7 +364,7 @@ export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<Snaps
  * Can be called as a maintenance job
  */
 export async function purgeOldSnapshots(): Promise<{ deleted: number }> {
-  const cutoffTime = Date.now() - 365 * 24 * 60 * 60 * 1000;
+  const cutoffTime = Date.now() - SNAPSHOT_RETENTION_MS;
   let deleted = 0;
 
   for (const [wallet, snapshots] of snapshotStore.entries()) {
@@ -304,7 +384,7 @@ export async function purgeOldSnapshots(): Promise<{ deleted: number }> {
     }
   }
 
-  logger.info('old snapshots purged', '/jobs/snapshot.worker.ts', { deleted });
+  logger.info('old snapshots purged', ROUTE, { deleted });
   return { deleted };
 }
 
