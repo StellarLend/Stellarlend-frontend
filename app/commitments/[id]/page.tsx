@@ -5,7 +5,7 @@
 
 "use client";
 
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CommitmentDetailActions from "@/components/CommitmentDetailActions";
 import CommitmentDiagnostics from "@/components/CommitmentDiagnostics";
@@ -20,6 +20,154 @@ import { PageHeader } from "@/components/shared/common";
 
 interface CommitmentDetailPageProps {
   params: Promise<{ id: string }>;
+}
+
+type CommitmentStatus =
+  | "pending"
+  | "active"
+  | "disputed"
+  | "early_exit"
+  | "settled"
+  | "defaulted"
+  | "cancelled";
+
+interface CommitmentRecord {
+  id: string;
+  status: CommitmentStatus;
+  borrower: string;
+  lender: string;
+  amount: number;
+  asset: string;
+  fundedAmount: number;
+  collateralAmount: number;
+  collateralAsset: string;
+  interestRate: number;
+  duration: number;
+  outstandingDebt: number;
+  createdAt: string;
+  updatedAt: string;
+  maturityDate?: string;
+  transactionHash?: string;
+  chainId?: string;
+}
+
+const ACTION_ALLOWED_STATUSES: Record<CommitmentActionType, CommitmentStatus[]> = {
+  fund: ["pending"],
+  dispute: ["active", "early_exit"],
+  early_exit: ["active"],
+  settle: ["active", "early_exit"],
+};
+
+const ACTION_TARGET_STATUSES: Record<CommitmentActionType, CommitmentStatus[]> = {
+  fund: ["active"],
+  dispute: ["disputed"],
+  early_exit: ["early_exit"],
+  settle: ["settled"],
+};
+
+interface EthereumProvider {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on?: (event: string, handler: (...args: unknown[]) => void) => void;
+  removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+}
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const isFiniteNonNegative = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
+
+const isFinitePositive = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const isAddress = (value: unknown): value is string =>
+  typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value);
+
+const isCommitmentStatus = (value: unknown): value is CommitmentStatus =>
+  typeof value === "string" &&
+  ["pending", "active", "disputed", "early_exit", "settled", "defaulted", "cancelled"].includes(value);
+
+function isValidCommitment(value: unknown): value is CommitmentRecord {
+  if (!value || typeof value !== "object") return false;
+  const c = value as Record<string, unknown>;
+  return (
+    isNonEmptyString(c.id) &&
+    isCommitmentStatus(c.status) &&
+    isAddress(c.borrower) &&
+    isAddress(c.lender) &&
+    isFinitePositive(c.amount) &&
+    isNonEmptyString(c.asset) &&
+    isFiniteNonNegative(c.fundedAmount) &&
+    isFiniteNonNegative(c.collateralAmount) &&
+    isNonEmptyString(c.collateralAsset) &&
+    isFiniteNonNegative(c.interestRate) &&
+    isFinitePositive(c.duration) &&
+    isFiniteNonNegative(c.outstandingDebt) &&
+    isNonEmptyString(c.createdAt) &&
+    !Number.isNaN(Date.parse(c.createdAt)) &&
+    isNonEmptyString(c.updatedAt) &&
+    !Number.isNaN(Date.parse(c.updatedAt)) &&
+    (c.maturityDate === undefined ||
+      (isNonEmptyString(c.maturityDate) && !Number.isNaN(Date.parse(c.maturityDate)))) &&
+    (c.transactionHash === undefined || isNonEmptyString(c.transactionHash)) &&
+    (c.chainId === undefined || isNonEmptyString(c.chainId))
+  );
+}
+
+const getEthereumProvider = (): EthereumProvider | null => {
+  if (typeof window === "undefined") return null;
+  return (window as unknown as { ethereum?: EthereumProvider }).ethereum ?? null;
+};
+
+const isSameAddress = (a: string, b: string): boolean =>
+  a.toLowerCase() === b.toLowerCase();
+
+function authorizeAction(
+  commitment: CommitmentRecord,
+  connectedAddress: string | null,
+  connectedChainId: string | null,
+  action: CommitmentActionType,
+): ActionAuthorization {
+  if (!connectedAddress) {
+    return { allowed: false, reason: "Connect your wallet to continue." };
+  }
+
+  if (
+    connectedChainId &&
+    commitment.chainId &&
+    !isSameAddress(connectedChainId, commitment.chainId)
+  ) {
+    return { allowed: false, reason: "Connected wallet is on the wrong network." };
+  }
+
+  const isParticipant =
+    isSameAddress(connectedAddress, commitment.borrower) ||
+    isSameAddress(connectedAddress, commitment.lender);
+
+  if (!isParticipant) {
+    return { allowed: false, reason: "Connected wallet is not a participant on this commitment." };
+  }
+
+  if (!ACTION_ALLOWED_STATUSES[action].includes(commitment.status)) {
+    return {
+      allowed: false,
+      reason: `Action is not available while the commitment is ${commitment.status}.`,
+    };
+  }
+
+  if (action === "fund" && !isSameAddress(connectedAddress, commitment.lender)) {
+    return { allowed: false, reason: "Only the lender can fund this commitment." };
+  }
+
+  if (action === "settle" && !isSameAddress(connectedAddress, commitment.borrower)) {
+    return { allowed: false, reason: "Only the borrower can settle this commitment." };
+  }
+
+  if (action === "early_exit" && !isSameAddress(connectedAddress, commitment.lender)) {
+    return { allowed: false, reason: "Only the lender can request an early exit." };
+  }
+
+  return { allowed: true };
 }
 
 /**
@@ -66,20 +214,21 @@ function getStatusBadgeClass(status: string): string {
 
 export default function CommitmentDetailPage({ params }: CommitmentDetailPageProps) {
   const resolvedParams = use(params);
-  const commitmentId = resolvedParams.id;
+  const commitmentId =
+    typeof resolvedParams.id === "string" ? resolvedParams.id.trim() : "";
   const router = useRouter();
 
   const [telemetryEvents, setTelemetryEvents] = useState<TelemetryEvent[]>([]);
   const telemetryBufferRef = useRef<TelemetryEvent[]>([]);
 
-  // Mock authorization data - in production, fetch from API
-  const [canPerformActions, setCanPerformActions] = useState<
-    Record<CommitmentActionType, ActionAuthorization>
-  >({
-    fund: { allowed: true },
-    dispute: { allowed: true },
-    early_exit: { allowed: true },
-    settle: { allowed: true },
+  const isRouteParamValid = useMemo(
+    () => /^0x[a-fA-F0-9]{64}$/.test(commitmentId),
+    [commitmentId],
+  );
+
+  const [wallet, setWallet] = useState<{ address: string | null; chainId: string | null }>({
+    address: null,
+    chainId: null,
   });
 
   // Handle telemetry events
@@ -99,29 +248,109 @@ export default function CommitmentDetailPage({ params }: CommitmentDetailPagePro
   // Use polling hook with telemetry
   const { commitment, isLoading, error, refetch, stopPolling } = useCommitmentPolling({
     commitmentId,
-    enabled: true,
+    enabled: isRouteParamValid,
     onTelemetry: handleTelemetry,
   });
 
-  // Handle action completion - refetch commitment data
+  // Handle action completion - refetch commitment data after re-checking authorization
   const handleActionComplete = useCallback(
     (action: CommitmentActionType, newStatus: string) => {
-      // Immediately refetch to get updated state
-      refetch();
+      if (!isValidCommitment(commitment)) return;
 
-      // Update authorization based on new status (in production, fetch from API)
-      // This is a simplified mock - real implementation should fetch permissions
-      if (newStatus === "settled" || newStatus === "defaulted" || newStatus === "cancelled") {
-        setCanPerformActions({
-          fund: { allowed: false, reason: "Commitment is finalized" },
-          dispute: { allowed: false, reason: "Commitment is finalized" },
-          early_exit: { allowed: false, reason: "Commitment is finalized" },
-          settle: { allowed: false, reason: "Commitment is finalized" },
-        });
+      const targetStatuses = ACTION_TARGET_STATUSES[action];
+      if (!targetStatuses) return;
+
+      const authorization = authorizeAction(commitment, wallet.address, wallet.chainId, action);
+
+      if (
+        !authorization.allowed ||
+        !targetStatuses.includes(newStatus as CommitmentStatus)
+      ) {
+        return;
       }
+
+      refetch();
     },
-    [refetch],
+    [commitment, wallet.address, wallet.chainId, refetch],
   );
+
+  const isCommitmentPayloadValid = useMemo(
+    () => isValidCommitment(commitment),
+    [commitment],
+  );
+
+  const canPerformActions = useMemo<Record<CommitmentActionType, ActionAuthorization>>(() => {
+    if (!commitment || !isValidCommitment(commitment)) {
+      return {
+        fund: { allowed: false, reason: "Commitment data is unavailable or invalid." },
+        dispute: { allowed: false, reason: "Commitment data is unavailable or invalid." },
+        early_exit: { allowed: false, reason: "Commitment data is unavailable or invalid." },
+        settle: { allowed: false, reason: "Commitment data is unavailable or invalid." },
+      };
+    }
+
+    return {
+      fund: authorizeAction(commitment, wallet.address, wallet.chainId, "fund"),
+      dispute: authorizeAction(commitment, wallet.address, wallet.chainId, "dispute"),
+      early_exit: authorizeAction(commitment, wallet.address, wallet.chainId, "early_exit"),
+      settle: authorizeAction(commitment, wallet.address, wallet.chainId, "settle"),
+    };
+  }, [commitment, wallet.address, wallet.chainId]);
+
+  useEffect(() => {
+    let active = true;
+    const provider = getEthereumProvider();
+
+    if (!provider) {
+      setWallet({ address: null, chainId: null });
+      return;
+    }
+
+    const syncWallet = async () => {
+      try {
+        const [accounts, chainId] = await Promise.all([
+          provider.request({ method: "eth_accounts" }),
+          provider.request({ method: "eth_chainId" }),
+        ]);
+
+        if (!active) return;
+
+        const accountList = Array.isArray(accounts) ? (accounts as string[]) : [];
+        setWallet({
+          address: accountList[0]?.toLowerCase() ?? null,
+          chainId: typeof chainId === "string" ? chainId.toLowerCase() : null,
+        });
+      } catch {
+        if (active) setWallet({ address: null, chainId: null });
+      }
+    };
+
+    syncWallet();
+
+    const onAccountsChanged = (accounts: unknown) => {
+      const accountList = Array.isArray(accounts) ? (accounts as string[]) : [];
+      setWallet((prev) => ({
+        ...prev,
+        address: accountList[0]?.toLowerCase() ?? null,
+      }));
+    };
+
+    const onChainChanged = (changedChainId: unknown) => {
+      setWallet((prev) => ({
+        ...prev,
+        chainId: typeof changedChainId === "string" ? changedChainId.toLowerCase() : null,
+      }));
+    };
+
+    provider.on?.("accountsChanged", onAccountsChanged);
+    provider.on?.("chainChanged", onChainChanged);
+
+    return () => {
+      active = false;
+      provider.removeListener?.("accountsChanged", onAccountsChanged);
+      provider.removeListener?.("chainChanged", onChainChanged);
+    };
+  }, []);
 
   // Cleanup on route change or unmount
   useEffect(() => {
@@ -129,6 +358,28 @@ export default function CommitmentDetailPage({ params }: CommitmentDetailPagePro
       stopPolling();
     };
   }, [stopPolling]);
+
+  if (!isRouteParamValid) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-7xl">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+            <h2 className="text-lg font-semibold text-red-900">Invalid Commitment ID</h2>
+            <p className="mt-2 text-sm text-red-700">The commitment identifier in the URL is malformed.</p>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/commitments")}
+                className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              >
+                Back to Commitments
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Loading state
   if (isLoading && !commitment) {
@@ -157,6 +408,37 @@ export default function CommitmentDetailPage({ params }: CommitmentDetailPagePro
           <div className="rounded-lg border border-red-200 bg-red-50 p-6">
             <h2 className="text-lg font-semibold text-red-900">Error Loading Commitment</h2>
             <p className="mt-2 text-sm text-red-700">{error.message}</p>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/commitments")}
+                className="rounded-lg bg-slate-600 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+              >
+                Back to Commitments
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (commitment && !isCommitmentPayloadValid) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-7xl">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+            <h2 className="text-lg font-semibold text-red-900">Invalid Commitment Data</h2>
+            <p className="mt-2 text-sm text-red-700">
+              The commitment response failed validation. Verify the commitment on-chain before proceeding.
+            </p>
             <div className="mt-4 flex gap-3">
               <button
                 type="button"
