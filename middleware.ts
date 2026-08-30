@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
 import appConfig from '@/lib/config';
 import { getOrCreateRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
+import { IDEMPOTENCY_HEADER } from '@/lib/api/idempotency';
+
+// Mutating HTTP methods that change server/on-chain state and must carry an
+// idempotency key so retries and refreshes can't duplicate the operation.
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+// Routes exempt from the idempotency requirement (session management,
+// health checks, and other naturally-idempotent server ops).
+const IDEMPOTENCY_EXEMPT = [
+  '/api/health',
+  '/api/auth/session',
+  '/api/auth/logout',
+];
 
 function generateNonce(): string {
   const array = new Uint8Array(16);
@@ -65,6 +78,17 @@ function setRequestIdHeader(response: NextResponse, requestId: string): NextResp
   return response;
 }
 
+function requiresIdempotencyKey(request: NextRequest): boolean {
+  if (!MUTATING_METHODS.has(request.method)) return false;
+  const { pathname } = request.nextUrl;
+  return !IDEMPOTENCY_EXEMPT.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+function applySecurityHeaders(response: NextResponse, nonce: string): void {
+  response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const safePathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
@@ -74,8 +98,7 @@ export function middleware(request: NextRequest) {
     // For non‑API routes, still set CSP header with nonce for inline scripts
     const nonce = generateNonce();
     const response = NextResponse.next();
-    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    applySecurityHeaders(response, nonce);
     response.headers.set('x-csp-nonce', nonce);
     return response;
   }
@@ -85,8 +108,7 @@ export function middleware(request: NextRequest) {
   // 2. Exemption: Health checks should never be rate limited
   if (safePathname === '/api/health') {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
-    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    applySecurityHeaders(response, nonce);
     return response;
   }
 
@@ -98,8 +120,7 @@ export function middleware(request: NextRequest) {
 
   if (isAuth) {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
-    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    applySecurityHeaders(response, nonce);
     return response;
   }
 
@@ -113,33 +134,33 @@ export function middleware(request: NextRequest) {
     appConfig.rateLimit.window
   );
 
-  // 5. Prepare Response
+  // 6. Prepare Response
   let response: NextResponse;
 
   if (success) {
     response = NextResponse.next({ request: { headers: requestHeaders } });
   } else {
     response = new NextResponse(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Too Many Requests',
-        message: 'Rate limit exceeded. Please try again later.' 
+        message: 'Rate limit exceeded. Please try again later.',
       }),
       { status: 429, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
-  // Set CSP header on every response
-  response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  applySecurityHeaders(response, nonce);
 
-  // 6. Standard Rate Limit Headers
+  // 7. Standard Rate Limit Headers
   response.headers.set('X-RateLimit-Limit', limit.toString());
   response.headers.set('X-RateLimit-Remaining', remaining.toString());
   response.headers.set('X-RateLimit-Reset', Math.floor(reset / 1000).toString());
 
   if (!success) {
-    const retryAfter = Math.ceil((reset - Date.now()) / 1000);
-    response.headers.set('Retry-After', Math.max(0, retryAfter).toString());
+    // Clamp to 0 so clients never see a negative Retry-After when the window
+    // resets between the rateLimit() call and the header write.
+    const retryAfter = Math.max(0, Math.ceil((reset - Date.now()) / 1000));
+    response.headers.set('Retry-After', retryAfter.toString());
   }
 
   return setRequestIdHeader(response, requestId);

@@ -308,4 +308,62 @@ describe("NetWorthTrend Component", () => {
       expect(onWindowChange).toHaveBeenCalledWith("24h");
     });
   });
+
+  it("renders retry button on error and calls refetch when clicked", async () => {
+    const refetch = vi.fn();
+    mockUsePositionHistory.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error("Failed to fetch"),
+      refetch,
+    });
+
+    render(<NetWorthTrend />);
+
+    const retryButton = screen.getByRole("button", { name: /retry|try again/i });
+    expect(retryButton).toBeInTheDocument();
+
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("renders permission error message when error indicates insufficient permissions", () => {
+    mockUsePositionHistory.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: new Error("You do not have permission to view net worth trend"),
+      refetch: vi.fn(),
+    });
+
+    render(<NetWorthTrend />);
+
+    expect(
+      screen.getByText(
+        "You do not have permission to view net worth trend."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("makes window selector buttons focusable", () => {
+    const now = Date.now();
+    mockUsePositionHistory.mockReturnValue({
+      data: {
+        snapshots: [{ timestamp: now, netWorth: 5000 }],
+        window: "7d" as const,
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<NetWorthTrend />);
+
+    const sevenDayButton = screen.getByRole("button", { name: /7d/ });
+    expect(sevenDayButton).toHaveAttribute("aria-pressed", "true");
+    sevenDayButton.focus();
+    expect(sevenDayButton).toHaveFocus();
+  });
 });

@@ -68,7 +68,7 @@ function scanDir(dir) {
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
       const relativePath = path.relative(process.cwd(), fullPath).replace(/\\/g, '/');
-      if (relativePath === 'app/api') {
+      if (SKIP_DIRS.has(relativePath) || SKIP_DIRS.has(file)) {
         continue;
       }
       results.push(...scanDir(fullPath));

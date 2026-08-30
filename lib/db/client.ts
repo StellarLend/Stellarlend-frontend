@@ -82,7 +82,8 @@ function initDbUnsafe() {
       attempts INTEGER NOT NULL DEFAULT 0,
       lastError TEXT,
       createdAt INTEGER NOT NULL,
-      processedAt INTEGER
+      processedAt INTEGER,
+      claimedAt INTEGER
     );
   `);
 
