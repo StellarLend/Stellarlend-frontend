@@ -386,5 +386,67 @@ describe("NotificationCenter", () => {
         expect(screen.getByTestId("live-region")).toHaveTextContent("New notification: Live Update");
       });
     });
+
+    it("caps the in-memory notification list so it cannot grow without bound", async () => {
+      mockFetchSuccess([]);
+      render(<NotificationCenter />);
+      await screen.findByRole("button", { name: /no unread/i });
+
+      // Stream in far more notifications than the client-side cap.
+      act(() => {
+        for (let i = 0; i < 150; i += 1) {
+          capturedOnNotification?.(
+            makeNotification({ id: `live-${i}`, title: `Live ${i}`, read: true }),
+          );
+        }
+      });
+
+      const trigger = screen.getByRole("button", { name: /notification/i });
+      fireEvent.click(trigger);
+      const items = screen.getAllByTestId(/notification-item-/);
+      expect(items.length).toBeLessThanOrEqual(100);
+      // The most recent event should still be present (oldest ones drop off).
+      expect(screen.getByText("Live 149")).toBeInTheDocument();
+    });
+
+    it("caps the initial fetch result to the client-side maximum as a defensive measure", async () => {
+      const manyNotifications = Array.from({ length: 120 }, (_, i) =>
+        makeNotification({ id: `n${i}`, title: `Notif ${i}`, read: true }),
+      );
+      mockFetchSuccess(manyNotifications);
+      render(<NotificationCenter />);
+      const trigger = await screen.findByRole("button", { name: /notification/i });
+      fireEvent.click(trigger);
+      const items = screen.getAllByTestId(/notification-item-/);
+      expect(items.length).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe("degraded stream visibility", () => {
+    it("shows a reconnecting indicator when the SSE connection reports offline", async () => {
+      streamFn.mockImplementation((opts?: { onNotification?: (n: Notification) => void }) => {
+        capturedOnNotification = opts?.onNotification;
+        return { unreadCount: 0, connectionState: "offline" };
+      });
+      mockFetchSuccess([]);
+      render(<NotificationCenter />);
+      const trigger = await screen.findByRole("button", { name: /no unread/i });
+      fireEvent.click(trigger);
+
+      expect(screen.getByTestId("notification-stream-offline")).toBeInTheDocument();
+    });
+
+    it("does not show a reconnecting indicator while connected", async () => {
+      streamFn.mockImplementation((opts?: { onNotification?: (n: Notification) => void }) => {
+        capturedOnNotification = opts?.onNotification;
+        return { unreadCount: 0, connectionState: "connected" };
+      });
+      mockFetchSuccess([]);
+      render(<NotificationCenter />);
+      const trigger = await screen.findByRole("button", { name: /no unread/i });
+      fireEvent.click(trigger);
+
+      expect(screen.queryByTestId("notification-stream-offline")).not.toBeInTheDocument();
+    });
   });
 });

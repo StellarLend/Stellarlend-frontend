@@ -7,6 +7,10 @@ import {
   validateNotificationPayload,
   sanitizeNotificationId,
   sanitizeUserId,
+  parseNotificationsPagination,
+  DEFAULT_NOTIFICATIONS_PAGE_SIZE,
+  MAX_NOTIFICATIONS_PAGE_SIZE,
+  MAX_NOTIFICATIONS_OFFSET,
 } from '@/lib/validation/notifications';
 
 describe('lib/validation/notifications', () => {
@@ -224,6 +228,61 @@ describe('lib/validation/notifications', () => {
   describe('sanitizeUserId', () => {
     it('trims whitespace from user ID', () => {
       expect(sanitizeUserId('  user-123  ')).toBe('user-123');
+    });
+  });
+
+  describe('parseNotificationsPagination', () => {
+    it('defaults limit and offset when nothing is provided', () => {
+      expect(parseNotificationsPagination({})).toEqual({
+        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
+        offset: 0,
+      });
+    });
+
+    it('honors an in-range limit and offset', () => {
+      expect(
+        parseNotificationsPagination({ limit: '10', offset: '20' }),
+      ).toEqual({ limit: 10, offset: 20 });
+    });
+
+    it('clamps a limit above the maximum page size', () => {
+      expect(
+        parseNotificationsPagination({ limit: '999999' }),
+      ).toEqual({ limit: MAX_NOTIFICATIONS_PAGE_SIZE, offset: 0 });
+    });
+
+    it('clamps an offset above the maximum offset', () => {
+      expect(
+        parseNotificationsPagination({ offset: '999999999' }),
+      ).toEqual({ limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE, offset: MAX_NOTIFICATIONS_OFFSET });
+    });
+
+    it('falls back to defaults for non-numeric or non-positive values', () => {
+      expect(parseNotificationsPagination({ limit: 'abc', offset: 'xyz' })).toEqual({
+        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
+        offset: 0,
+      });
+      expect(parseNotificationsPagination({ limit: '-5', offset: '-1' })).toEqual({
+        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
+        offset: 0,
+      });
+      expect(parseNotificationsPagination({ limit: '0' })).toEqual({
+        limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE,
+        offset: 0,
+      });
+    });
+
+    it('floors fractional values', () => {
+      expect(parseNotificationsPagination({ limit: '10.9', offset: '5.9' })).toEqual({
+        limit: 10,
+        offset: 5,
+      });
+    });
+
+    it('treats null values (missing query params) as defaults', () => {
+      expect(
+        parseNotificationsPagination({ limit: null, offset: null }),
+      ).toEqual({ limit: DEFAULT_NOTIFICATIONS_PAGE_SIZE, offset: 0 });
     });
   });
 });

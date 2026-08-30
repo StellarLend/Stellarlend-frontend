@@ -65,29 +65,81 @@ async function seedUser(userId: string): Promise<Notification[]> {
   }));
 }
 
-/** Returns all notifications for `userId`, seeding demo data on first access. */
+export interface GetNotificationsOptions {
+  /** Max rows to return. Callers should pass an already-clamped value
+   * (see `parseNotificationsPagination`) — this is a last-line defensive cap. */
+  limit?: number;
+  offset?: number;
+}
+
+export interface NotificationsPage {
+  notifications: Notification[];
+  /** True when more rows exist beyond this page (limit+offset < total). */
+  hasMore: boolean;
+}
+
+const HARD_MAX_PAGE_SIZE = 100;
+
+/**
+ * Returns a bounded page of notifications for `userId`, most recent first,
+ * seeding demo data on first access. Unbounded reads are never issued
+ * against the notifications table to keep response size and memory
+ * bounded regardless of caller input.
+ */
 export async function getNotifications(
   userId: string,
-): Promise<Notification[]> {
+  options: GetNotificationsOptions = {},
+): Promise<NotificationsPage> {
+  const limit = Math.max(
+    1,
+    Math.min(options.limit ?? HARD_MAX_PAGE_SIZE, HARD_MAX_PAGE_SIZE),
+  );
+  const offset = Math.max(0, options.offset ?? 0);
+
   const rows = await db
     .select()
     .from(notificationsTable)
     .where(eq(notificationsTable.userId, userId))
-    .orderBy(desc(notificationsTable.createdAt));
+    .orderBy(desc(notificationsTable.createdAt))
+    // Fetch one extra row to cheaply determine hasMore without a count query.
+    .limit(limit + 1)
+    .offset(offset);
 
-  if (rows.length === 0) {
-    return await seedUser(userId);
+  if (rows.length === 0 && offset === 0) {
+    const seeded = await seedUser(userId);
+    return { notifications: seeded.slice(0, limit), hasMore: seeded.length > limit };
   }
 
-  return rows.map((r) => ({
-    id: r.id.replace(`${userId}-`, ""),
-    userId: r.userId,
-    title: r.title,
-    message: r.message,
-    read: r.read,
-    createdAt: r.createdAt.toISOString(),
-    type: r.type,
-  }));
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+
+  return {
+    notifications: page.map((r) => ({
+      id: r.id.replace(`${userId}-`, ""),
+      userId: r.userId,
+      title: r.title,
+      message: r.message,
+      read: r.read,
+      createdAt: r.createdAt.toISOString(),
+      type: r.type,
+    })),
+    hasMore,
+  };
+}
+
+/** Returns the count of unread notifications for `userId` without loading
+ * the full notification list into memory. */
+export async function getUnreadCount(userId: string): Promise<number> {
+  const rows = await db
+    .select({ id: notificationsTable.id })
+    .from(notificationsTable)
+    .where(
+      and(
+        eq(notificationsTable.userId, userId),
+        eq(notificationsTable.read, false),
+      ),
+    );
+  return rows.length;
 }
 
 /** Adds a new notification for userId, emits hub events, and returns it.
@@ -143,8 +195,7 @@ export async function addNotification(
   }
 
   try {
-    const list = await getNotifications(trimmedUserId);
-    const unreadCount = list.filter((x) => !x.read).length;
+    const unreadCount = await getUnreadCount(trimmedUserId);
     notificationHub.publish(trimmedUserId, { type: "unreadCount", unreadCount });
   } catch (e) {
     // noop

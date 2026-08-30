@@ -6,6 +6,37 @@ const MAX_USER_ID_LENGTH = 256;
 const VALID_NOTIFICATION_TYPES: NotificationType[] = ['info', 'success', 'warning', 'error'];
 const NOTIFICATION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
+/** Default and hard-cap page sizes for notification list pagination. */
+export const DEFAULT_NOTIFICATIONS_PAGE_SIZE = 50;
+export const MAX_NOTIFICATIONS_PAGE_SIZE = 100;
+export const MAX_NOTIFICATIONS_OFFSET = 10_000;
+
+/**
+ * Parses and clamps untrusted `limit`/`offset` query params into safe,
+ * bounded pagination values. Never throws: invalid or out-of-range input
+ * falls back to the defaults/bounds rather than rejecting the request,
+ * since these are read-only display params.
+ */
+export function parseNotificationsPagination(params: {
+  limit?: string | null;
+  offset?: string | null;
+}): { limit: number; offset: number } {
+  const rawLimit = Number(params.limit);
+  const rawOffset = Number(params.offset);
+
+  const limit =
+    Number.isFinite(rawLimit) && rawLimit > 0
+      ? Math.min(Math.floor(rawLimit), MAX_NOTIFICATIONS_PAGE_SIZE)
+      : DEFAULT_NOTIFICATIONS_PAGE_SIZE;
+
+  const offset =
+    Number.isFinite(rawOffset) && rawOffset > 0
+      ? Math.min(Math.floor(rawOffset), MAX_NOTIFICATIONS_OFFSET)
+      : 0;
+
+  return { limit, offset };
+}
+
 export interface ValidationResult {
   valid: boolean;
   error?: string;
