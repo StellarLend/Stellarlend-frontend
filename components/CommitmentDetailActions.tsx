@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   Commitment,
   CommitmentActionType,
@@ -19,8 +19,148 @@ import { COMMITMENT_STATE_MACHINE, COMMITMENT_BOUNDS } from "@/types/commitment"
 interface CommitmentDetailActionsProps {
   commitment: Commitment;
   canPerformActions: Record<CommitmentActionType, ActionAuthorization>;
+  wallet?: {
+    address: string;
+    chainId: number;
+    isConnected: boolean;
+  } | null;
   onActionComplete?: (action: CommitmentActionType, newStatus: string) => void;
   onTelemetry?: (event: TelemetryEvent) => void;
+}
+
+const VALID_ACTION_TYPES = new Set<CommitmentActionType>([
+  "fund",
+  "dispute",
+  "early_exit",
+  "settle",
+]);
+
+const VALID_STATUSES = new Set(Object.keys(COMMITMENT_STATE_MACHINE));
+
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+const TX_HASH = /^0x[a-fA-F0-9]{64}$/;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateCommitment(commitment: Commitment): {
+  valid: boolean;
+  error?: string;
+} {
+  if (!isRecord(commitment)) {
+    return { valid: false, error: "Commitment payload is malformed." };
+  }
+
+  if (typeof commitment.id !== "string" || !SAFE_ID.test(commitment.id)) {
+    return { valid: false, error: "Commitment id is missing or unsafe." };
+  }
+
+  if (
+    typeof commitment.status !== "string" ||
+    !VALID_STATUSES.has(commitment.status)
+  ) {
+    return {
+      valid: false,
+      error: `Commitment status is not a known state: ${String(commitment.status)}`,
+    };
+  }
+
+  const record = commitment as unknown as Record<string, unknown>;
+
+  if (record.updatedAt !== undefined) {
+    const timestamp =
+      typeof record.updatedAt === "number"
+        ? record.updatedAt
+        : Date.parse(String(record.updatedAt));
+    if (
+      !Number.isFinite(timestamp) ||
+      timestamp <= 0 ||
+      timestamp > Date.now() + 60_000
+    ) {
+      return { valid: false, error: "Commitment updatedAt is invalid." };
+    }
+  }
+
+  for (const field of ["amount", "collateral", "penalty", "exitFee"] as const) {
+    const rawValue = record[field];
+    if (rawValue === undefined || rawValue === null || rawValue === "") {
+      continue;
+    }
+    if (
+      typeof rawValue === "boolean" ||
+      (typeof rawValue !== "number" && typeof rawValue !== "string")
+    ) {
+      return {
+        valid: false,
+        error: `Commitment ${field} must be a non-negative number.`,
+      };
+    }
+    const numericValue =
+      typeof rawValue === "number" ? rawValue : Number(rawValue);
+    if (!Number.isFinite(numericValue) || numericValue < 0) {
+      return {
+        valid: false,
+        error: `Commitment ${field} must be a non-negative number.`,
+      };
+    }
+  }
+
+  const chainId = record.chainId ?? record.networkId;
+  if (chainId !== undefined) {
+    const numericChainId =
+      typeof chainId === "number" ? chainId : Number(chainId);
+    if (!Number.isInteger(numericChainId) || numericChainId <= 0) {
+      return { valid: false, error: "Commitment network/chain id is invalid." };
+    }
+  }
+
+  const owner = record.owner ?? record.walletAddress;
+  if (owner !== undefined && (typeof owner !== "string" || !ADDRESS.test(owner))) {
+    return { valid: false, error: "Commitment owner wallet address is malformed." };
+  }
+
+  return { valid: true };
+}
+
+function validateAuthorizations(
+  canPerformActions: Record<CommitmentActionType, ActionAuthorization>,
+): { valid: boolean; error?: string } {
+  if (!isRecord(canPerformActions)) {
+    return { valid: false, error: "Action authorization payload is malformed." };
+  }
+
+  for (const action of VALID_ACTION_TYPES) {
+    const authorization = canPerformActions[action];
+    if (
+      !isRecord(authorization) ||
+      typeof (authorization as ActionAuthorization).allowed !== "boolean"
+    ) {
+      return {
+        valid: false,
+        error: `Authorization for ${action} is missing or malformed.`,
+      };
+    }
+  }
+
+  return { valid: true };
+}
+
+function parseCommitmentActionResponse(raw: unknown): CommitmentActionResponse {
+  if (!isRecord(raw)) {
+    throw new Error("Server returned a malformed response.");
+  }
+  if (typeof raw.success !== "boolean") {
+    throw new Error("Server response is missing a valid success flag.");
+  }
+  if (raw.success && raw.newStatus !== undefined && typeof raw.newStatus !== "string") {
+    throw new Error("Server response newStatus is invalid.");
+  }
+  if (raw.error !== undefined && !isRecord(raw.error)) {
+    throw new Error("Server response error payload is invalid.");
+  }
+  return raw as unknown as CommitmentActionResponse;
 }
 
 /**
@@ -32,6 +172,7 @@ export default function CommitmentDetailActions({
   canPerformActions,
   onActionComplete,
   onTelemetry,
+  wallet,
 }: CommitmentDetailActionsProps) {
   const [actionStates, setActionStates] = useState<Record<CommitmentActionType, ActionState>>({
     fund: "idle",
@@ -43,6 +184,17 @@ export default function CommitmentDetailActions({
   const [actionErrors, setActionErrors] = useState<
     Partial<Record<CommitmentActionType, string>>
   >({});
+
+  const pendingActionsRef = useRef<Set<CommitmentActionType>>(new Set());
+
+  const commitmentBoundary = useMemo(
+    () => validateCommitment(commitment),
+    [commitment],
+  );
+  const authorizationBoundary = useMemo(
+    () => validateAuthorizations(canPerformActions),
+    [canPerformActions],
+  );
 
   // Emit telemetry event
   const emitTelemetry = useCallback(
@@ -67,6 +219,9 @@ export default function CommitmentDetailActions({
   // Check if an action is available (allowed by state machine and authorized)
   const isActionAvailable = useCallback(
     (action: CommitmentActionType): boolean => {
+      if (!commitmentBoundary.valid || !authorizationBoundary.valid) {
+        return false;
+      }
       return allowedActions.includes(action) && canPerformActions[action]?.allowed === true;
     },
     [allowedActions, canPerformActions],
@@ -75,7 +230,99 @@ export default function CommitmentDetailActions({
   // Execute action with timeout and error handling
   const executeAction = useCallback(
     async (action: CommitmentActionType) => {
-      // Pre-flight checks
+      // Reject unknown actions before changing any UI state.
+      if (!VALID_ACTION_TYPES.has(action)) {
+        const reason = "Unknown action requested.";
+        setActionErrors((prev) => ({ ...prev, [action]: reason }));
+        emitTelemetry({
+          type: "action_failed",
+          action,
+          status: commitment.status,
+          errorType: "invalid_action",
+          errorMessage: reason,
+        });
+        return;
+      }
+
+      // Prevent replay while the same action is already in flight.
+      if (pendingActionsRef.current.has(action) || actionStates[action] === "loading") {
+        return;
+      }
+
+      if (!commitmentBoundary.valid) {
+        const reason = commitmentBoundary.error || "Commitment data failed validation.";
+        setActionErrors((prev) => ({ ...prev, [action]: reason }));
+        emitTelemetry({
+          type: "action_failed",
+          action,
+          status: commitment.status,
+          errorType: "boundary_validation_failed",
+          errorMessage: reason,
+        });
+        return;
+      }
+
+      if (!authorizationBoundary.valid) {
+        const reason = authorizationBoundary.error || "Authorization data failed validation.";
+        setActionErrors((prev) => ({ ...prev, [action]: reason }));
+        emitTelemetry({
+          type: "action_failed",
+          action,
+          status: commitment.status,
+          errorType: "boundary_validation_failed",
+          errorMessage: reason,
+        });
+        return;
+      }
+
+      if (wallet) {
+        if (!wallet.isConnected) {
+          setActionErrors((prev) => ({ ...prev, [action]: "Wallet is not connected." }));
+          emitTelemetry({
+            type: "action_failed",
+            action,
+            status: commitment.status,
+            errorType: "wallet_validation_failed",
+            errorMessage: "Wallet is not connected.",
+          });
+          return;
+        }
+
+        const record = commitment as unknown as Record<string, unknown>;
+        const chainId = record.chainId ?? record.networkId;
+        if (chainId !== undefined && wallet.chainId !== Number(chainId)) {
+          const reason = `Wrong network. Expected chain ${String(chainId)}, connected to chain ${wallet.chainId}.`;
+          setActionErrors((prev) => ({ ...prev, [action]: reason }));
+          emitTelemetry({
+            type: "action_failed",
+            action,
+            status: commitment.status,
+            errorType: "wallet_validation_failed",
+            errorMessage: reason,
+          });
+          return;
+        }
+
+        const owner = record.owner ?? record.walletAddress;
+        if (
+          owner !== undefined &&
+          typeof owner === "string" &&
+          (typeof wallet.address !== "string" ||
+            wallet.address.toLowerCase() !== owner.toLowerCase())
+        ) {
+          const reason = "Connected wallet is not authorized for this commitment.";
+          setActionErrors((prev) => ({ ...prev, [action]: reason }));
+          emitTelemetry({
+            type: "action_failed",
+            action,
+            status: commitment.status,
+            errorType: "wallet_validation_failed",
+            errorMessage: reason,
+          });
+          return;
+        }
+      }
+
       if (!isActionAvailable(action)) {
         const reason = canPerformActions[action]?.reason || "Action not allowed in current state";
         setActionErrors((prev) => ({ ...prev, [action]: reason }));
@@ -89,10 +336,7 @@ export default function CommitmentDetailActions({
         return;
       }
 
-      // Prevent concurrent execution of same action
-      if (actionStates[action] === "loading") {
-        return;
-      }
+      pendingActionsRef.current.add(action);
 
       const startTime = Date.now();
 
@@ -149,10 +393,32 @@ export default function CommitmentDetailActions({
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        const data: CommitmentActionResponse = await response.json();
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Server returned a non-JSON response.");
+        }
+
+        const data = parseCommitmentActionResponse(await response.json());
 
         if (!data.success) {
           throw new Error(data.error?.message || "Action failed");
+        }
+
+        const responseRecord = data as unknown as Record<string, unknown>;
+        if (
+          responseRecord.commitmentId !== undefined &&
+          responseRecord.commitmentId !== commitment.id
+        ) {
+          throw new Error("Server response commitment id does not match request.");
+        }
+        if (responseRecord.action !== undefined && responseRecord.action !== action) {
+          throw new Error("Server response action does not match request.");
+        }
+        if (data.transactionHash !== undefined && !TX_HASH.test(data.transactionHash)) {
+          throw new Error("Server response transaction hash is malformed.");
+        }
+        if (data.newStatus !== undefined && !VALID_STATUSES.has(data.newStatus)) {
+          throw new Error("Server response status is not recognized.");
         }
 
         setActionStates((prev) => ({ ...prev, [action]: "success" }));
@@ -213,14 +479,19 @@ export default function CommitmentDetailActions({
         }, 3000);
       } finally {
         clearTimeout(timeoutId);
+        pendingActionsRef.current.delete(action);
       }
     },
     [
       commitment.id,
       commitment.status,
+      commitmentBoundary,
+      authorizationBoundary,
       isActionAvailable,
       canPerformActions,
       actionStates,
+      wallet,
+      pendingActionsRef,
       emitTelemetry,
       onActionComplete,
     ],
@@ -287,7 +558,7 @@ export default function CommitmentDetailActions({
 
     const disabledClasses = "opacity-50 cursor-not-allowed bg-slate-300 text-slate-500";
 
-    const isDisabled = !isAvailable || state === "loading";
+    const isDisabled = !isAvailable || state === "loading" || state === "success";
 
     return (
       <div key={action} className="space-y-2">

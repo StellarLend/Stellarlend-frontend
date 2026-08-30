@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CollateralRatioHistoryChart from "./CollateralRatioHistoryChart";
 
@@ -213,5 +213,50 @@ describe("CollateralRatioHistoryChart", () => {
     ).toHaveStyle({
       transition: "none",
     });
+  });
+
+  it("retries the history request when the retry button is clicked", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({}),
+      } as Response)
+      .mockResolvedValueOnce(
+        historyResponse([
+          {
+            timestamp: Date.UTC(2026, 0, 1),
+            supplied: 2_000,
+            borrowed: 1_000,
+            effectiveSupplyApy: 3,
+            effectiveBorrowApy: 6,
+          },
+        ]),
+      );
+
+    render(<CollateralRatioHistoryChart />);
+
+    expect(
+      await screen.findByText(/Collateral ratio history unavailable/i),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    expect(
+      await screen.findByText("2.00x"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a permission error when the history request is forbidden", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ message: "Forbidden" }),
+    } as Response);
+
+    render(<CollateralRatioHistoryChart />);
+
+    expect(
+      await screen.findByText(/permission/i),
+    ).toBeInTheDocument();
   });
 });

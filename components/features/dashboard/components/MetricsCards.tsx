@@ -295,9 +295,7 @@ export default function MetricsCards() {
   }, [allAssets, filterQuery]);
 
   if (isLoading || !data) {
-    return (
-      <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>
-    );
+    return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
   }
 
   if (error) {

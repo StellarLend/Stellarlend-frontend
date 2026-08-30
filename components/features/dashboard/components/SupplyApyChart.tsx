@@ -96,10 +96,21 @@ function buildAreaPath(points: Array<{ x: number; y: number }>, width: number, h
   return `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${baselineY} L ${points[0].x.toFixed(2)} ${baselineY} Z`;
 }
 
+/**
+ * Renders a responsive sparkline of supply APY from position history.
+ *
+ * Contract:
+ * - All rendered points have finite numeric timestamp, supplyApy, and netValue.
+ * - Points are sorted chronologically and de-duplicated by timestamp.
+ * - Invalid or empty payloads render the empty state.
+ * - Network and permission failures render an error state with retry.
+ */
 export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => {
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [points, setPoints] = useState<SupplyApyChartPoint[]>([]);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [errorKind, setErrorKind] = useState<"network" | "forbidden" | "unavailable">("network");
 
   useEffect(() => {
     const media = typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -126,6 +137,7 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
 
     async function loadHistory() {
       setStatus("loading");
+      setErrorKind("network");
       try {
         const response = await fetch("/api/positions/history?interval=1d", {
           signal: controller.signal,
@@ -134,28 +146,51 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
           },
         });
 
+        if (response.status === 401 || response.status === 403) {
+          setErrorKind("forbidden");
+          throw new Error("Forbidden");
+        }
+
         if (!response.ok) {
+          setErrorKind("unavailable");
           throw new Error("Request failed");
         }
 
         const payload = (await response.json()) as SnapshotHistoryResponse;
         const snapshots = Array.isArray(payload?.snapshots) ? payload.snapshots : [];
 
-        if (snapshots.length === 0) {
+        const chartPoints = snapshots
+          .filter((snapshot) =>
+            snapshot &&
+            snapshot.timestamp != null &&
+            snapshot.effectiveSupplyApy != null &&
+            snapshot.supplied != null &&
+            snapshot.borrowed != null &&
+            Number.isFinite(Number(snapshot.timestamp)) &&
+            Number.isFinite(Number(snapshot.effectiveSupplyApy)) &&
+            Number.isFinite(Number(snapshot.supplied)) &&
+            Number.isFinite(Number(snapshot.borrowed))
+          )
+          .map((snapshot) => ({
+            timestamp: Number(snapshot.timestamp),
+            supplyApy: Number(snapshot.effectiveSupplyApy),
+            netValue: Number(snapshot.supplied) - Number(snapshot.borrowed),
+          }))
+          .sort((a, b) => a.timestamp - b.timestamp)
+          .filter((point, index, array) => index === 0 || point.timestamp !== array[index - 1].timestamp);
+
+        if (chartPoints.length === 0) {
           setPoints([]);
           setStatus("empty");
           return;
         }
 
-        const chartPoints = snapshots.map((snapshot) => ({
-          timestamp: snapshot.timestamp,
-          supplyApy: snapshot.effectiveSupplyApy,
-          netValue: snapshot.supplied - snapshot.borrowed,
-        }));
-
         setPoints(chartPoints);
         setStatus("ready");
       } catch {
+        if (controller.signal.aborted) {
+          return;
+        }
         setPoints([]);
         setStatus("error");
       }
@@ -164,7 +199,7 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
     loadHistory();
 
     return () => controller.abort();
-  }, []);
+  }, [retryCount]);
 
   const chart = useMemo(() => {
     const width = 280;
@@ -227,7 +262,7 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
 
   if (status === "empty") {
     return (
-      <div className={`rounded-xl border border-[#71B48D33] bg-[#072815] p-4 ${className ?? ""}`}>
+      <div className={`rounded-xl border border-[#71B48D33] bg-[#072815] p-4 ${className ?? ""}`} role="status" aria-label="No trend history available">
         <p className="text-sm font-medium text-[#D4F3E6]">Supply APY trend</p>
         <p className="mt-2 text-sm text-[#AAABAB]">No trend history available</p>
       </div>
@@ -235,10 +270,24 @@ export const SupplyApyChart: React.FC<SupplyApyChartProps> = ({ className }) => 
   }
 
   if (status === "error" || !chart) {
+    const message =
+      errorKind === "forbidden"
+        ? "You do not have access to trend data"
+        : errorKind === "network"
+          ? "Trend data is temporarily unavailable"
+          : "Trend data unavailable";
+
     return (
       <div className={`rounded-xl border border-[#71B48D33] bg-[#072815] p-4 ${className ?? ""}`} role="alert">
         <p className="text-sm font-medium text-[#D4F3E6]">Supply APY trend</p>
-        <p className="mt-2 text-sm text-[#AAABAB]">Trend data unavailable</p>
+        <p className="mt-2 text-sm text-[#AAABAB]">{message}</p>
+        <button
+          type="button"
+          onClick={() => setRetryCount((count) => count + 1)}
+          className="mt-3 rounded-md bg-[#71B48D] px-3 py-1.5 text-xs font-semibold text-[#072815] transition-colors hover:bg-[#8FD0A8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4F3E6] motion-reduce:transition-none"
+        >
+          Try again
+        </button>
       </div>
     );
   }
