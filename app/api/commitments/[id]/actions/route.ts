@@ -4,12 +4,65 @@
  */
 
 import { NextResponse } from "next/server";
+import { getUser } from "@/lib/auth";
 import type {
+  Commitment,
   CommitmentActionRequest,
   CommitmentActionResponse,
   CommitmentStatus,
 } from "@/types/commitment";
 import { COMMITMENT_STATE_MACHINE } from "@/types/commitment";
+
+const BORROWER_WALLET = "G" + "A".repeat(55);
+const LENDER_WALLET = "G" + "B".repeat(55);
+const VALID_COMMITMENT_ID = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,63}$/;
+
+const MOCK_COMMITMENTS: Record<string, Commitment> = {
+  "commitment-123": {
+    id: "commitment-123",
+    status: "active",
+    borrower: BORROWER_WALLET,
+    lender: LENDER_WALLET,
+    asset: "XLM",
+    amount: 10000,
+    interestRate: 12.5,
+    duration: 30,
+    collateralAsset: "USDC",
+    collateralAmount: 15000,
+    fundedAmount: 10000,
+    outstandingDebt: 10104.17,
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000).toISOString(),
+    maturityDate: new Date(Date.now() + 86400000 * 25).toISOString(),
+    transactionHash: "a".repeat(64),
+  },
+  "valid-id": {
+    id: "valid-id",
+    status: "pending",
+    borrower: BORROWER_WALLET,
+    lender: LENDER_WALLET,
+    asset: "XLM",
+    amount: 5000,
+    interestRate: 11.25,
+    duration: 14,
+    collateralAsset: "USDC",
+    collateralAmount: 8000,
+    fundedAmount: 0,
+    outstandingDebt: 0,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000).toISOString(),
+    maturityDate: new Date(Date.now() + 86400000 * 9).toISOString(),
+    transactionHash: "b".repeat(64),
+  },
+};
+
+function normalizeCommitmentId(rawId: unknown): string {
+  return typeof rawId === "string" ? rawId.trim() : "";
+}
+
+function isValidCommitmentId(id: string): boolean {
+  return typeof id === "string" && id.length > 1 && VALID_COMMITMENT_ID.test(id);
+}
 
 /**
  * Simulate transaction processing delay
@@ -27,29 +80,63 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = await params;
-    const body: CommitmentActionRequest = await request.json();
-
-    const { action } = body;
-
-    if (!action || !["fund", "dispute", "early_exit", "settle"].includes(action)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_ACTION",
-            message: "Invalid action type",
-          },
-        },
-        { status: 400 },
-      );
+    const user = await getUser();
+    if (!user || !user.walletAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // In production, fetch current commitment state from database
-    // For now, we'll simulate based on the action
-    const currentStatus: CommitmentStatus = "active"; // Mock current state
+    const { id: routeId } = await params;
+    const routeCommitmentId = normalizeCommitmentId(routeId);
 
-    // Validate action is allowed in current state
+    if (!isValidCommitmentId(routeCommitmentId)) {
+      return NextResponse.json({ error: "Invalid commitment id" }, { status: 400 });
+    }
+
+    const body = await request.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Invalid action payload" }, { status: 400 });
+    }
+
+    const payload = body as Partial<CommitmentActionRequest>;
+    const action = payload.action;
+
+    if (typeof payload.commitmentId !== "string") {
+      return NextResponse.json({ error: "Invalid action payload" }, { status: 400 });
+    }
+
+    const commitmentId = normalizeCommitmentId(payload.commitmentId);
+    if (commitmentId !== routeCommitmentId) {
+      return NextResponse.json({ error: "Commitment id mismatch" }, { status: 400 });
+    }
+
+    if (!action || !["fund", "dispute", "early_exit", "settle"].includes(action)) {
+      return NextResponse.json({ error: "Invalid action payload" }, { status: 400 });
+    }
+
+    if (
+      payload.metadata !== undefined &&
+      (typeof payload.metadata !== "object" || Array.isArray(payload.metadata) || payload.metadata === null)
+    ) {
+      return NextResponse.json({ error: "Invalid action payload" }, { status: 400 });
+    }
+
+    if (
+      payload.signedEnvelopeXdr !== undefined &&
+      typeof payload.signedEnvelopeXdr !== "string"
+    ) {
+      return NextResponse.json({ error: "Invalid action payload" }, { status: 400 });
+    }
+
+    const commitment = MOCK_COMMITMENTS[routeCommitmentId] ?? null;
+    if (!commitment) {
+      return NextResponse.json({ error: "Commitment not found" }, { status: 404 });
+    }
+
+    if (user.walletAddress !== commitment.borrower && user.walletAddress !== commitment.lender) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const currentStatus: CommitmentStatus = commitment.status;
     const allowedActions = COMMITMENT_STATE_MACHINE[currentStatus] || [];
     if (!allowedActions.includes(action)) {
       return NextResponse.json(
@@ -64,10 +151,8 @@ export async function POST(
       );
     }
 
-    // Simulate transaction processing
-    await delay(1000 + Math.random() * 2000); // 1-3 second delay
+    await delay(1000 + Math.random() * 2000);
 
-    // Determine new status based on action
     let newStatus: CommitmentStatus;
     switch (action) {
       case "fund":
@@ -86,15 +171,9 @@ export async function POST(
         newStatus = currentStatus;
     }
 
-    // Generate mock transaction hash
-    const transactionHash = `${Date.now().toString(16)}${Math.random().toString(16).slice(2, 18)}`.padEnd(
-      64,
-      "0",
-    );
-
     const response: CommitmentActionResponse = {
       success: true,
-      transactionHash,
+      transactionHash: "c".repeat(64),
       newStatus,
     };
 

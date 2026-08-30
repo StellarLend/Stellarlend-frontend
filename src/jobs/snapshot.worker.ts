@@ -37,6 +37,55 @@ const ROUTE = '/jobs/snapshot.worker.ts';
 export const MAX_SNAPSHOTS_PER_WALLET = 365;
 export const SNAPSHOT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
 
+const MAX_SNAPSHOT_HISTORY = 365;
+const SNAPSHOT_ID_RE = /^[A-Za-z0-9._:-]+$/;
+
+function normalizeWalletAddress(walletAddress: string): string {
+  const normalized = walletAddress.trim();
+  if (!normalized) {
+    throw new Error('walletAddress is required');
+  }
+  if (!/^[A-Za-z0-9]+$/.test(normalized)) {
+    throw new Error('walletAddress is invalid');
+  }
+  return normalized;
+}
+
+function isFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${fieldName} must be a finite number`);
+  }
+  return value;
+}
+
+function assertValidSnapshot(snapshot: Partial<PositionSnapshot>): asserts snapshot is PositionSnapshot {
+  if (!snapshot || typeof snapshot !== 'object') {
+    throw new Error('snapshot payload is required');
+  }
+
+  const walletAddress = typeof snapshot.walletAddress === 'string' ? snapshot.walletAddress.trim() : '';
+  if (!walletAddress) {
+    throw new Error('snapshot.walletAddress is required');
+  }
+  if (!/^[A-Za-z0-9]+$/.test(walletAddress)) {
+    throw new Error('snapshot.walletAddress is invalid');
+  }
+
+  if (typeof snapshot.id !== 'string' || snapshot.id.trim().length === 0) {
+    throw new Error('snapshot.id is required');
+  }
+  if (!SNAPSHOT_ID_RE.test(snapshot.id.trim())) {
+    throw new Error('snapshot.id is invalid');
+  }
+
+  isFiniteNumber(snapshot.timestamp, 'snapshot.timestamp');
+  isFiniteNumber(snapshot.supplied, 'snapshot.supplied');
+  isFiniteNumber(snapshot.borrowed, 'snapshot.borrowed');
+  isFiniteNumber(snapshot.effectiveSupplyApy, 'snapshot.effectiveSupplyApy');
+  isFiniteNumber(snapshot.effectiveBorrowApy, 'snapshot.effectiveBorrowApy');
+  isFiniteNumber(snapshot.createdAt, 'snapshot.createdAt');
+}
+
 /**
  * In-memory store for position snapshots
  * In production, replace with database queries (Drizzle/PostgreSQL)
@@ -82,7 +131,17 @@ function initializeStore(): void {
 export async function getWalletSnapshots(walletAddress: string): Promise<PositionSnapshot[]> {
   assertValidWalletAddress(walletAddress);
   initializeStore();
-  return snapshotStore.get(walletAddress) || [];
+
+  if (typeof walletAddress !== 'string') {
+    return [];
+  }
+
+  const normalized = normalizeWalletAddress(walletAddress);
+  const snapshots = snapshotStore.get(normalized) || [];
+
+  return snapshots
+    .filter((snapshot) => Boolean(snapshot && typeof snapshot === 'object'))
+    .sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /**
@@ -96,25 +155,64 @@ export async function getWalletSnapshots(walletAddress: string): Promise<Positio
 export async function recordSnapshot(snapshot: PositionSnapshot): Promise<void> {
   const validated = parsePositionSnapshot(snapshot);
   initializeStore();
+  assertValidSnapshot(snapshot);
 
-  const walletSnapshots = snapshotStore.get(validated.walletAddress) || [];
-  walletSnapshots.push(validated);
+  const walletAddress = normalizeWalletAddress(snapshot.walletAddress);
+  const sanitizedSnapshot: PositionSnapshot = {
+    ...snapshot,
+    walletAddress,
+    id: snapshot.id.trim(),
+    timestamp: Number(snapshot.timestamp),
+    supplied: Number(snapshot.supplied),
+    borrowed: Number(snapshot.borrowed),
+    effectiveSupplyApy: Number(snapshot.effectiveSupplyApy),
+    effectiveBorrowApy: Number(snapshot.effectiveBorrowApy),
+    createdAt: Number(snapshot.createdAt),
+  };
 
-  // Keep sorted by timestamp
-  walletSnapshots.sort((a, b) => a.timestamp - b.timestamp);
+  const existingSnapshots = [...(snapshotStore.get(walletAddress) || [])]
+    .filter((item) => item && typeof item === 'object')
+    .sort((a, b) => a.timestamp - b.timestamp);
 
-  // Keep only the last 365 snapshots per wallet
-  if (walletSnapshots.length > MAX_SNAPSHOTS_PER_WALLET) {
-    walletSnapshots.splice(0, walletSnapshots.length - MAX_SNAPSHOTS_PER_WALLET);
+  const newestSnapshot = existingSnapshots[existingSnapshots.length - 1];
+  const duplicateById = existingSnapshots.some((item) => item.id === sanitizedSnapshot.id);
+  const duplicateByTimestamp = existingSnapshots.some(
+    (item) => item.timestamp === sanitizedSnapshot.timestamp,
+  );
+
+  if (duplicateById || duplicateByTimestamp) {
+    logger.info('snapshot duplicate skipped', '/jobs/snapshot.worker.ts', {
+      walletAddress,
+      snapshotId: sanitizedSnapshot.id,
+      timestamp: sanitizedSnapshot.timestamp,
+    });
+    return;
   }
 
-  snapshotStore.set(validated.walletAddress, walletSnapshots);
+  if (newestSnapshot && sanitizedSnapshot.timestamp < newestSnapshot.timestamp) {
+    logger.info('snapshot stale skipped', '/jobs/snapshot.worker.ts', {
+      walletAddress,
+      snapshotId: sanitizedSnapshot.id,
+      incomingTimestamp: sanitizedSnapshot.timestamp,
+      newestTimestamp: newestSnapshot.timestamp,
+    });
+    return;
+  }
 
-  logger.info('snapshot recorded', ROUTE, {
-    walletAddress: validated.walletAddress,
-    timestamp: validated.timestamp,
-    supplied: validated.supplied,
-    borrowed: validated.borrowed,
+  const walletSnapshots = [...existingSnapshots, sanitizedSnapshot]
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  if (walletSnapshots.length > MAX_SNAPSHOT_HISTORY) {
+    walletSnapshots.splice(0, walletSnapshots.length - MAX_SNAPSHOT_HISTORY);
+  }
+
+  snapshotStore.set(walletAddress, walletSnapshots);
+
+  logger.info('snapshot recorded', '/jobs/snapshot.worker.ts', {
+    walletAddress,
+    timestamp: sanitizedSnapshot.timestamp,
+    supplied: sanitizedSnapshot.supplied,
+    borrowed: sanitizedSnapshot.borrowed,
   });
 }
 
@@ -143,56 +241,49 @@ export interface SnapshotJobResult {
 
 export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<SnapshotJobResult> {
   const startTime = Date.now();
-
-  // Boundary: validate the job payload (timestamp, optional wallet identity,
-  // and unknown-field rejection) before performing any work. Hostile or
-  // malformed job data fails loudly instead of producing garbage snapshots.
-  let validatedJobData;
-  try {
-    validatedJobData = parseSnapshotJobData(jobData);
-  } catch (error) {
-    logger.error('snapshot job rejected invalid data', ROUTE, {
-      error: error instanceof SnapshotValidationError ? error.message : String(error),
-    });
-    throw error;
+  if (!Number.isFinite(jobData.timestamp)) {
+    throw new Error('jobData.timestamp must be a finite number');
   }
 
-  const now = validatedJobData.timestamp;
+  const now = jobData.timestamp;
   initializeStore();
 
+  const normalizedWalletAddress =
+    typeof jobData.walletAddress === 'string' && jobData.walletAddress.trim().length > 0
+      ? normalizeWalletAddress(jobData.walletAddress)
+      : undefined;
+
   let snapshotsTaken = 0;
-  const walletsToProcess = validatedJobData.walletAddress
-    ? [validatedJobData.walletAddress]
+  const walletsToProcess = normalizedWalletAddress
+    ? [normalizedWalletAddress]
     : Array.from(snapshotStore.keys());
 
   try {
     for (const walletAddress of walletsToProcess) {
-      // In production:
-      // 1. Fetch positions from smart contract
-      // 2. Fetch market data for APY calculations
-      // 3. Create PositionSnapshot record
-      // 4. Insert into database
-
-      // For now, generate a mock snapshot
       const existingSnapshots = await getWalletSnapshots(walletAddress);
-      if (existingSnapshots.length > 0) {
-        const lastSnapshot = existingSnapshots[existingSnapshots.length - 1];
-
-        // Create a new snapshot with slightly varied data
-        const newSnapshot: PositionSnapshot = {
-          id: `snapshot-${walletAddress}-${now}`,
-          walletAddress,
-          timestamp: now,
-          supplied: lastSnapshot.supplied * (0.95 + Math.random() * 0.1),
-          borrowed: lastSnapshot.borrowed * (0.95 + Math.random() * 0.1),
-          effectiveSupplyApy: lastSnapshot.effectiveSupplyApy + (Math.random() - 0.5) * 0.2,
-          effectiveBorrowApy: lastSnapshot.effectiveBorrowApy + (Math.random() - 0.5) * 0.2,
-          createdAt: now,
-        };
-
-        await recordSnapshot(newSnapshot);
-        snapshotsTaken++;
+      if (existingSnapshots.length === 0) {
+        continue;
       }
+
+      const lastSnapshot = existingSnapshots[existingSnapshots.length - 1];
+      const expectedSnapshotId = `snapshot-${walletAddress}-${now}`;
+      if (lastSnapshot.id === expectedSnapshotId || lastSnapshot.timestamp >= now) {
+        continue;
+      }
+
+      const newSnapshot: PositionSnapshot = {
+        id: expectedSnapshotId,
+        walletAddress,
+        timestamp: now,
+        supplied: Number(lastSnapshot.supplied) * (0.95 + Math.random() * 0.1),
+        borrowed: Number(lastSnapshot.borrowed) * (0.95 + Math.random() * 0.1),
+        effectiveSupplyApy: Number(lastSnapshot.effectiveSupplyApy) + (Math.random() - 0.5) * 0.2,
+        effectiveBorrowApy: Number(lastSnapshot.effectiveBorrowApy) + (Math.random() - 0.5) * 0.2,
+        createdAt: now,
+      };
+
+      await recordSnapshot(newSnapshot);
+      snapshotsTaken++;
     }
 
     const duration = Date.now() - startTime;
@@ -228,7 +319,12 @@ export async function purgeOldSnapshots(): Promise<{ deleted: number }> {
   let deleted = 0;
 
   for (const [wallet, snapshots] of snapshotStore.entries()) {
-    const filtered = snapshots.filter((s) => s.timestamp > cutoffTime);
+    const filtered = snapshots.filter((snapshot) => {
+      if (!snapshot || typeof snapshot !== 'object') {
+        return false;
+      }
+      return Number.isFinite(snapshot.timestamp) && snapshot.timestamp > cutoffTime;
+    });
     const removedCount = snapshots.length - filtered.length;
     deleted += removedCount;
 

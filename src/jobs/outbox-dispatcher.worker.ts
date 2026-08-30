@@ -15,6 +15,9 @@ import type { OutboxPayload } from '@/lib/validation/outbox';
 
 const ROUTE = 'jobs/outbox-dispatcher';
 
+const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
+const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
+
 // Redis connection options (pulled from environment)
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -46,32 +49,9 @@ export const dispatcherMetrics = {
 export const notificationQueue = new Queue('notification-queue', { connection });
 export const auditQueue = new Queue('audit-queue', { connection });
 
-function truncateError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.length > LAST_ERROR_MAX_LENGTH
-    ? `${message.slice(0, LAST_ERROR_MAX_LENGTH)}…`
-    : message;
-}
-
-async function markFailed(eventId: string, attempts: number, error: string): Promise<void> {
-  await db
-    .update(outboxEvents)
-    .set({
-      status: 'FAILED',
-      attempts,
-      lastError: truncateError(error),
-    })
-    .where(eq(outboxEvents.id, eventId));
-}
-
-async function markCompleted(eventId: string): Promise<void> {
-  await db
-    .update(outboxEvents)
-    .set({
-      status: 'COMPLETED',
-      processedAt: new Date(),
-    })
-    .where(eq(outboxEvents.id, eventId));
+function getAttempts(event: { attempts?: number | null } | null | undefined): number {
+  const value = Number(event?.attempts ?? 0);
+  return Number.isFinite(value) ? value : 0;
 }
 
 /**
@@ -82,53 +62,71 @@ async function markCompleted(eventId: string): Promise<void> {
  * never reach a queue. Valid events use the outbox event ID as the BullMQ
  * jobId to guarantee strict idempotency (at-least-once delivery).
  */
-export async function dispatchEvent(event: typeof outboxEvents.$inferSelect): Promise<void> {
-  let payload: OutboxPayload;
-  try {
-    payload = parseOutboxPayload(event.type, event.payload);
-  } catch (error) {
-    const reason =
-      error instanceof OutboxPayloadValidationError ? error.message : truncateError(error);
-    await markFailed(event.id, event.attempts + 1, `rejected: ${reason}`);
-    dispatcherMetrics.rejected += 1;
-    logger.warn('Outbox event rejected at validation boundary', ROUTE, {
-      eventId: event.id,
-      type: event.type,
-      reason,
-    });
+export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
+  if (!event?.id || !event.type || !event.payload) {
+    throw new Error('Outbox event is missing required fields');
+  }
+
+  if (!VALID_OUTBOX_TYPES.has(event.type)) {
+    await db
+      .update(outboxEvents)
+      .set({
+        status: 'FAILED',
+        attempts: Math.min(getAttempts(event) + 1, MAX_OUTBOX_RETRY_ATTEMPTS),
+        lastError: `Unknown event type: ${event.type}`,
+      })
+      .where(eq(outboxEvents.id, event.id));
+    return;
+  }
+
+  const attempts = getAttempts(event);
+  if (attempts >= MAX_OUTBOX_RETRY_ATTEMPTS) {
+    await db
+      .update(outboxEvents)
+      .set({
+        status: 'FAILED',
+        lastError: 'Retry limit reached',
+      })
+      .where(eq(outboxEvents.id, event.id));
     return;
   }
 
   try {
+    const payload = JSON.parse(event.payload);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new Error('Outbox payload must be a JSON object');
+    }
+
+  try {
     if (event.type === 'notification') {
       await notificationQueue.add('send_notification', payload, {
-        jobId: event.id, // Idempotency key
+        jobId: event.id,
       });
     } else if (event.type === 'audit') {
       await auditQueue.add('log_audit', payload, {
-        jobId: event.id, // Idempotency key
+        jobId: event.id,
       });
     }
 
-    // Mark as COMPLETED in DB upon successful enqueue
-    await markCompleted(event.id);
-    dispatcherMetrics.dispatched += 1;
-    logger.info('Outbox event dispatched', ROUTE, {
-      eventId: event.id,
-      type: event.type,
-      attempts: event.attempts,
-    });
-  } catch (error) {
-    // Record failure details and increment attempts (bounded by MAX_ATTEMPTS
-    // in the claim query so a permanently failing event stops being retried).
-    await markFailed(event.id, event.attempts + 1, truncateError(error));
-    dispatcherMetrics.failed += 1;
-    logger.error('Outbox event dispatch failed', ROUTE, {
-      eventId: event.id,
-      type: event.type,
-      attempts: event.attempts + 1,
-      error: truncateError(error),
-    });
+    await db
+      .update(outboxEvents)
+      .set({
+        status: 'COMPLETED',
+        processedAt: new Date(),
+        attempts: Math.max(attempts, 0),
+        lastError: null,
+      })
+      .where(eq(outboxEvents.id, event.id));
+  } catch (error: any) {
+    const nextAttempts = Math.min(attempts + 1, MAX_OUTBOX_RETRY_ATTEMPTS);
+    await db
+      .update(outboxEvents)
+      .set({
+        status: 'FAILED',
+        attempts: nextAttempts,
+        lastError: error?.message || String(error),
+      })
+      .where(eq(outboxEvents.id, event.id));
   }
 }
 
@@ -160,17 +158,7 @@ export async function processOutbox() {
             eq(outboxEvents.status, 'PENDING'),
             and(
               eq(outboxEvents.status, 'FAILED'),
-              lt(outboxEvents.attempts, MAX_ATTEMPTS)
-            ),
-            // Stale lease recovery: PROCESSING events whose lease expired
-            // (crash between claim and dispatch) or that predate lease
-            // tracking are re-claimed.
-            and(
-              eq(outboxEvents.status, 'PROCESSING'),
-              or(
-                isNull(outboxEvents.claimedAt),
-                lt(outboxEvents.claimedAt, staleCutoff)
-              )
+              lt(outboxEvents.attempts, MAX_OUTBOX_RETRY_ATTEMPTS)
             )
           )
         )
@@ -179,14 +167,20 @@ export async function processOutbox() {
 
       if (pending.length === 0) return [];
 
-      // Transition to PROCESSING inside the transaction to prevent double
-      // dispatch, stamping the lease timestamp for crash recovery.
-      const claimedAt = new Date();
       for (const event of pending) {
-        const wasStale = event.status === 'PROCESSING';
-        if (wasStale) {
-          dispatcherMetrics.recoveredStale += 1;
+        const attempts = getAttempts(event);
+        if (attempts >= MAX_OUTBOX_RETRY_ATTEMPTS && event.status === 'FAILED') {
+          tx
+            .update(outboxEvents)
+            .set({
+              status: 'FAILED',
+              lastError: 'Retry limit reached',
+            })
+            .where(eq(outboxEvents.id, event.id))
+            .run();
+          continue;
         }
+
         tx
           .update(outboxEvents)
           .set({
@@ -202,7 +196,14 @@ export async function processOutbox() {
     });
 
     for (const event of events) {
-      await dispatchEvent(event);
+      try {
+        await dispatchEvent({ ...event, attempts: getAttempts(event) });
+      } catch (err) {
+        logger.error('Error dispatching outbox event', 'jobs/outbox-dispatcher', {
+          eventId: event.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   } catch (err) {
     logger.error('Error in outbox dispatcher loop', ROUTE, { error: String(err) });

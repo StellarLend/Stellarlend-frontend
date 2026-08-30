@@ -319,6 +319,43 @@ describe('Transactional Outbox', () => {
     notifQueue.add = originalAdd;
   });
 
+  it('should stop retrying after the bounded retry limit is reached', async () => {
+    const userId = 'user-retry-limit-test';
+    const notifQueue = (Queue as any).instances['notification-queue'];
+    const originalAdd = notifQueue.add;
+    notifQueue.add = async () => {
+      throw new Error('Retry limit triggered');
+    };
+
+    await db.insert(outboxEvents).values({
+      id: 'evt-retry-limit',
+      type: 'notification',
+      payload: JSON.stringify({
+        userId,
+        title: 'Retry Limit',
+        message: 'This should not retry forever.',
+        type: 'warning',
+      }),
+      status: 'FAILED',
+      attempts: 3,
+      lastError: 'Retry limit triggered',
+      createdAt: new Date(),
+    });
+
+    await processOutbox();
+
+    const [dbEvent] = await db
+      .select()
+      .from(outboxEvents)
+      .where(eq(outboxEvents.id, 'evt-retry-limit'));
+
+    expect(dbEvent.status).toBe('FAILED');
+    expect(dbEvent.attempts).toBe(3);
+    expect(notifQueue.jobs).toHaveLength(0);
+
+    notifQueue.add = originalAdd;
+  });
+
   it('should process jobs through the consumers (workers)', async () => {
     const userId = 'user-worker-test';
     

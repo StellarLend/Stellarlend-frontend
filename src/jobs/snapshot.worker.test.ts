@@ -27,7 +27,7 @@ const VALID_WALLET_C = 'GDS2KKVQY62J2BNA3MQPQGNMVKQR6MB2OOMJBIORQSYLOJPQKOKPOHKD
 const VALID_WALLET_UNUSED = 'GD5OYF2O3YDKBUCC3ZUGZEQCAYVFXBCLIF4YVZ3ZDK6SUKRQD2QDMMZP';
 
 describe('src/jobs/snapshot.worker', () => {
-  const testWallet = VALID_WALLET_A;
+  let testWallet = 'GBTEST123';
   const now = Date.now();
 
   const createTestSnapshot = (
@@ -47,11 +47,29 @@ describe('src/jobs/snapshot.worker', () => {
   });
 
   beforeEach(() => {
-    // Clear snapshots before each test
+    // Clear snapshots before each test and use a unique wallet to avoid stale
+    // snapshots from earlier tests leaking into later assertions.
     vi.clearAllMocks();
+    testWallet = `GBTEST${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   });
 
   describe('recordSnapshot', () => {
+    it('rejects invalid snapshot payloads', async () => {
+      await expect(recordSnapshot({} as any)).rejects.toThrow('snapshot.walletAddress is required');
+      await expect(
+        recordSnapshot({
+          id: 'bad-snapshot',
+          walletAddress: '   ',
+          timestamp: now,
+          supplied: 5000,
+          borrowed: 2000,
+          effectiveSupplyApy: 2.5,
+          effectiveBorrowApy: 8.5,
+          createdAt: now,
+        })
+      ).rejects.toThrow('snapshot.walletAddress is required');
+    });
+
     it('records a new snapshot', async () => {
       const snapshot = createTestSnapshot(testWallet, now);
       await recordSnapshot(snapshot);
