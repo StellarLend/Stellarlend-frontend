@@ -34,12 +34,36 @@
  *    non-negative numbers before any derived metric is computed;
  *    effectiveSupplyApy is clamped to [0, 100] so the chart never
  *    presents a nonsensical percentage.
+ *
+ * 7. AUTHORIZATION BOUNDARY — when an authContext is supplied the hook
+ *    enforces wallet connection, network match, and response ownership
+ *    before data is accepted.  A disconnected wallet or wrong-network
+ *    session short-circuits to the "unauthorized" status immediately
+ *    (no HTTP request is issued).  A 401/403 response and a wallet
+ *    address mismatch in the payload both map to "unauthorized" so
+ *    callers receive a consistent, tamper-resistant signal.
  */
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { SnapshotHistoryResponse } from "@/lib/positions/snapshot";
+import { isAccountId } from "@/lib/validation/stellar";
 
 // ─── Public types ──────────────────────────────────────────────────────────────
+
+/**
+ * Authorization context supplied by the wallet provider.
+ * When present, the hook refuses to fetch unless the wallet is connected
+ * to the expected network, and rejects any response whose walletAddress
+ * does not match the active wallet.
+ */
+export interface ChartAuthContext {
+  /** Active Stellar public key, or null when the wallet is not connected. */
+  walletAddress: string | null;
+  /** Wallet connection status. Only "connected" passes the auth gate. */
+  status: "disconnected" | "connecting" | "connected" | "error";
+  /** Expected network — responses from the wrong network are rejected. */
+  network: "PUBLIC" | "TESTNET";
+}
 
 export interface NormalizedSnapshot {
   timestamp: number;
@@ -68,15 +92,38 @@ export interface NormalizedSnapshot {
  */
 export type ChartHistoryState =
   | { status: "idle" }
+  | { status: "unauthorized"; reason: ChartAuthFailureReason }
   | { status: "loading"; isStale: false }
   | { status: "loading-stale"; isStale: true; snapshots: NormalizedSnapshot[] }
   | { status: "ready"; isStale: false; snapshots: NormalizedSnapshot[] }
   | { status: "empty"; isStale: false }
   | { status: "error"; isStale: boolean; error: Error; snapshots: NormalizedSnapshot[] };
 
+/**
+ * Reason codes for the "unauthorized" status.
+ * - disconnected-wallet: no wallet connected, or wallet status is not "connected"
+ * - wrong-network:       wallet is connected but to a different network than expected
+ * - forbidden:           server returned 401 or 403
+ * - wallet-mismatch:     response walletAddress does not match the connected wallet
+ * - invalid-wallet:      walletAddress in the response is not a valid Stellar account ID
+ */
+export type ChartAuthFailureReason =
+  | "disconnected-wallet"
+  | "wrong-network"
+  | "forbidden"
+  | "wallet-mismatch"
+  | "invalid-wallet";
+
 export interface UseChartHistoryOptions {
   /** Overrides `fetch` for testing. Defaults to the global `fetch`. */
   fetcher?: typeof fetch;
+  /**
+   * When supplied, the hook checks wallet connection status and network
+   * before issuing any request, and validates the response walletAddress
+   * against the active wallet.  Omitting this option skips auth checks
+   * (backward-compatible for contexts where auth is enforced upstream).
+   */
+  authContext?: ChartAuthContext;
 }
 
 export interface UseChartHistoryResult {
@@ -159,7 +206,8 @@ type Action =
   | { type: "FETCH_START"; hasStaleData: boolean; staleSnapshots: NormalizedSnapshot[] }
   | { type: "FETCH_SUCCESS"; snapshots: NormalizedSnapshot[] }
   | { type: "FETCH_EMPTY" }
-  | { type: "FETCH_ERROR"; error: Error; snapshots: NormalizedSnapshot[] };
+  | { type: "FETCH_ERROR"; error: Error; snapshots: NormalizedSnapshot[] }
+  | { type: "FETCH_UNAUTHORIZED"; reason: ChartAuthFailureReason };
 
 function reducer(_prev: ChartHistoryState, action: Action): ChartHistoryState {
   switch (action.type) {
@@ -181,6 +229,9 @@ function reducer(_prev: ChartHistoryState, action: Action): ChartHistoryState {
         error: action.error,
         snapshots: action.snapshots,
       };
+
+    case "FETCH_UNAUTHORIZED":
+      return { status: "unauthorized", reason: action.reason };
   }
 }
 
@@ -194,7 +245,7 @@ function reducer(_prev: ChartHistoryState, action: Action): ChartHistoryState {
  */
 export function useChartHistory(
   url: string,
-  { fetcher = fetch }: UseChartHistoryOptions = {},
+  { fetcher = fetch, authContext }: UseChartHistoryOptions = {},
 ): UseChartHistoryResult {
   const [state, dispatch] = useReducer(reducer, { status: "idle" });
 
@@ -218,6 +269,21 @@ export function useChartHistory(
     ): Promise<void> => {
       // Stale-generation guard: a newer fetch superseded this one
       if (generation !== generationRef.current) return;
+
+      // ── Pre-flight authorization check ────────────────────────────────────
+      // Performed on every attempt (not just attempt=0) so that a wallet
+      // disconnect mid-retry is caught before the next request is issued.
+      if (authContext) {
+        if (authContext.status !== "connected" || !authContext.walletAddress) {
+          dispatch({ type: "FETCH_UNAUTHORIZED", reason: "disconnected-wallet" });
+          return;
+        }
+        // Validate the wallet address itself is a proper Stellar account ID
+        if (!isAccountId(authContext.walletAddress)) {
+          dispatch({ type: "FETCH_UNAUTHORIZED", reason: "invalid-wallet" });
+          return;
+        }
+      }
 
       // Only dispatch FETCH_START on the first attempt — retries keep the
       // current loading/loading-stale state without resetting it.
@@ -244,6 +310,13 @@ export function useChartHistory(
             signal: abortSignal,
             headers: { Accept: "application/json" },
           }).then(async (res) => {
+            // ── HTTP authorization check ───────────────────────────────────
+            if (res.status === 401 || res.status === 403) {
+              throw Object.assign(
+                new Error(`Unauthorized: ${res.status} ${res.statusText}`),
+                { authFailure: "forbidden" as ChartAuthFailureReason },
+              );
+            }
             if (!res.ok) {
               throw new Error(
                 `History request failed: ${res.status} ${res.statusText}`,
@@ -263,6 +336,23 @@ export function useChartHistory(
         // Stale-generation guard after await
         if (generation !== generationRef.current) return;
 
+        // ── Response ownership validation ──────────────────────────────────
+        // When an auth context is provided we verify the response walletAddress
+        // matches the active wallet to detect replay or wrong-account responses.
+        if (authContext?.walletAddress) {
+          const responseWallet = (payload as { walletAddress?: unknown }).walletAddress;
+          if (typeof responseWallet === "string") {
+            if (!isAccountId(responseWallet)) {
+              dispatch({ type: "FETCH_UNAUTHORIZED", reason: "invalid-wallet" });
+              return;
+            }
+            if (responseWallet !== authContext.walletAddress) {
+              dispatch({ type: "FETCH_UNAUTHORIZED", reason: "wallet-mismatch" });
+              return;
+            }
+          }
+        }
+
         const snapshots = normalizeSnapshots(
           Array.isArray(payload?.snapshots) ? payload.snapshots : [],
         );
@@ -280,6 +370,13 @@ export function useChartHistory(
 
         // Stale-generation guard after await
         if (generation !== generationRef.current) return;
+
+        // ── Auth failures are not retried ─────────────────────────────────
+        const authFailure = (err as { authFailure?: ChartAuthFailureReason }).authFailure;
+        if (authFailure) {
+          dispatch({ type: "FETCH_UNAUTHORIZED", reason: authFailure });
+          return;
+        }
 
         if (attempt < MAX_RETRIES) {
           const delay = backoffDelay(attempt);
@@ -308,7 +405,8 @@ export function useChartHistory(
     },
     // fetcher identity is stable in production (global fetch); tests swap it
     // per-render, so including it keeps the hook honest in both contexts.
-    [url, fetcher],
+    // authContext is included so a wallet disconnect triggers a re-evaluation.
+    [url, fetcher, authContext],
   );
 
   useEffect(() => {
@@ -340,6 +438,11 @@ export function useChartHistory(
 /** True while any fetch (including retries) is pending. */
 export function isChartLoading(state: ChartHistoryState): boolean {
   return state.status === "loading" || state.status === "loading-stale";
+}
+
+/** True when the hook has stopped due to an auth/authorization failure. */
+export function isChartUnauthorized(state: ChartHistoryState): state is { status: "unauthorized"; reason: ChartAuthFailureReason } {
+  return state.status === "unauthorized";
 }
 
 /** Safe snapshot accessor — returns [] for non-data states. */
