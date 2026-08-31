@@ -137,6 +137,10 @@ export const notificationsWorkerConnection = new Redis(redisUrl, {
 export const notificationsWorker = new Worker(
   queueNames.notifications,
   async (job: Job<NotificationsJobPayload>) => {
+    const { userId, title, message, type } = job.data;
+    if (!userId || !title || !message || !type) {
+      throw new Error('Missing required notification fields: userId, title, message, type');
+    }
     return handleNotificationJob({
       ...job.data,
       id: job.id || crypto.randomUUID(),

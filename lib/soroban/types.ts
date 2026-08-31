@@ -33,11 +33,11 @@ export type SorobanRpcResponse = z.infer<typeof SorobanRpcResponseSchema>;
 export function isSorobanRpcErrorResponse(
   response: SorobanRpcResponse,
 ): response is SorobanRpcErrorResponse {
-  return 'error' in response && response.error !== undefined;
+  return response != null && typeof response === 'object' && 'error' in response && response.error !== undefined && response.error !== null;
 }
 
 export function isSorobanRpcSuccessResponse(
   response: SorobanRpcResponse,
 ): response is SorobanRpcSuccessResponse {
-  return 'result' in response && response.result !== undefined;
+  return response != null && typeof response === 'object' && 'result' in response && response.result !== undefined;
 }

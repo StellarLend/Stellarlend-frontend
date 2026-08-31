@@ -294,7 +294,7 @@ describe('fetchAccountOperations', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () =>
-          makeHorizonPage(page1Ops, 'https://horizon-testnet.stellar.org/next'),
+          makeHorizonPage(page1Ops, 'https://horizon-testnet.stellar.org/next?cursor=abc123'),
       } as Response)
       .mockResolvedValueOnce({
         ok: true,

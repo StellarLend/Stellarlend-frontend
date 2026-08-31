@@ -11,6 +11,7 @@ import { HorizonSelector } from '@/lib/http/horizon-selector';
 import type { HorizonOperation as RawHorizonOperation, IndexerOptions } from './types';
 import { getLatestCursor, saveCursorCheckpoint } from './cursor';
 import { enqueue } from '@/lib/queue';
+import { resolveAccountByMemo, validateMemo, isStrictModeEnabled, type MemoType } from '@/lib/stellar/memo';
 
 export interface HorizonOperation extends RawHorizonOperation {
   paging_token: string;
@@ -45,7 +46,39 @@ export class HorizonIndexer {
       return 0;
     }
 
-    const totalProcessed = operations.length;
+    const strictMode = isStrictModeEnabled();
+    const filteredOperations: HorizonOperation[] = [];
+
+    for (const op of operations) {
+      if (op.memo && op.memo_type) {
+        const memoType = op.memo_type as MemoType;
+        const valid = validateMemo(op.memo, memoType);
+        const resolvedAccount = resolveAccountByMemo(op.memo, memoType);
+
+        if (!valid) {
+          if (strictMode) {
+            throw new Error(`Strict Mode Rejection: Operation ${op.id} has invalid memo "${op.memo}" of type "${memoType}"`);
+          }
+          continue; // filter out in non-strict mode
+        }
+
+        if (!resolvedAccount) {
+          if (strictMode) {
+            throw new Error(`Strict Mode Rejection: Operation ${op.id} has unknown memo "${op.memo}"`);
+          }
+          continue; // filter out in non-strict mode
+        }
+      } else {
+        // No memo present — inbound operations need a memo in strict mode
+        if (strictMode) {
+          throw new Error(`Strict Mode Rejection: Inbound operation ${op.id} has no memo`);
+        }
+      }
+
+      filteredOperations.push(op);
+    }
+
+    const totalProcessed = filteredOperations.length;
     const nextCursor = operations[operations.length - 1].paging_token;
     await saveCursorCheckpoint(this.indexerId, nextCursor);
 
@@ -116,7 +149,7 @@ async function fetchPageWithFailover(url: string, timeoutMs: number): Promise<Ho
       horizonSelector.recordFailure(endpoint.url);
       lastError = err;
 
-      if (err instanceof TimeoutError || err instanceof UpstreamHttpError || err instanceof NetworkError || err instanceof RetryExhaustedError) {
+      if (err instanceof TimeoutError || err instanceof UpstreamHttpError || err instanceof NetworkError || err instanceof RetryExhaustedError || err instanceof HorizonError) {
         continue;
       }
 

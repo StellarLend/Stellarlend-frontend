@@ -96,6 +96,7 @@
     "lint-staged": "^16.1.2",
     "markdown-to-jsx": "^9.8.1",
     "mini-css-extract-plugin": "^2.9.2",
+    "next-test-api-route-handler": "^5.0.7",
     "playwright": "^1.54.1",
     "plop": "^4.0.1",
     "prettier": "^3.6.2",
