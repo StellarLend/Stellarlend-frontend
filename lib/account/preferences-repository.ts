@@ -1,8 +1,8 @@
 export interface NotificationSettings {
-  email: boolean;
-  push: boolean;
-  sms: boolean;
-  inApp: boolean;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  loanAlerts: boolean;
+  marketingEmails: boolean;
 }
 
 export interface UserPreferences {
@@ -22,10 +22,10 @@ export type UpsertPreferencesInput = {
 };
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  email: true,
-  push: true,
-  sms: false,
-  inApp: true,
+  emailNotifications: true,
+  pushNotifications: true,
+  loanAlerts: true,
+  marketingEmails: false,
 };
 
 export class PreferencesRepository {

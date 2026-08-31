@@ -13,7 +13,7 @@
  * future refactoring of the route's error serialisation will be caught here.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/quote/route";
 
@@ -22,9 +22,14 @@ import { POST } from "@/app/api/quote/route";
 // without relying on fragile floating-point edge cases.
 // ---------------------------------------------------------------------------
 
+// Save a reference to the real implementation before mocking
+// Using var to avoid TDZ issues with vi.mock hoisting
+var realCalculateQuote: typeof import("@/lib/lending/quote")["calculateQuote"];
+
 vi.mock("@/lib/lending/quote", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("@/lib/lending/quote")>();
+  realCalculateQuote = actual.calculateQuote;
   return {
     ...actual,
     calculateQuote: vi.fn(actual.calculateQuote),
@@ -70,9 +75,7 @@ describe("POST /api/quote — error code surface (#1186)", () => {
   // ── Success path (baseline) ──────────────────────────────────────────────
 
   it("returns 200 with a result when calculateQuote succeeds", async () => {
-    mockedCalculateQuote.mockImplementation(
-      (await import("@/lib/lending/quote")).calculateQuote,
-    );
+    mockedCalculateQuote.mockImplementation(realCalculateQuote);
 
     const req = makePostRequest(validPayload);
     const res = await POST(req);
@@ -111,9 +114,7 @@ describe("POST /api/quote — error code surface (#1186)", () => {
 
   it("returns INVALID_INPUT via the real implementation for a zero amount", async () => {
     // Let the real function run — amount: 0 triggers INVALID_INPUT.
-    mockedCalculateQuote.mockImplementation(
-      (await import("@/lib/lending/quote")).calculateQuote,
-    );
+    mockedCalculateQuote.mockImplementation(realCalculateQuote);
 
     const req = makePostRequest({
       ...validPayload,

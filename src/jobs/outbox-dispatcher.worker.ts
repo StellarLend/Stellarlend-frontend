@@ -18,13 +18,6 @@ const ROUTE = 'jobs/outbox-dispatcher';
 const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
 const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
 
-const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
-const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
-
-const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
-
-const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
-
 // Redis connection options (pulled from environment)
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -87,12 +80,9 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
   }
 
   try {
-    const payload = JSON.parse(event.payload);
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      throw new Error('Outbox payload must be a JSON object');
-    }
+    // Validate and parse the payload at the dispatch boundary
+    const payload = parseOutboxPayload(event.type, event.payload);
 
-  try {
     if (event.type === 'notification') {
       await notificationQueue.add('send_notification', payload, {
         jobId: event.id,
@@ -103,6 +93,7 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
       });
     }
 
+    dispatcherMetrics.dispatched++;
     await db
       .update(outboxEvents)
       .set({
@@ -113,12 +104,23 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
       .where(eq(outboxEvents.id, event.id));
   } catch (error: any) {
     const nextAttempts = Math.min(attempts + 1, MAX_OUTBOX_RETRY_ATTEMPTS);
+    const errorMessage = error?.message || String(error);
+    const truncatedError = errorMessage.length > LAST_ERROR_MAX_LENGTH
+      ? errorMessage.slice(0, LAST_ERROR_MAX_LENGTH)
+      : errorMessage;
+
+    if (error instanceof OutboxPayloadValidationError) {
+      dispatcherMetrics.rejected++;
+    } else {
+      dispatcherMetrics.failed++;
+    }
+
     await db
       .update(outboxEvents)
       .set({
         status: 'FAILED',
         attempts: nextAttempts,
-        lastError: error?.message || String(error),
+        lastError: truncatedError,
       })
       .where(eq(outboxEvents.id, event.id));
   }
@@ -153,6 +155,14 @@ export async function processOutbox() {
             and(
               eq(outboxEvents.status, 'FAILED'),
               lt(outboxEvents.attempts, MAX_OUTBOX_RETRY_ATTEMPTS)
+            ),
+            // Recover stale PROCESSING events whose lease expired
+            and(
+              eq(outboxEvents.status, 'PROCESSING'),
+              or(
+                lt(outboxEvents.claimedAt, staleCutoff),
+                isNull(outboxEvents.claimedAt)
+              )
             )
           )
         )
@@ -175,6 +185,8 @@ export async function processOutbox() {
           continue;
         }
 
+        const claimedAt = new Date();
+        const wasStale = event.status === 'PROCESSING';
         tx
           .update(outboxEvents)
           .set({

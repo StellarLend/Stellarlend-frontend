@@ -22,6 +22,7 @@ describe('CircuitBreaker', () => {
   let breaker: CircuitBreaker;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.setSystemTime(0);
     breaker = new CircuitBreaker();
   });

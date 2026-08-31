@@ -105,24 +105,24 @@ export function formatZodIssues(error: z.ZodError): string {
  */
 export function parseOutboxPayload(type: string, rawPayload: string): OutboxPayload {
   if (typeof rawPayload !== 'string' || rawPayload.length === 0) {
-    throw new OutboxPayloadValidationError('payload is missing or not a string');
+    throw new OutboxPayloadValidationError('rejected: payload is missing or not a string');
   }
 
   if (Buffer.byteLength(rawPayload, 'utf8') > MAX_OUTBOX_PAYLOAD_BYTES) {
-    throw new OutboxPayloadValidationError(`payload exceeds ${MAX_OUTBOX_PAYLOAD_BYTES} bytes`);
+    throw new OutboxPayloadValidationError(`rejected: payload exceeds ${MAX_OUTBOX_PAYLOAD_BYTES} bytes`);
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawPayload);
   } catch {
-    throw new OutboxPayloadValidationError('payload is not valid JSON');
+    throw new OutboxPayloadValidationError('rejected: payload is not valid JSON');
   }
 
   if (type === 'notification') {
     const result = NotificationOutboxPayloadSchema.safeParse(parsed);
     if (!result.success) {
-      throw new OutboxPayloadValidationError(`invalid notification payload: ${formatZodIssues(result.error)}`);
+      throw new OutboxPayloadValidationError(`rejected: invalid notification payload: ${formatZodIssues(result.error)}`);
     }
     return result.data;
   }
@@ -130,10 +130,10 @@ export function parseOutboxPayload(type: string, rawPayload: string): OutboxPayl
   if (type === 'audit') {
     const result = AuditOutboxPayloadSchema.safeParse(parsed);
     if (!result.success) {
-      throw new OutboxPayloadValidationError(`invalid audit payload: ${formatZodIssues(result.error)}`);
+      throw new OutboxPayloadValidationError(`rejected: invalid audit payload: ${formatZodIssues(result.error)}`);
     }
     return result.data;
   }
 
-  throw new OutboxPayloadValidationError(`Unknown event type: ${type}`);
+  throw new OutboxPayloadValidationError(`rejected: Unknown event type: ${type}`);
 }

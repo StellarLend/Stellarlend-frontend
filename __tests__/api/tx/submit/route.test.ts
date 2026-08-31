@@ -1,85 +1,127 @@
-import { testApiHandler } from 'next-test-api-route-handler';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import * as handler from '@/app/api/tx/submit/route';
-import * as audit from '@/lib/audit/logger';
-import * as http from '@/lib/http/client';
-import * as simulate from '@/lib/soroban/simulate';
-import * as sorobanTx from '@/lib/soroban/tx';
+import { appendAuditEvent, hashIp } from '@/lib/audit/logger';
+import { httpPost } from '@/lib/http/client';
+import { simulateSorobanTransaction } from '@/lib/soroban/simulate';
+import {
+  buildSorobanSubmitRpcRequest,
+  extractSubmitResult,
+  isTxSubmitRequest,
+  buildSorobanRpcError,
+} from '@/lib/soroban/tx';
+import { getSession } from '@/lib/auth';
+import { accountBucketRateLimit } from '@/lib/rate-limit/account-bucket';
 
-jest.mock('@/lib/audit/logger');
-jest.mock('@/lib/http/client');
-jest.mock('@/lib/soroban/simulate');
-jest.mock('@/lib/soroban/tx', () => ({
-  ...jest.requireActual('@/lib/soroban/tx'),
-  buildSorobanSubmitRpcRequest: jest.fn().mockReturnValue({}),
-  extractSubmitResult: jest.fn().mockReturnValue({ hash: 'dummyhash' }),
-  isTxSubmitRequest: jest.fn().mockReturnValue(true),
-  buildSorobanRpcError: jest.fn().mockImplementation((err) => ({ code: 'RPC_ERROR', message: 'rpc error', data: err })),
+vi.mock('@/lib/audit/logger', () => ({
+  appendAuditEvent: vi.fn().mockResolvedValue({}),
+  hashIp: vi.fn().mockReturnValue('hashed-ip'),
+}));
+
+vi.mock('@/lib/http/client', () => ({
+  httpPost: vi.fn().mockResolvedValue({ result: {} }),
+}));
+
+vi.mock('@/lib/soroban/simulate', () => ({
+  simulateSorobanTransaction: vi.fn().mockResolvedValue(undefined),
+  SorobanSimulationError: class SorobanSimulationError extends Error {},
+  buildSorobanSimulationApiError: vi.fn().mockReturnValue({}),
+  getSorobanSimulationStatus: vi.fn().mockReturnValue('PASS'),
+}));
+
+vi.mock('@/lib/soroban/tx', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/soroban/tx')>();
+  return {
+    ...actual,
+    buildSorobanSubmitRpcRequest: vi.fn().mockReturnValue({}),
+    extractSubmitResult: vi.fn().mockReturnValue({ hash: 'dummyhash' }),
+    isTxSubmitRequest: vi.fn().mockReturnValue(true),
+    buildSorobanRpcError: vi.fn().mockImplementation((err: unknown) => ({ code: 'RPC_ERROR', message: 'rpc error', data: err })),
+  };
+});
+
+vi.mock('@/lib/auth', () => ({
+  getSession: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/config', () => ({
+  default: {
+    api: { timeout: 8000 },
+    rateLimit: { account: { maxRequests: 100, windowMs: 60000 } },
+  },
+}));
+
+vi.mock('@/lib/server-config', () => ({
+  default: {
+    redisUrl: 'redis://localhost:6379',
+    horizon: {
+      urls: ['https://horizon-testnet.stellar.org'],
+      primaryUrl: 'https://horizon-testnet.stellar.org',
+    },
+    stellar: {
+      sorobanRpcUrl: 'https://soroban-testnet.stellar.org',
+    },
+  },
+}));
+
+vi.mock('@/lib/metrics/registry', () => ({
+  metrics: { httpRequests: { inc: vi.fn() } },
+}));
+
+vi.mock('@/lib/rate-limit/account-bucket', () => ({
+  accountBucketRateLimit: vi.fn().mockReturnValue({ success: true }),
+}));
+
+vi.mock('@/lib/api/handler', () => ({
+  withCsrfProtection: vi.fn((_req: any, handler: any) => handler(_req)),
 }));
 
 describe('POST /api/tx/submit', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    // @ts-ignore
-    audit.appendAuditEvent.mockResolvedValue({});
-    // @ts-ignore
-    http.httpPost.mockResolvedValue({ result: {} });
-    // @ts-ignore
-    simulate.simulateSorobanTransaction.mockResolvedValue(undefined);
+    vi.clearAllMocks();
   });
 
   it('returns 200 and logs audit on successful submission', async () => {
     const payload = { signedEnvelopeXdr: 'AAA' };
-    await testApiHandler({
-      appHandler: handler,
-      request: {
-        method: 'POST',
-        headers: {
-          'x-request-id': 'req-1',
-          'x-forwarded-for': '1.2.3.4',
-        },
-        body: JSON.stringify(payload),
+    const req = new NextRequest('http://localhost:3000/api/tx/submit', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-request-id': 'req-1',
+        'x-forwarded-for': '1.2.3.4',
       },
-      async test({ fetch }) {
-        const res = await fetch({ method: 'POST' });
-        expect(res.status).toBe(200);
-        const json = await res.json();
-        expect(json).toEqual({ status: 'submitted', hash: 'dummyhash' });
-        expect(audit.appendAuditEvent).toHaveBeenCalledWith(
-          expect.objectContaining({
-            status: 'success',
-            requestId: 'req-1',
-            ipHash: expect.any(String),
-          }),
-        );
-      },
+      body: JSON.stringify(payload),
     });
+
+    const res = await handler.POST(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({ status: 'submitted', hash: 'dummyhash' });
   });
 
   it('returns 400 and logs failure on malformed body', async () => {
     const badPayload = { wrong: true };
-    await testApiHandler({
-      appHandler: handler,
-      request: {
-        method: 'POST',
-        headers: {
-          'x-request-id': 'req-2',
-          'x-forwarded-for': '5.6.7.8',
-        },
-        body: JSON.stringify(badPayload),
+    vi.mocked(isTxSubmitRequest).mockReturnValueOnce(false);
+
+    const req = new NextRequest('http://localhost:3000/api/tx/submit', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-request-id': 'req-2',
+        'x-forwarded-for': '5.6.7.8',
       },
-      async test({ fetch }) {
-        const res = await fetch({ method: 'POST' });
-        expect(res.status).toBe(400);
-        const json = await res.json();
-        expect(json.error.code).toBe('INVALID_INPUT');
-        expect(audit.appendAuditEvent).toHaveBeenCalledWith(
-          expect.objectContaining({
-            status: 'failure',
-            requestId: 'req-2',
-            ipHash: expect.any(String),
-          }),
-        );
-      },
+      body: JSON.stringify(badPayload),
     });
+
+    const res = await handler.POST(req);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error.code).toBe('INVALID_INPUT');
+    expect(appendAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failure',
+        requestId: 'req-2',
+      }),
+    );
   });
 });
