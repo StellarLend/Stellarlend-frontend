@@ -1,13 +1,19 @@
-interface ShieldBlockchainProps {
+import type { SVGProps } from "react";
+interface ShieldBlockchainProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
+  title?: string;
 }
 
 export const ShieldBlockchain = ({
   className = "",
   width = "41",
   height = "40",
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: ShieldBlockchainProps) => {
   return (
     <svg
@@ -17,7 +23,12 @@ export const ShieldBlockchain = ({
       viewBox="0 0 41 40"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         d="M35.333 18.6391V13.8006C35.333 11.0673 35.333 9.70065 34.6595 8.80898C33.986 7.91733 32.4632 7.48443 29.4175 6.61866C27.3367 6.02716 25.5023 5.31455 24.0368 4.66398C22.0387 3.777 21.0397 3.3335 20.333 3.3335C19.6263 3.3335 18.6273 3.777 16.6292 4.66398C15.1637 5.31455 13.3294 6.02716 11.2486 6.61866C8.20289 7.48443 6.68004 7.91733 6.00652 8.80898C5.33301 9.70065 5.33301 11.0673 5.33301 13.8006V18.6391C5.33301 28.0143 13.771 33.6393 17.9897 35.8658C19.0015 36.3998 19.5073 36.6668 20.333 36.6668C21.1587 36.6668 21.6645 36.3998 22.6763 35.8658C26.895 33.6393 35.333 28.0143 35.333 18.6391Z"
         stroke="currentColor"

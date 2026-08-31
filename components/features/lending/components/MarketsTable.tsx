@@ -23,6 +23,9 @@ const TOKEN_COLORS: Record<string, string> = {
 
 /** Look up the human-readable asset name from the canonical ASSETS list. */
 function getAssetName(symbol: string): string {
+  if (typeof symbol !== "string" || symbol.length === 0) {
+    return "Unknown";
+  }
   return ASSETS.find((a) => a.symbol === symbol)?.name ?? symbol;
 }
 
@@ -100,21 +103,37 @@ function sortMarkets(
   markets: AssetMarket[],
   config: SortConfig,
 ): AssetMarket[] {
-  return [...markets].sort((a, b) => {
-    const aVal = a[config.field];
-    const bVal = b[config.field];
-    const directionMultiplier = config.direction === "asc" ? 1 : -1;
+  if (!Array.isArray(markets) || !config) {
+    return [];
+  }
 
-    if (typeof aVal === "string" && typeof bVal === "string") {
-      const comparison = aVal.localeCompare(bVal);
+  const field = config.field;
+  const direction = config.direction;
+  const isValidField = COLUMNS.some((col) => col.key === field);
+  const isValidDirection = direction === "asc" || direction === "desc";
+
+  if (!isValidField || !isValidDirection) {
+    return [...markets];
+  }
+
+  return [...markets].sort((a, b) => {
+    if (!a || !b) return 0;
+
+    const aVal = a[field];
+    const bVal = b[field];
+    const directionMultiplier = direction === "asc" ? 1 : -1;
+
+    if (field === "asset") {
+      const aName = String(aVal ?? "").toLowerCase();
+      const bName = String(bVal ?? "").toLowerCase();
+      const comparison = aName.localeCompare(bName);
       return comparison === 0
         ? a.asset.localeCompare(b.asset)
         : comparison * directionMultiplier;
     }
 
-    const aNum = aVal as number;
-    const bNum = bVal as number;
-
+    const aNum = typeof aVal === "number" && Number.isFinite(aVal) ? aVal : 0;
+    const bNum = typeof bVal === "number" && Number.isFinite(bVal) ? bVal : 0;
     const comparison = aNum - bNum;
     return comparison === 0
       ? a.asset.localeCompare(b.asset)
@@ -123,13 +142,26 @@ function sortMarkets(
 }
 
 function filterMarkets(markets: AssetMarket[], query: string): AssetMarket[] {
-  const normalizedQuery = query.trim().toLowerCase();
+  if (!Array.isArray(markets)) {
+    return [];
+  }
+
+  const safeQuery = typeof query === "string" ? query : "";
+  const MAX_FILTER_QUERY_LENGTH = 80;
+  if (safeQuery.length > MAX_FILTER_QUERY_LENGTH) {
+    return markets;
+  }
+
+  const normalizedQuery = safeQuery.trim().toLowerCase();
 
   if (!normalizedQuery) {
     return markets;
   }
 
   return markets.filter((market) => {
+    if (!market || typeof market.asset !== "string") {
+      return false;
+    }
     const assetName = getAssetName(market.asset).toLowerCase();
     return (
       market.asset.toLowerCase().includes(normalizedQuery) ||
@@ -336,7 +368,12 @@ function MarketsCardSkeleton() {
 
 /** Single market row for desktop */
 function MarketRow({ market }: { market: AssetMarket }) {
-  const colorClass = TOKEN_COLORS[market.asset] || "bg-gray-400";
+  const colorClass = Object.prototype.hasOwnProperty.call(
+    TOKEN_COLORS,
+    market.asset,
+  )
+    ? TOKEN_COLORS[market.asset]
+    : "bg-gray-400";
 
   return (
     <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
@@ -367,7 +404,12 @@ function MarketRow({ market }: { market: AssetMarket }) {
 
 /** Single market card for mobile */
 function MarketCard({ market }: { market: AssetMarket }) {
-  const colorClass = TOKEN_COLORS[market.asset] || "bg-gray-400";
+  const colorClass = Object.prototype.hasOwnProperty.call(
+    TOKEN_COLORS,
+    market.asset,
+  )
+    ? TOKEN_COLORS[market.asset]
+    : "bg-gray-400";
 
   return (
     <div className="p-4 border border-slate-200 rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow">
@@ -493,6 +535,7 @@ export function MarketsTable({ apiUrl = "/api/markets" }: MarketsTableProps) {
           description={error}
           actionLabel="Retry"
           onAction={fetchMarkets}
+          tone="error"
         />
       </div>
     );

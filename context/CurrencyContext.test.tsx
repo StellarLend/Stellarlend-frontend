@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { CurrencyProvider, useCurrencyPreference } from "./CurrencyContext";
 
@@ -16,6 +16,7 @@ describe("CurrencyContext", () => {
 
   afterEach(() => {
     vi.resetAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("fetches and provides the displayCurrency preference", async () => {
@@ -27,7 +28,7 @@ describe("CurrencyContext", () => {
     render(
       <CurrencyProvider>
         <TestComponent />
-      </CurrencyProvider>
+      </CurrencyProvider>,
     );
 
     expect(screen.getByTestId("loading")).toBeInTheDocument();
@@ -45,7 +46,7 @@ describe("CurrencyContext", () => {
     render(
       <CurrencyProvider>
         <TestComponent />
-      </CurrencyProvider>
+      </CurrencyProvider>,
     );
 
     await waitFor(() => {
@@ -62,7 +63,7 @@ describe("CurrencyContext", () => {
     render(
       <CurrencyProvider>
         <TestComponent />
-      </CurrencyProvider>
+      </CurrencyProvider>,
     );
 
     await waitFor(() => {
@@ -76,11 +77,87 @@ describe("CurrencyContext", () => {
     render(
       <CurrencyProvider>
         <TestComponent />
-      </CurrencyProvider>
+      </CurrencyProvider>,
     );
 
     await waitFor(() => {
       expect(screen.getByTestId("error")).toHaveTextContent("Network error");
+    });
+  });
+
+  it("aborts in-flight request on unmount", () => {
+    const abortMock = vi.fn();
+    vi.stubGlobal(
+      "AbortController",
+      vi.fn().mockImplementation(() => ({
+        abort: abortMock,
+        signal: {},
+      })),
+    );
+
+    vi.mocked(global.fetch).mockImplementation(() => new Promise(() => {}));
+
+    const { unmount } = render(
+      <CurrencyProvider>
+        <TestComponent />
+      </CurrencyProvider>,
+    );
+
+    unmount();
+
+    expect(abortMock).toHaveBeenCalled();
+  });
+
+  it("stale in-flight response does not overwrite newer response", async () => {
+    let resolveOld: (value: unknown) => void;
+    const oldPromise = new Promise((resolve) => {
+      resolveOld = resolve;
+    });
+
+    let resolveNew: (value: unknown) => void;
+    const newPromise = new Promise((resolve) => {
+      resolveNew = resolve;
+    });
+
+    global.fetch = vi
+      .fn()
+      .mockReturnValueOnce(oldPromise)
+      .mockReturnValueOnce(newPromise);
+
+    const { rerender } = render(
+      <CurrencyProvider key="1">
+        <TestComponent />
+      </CurrencyProvider>,
+    );
+
+    expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+    rerender(
+      <CurrencyProvider key="2">
+        <TestComponent />
+      </CurrencyProvider>,
+    );
+
+    expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveOld!({
+        ok: true,
+        json: async () => ({ displayCurrency: "EUR" }),
+      });
+    });
+
+    expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveNew!({
+        ok: true,
+        json: async () => ({ displayCurrency: "BTC" }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("currency")).toHaveTextContent("BTC");
     });
   });
 });

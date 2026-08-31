@@ -37,8 +37,12 @@ export async function listSourceMigrations(migrationsDir?: string): Promise<stri
   }
 }
 
+export interface MigrationRow {
+  name: string;
+}
+
 // `fetchAppliedMigrations` accepts a simple query function for portability and testing.
-export async function fetchAppliedMigrations(queryFn: (sql: string, params?: any[]) => Promise<{ rows: any[] }>): Promise<string[]> {
+export async function fetchAppliedMigrations(queryFn: (sql: string, params?: unknown[]) => Promise<{ rows: MigrationRow[] }>): Promise<string[]> {
   const res = await queryFn('SELECT name FROM __drizzle_migrations ORDER BY id');
-  return (res.rows || []).map((r: any) => r.name).filter(Boolean);
+  return (res.rows || []).map((r) => r.name).filter(Boolean);
 }

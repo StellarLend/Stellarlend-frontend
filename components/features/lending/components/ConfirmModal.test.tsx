@@ -248,7 +248,7 @@ describe("ConfirmModal withdraw variant", () => {
     expect(within(dialog).getByText(/Remaining Supplied/i)).toBeInTheDocument();
     expect(within(dialog).getByText("4,000.00 XLM")).toBeInTheDocument();
     expect(within(dialog).getByText(/New Health Factor/i)).toBeInTheDocument();
-    expect(within(dialog).getByText("1.48")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("1.48").length).toBeGreaterThan(0);
   });
 
   it("shows Health Factor Warning when health degrades to at-risk range", async () => {
@@ -339,3 +339,170 @@ describe("ConfirmModal withdraw variant", () => {
     expect(closeButton).toHaveFocus();
   });
 });
+
+function formatModalAmount(amount: number, asset: string): string {
+  return `${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })} ${asset}`;
+}
+
+describe("ConfirmModal protocol fee breakdown", () => {
+  it("shows gross, fee, and net matching calculateProtocolFee for lend/borrow/repay", async () => {
+    const { calculateProtocolFee } = await import("@/lib/fee-calculator");
+    const testCases: Array<{
+      asset: string;
+      type: "lend" | "borrow" | "repay";
+      amount: number;
+    }> = [
+      { asset: "XLM", type: "lend", amount: 1000 },
+      { asset: "USDC", type: "borrow", amount: 500 },
+      { asset: "XLM", type: "repay", amount: 200 },
+    ];
+
+    for (const testCase of testCases) {
+      const expectedFeeResult = calculateProtocolFee(
+        testCase.asset,
+        testCase.type,
+        testCase.amount,
+      );
+      const net = Math.max(0, testCase.amount - expectedFeeResult.feeAmount);
+
+      const { unmount } = render(
+        <ConfirmModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onConfirm={vi.fn()}
+          data={{
+            asset: testCase.asset,
+            amount: testCase.amount,
+            interestRate: 5.0,
+          }}
+          calculation={{ dailyEarnings: 0.1, totalEarnings: 10 }}
+          type={testCase.type}
+        />,
+      );
+
+      const dialog = screen.getByRole("dialog");
+      const breakdown = within(dialog).getByTestId("fee-breakdown");
+      expect(breakdown).toHaveAttribute("aria-label", "Fee breakdown");
+
+      expect(within(breakdown).getByText("Gross Amount")).toBeInTheDocument();
+      expect(
+        within(breakdown).getByText(
+          formatModalAmount(testCase.amount, testCase.asset),
+        ),
+      ).toBeInTheDocument();
+
+      expect(within(breakdown).getByText(/Protocol Fee/)).toBeInTheDocument();
+      expect(
+        within(breakdown).getByText(
+          formatModalAmount(expectedFeeResult.feeAmount, testCase.asset),
+        ),
+      ).toBeInTheDocument();
+
+      expect(within(breakdown).getByText("Net Amount")).toBeInTheDocument();
+      expect(
+        within(breakdown).getByText(formatModalAmount(net, testCase.asset)),
+      ).toBeInTheDocument();
+
+      unmount();
+    }
+  });
+
+  it("recomputes the breakdown when the amount changes", async () => {
+    const { calculateProtocolFee } = await import("@/lib/fee-calculator");
+    const baseProps = {
+      isOpen: true,
+      onClose: vi.fn(),
+      onConfirm: vi.fn(),
+      calculation: { dailyEarnings: 0.1, totalEarnings: 10 },
+      type: "lend" as const,
+    };
+
+    const { rerender } = render(
+      <ConfirmModal
+        {...baseProps}
+        data={{ asset: "XLM", amount: 1000, interestRate: 5 }}
+      />,
+    );
+
+    const fee1000 = calculateProtocolFee("XLM", "lend", 1000);
+    expect(
+      screen.getByText(formatModalAmount(fee1000.feeAmount, "XLM")),
+    ).toBeInTheDocument();
+
+    rerender(
+      <ConfirmModal
+        {...baseProps}
+        data={{ asset: "XLM", amount: 250, interestRate: 5 }}
+      />,
+    );
+
+    const fee250 = calculateProtocolFee("XLM", "lend", 250);
+    const breakdown = screen.getByTestId("fee-breakdown");
+    expect(
+      within(breakdown).getByText(formatModalAmount(fee250.feeAmount, "XLM")),
+    ).toBeInTheDocument();
+    expect(
+      within(breakdown).getByText(formatModalAmount(250, "XLM")),
+    ).toBeInTheDocument();
+    expect(
+      within(breakdown).getByText(
+        formatModalAmount(Math.max(0, 250 - fee250.feeAmount), "XLM"),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a zero fee and zero net for a zero amount", () => {
+    render(
+      <ConfirmModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        data={{ asset: "XLM", amount: 0, interestRate: 5 }}
+        calculation={null}
+        type="lend"
+      />,
+    );
+
+    const breakdown = screen.getByTestId("fee-breakdown");
+    // Gross, fee, and net all format as 0.00 XLM — three rows.
+    const zeros = within(breakdown).getAllByText(formatModalAmount(0, "XLM"));
+    expect(zeros.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("omits the fee breakdown for withdraw (no fee schedule)", () => {
+    render(
+      <ConfirmModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        data={{ asset: "XLM", amount: 100, interestRate: 0 }}
+        calculation={null}
+        type="withdraw"
+      />,
+    );
+
+    expect(screen.queryByTestId("fee-breakdown")).not.toBeInTheDocument();
+  });
+
+  it("omits the fee breakdown for an unknown market instead of blocking confirm", () => {
+    render(
+      <ConfirmModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        data={{ asset: "UNKNOWN", amount: 100, interestRate: 5 }}
+        calculation={null}
+        type="lend"
+      />,
+    );
+
+    expect(screen.queryByTestId("fee-breakdown")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /confirm/i }),
+    ).toBeInTheDocument();
+  });
+});
+

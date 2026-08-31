@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LendingData, CalculationResult } from "@/app/lending/page";
 import type { LendingActionType } from "@/lib/lending/types";
 import { cn } from "@/lib/utils/cn";
+import { calculateProtocolFee } from "@/lib/fee-calculator";
 import TermsModal from "./TermsModal";
 
 interface ConfirmModalProps {
@@ -33,6 +34,7 @@ export default function ConfirmModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -93,6 +95,10 @@ export default function ConfirmModal({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       previouslyFocusedElementRef.current?.focus();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
   }, [isOpen, onClose]);
 
@@ -125,7 +131,7 @@ export default function ConfirmModal({
       await onConfirm();
       setSubmitStatus("success");
       setSubmitMessage("Transaction confirmed successfully!");
-      setTimeout(onClose, 2000);
+      timeoutRef.current = setTimeout(onClose, 2000);
     } catch (err) {
       setSubmitStatus("error");
       setSubmitMessage("Transaction failed. Please try again.");
@@ -147,17 +153,18 @@ export default function ConfirmModal({
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
         <div
-          className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+          className="fixed inset-0 transition-opacity motion-reduce:transition-none bg-gray-500 bg-opacity-75"
           onClick={onClose}
         />
 
         {/* Modal */}
         <div
           ref={dialogRef}
-          className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl"
+          className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all motion-reduce:transition-none transform bg-white shadow-xl rounded-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-transaction-title"
+          aria-busy={isConfirming}
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -170,7 +177,7 @@ export default function ConfirmModal({
             <button
               ref={closeButtonRef}
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
+              className="text-gray-400 hover:text-gray-600 transition-colors motion-reduce:transition-none p-1 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
               aria-label="Close modal"
             >
               <svg
@@ -293,6 +300,60 @@ export default function ConfirmModal({
                     )}
                 </>
               )}
+
+              {(() => {
+                // Withdraw has no protocol fee schedule in fee-calculator.
+                if (type === "withdraw") return null;
+                try {
+                  const feeResult = calculateProtocolFee(
+                    data.asset,
+                    type,
+                    data.amount,
+                  );
+                  const gross = data.amount;
+                  const fee = feeResult.feeAmount;
+                  // Net is the amount that actually settles after the protocol cut.
+                  // Zero-amount actions short-circuit to zero fee inside the calculator.
+                  const net = Math.max(0, gross - fee);
+                  return (
+                    <div
+                      className="space-y-2 border-t pt-3"
+                      data-testid="fee-breakdown"
+                      aria-label="Fee breakdown"
+                    >
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Gross Amount</span>
+                        <span className="font-medium">
+                          {formatCurrency(gross, data.asset)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">
+                          Protocol Fee
+                          {feeResult.feeBps > 0 ? (
+                            <span className="text-gray-400">
+                              {" "}
+                              ({feeResult.feeBps} bps)
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(fee, data.asset)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="font-medium">Net Amount</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatCurrency(net, data.asset)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                } catch {
+                  // Unknown market / action — omit the breakdown rather than block confirm.
+                  return null;
+                }
+              })()}
 
               {calculation && type !== "repay" && (
                 <>

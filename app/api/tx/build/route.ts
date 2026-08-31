@@ -17,6 +17,7 @@ import {
 } from '@/lib/soroban/tx';
 import {
   isSorobanRpcErrorResponse,
+  SorobanRpcResponseSchema,
   type SorobanRpcResponse,
 } from '@/lib/soroban/types';
 
@@ -100,9 +101,16 @@ export async function POST(request: NextRequest) {
   );
 
   try {
-    const rpcResponse: SorobanRpcResponse = await httpPost<SorobanRpcResponse>(serverConfig.stellar.sorobanRpcUrl, payload, {
+    const rawResponse = await httpPost<unknown>(serverConfig.stellar.sorobanRpcUrl, payload, {
       timeoutMs: 10000,
     });
+
+    const parsedResponse = SorobanRpcResponseSchema.safeParse(rawResponse);
+    if (!parsedResponse.success) {
+      return rpcFailure();
+    }
+
+    const rpcResponse = parsedResponse.data;
 
     if (isSorobanRpcErrorResponse(rpcResponse)) {
       return NextResponse.json(

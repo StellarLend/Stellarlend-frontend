@@ -31,11 +31,14 @@ describe('parseTransactionFilter', () => {
       ['completed', 'Completed'],
       ['pending', 'Processing'],
       ['failed', 'Failed'],
-    ])('accepts valid status: %s', (inputStatus, expectedStatus) => {
-      const result = parse(`status=${inputStatus}`);
-      expect(result.valid).toBe(true);
-      expect(result.filter.status).toBe(expectedStatus);
-    });
+    ])(
+      'accepts valid status: %s → %s',
+      (input, expected) => {
+        const result = parse(`status=${input}`);
+        expect(result.valid).toBe(true);
+        expect(result.filter.status).toBe(expected);
+      },
+    );
 
     it('accepts valid asset and uppercases it', () => {
       const result = parse('asset=btc');

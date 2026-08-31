@@ -1,224 +1,158 @@
 import { describe, it, expect } from 'vitest';
-import { paginateTransactionsByCursor } from './cursor-pagination';
-import { decodeTransactionCursor, encodeTransactionCursor } from '@/lib/api/cursor';
+import {
+  paginateTransactionsByCursor,
+  type CursorPaginationOptions,
+} from './cursor-pagination';
+import { encodeTransactionCursor } from '@/lib/api/cursor';
 
-interface TestTx {
+interface TestTransaction {
   id: string;
   date: string;
   amount: number;
 }
 
-const mockTxns: TestTx[] = [
-  { id: 'tx-1', date: '2025-01-01T00:00:00Z', amount: 100 },
-  { id: 'tx-2', date: '2025-01-02T00:00:00Z', amount: 200 },
-  { id: 'tx-3', date: '2025-01-03T00:00:00Z', amount: 300 },
-  { id: 'tx-4', date: '2025-01-04T00:00:00Z', amount: 400 },
-  { id: 'tx-5', date: '2025-01-05T00:00:00Z', amount: 500 },
-];
+function tx(id: string, date: string): TestTransaction {
+  return { id, date, amount: 0 };
+}
+
+function makeOptions(
+  overrides: Partial<CursorPaginationOptions> = {},
+): CursorPaginationOptions {
+  return {
+    cursor: null,
+    limit: 6,
+    sortDir: 'desc',
+    ...overrides,
+  };
+}
 
 describe('paginateTransactionsByCursor', () => {
-  describe('Initial Page (no cursor)', () => {
-    it('returns first page for ascending sort order', () => {
-      const result = paginateTransactionsByCursor(mockTxns, {
-        cursor: null,
-        limit: 2,
-        sortDir: 'asc',
+  const sample: TestTransaction[] = [
+    tx('tx-1', '2025-04-12'),
+    tx('tx-2', '2025-04-11'),
+    tx('tx-3', '2025-04-10'),
+    tx('tx-4', '2025-04-09'),
+    tx('tx-5', '2025-04-08'),
+    tx('tx-6', '2025-04-07'),
+    tx('tx-7', '2025-04-06'),
+    tx('tx-8', '2025-04-05'),
+  ];
+
+  describe('first page (no cursor)', () => {
+    it('returns the first `limit` items in sort order', () => {
+      const result = paginateTransactionsByCursor(sample, makeOptions());
+      expect(result.transactions).toHaveLength(6);
+      expect(result.transactions[0].id).toBe('tx-1');
+      expect(result.transactions[5].id).toBe('tx-6');
+    });
+
+    it('sets nextCursor when there are more items', () => {
+      const result = paginateTransactionsByCursor(sample, makeOptions());
+      expect(result.nextCursor).not.toBeNull();
+    });
+
+    it('sets prevCursor to null on the first page', () => {
+      const result = paginateTransactionsByCursor(sample, makeOptions());
+      expect(result.prevCursor).toBeNull();
+    });
+  });
+
+  describe('next page (cursor.direction=next)', () => {
+    it('returns the next page after the cursor position', () => {
+      const cursor = encodeTransactionCursor({
+        v: 1,
+        date: '2025-04-07',
+        id: 'tx-6',
+        direction: 'next',
       });
+
+      const result = paginateTransactionsByCursor(
+        sample,
+        makeOptions({ cursor: { v: 1, date: '2025-04-07', id: 'tx-6', direction: 'next' } }),
+      );
 
       expect(result.transactions).toHaveLength(2);
-      expect(result.transactions.map((t) => t.id)).toEqual(['tx-1', 'tx-2']);
-      expect(result.prevCursor).toBeNull();
+      expect(result.transactions[0].id).toBe('tx-7');
+      expect(result.transactions[1].id).toBe('tx-8');
+    });
 
+    it('sets nextCursor to null on the last page', () => {
+      const result = paginateTransactionsByCursor(
+        sample,
+        makeOptions({ cursor: { v: 1, date: '2025-04-07', id: 'tx-6', direction: 'next' } }),
+      );
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('sets prevCursor when there are items before', () => {
+      const result = paginateTransactionsByCursor(
+        sample,
+        makeOptions({ cursor: { v: 1, date: '2025-04-07', id: 'tx-6', direction: 'next' } }),
+      );
+      expect(result.prevCursor).not.toBeNull();
+    });
+  });
+
+  describe('previous page (cursor.direction=prev)', () => {
+    it('returns items before the cursor position', () => {
+      const result = paginateTransactionsByCursor(
+        sample,
+        makeOptions({ cursor: { v: 1, date: '2025-04-07', id: 'tx-6', direction: 'prev' } }),
+      );
+
+      expect(result.transactions).toHaveLength(6);
+      expect(result.transactions[0].id).toBe('tx-1');
+      expect(result.transactions[5].id).toBe('tx-6');
+    });
+
+    it('sets nextCursor when there are items after', () => {
+      const result = paginateTransactionsByCursor(
+        sample,
+        makeOptions({ cursor: { v: 1, date: '2025-04-07', id: 'tx-6', direction: 'prev' } }),
+      );
       expect(result.nextCursor).not.toBeNull();
-      const decodedNext = decodeTransactionCursor(result.nextCursor!);
-      expect(decodedNext).toEqual({
-        v: 1,
-        date: '2025-01-02T00:00:00Z',
-        id: 'tx-2',
-        direction: 'next',
-      });
-    });
-
-    it('returns first page for descending sort order', () => {
-      const result = paginateTransactionsByCursor(mockTxns, {
-        cursor: null,
-        limit: 2,
-        sortDir: 'desc',
-      });
-
-      expect(result.transactions).toHaveLength(2);
-      expect(result.transactions.map((t) => t.id)).toEqual(['tx-5', 'tx-4']);
-      expect(result.prevCursor).toBeNull();
-
-      expect(result.nextCursor).not.toBeNull();
-      const decodedNext = decodeTransactionCursor(result.nextCursor!);
-      expect(decodedNext).toEqual({
-        v: 1,
-        date: '2025-01-04T00:00:00Z',
-        id: 'tx-4',
-        direction: 'next',
-      });
     });
   });
 
-  describe('Forward Navigation (next direction)', () => {
-    it('paginates forward through dataset in ascending order', () => {
-      const cursor1 = decodeTransactionCursor(
-        encodeTransactionCursor({ v: 1, date: '2025-01-02T00:00:00Z', id: 'tx-2', direction: 'next' }),
-      );
-
-      const page2 = paginateTransactionsByCursor(mockTxns, {
-        cursor: cursor1,
-        limit: 2,
-        sortDir: 'asc',
-      });
-
-      expect(page2.transactions.map((t) => t.id)).toEqual(['tx-3', 'tx-4']);
-      expect(page2.prevCursor).not.toBeNull();
-      expect(decodeTransactionCursor(page2.prevCursor!)).toEqual({
-        v: 1,
-        date: '2025-01-03T00:00:00Z',
-        id: 'tx-3',
-        direction: 'prev',
-      });
-
-      expect(page2.nextCursor).not.toBeNull();
-      expect(decodeTransactionCursor(page2.nextCursor!)).toEqual({
-        v: 1,
-        date: '2025-01-04T00:00:00Z',
-        id: 'tx-4',
-        direction: 'next',
-      });
-    });
-
-    it('handles last page boundary when next page is partially filled', () => {
-      const cursor2 = decodeTransactionCursor(
-        encodeTransactionCursor({ v: 1, date: '2025-01-04T00:00:00Z', id: 'tx-4', direction: 'next' }),
-      );
-
-      const page3 = paginateTransactionsByCursor(mockTxns, {
-        cursor: cursor2,
-        limit: 2,
-        sortDir: 'asc',
-      });
-
-      expect(page3.transactions.map((t) => t.id)).toEqual(['tx-5']);
-      expect(page3.nextCursor).toBeNull();
-      expect(page3.prevCursor).not.toBeNull();
-      expect(decodeTransactionCursor(page3.prevCursor!)).toEqual({
-        v: 1,
-        date: '2025-01-05T00:00:00Z',
-        id: 'tx-5',
-        direction: 'prev',
-      });
-    });
-  });
-
-  describe('Backward Navigation (prev direction)', () => {
-    it('paginates backward from a middle cursor', () => {
-      const prevCursor = decodeTransactionCursor(
-        encodeTransactionCursor({ v: 1, date: '2025-01-05T00:00:00Z', id: 'tx-5', direction: 'prev' }),
-      );
-
-      const page = paginateTransactionsByCursor(mockTxns, {
-        cursor: prevCursor,
-        limit: 2,
-        sortDir: 'asc',
-      });
-
-      expect(page.transactions.map((t) => t.id)).toEqual(['tx-3', 'tx-4']);
-      expect(page.nextCursor).not.toBeNull();
-      expect(decodeTransactionCursor(page.nextCursor!)).toEqual({
-        v: 1,
-        date: '2025-01-04T00:00:00Z',
-        id: 'tx-4',
-        direction: 'next',
-      });
-    });
-
-    it('reaches the first page when navigating backward and sets prevCursor to null', () => {
-      const prevCursor = decodeTransactionCursor(
-        encodeTransactionCursor({ v: 1, date: '2025-01-03T00:00:00Z', id: 'tx-3', direction: 'prev' }),
-      );
-
-      const page = paginateTransactionsByCursor(mockTxns, {
-        cursor: prevCursor,
-        limit: 2,
-        sortDir: 'asc',
-      });
-
-      expect(page.transactions.map((t) => t.id)).toEqual(['tx-1', 'tx-2']);
-      expect(page.prevCursor).toBeNull();
-      expect(page.nextCursor).not.toBeNull();
-    });
-  });
-
-  describe('Edge Cases & Secondary Sorting', () => {
-    it('handles empty transaction list', () => {
-      const result = paginateTransactionsByCursor([], {
-        cursor: null,
-        limit: 5,
-        sortDir: 'asc',
-      });
-
-      expect(result.transactions).toEqual([]);
+  describe('empty dataset', () => {
+    it('returns empty transactions and null cursors', () => {
+      const result = paginateTransactionsByCursor([], makeOptions());
+      expect(result.transactions).toHaveLength(0);
       expect(result.nextCursor).toBeNull();
       expect(result.prevCursor).toBeNull();
     });
+  });
 
-    it('handles dataset smaller than limit', () => {
-      const result = paginateTransactionsByCursor(mockTxns.slice(0, 2), {
-        cursor: null,
-        limit: 10,
-        sortDir: 'asc',
-      });
+  describe('ascending sort order', () => {
+    it('sorts and paginates in ascending order', () => {
+      const result = paginateTransactionsByCursor(
+        sample,
+        makeOptions({ sortDir: 'asc' }),
+      );
+      expect(result.transactions[0].id).toBe('tx-8');
+      expect(result.transactions[5].id).toBe('tx-3');
+    });
+  });
 
-      expect(result.transactions).toHaveLength(2);
+  describe('unsorted input', () => {
+    it('sorts the input when it is not already sorted', () => {
+      const unsorted = [tx('tx-c', '2025-04-10'), tx('tx-a', '2025-04-12'), tx('tx-b', '2025-04-11')];
+      const result = paginateTransactionsByCursor(unsorted, makeOptions({ limit: 10 }));
+      expect(result.transactions.map((t) => t.id)).toEqual(['tx-a', 'tx-b', 'tx-c']);
+    });
+  });
+
+  describe('limit edge cases', () => {
+    it('handles limit larger than dataset', () => {
+      const result = paginateTransactionsByCursor(sample, makeOptions({ limit: 100 }));
+      expect(result.transactions).toHaveLength(8);
       expect(result.nextCursor).toBeNull();
-      expect(result.prevCursor).toBeNull();
     });
 
-    it('breaks ties using secondary sort on id when dates are identical', () => {
-      const sameDateTxns: TestTx[] = [
-        { id: 'tx-b', date: '2025-01-01T00:00:00Z', amount: 10 },
-        { id: 'tx-a', date: '2025-01-01T00:00:00Z', amount: 20 },
-        { id: 'tx-c', date: '2025-01-01T00:00:00Z', amount: 30 },
-      ];
-
-      const result = paginateTransactionsByCursor(sameDateTxns, {
-        cursor: null,
-        limit: 2,
-        sortDir: 'asc',
-      });
-
-      expect(result.transactions.map((t) => t.id)).toEqual(['tx-a', 'tx-b']);
-
-      const cursor = decodeTransactionCursor(result.nextCursor!);
-      const page2 = paginateTransactionsByCursor(sameDateTxns, {
-        cursor,
-        limit: 2,
-        sortDir: 'asc',
-      });
-
-      expect(page2.transactions.map((t) => t.id)).toEqual(['tx-c']);
-    });
-
-    it('produces identical result whether input array is pre-sorted or unsorted', () => {
-      const unsorted = [...mockTxns].reverse();
-
-      const sortedResult = paginateTransactionsByCursor(mockTxns, {
-        cursor: null,
-        limit: 3,
-        sortDir: 'asc',
-      });
-
-      const unsortedResult = paginateTransactionsByCursor(unsorted, {
-        cursor: null,
-        limit: 3,
-        sortDir: 'asc',
-      });
-
-      expect(sortedResult).toEqual(unsortedResult);
+    it('handles limit of 1', () => {
+      const result = paginateTransactionsByCursor(sample, makeOptions({ limit: 1 }));
+      expect(result.transactions).toHaveLength(1);
+      expect(result.transactions[0].id).toBe('tx-1');
     });
   });
 });

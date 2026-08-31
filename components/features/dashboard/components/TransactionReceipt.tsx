@@ -4,9 +4,11 @@ import { Printer, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import type { Transaction } from "@/types/Transaction";
 import { sanitiseString } from "@/lib/security/input-sanitizer";
-import type { StellarNetwork } from "@/lib/wallet/connectHandshake";
-import { getTransactionHash, buildStellarExpertTransactionUrl } from "@/lib/utils/explorer";
+import { isValidTxHash } from "@/lib/validation/stellar";
+import { formatCurrency } from "@/lib/utils/format";
 import config from "@/lib/config";
+import { getTransactionHash, buildStellarExpertTransactionUrl } from "@/lib/utils/explorer";
+import type { StellarNetwork } from "@/context/WalletContext";
 
 interface TransactionReceiptProps {
   transaction: Transaction;
@@ -29,7 +31,17 @@ interface TransactionReceiptProps {
 /**
  * TransactionReceipt displays a print-friendly receipt view of a transaction.
  * Includes a print button that triggers window.print() with print-optimized styles.
- * 
+ *
+ * Contract:
+ * - `transaction` fields (id, type, amount, asset, date/time, status) always render.
+ * - `details` is optional; each of its fields (fee, memo, operations) renders only
+ *   when present, and a `null`/`undefined` `details` renders none of them.
+ * - The explorer link uses `details.explorerUrl` when provided; otherwise it is
+ *   derived from the transaction's hash via `getTransactionHash` +
+ *   `buildStellarExpertTransactionUrl`, and is omitted entirely when no valid
+ *   64-character hex hash can be found.
+ * - `onBack`, when provided, renders a "Back" button; otherwise it is omitted.
+ *
  * @param transaction - The transaction to display
  * @param details - Optional detailed transaction information (fee, memo, operations)
  * @param onBack - Optional callback to return to previous view
@@ -41,7 +53,7 @@ export default function TransactionReceipt({ transaction, details, onBack }: Tra
     window.print();
   };
 
-  const signedAmount = amount > 0 ? `+$${amount}` : `-$${Math.abs(amount)}`;
+  const signedAmount = amount > 0 ? `+$${formatCurrency(amount)}` : `-$${formatCurrency(Math.abs(amount))}`;
 
   const formatDateTime = (dateStr: string, timeStr: string) => {
     let fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
