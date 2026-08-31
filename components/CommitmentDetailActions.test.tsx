@@ -87,7 +87,7 @@ describe("CommitmentDetailActions", () => {
       );
 
       expect(screen.getByText(/no actions available/i)).toBeInTheDocument();
-      expect(screen.getByText(/settled/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/settled/i).length).toBeGreaterThan(0);
     });
 
     it("should disable button when action is not authorized", () => {
@@ -119,14 +119,24 @@ describe("CommitmentDetailActions", () => {
         settle: { allowed: false },
       };
 
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          transactionHash: "abc123",
-          newStatus: "active",
-        }),
-      });
+      (global.fetch as any).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  headers: { get: () => "application/json" },
+                  json: async () => ({
+                    success: true,
+                    transactionHash: "0x" + "a".repeat(64),
+                    newStatus: "active",
+                  }),
+                }),
+              50,
+            ),
+          ),
+      );
 
       render(
         <CommitmentDetailActions
@@ -351,9 +361,10 @@ describe("CommitmentDetailActions", () => {
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
+        headers: { get: () => "application/json" },
         json: async () => ({
           success: true,
-          transactionHash: "test-hash",
+          transactionHash: "0x" + "b".repeat(64),
           newStatus: "settled",
         }),
       });
@@ -417,6 +428,7 @@ describe("CommitmentDetailActions", () => {
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
+        headers: { get: () => "application/json" },
         json: async () => ({ success: true, newStatus: "settled" }),
       });
 
@@ -448,6 +460,7 @@ describe("CommitmentDetailActions", () => {
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
+        headers: { get: () => "application/json" },
         json: async () => ({ success: true, newStatus: "settled" }),
       });
 
