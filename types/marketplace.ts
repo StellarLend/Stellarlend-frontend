@@ -171,6 +171,28 @@ export const MARKETPLACE_BOUNDS = {
   ALLOWED_ASSETS: ["USDC", "XLM"] as const,
   ALLOWED_CATEGORIES: ["collateral", "receivable", "claim"] as const,
   ALLOWED_SORTS: ["price_asc", "price_desc", "newest"] as const,
+
+  // -------------------------------------------------------------------------
+  // Polling, network, and concurrency bounds
+  // -------------------------------------------------------------------------
+  /** Minimum auto-refresh interval; prevents runaway polling. */
+  POLLING_MIN_INTERVAL_MS: 10_000,
+  /** Default auto-refresh interval for the listings hook. */
+  POLLING_DEFAULT_INTERVAL_MS: 30_000,
+  /** Maximum interval after backoff is applied. */
+  POLLING_MAX_INTERVAL_MS: 120_000,
+  /** Backoff multiplier applied on consecutive failures. */
+  POLLING_BACKOFF_MULTIPLIER: 2,
+  /** Stop auto-polling after this many consecutive failures. */
+  POLLING_MAX_RETRIES: 5,
+  /** Per-request network timeout (ms). Prevents indefinite hangs. */
+  REQUEST_TIMEOUT_MS: 15_000,
+  /** Maximum number of simultaneous in-flight marketplace requests. */
+  MAX_CONCURRENT_REQUESTS: 2,
+  /** Open the circuit breaker after this many consecutive failures. */
+  CIRCUIT_BREAKER_THRESHOLD: 4,
+  /** Auto-close the circuit breaker after this quiet period (ms). */
+  CIRCUIT_BREAKER_RESET_MS: 60_000,
 } as const;
 
 /**
@@ -186,6 +208,49 @@ export const PURCHASE_ALLOWED_TRANSITIONS: Record<PurchaseState, PurchaseEvent[]
   failed: ["VALIDATE", "RESET"],
   cancelled: ["RESET"],
 };
+
+// ---------------------------------------------------------------------------
+// Operational visibility — structured telemetry (no secrets emitted)
+// ---------------------------------------------------------------------------
+
+export type MarketplaceTelemetryEventType =
+  | "fetch_started"
+  | "fetch_succeeded"
+  | "fetch_failed"
+  | "stale_response_dropped"
+  | "concurrent_limit_exceeded"
+  | "filter_applied"
+  | "poll_started"
+  | "poll_stopped"
+  | "circuit_breaker_opened"
+  | "circuit_breaker_closed"
+  | "purchase_started"
+  | "purchase_succeeded"
+  | "purchase_failed"
+  | "purchase_ambiguous"
+  | "reconcile_started"
+  | "reconcile_succeeded"
+  | "reconcile_failed"
+  | "reconcile_unknown"
+  | "latency";
+
+export interface MarketplaceTelemetryEvent {
+  type: MarketplaceTelemetryEventType;
+  timestamp: number;
+  /** Latency of the completed request in ms (present for latency events). */
+  latencyMs?: number;
+  /** Sanitised error description — no secrets, no raw server responses. */
+  errorCode?: string;
+  errorMessage?: string;
+  /** Structured context that is safe to log (no PII, no credentials). */
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export interface MarketplaceCircuitBreakerState {
+  isOpen: boolean;
+  failureCount: number;
+  lastFailureTime: number;
+}
 
 export const MARKETPLACE_MESSAGES: Record<PurchaseErrorCode, string> = {
   invalid_request: "The purchase request failed client-side validation.",
