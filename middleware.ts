@@ -16,6 +16,10 @@ const IDEMPOTENCY_EXEMPT = [
   '/api/auth/logout',
 ];
 
+const MAX_FORWARDED_IP_LENGTH = 128;
+const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+const IPV6 = /^[0-9a-fA-F:]+$/;
+
 function generateNonce(): string {
   const array = new Uint8Array(16);
   (globalThis.crypto || crypto).getRandomValues(array);
@@ -66,7 +70,6 @@ function getRequestIdHeaders(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(REQUEST_ID_HEADER, requestId);
 
-  // Generate CSP nonce per request
   const nonce = generateNonce();
   requestHeaders.set('x-csp-nonce', nonce);
 
@@ -78,6 +81,23 @@ function setRequestIdHeader(response: NextResponse, requestId: string): NextResp
   return response;
 }
 
+/**
+ * Only use the first forwarded address when it is syntactically bounded.
+ * Invalid/oversized values fall back to a stable bucket instead of becoming
+ * unbounded rate-limit keys supplied by an arbitrary client.
+ */
+export function getAnonymousRateLimitIdentifier(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const candidate = forwarded?.split(',')[0]?.trim() ?? '';
+  const valid = candidate.length > 0 && candidate.length <= MAX_FORWARDED_IP_LENGTH &&
+    (IPV4.test(candidate) || IPV6.test(candidate));
+  return `api-ratelimit:${valid ? candidate : 'unknown'}`;
+}
+
+function securityHeaders(response: NextResponse, nonce: string): NextResponse {
+  response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  return response;
 function requiresIdempotencyKey(request: NextRequest): boolean {
   if (!MUTATING_METHODS.has(request.method)) return false;
   const { pathname } = request.nextUrl;
@@ -93,6 +113,10 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const safePathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
 
+  if (!pathname.startsWith('/api')) {
+    const nonce = generateNonce();
+    const response = NextResponse.next();
+    securityHeaders(response, nonce);
   // 1. Path Filter: Only apply to API routes
   if (!safePathname.startsWith('/api')) {
     // For non‑API routes, still set CSP header with nonce for inline scripts
@@ -105,6 +129,12 @@ export function middleware(request: NextRequest) {
 
   const { requestId, requestHeaders, nonce } = getRequestIdHeaders(request);
 
+  if (pathname === '/api/health') {
+    const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
+    return securityHeaders(response, nonce);
+  }
+
+  const sessionCookieName = appConfig.rateLimit ? (process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session') : 'session';
   // 2. Exemption: Health checks should never be rate limited
   if (safePathname === '/api/health') {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
@@ -120,6 +150,10 @@ export function middleware(request: NextRequest) {
 
   if (isAuth) {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
+    return securityHeaders(response, nonce);
+  }
+
+  const identifier = getAnonymousRateLimitIdentifier(request);
     applySecurityHeaders(response, nonce);
     return response;
   }
@@ -140,15 +174,22 @@ export function middleware(request: NextRequest) {
   if (success) {
     response = NextResponse.next({ request: { headers: requestHeaders } });
   } else {
+    console.warn('[middleware] rate_limit_exceeded', {
+      requestId,
+      pathname,
+      status: 429,
+    });
     response = new NextResponse(
       JSON.stringify({
         error: 'Too Many Requests',
+        message: 'Rate limit exceeded. Please try again later.'
         message: 'Rate limit exceeded. Please try again later.',
       }),
       { status: 429, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
+  securityHeaders(response, nonce);
   applySecurityHeaders(response, nonce);
 
   // 7. Standard Rate Limit Headers
