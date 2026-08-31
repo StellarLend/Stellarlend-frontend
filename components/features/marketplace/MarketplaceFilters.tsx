@@ -5,6 +5,16 @@
  * length, min/max ranges) and validated inline so an out-of-bounds filter is
  * reported to the user instead of silently clamped or sent to the server.
  * Filter semantics are enforced by `lib/marketplace/invariants`.
+ *
+ * Staleness visibility:
+ *  - `isStale`       — when true, a non-blocking banner prompts the user to
+ *                      refresh. The Apply button is NOT disabled: stale data
+ *                      is a soft warning, not a hard error.
+ *  - `isCircuitOpen` — when true, a secondary notice explains that auto-polling
+ *                      is suspended due to repeated failures, so users
+ *                      understand why data is not refreshing automatically.
+ *  - `onRefresh`     — called when the user clicks the Refresh button inside
+ *                      either staleness banner.
  */
 
 import React, { useMemo } from "react";
@@ -18,6 +28,18 @@ export interface MarketplaceFiltersProps {
   value: MarketplaceFilters;
   errors?: Record<string, string>;
   disabled?: boolean;
+  /**
+   * When true, the displayed listings may no longer reflect current inventory.
+   * A non-blocking refresh prompt is shown; the Apply button remains enabled.
+   */
+  isStale?: boolean;
+  /**
+   * When true, the circuit-breaker has opened due to repeated fetch failures
+   * and auto-polling is suspended. A notice is shown so the user can act.
+   */
+  isCircuitOpen?: boolean;
+  /** Called when the user clicks Refresh inside a staleness or circuit-open notice. */
+  onRefresh?: () => void;
   onChange: (patch: Partial<MarketplaceFilters>) => void;
   onApply: () => void;
   onReset: () => void;
@@ -49,6 +71,9 @@ export function MarketplaceFilters({
   value,
   errors = {},
   disabled = false,
+  isStale = false,
+  isCircuitOpen = false,
+  onRefresh,
   onChange,
   onApply,
   onReset,
@@ -207,6 +232,48 @@ export function MarketplaceFilters({
         <p className="text-xs text-red-500" role="alert">
           {rangeError ?? generalError}
         </p>
+      )}
+
+      {/* Staleness notice — non-blocking: Apply remains enabled. */}
+      {isStale && !isCircuitOpen && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          <span>Listings may have changed since last loaded.</span>
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="shrink-0 font-medium underline underline-offset-2 hover:text-amber-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Circuit-open notice — explains why auto-polling has stopped. */}
+      {isCircuitOpen && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"
+        >
+          <span>
+            Auto-refresh paused after repeated failures. Listings may be out of date.
+          </span>
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="shrink-0 font-medium underline underline-offset-2 hover:text-red-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-600"
+            >
+              Retry
+            </button>
+          )}
+        </div>
       )}
 
       <div className="flex gap-2">
