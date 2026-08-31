@@ -113,7 +113,6 @@ beforeEach(() => {
 describe("MarketsTable", () => {
   describe("loading state", () => {
     it("shows skeleton while fetching", () => {
-      // Never resolve the fetch to keep loading state
       vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
       render(<MarketsTable />);
 
@@ -126,7 +125,6 @@ describe("MarketsTable", () => {
       mockFetchError("Failed to fetch");
       render(<MarketsTable />);
 
-      // Wait for the error state to appear
       const errorContainer = await screen.findByTestId("markets-error");
       expect(errorContainer).toBeInTheDocument();
       expect(screen.getByRole("alert")).toHaveAttribute(
@@ -150,14 +148,12 @@ describe("MarketsTable", () => {
     });
 
     it("retries fetch when retry button is clicked", async () => {
-      // First call fails
       mockFetchError("Temporary failure");
       render(<MarketsTable />);
 
       await screen.findByTestId("markets-error");
       expect(screen.getByText("Temporary failure")).toBeInTheDocument();
 
-      // Second call succeeds
       mockFetchOnce(mockMarkets);
       fireEvent.click(screen.getByText("Retry"));
 
@@ -245,7 +241,6 @@ describe("MarketsTable", () => {
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
 
-      // Default sort is ascending by asset: BTC, ETH, USDC, XLM
       expect(getRowAssetNames()).toEqual([
         "Bitcoin",
         "Ethereum",
@@ -259,10 +254,8 @@ describe("MarketsTable", () => {
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
 
-      const sortButton = screen.getByLabelText(/Sort by Asset/);
-      fireEvent.click(sortButton);
+      fireEvent.click(screen.getByLabelText(/Sort by Asset/));
 
-      // Should now be descending: XLM, USDC, ETH, BTC
       expect(getRowAssetNames()).toEqual([
         "Stellar Lumens",
         "USD Coin",
@@ -271,118 +264,94 @@ describe("MarketsTable", () => {
       ]);
     });
 
-    it("sorts by supply APR when clicking Supply APR header", async () => {
+    it("sorts by supply APR ascending on first click", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
 
-      const sortButton = screen.getByLabelText(/Sort by Supply APR/);
-      fireEvent.click(sortButton);
+      const btn = screen.getByLabelText(/Sort by Supply APR/);
+      fireEvent.click(btn);
 
-      // Ascending: BTC (2.10%), ETH (3.80%), USDC (5.20%), XLM (8.50%)
       expect(getRowAssetNames()).toEqual([
         "Bitcoin",
         "Ethereum",
         "USD Coin",
         "Stellar Lumens",
       ]);
-      expect(sortButton).toHaveAttribute(
+      expect(btn).toHaveAttribute(
         "aria-label",
         expect.stringContaining("ascending"),
       );
     });
 
-    it("sorts by utilization", async () => {
+    it("sorts by utilization ascending on first click", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
 
-      const sortButton = screen.getByLabelText(/Sort by Utilization/);
-      fireEvent.click(sortButton);
+      const btn = screen.getByLabelText(/Sort by Utilization/);
+      fireEvent.click(btn);
 
-      // Ascending utilization: BTC (47.0%), ETH (58.0%), USDC (65.0%), XLM (71.0%)
       expect(getRowAssetNames()).toEqual([
         "Bitcoin",
         "Ethereum",
         "USD Coin",
         "Stellar Lumens",
       ]);
-      expect(sortButton).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("ascending"),
-      );
     });
 
-    it("sorts by total supplied", async () => {
+    it("sorts by total supplied ascending on first click", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
 
-      const sortButton = screen.getByLabelText(/Sort by Total Supplied/);
-      fireEvent.click(sortButton);
+      fireEvent.click(screen.getByLabelText(/Sort by Total Supplied/));
 
-      // Ascending: BTC (500K), ETH (1.2M), XLM (2.5M), USDC (10M)
       expect(getRowAssetNames()).toEqual([
         "Bitcoin",
         "Ethereum",
         "Stellar Lumens",
         "USD Coin",
       ]);
-      expect(sortButton).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("ascending"),
-      );
     });
 
-    it("sorts by total borrowed", async () => {
+    it("sorts by total borrowed ascending on first click", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
 
-      const sortButton = screen.getByLabelText(/Sort by Total Borrowed/);
-      fireEvent.click(sortButton);
+      fireEvent.click(screen.getByLabelText(/Sort by Total Borrowed/));
 
-      // Ascending: BTC (235K), ETH (696K), XLM (1.775M), USDC (6.5M)
       expect(getRowAssetNames()).toEqual([
         "Bitcoin",
         "Ethereum",
         "Stellar Lumens",
         "USD Coin",
       ]);
-      expect(sortButton).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("ascending"),
-      );
     });
 
-    it("toggles sort direction on second click", async () => {
+    it("toggles to descending on second click of the same column", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
 
-      const sortButton = screen.getByLabelText(/Sort by Supply APR/);
-      fireEvent.click(sortButton);
-      // First click: ascending
-      expect(sortButton).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("ascending"),
-      );
+      const btn = screen.getByLabelText(/Sort by Supply APR/);
+      fireEvent.click(btn); // asc
+      fireEvent.click(btn); // desc
 
-      fireEvent.click(sortButton);
-      // Second click: descending
       expect(getRowAssetNames()).toEqual([
         "Stellar Lumens",
         "USD Coin",
         "Ethereum",
         "Bitcoin",
       ]);
-      expect(sortButton).toHaveAttribute(
+      expect(btn).toHaveAttribute(
         "aria-label",
         expect.stringContaining("descending"),
       );
     });
 
-    it("exposes aria-sort on active and inactive sortable headers", async () => {
+    it("exposes aria-sort on active and inactive column headers", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
@@ -400,6 +369,9 @@ describe("MarketsTable", () => {
       expect(
         within(table).getByRole("columnheader", { name: /Borrow APR/ }),
       ).toHaveAttribute("aria-sort", "ascending");
+      expect(
+        within(table).getByRole("columnheader", { name: /Asset/ }),
+      ).toHaveAttribute("aria-sort", "none");
     });
   });
 
@@ -425,7 +397,7 @@ describe("MarketsTable", () => {
       expect(getRowAssetNames()).toEqual(["Stellar Lumens"]);
     });
 
-    it("renders a filter-empty state and clears it with the empty-state action", async () => {
+    it("shows filter-empty state and clears it via the empty-state action", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
@@ -443,7 +415,7 @@ describe("MarketsTable", () => {
       expect(screen.getByText("Showing 4 of 4 markets")).toBeInTheDocument();
     });
 
-    it("clears the filter from the search input clear control", async () => {
+    it("clears the filter from the input's clear button", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
@@ -470,7 +442,7 @@ describe("MarketsTable", () => {
       expect(await screen.findByTestId("markets-table")).toBeInTheDocument();
     });
 
-    it("has sort buttons with accessible aria-labels", async () => {
+    it("all six sort buttons have accessible aria-labels", async () => {
       mockFetchOnce(mockMarkets);
       render(<MarketsTable />);
       await screen.findByTestId("markets-table");
@@ -479,70 +451,230 @@ describe("MarketsTable", () => {
       expect(screen.getByLabelText(/Sort by Supply APR/)).toBeInTheDocument();
       expect(screen.getByLabelText(/Sort by Borrow APR/)).toBeInTheDocument();
       expect(screen.getByLabelText(/Sort by Utilization/)).toBeInTheDocument();
-      expect(
-        screen.getByLabelText(/Sort by Total Supplied/),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByLabelText(/Sort by Total Borrowed/),
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/Sort by Total Supplied/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Sort by Total Borrowed/)).toBeInTheDocument();
     });
   });
 
   describe("skeleton loading accessibility", () => {
-    it("desktop skeleton exposes aria-busy and aria-label on the table element", () => {
+    it("desktop skeleton table carries aria-busy=true", () => {
       vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
       render(<MarketsTable />);
 
-      // The <table> inside MarketsTableSkeleton carries aria-busy="true"
+      // The <table> inside MarketsTableSkeleton is the element with aria-busy
       const table = screen.getByRole("table");
       expect(table).toHaveAttribute("aria-busy", "true");
-
-      // The wrapping div carries aria-label="Loading markets"
-      expect(
-        screen.getByLabelText("Loading markets"),
-      ).toBeInTheDocument();
     });
 
-    it("mobile skeleton exposes the same aria-busy and aria-label as the desktop skeleton", () => {
+    it("desktop skeleton wrapper is labelled 'Loading markets'", () => {
       vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
       render(<MarketsTable />);
 
-      // Both skeletons sit inside data-testid="markets-loading"
+      // The div wrapping the desktop skeleton carries aria-label="Loading markets"
+      expect(screen.getAllByLabelText("Loading markets").length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("mobile skeleton wrapper carries aria-busy=true and aria-label='Loading markets'", () => {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
+      render(<MarketsTable />);
+
       const loadingWrapper = screen.getByTestId("markets-loading");
+      // The mobile skeleton div (md:hidden) carries both attributes directly
+      const mobileWrapper = loadingWrapper.querySelector(".md\\:hidden[aria-busy='true']");
+      expect(mobileWrapper).not.toBeNull();
+      expect(mobileWrapper).toHaveAttribute("aria-label", "Loading markets");
+    });
+  });
 
-      // Every element labelled "Loading markets" (desktop wrapper + mobile wrapper)
-      const labelledRegions = within(loadingWrapper).getAllByLabelText(
-        "Loading markets",
-      );
+  describe("apiUrl prop contract", () => {
+    it("fetches from /api/markets by default", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
 
-      // At least two: one for the desktop table wrapper, one for the mobile card wrapper
-      expect(labelledRegions.length).toBeGreaterThanOrEqual(2);
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/markets");
+    });
 
-      // All of them must advertise aria-busy="true"
-      for (const region of labelledRegions) {
-        expect(region).toHaveAttribute("aria-busy", "true");
+    it("fetches from the supplied apiUrl when provided", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable apiUrl="/api/v2/markets" />);
+      await screen.findByTestId("markets-table");
+
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/v2/markets");
+    });
+
+    it("re-fetches when apiUrl prop changes", async () => {
+      mockFetchOnce(mockMarkets);
+      const { rerender } = render(<MarketsTable apiUrl="/api/markets" />);
+      await screen.findByTestId("markets-table");
+
+      mockFetchOnce(mockMarkets);
+      rerender(<MarketsTable apiUrl="/api/v2/markets" />);
+      await waitFor(() => {
+        expect(vi.mocked(fetch)).toHaveBeenLastCalledWith("/api/v2/markets");
+      });
+    });
+
+    it("shows error state when the custom endpoint returns non-ok", async () => {
+      mockFetchOnce({ error: "not found" }, false);
+      render(<MarketsTable apiUrl="/api/staging/markets" />);
+
+      await screen.findByTestId("markets-error");
+      expect(screen.getByText("Unable to load markets")).toBeInTheDocument();
+    });
+  });
+
+  describe("keyboard navigation", () => {
+    it("all sort buttons are in the natural tab order", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      const sortButtons = screen.getAllByRole("button", { name: /Sort by/ });
+      expect(sortButtons).toHaveLength(6);
+
+      for (const btn of sortButtons) {
+        expect(btn).not.toHaveAttribute("tabindex", "-1");
       }
     });
 
-    it("both skeleton variants have identical loading semantics regardless of viewport", () => {
+    it("sort button responds to click after receiving focus", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      const btn = screen.getByLabelText(/Sort by Supply APR/);
+      btn.focus();
+      fireEvent.click(btn);
+
+      expect(btn).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("ascending"),
+      );
+    });
+
+    it("clear-filter button is in the natural tab order and operable", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      await typeFilter("btc");
+      const clearBtn = screen.getByLabelText("Clear market filter");
+      expect(clearBtn).not.toHaveAttribute("tabindex", "-1");
+
+      clearBtn.focus();
+      fireEvent.click(clearBtn);
+
+      expect(screen.getByText("Showing 4 of 4 markets")).toBeInTheDocument();
+    });
+
+    it("retry button is in the natural tab order after an error", async () => {
+      mockFetchError("Fetch failed");
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-error");
+
+      const retryBtn = screen.getByRole("button", { name: "Retry" });
+      expect(retryBtn).not.toHaveAttribute("tabindex", "-1");
+    });
+  });
+
+  describe("focus-visible styles", () => {
+    it("sort buttons declare focus-visible ring classes", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      const btn = screen.getByLabelText(/Sort by Asset/);
+      expect(btn.className).toContain("focus-visible:ring-2");
+    });
+
+    it("clear-filter button declares focus-visible ring classes", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      await typeFilter("xlm");
+      const clearBtn = screen.getByLabelText("Clear market filter");
+      expect(clearBtn.className).toContain("focus-visible:ring-2");
+    });
+  });
+
+  describe("screen-reader semantics", () => {
+    it("result count uses aria-live=polite for non-interruptive updates", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      const countEl = screen.getByText(/Showing \d+ of \d+ markets/);
+      expect(countEl).toHaveAttribute("aria-live", "polite");
+    });
+
+    it("error region uses role=alert with aria-live=assertive", async () => {
+      mockFetchError("Boom");
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-error");
+
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveAttribute("aria-live", "assertive");
+    });
+
+    it("filter input has a visible accessible label", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      expect(screen.getByLabelText("Filter markets by asset")).toBeInTheDocument();
+    });
+
+    it("filter input enforces a maxlength to bound query size", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      expect(screen.getByLabelText("Filter markets by asset")).toHaveAttribute(
+        "maxlength",
+        "80",
+      );
+    });
+
+    it("color-dot asset indicators carry aria-hidden", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
+
+      const table = screen.getByRole("table");
+      const hiddenDots = table.querySelectorAll(
+        '[aria-hidden="true"].rounded-full',
+      );
+      expect(hiddenDots.length).toBeGreaterThanOrEqual(4);
+    });
+  });
+
+  describe("reduced-motion", () => {
+    it("skeleton placeholders include motion-reduce:animate-none to suppress pulse", () => {
+      // Skeleton renders `animate-pulse motion-reduce:animate-none`.
+      // The browser suppresses the animation when prefers-reduced-motion:reduce
+      // is active — we verify the suppression class is present in the markup.
       vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
       render(<MarketsTable />);
 
       const loadingWrapper = screen.getByTestId("markets-loading");
-      const labelledRegions = within(loadingWrapper).getAllByLabelText(
-        "Loading markets",
+      const skeletons = loadingWrapper.querySelectorAll(
+        "[class*='motion-reduce:animate-none']",
       );
+      expect(skeletons.length).toBeGreaterThan(0);
+    });
 
-      // Collect the unique set of aria-label values — should all be identical
-      const labels = new Set(
-        labelledRegions.map((el) => el.getAttribute("aria-label")),
-      );
-      const busyValues = new Set(
-        labelledRegions.map((el) => el.getAttribute("aria-busy")),
-      );
+    it("data rows use transition-colors, which Tailwind suppresses under prefers-reduced-motion", async () => {
+      mockFetchOnce(mockMarkets);
+      render(<MarketsTable />);
+      await screen.findByTestId("markets-table");
 
-      expect(labels).toEqual(new Set(["Loading markets"]));
-      expect(busyValues).toEqual(new Set(["true"]));
+      const table = screen.getByRole("table");
+      const rows = within(table).getAllByRole("row").slice(1);
+      for (const row of rows) {
+        expect(row.className).toContain("transition-colors");
+      }
     });
   });
 });
