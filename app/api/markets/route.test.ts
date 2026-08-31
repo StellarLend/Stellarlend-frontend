@@ -138,3 +138,113 @@ describe('GET /api/markets', () => {
     consoleSpy.mockRestore();
   });
 });
+
+describe('GET /api/markets — filter boundary cases', () => {
+  it('returns all assets when ?asset= is an empty string', async () => {
+    const response = await GET(makeRequest('/api/markets?asset='));
+
+    expect(response.status).toBe(200);
+    expect(globalCache.getOrFetch).toHaveBeenCalledWith(
+      'markets:assets:BTC,ETH,USDC,XLM',
+      expect.any(Function),
+      { ttl: 30_000, swr: 60_000 },
+    );
+  });
+
+  it('rejects a CSV where one entry is blank after trimming', async () => {
+    // "XLM,,USDC" splits to ["XLM", "", "USDC"] — "" fails isAssetSymbol
+    const response = await GET(makeRequest('/api/markets?asset=XLM,,USDC'));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('Supported:');
+    expect(globalCache.getOrFetch).not.toHaveBeenCalled();
+    expect(fetchMarkets).not.toHaveBeenCalled();
+  });
+
+  it('rejects a whitespace-only entry inside a CSV', async () => {
+    const response = await GET(makeRequest('/api/markets?asset=XLM,%20,USDC'));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('Supported:');
+  });
+
+  it('returns a single asset when only one symbol is requested', async () => {
+    const response = await GET(makeRequest('/api/markets?asset=BTC'));
+
+    expect(response.status).toBe(200);
+    expect(globalCache.getOrFetch).toHaveBeenCalledWith(
+      'markets:assets:BTC',
+      expect.any(Function),
+      { ttl: 30_000, swr: 60_000 },
+    );
+  });
+
+  it('normalises lowercase symbols before cache key construction', async () => {
+    const response = await GET(makeRequest('/api/markets?asset=eth'));
+
+    expect(response.status).toBe(200);
+    expect(globalCache.getOrFetch).toHaveBeenCalledWith(
+      'markets:assets:ETH',
+      expect.any(Function),
+      { ttl: 30_000, swr: 60_000 },
+    );
+  });
+
+  it('all four symbols in any order collapse to the same sorted cache key', async () => {
+    await GET(makeRequest('/api/markets?asset=ETH,BTC,XLM,USDC'));
+    await GET(makeRequest('/api/markets?asset=USDC,XLM,BTC,ETH'));
+
+    const keys = vi.mocked(globalCache.getOrFetch).mock.calls.map(([k]) => k);
+    expect(new Set(keys).size).toBe(1);
+    expect(keys[0]).toBe('markets:assets:BTC,ETH,USDC,XLM');
+  });
+});
+
+describe('GET /api/markets — cache bypass boundary cases', () => {
+  it('bypasses cache when the token cookie is present', async () => {
+    const req = new NextRequest('http://localhost:3000/api/markets', {
+      headers: { Cookie: 'token=abc123' },
+    });
+    const response = await GET(req);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Cache')).toBe('BYPASS');
+    expect(fetchMarkets).toHaveBeenCalledTimes(1);
+    expect(globalCache.getOrFetch).not.toHaveBeenCalled();
+  });
+
+  it('bypasses cache when x-user-id header is present without Authorization', async () => {
+    const response = await GET(
+      makeRequest('/api/markets', { 'x-user-id': 'user-42' }),
+    );
+
+    expect(response.headers.get('X-Cache')).toBe('BYPASS');
+    expect(globalCache.getOrFetch).not.toHaveBeenCalled();
+  });
+
+  it('bypass response carries all no-cache directives', async () => {
+    const response = await GET(
+      makeRequest('/api/markets', { Authorization: 'Bearer tok' }),
+    );
+
+    const cc = response.headers.get('Cache-Control') ?? '';
+    expect(cc).toContain('no-store');
+    expect(cc).toContain('no-cache');
+    expect(cc).toContain('must-revalidate');
+    expect(response.headers.get('Pragma')).toBe('no-cache');
+    expect(response.headers.get('Expires')).toBe('0');
+  });
+
+  it('still validates the ?asset param before bypassing the cache', async () => {
+    const response = await GET(
+      makeRequest('/api/markets?asset=FAKE', { Authorization: 'Bearer tok' }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('FAKE');
+    expect(fetchMarkets).not.toHaveBeenCalled();
+  });
+});
