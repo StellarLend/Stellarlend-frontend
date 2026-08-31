@@ -13,7 +13,7 @@ const FORBIDDEN_IMPORTS = [
 ];
 
 const SECRET_ACCESS = new RegExp(
-  `process\\s*(?:\\?\\.)?\\s*env\\s*(?:\\?\\.)?\\s*(?:\\.\\s*(${SECRETS.join('|')})\\b|\\[\\s*[\\\"'](${SECRETS.join('|')})[\\\"']\\s*\\])`,
+  `process\\s*(?:\\.|\\?\\.)\\s*env\\s*(?:\\.|\\?\\.)?\\s*(?:(${SECRETS.join('|')})\\b|\\[\\s*[\\\"'](${SECRETS.join('|')})[\\\"']\\s*\\])`,
   'g'
 );
 
