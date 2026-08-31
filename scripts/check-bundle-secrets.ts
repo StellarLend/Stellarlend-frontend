@@ -20,13 +20,45 @@ interface ScanResult {
   matches: SecretMatch[];
   filesScanned: number;
   errors: string[];
+  telemetry: ScanTelemetry;
 }
+
+interface ScanTelemetry {
+  startTime: number;
+  endTime: number;
+  durationMs: number;
+  filesSkipped: number;
+  bytesScanned: number;
+  truncated: boolean;
+  timedOut: boolean;
+}
+
+// Performance bounds
+const MAX_FILES_TO_SCAN = 10000;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB per file
+const MAX_TOTAL_BYTES = 500 * 1024 * 1024; // 500MB total scan limit
+const MAX_SCAN_DURATION_MS = 60000; // 60 seconds
 
 /**
  * Recursively scan a directory for files to check
  */
-function scanDirectory(dir: string, extensions: string[]): string[] {
+function scanDirectory(
+  dir: string,
+  extensions: string[],
+  telemetry: ScanTelemetry
+): string[] {
   const files: string[] = [];
+  
+  // Bound: Check timeout and file limits
+  if (Date.now() - telemetry.startTime > MAX_SCAN_DURATION_MS) {
+    telemetry.timedOut = true;
+    return files;
+  }
+  
+  if (files.length >= MAX_FILES_TO_SCAN) {
+    telemetry.truncated = true;
+    return files;
+  }
   
   if (!fs.existsSync(dir)) {
     return files;
@@ -38,11 +70,37 @@ function scanDirectory(dir: string, extensions: string[]): string[] {
     const fullPath = path.join(dir, entry.name);
     
     if (entry.isDirectory()) {
-      files.push(...scanDirectory(fullPath, extensions));
+      // Recursively scan subdirectories
+      const subFiles = scanDirectory(fullPath, extensions, telemetry);
+      files.push(...subFiles);
+      
+      // Check bounds after recursion
+      if (telemetry.truncated || telemetry.timedOut) {
+        return files;
+      }
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).toLowerCase();
       if (extensions.includes(ext)) {
-        files.push(fullPath);
+        try {
+          const stats = fs.statSync(fullPath);
+          
+          // Bound: Skip files exceeding size limit
+          if (stats.size > MAX_FILE_SIZE_BYTES) {
+            telemetry.filesSkipped++;
+            continue;
+          }
+          
+          // Bound: Check total bytes scanned
+          if (telemetry.bytesScanned + stats.size > MAX_TOTAL_BYTES) {
+            telemetry.truncated = true;
+            return files;
+          }
+          
+          telemetry.bytesScanned += stats.size;
+          files.push(fullPath);
+        } catch {
+          telemetry.filesSkipped++;
+        }
       }
     }
   }
@@ -110,16 +168,30 @@ export function scanFile(filePath: string, patterns: SecretPattern[]): SecretMat
  * Main scan function
  */
 function scanBundles(): ScanResult {
+  const startTime = Date.now();
+  const telemetry: ScanTelemetry = {
+    startTime,
+    endTime: 0,
+    durationMs: 0,
+    filesSkipped: 0,
+    bytesScanned: 0,
+    truncated: false,
+    timedOut: false,
+  };
+
   const result: ScanResult = {
     matches: [],
     filesScanned: 0,
-    errors: []
+    errors: [],
+    telemetry,
   };
 
   const staticDir = path.join(process.cwd(), '.next', 'static');
 
   if (!fs.existsSync(staticDir)) {
     result.errors.push('.next/static directory not found. Run "npm run build" first.');
+    telemetry.endTime = Date.now();
+    telemetry.durationMs = telemetry.endTime - telemetry.startTime;
     return result;
   }
 
@@ -130,10 +202,12 @@ function scanBundles(): ScanResult {
 
   let files: string[];
   try {
-    files = scanDirectory(staticDir, extensions);
+    files = scanDirectory(staticDir, extensions, telemetry);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     result.errors.push(`Failed to enumerate bundle files: ${message}`);
+    telemetry.endTime = Date.now();
+    telemetry.durationMs = telemetry.endTime - telemetry.startTime;
     return result;
   }
 
@@ -141,9 +215,18 @@ function scanBundles(): ScanResult {
   console.log(`📄 Files to scan: ${result.filesScanned}`);
 
   for (const file of files) {
+    // Bound: Check timeout during scan
+    if (Date.now() - telemetry.startTime > MAX_SCAN_DURATION_MS) {
+      telemetry.timedOut = true;
+      break;
+    }
+
     const matches = scanFile(file, SECRET_PATTERNS);
     result.matches.push(...matches);
   }
+
+  telemetry.endTime = Date.now();
+  telemetry.durationMs = telemetry.endTime - telemetry.startTime;
 
   return result;
 }
@@ -156,6 +239,20 @@ function displayResults(result: ScanResult): void {
   console.log('SCAN RESULTS');
   console.log('='.repeat(80));
   
+  // Operational visibility: Display telemetry without secrets
+  console.log('\n📊 Scan Telemetry:');
+  console.log(`   - Duration: ${result.telemetry.durationMs}ms`);
+  console.log(`   - Files scanned: ${result.filesScanned}`);
+  console.log(`   - Files skipped: ${result.telemetry.filesSkipped}`);
+  console.log(`   - Bytes scanned: ${(result.telemetry.bytesScanned / 1024 / 1024).toFixed(2)}MB`);
+  
+  if (result.telemetry.truncated) {
+    console.log(`   ⚠️  Truncated: Reached scan limits (max ${MAX_FILES_TO_SCAN} files or ${MAX_TOTAL_BYTES / 1024 / 1024}MB)`);
+  }
+  if (result.telemetry.timedOut) {
+    console.log(`   ⚠️  Timeout: Exceeded max duration (${MAX_SCAN_DURATION_MS}ms)`);
+  }
+  
   if (result.errors.length > 0) {
     console.log('\n❌ Errors:');
     for (const error of result.errors) {
@@ -163,8 +260,7 @@ function displayResults(result: ScanResult): void {
     }
   }
   
-  console.log(`\n📊 Files scanned: ${result.filesScanned}`);
-  console.log(`🔍 Secrets found: ${result.matches.length}`);
+  console.log(`\n🔍 Secrets found: ${result.matches.length}`);
   
   if (result.matches.length === 0) {
     console.log('\n✅ No secrets detected in client bundles.');
