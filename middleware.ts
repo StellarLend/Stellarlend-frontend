@@ -16,6 +16,23 @@ const IDEMPOTENCY_EXEMPT = [
   '/api/auth/logout',
 ];
 
+// Performance bounds for middleware execution
+const MAX_HEADER_SIZE = 8192; // 8KB header limit
+const MAX_COOKIE_SIZE = 4096; // 4KB per cookie
+const MAX_PATH_LENGTH = 2048; // Max URL path length
+
+// Telemetry for operational visibility
+interface MiddlewareTelemetry {
+  requestId: string;
+  path: string;
+  method: string;
+  rateLimitApplied: boolean;
+  rateLimitExceeded: boolean;
+  securityHeadersApplied: boolean;
+  durationMs: number;
+  error?: string;
+}
+
 function generateNonce(): string {
   const array = new Uint8Array(16);
   (globalThis.crypto || crypto).getRandomValues(array);
@@ -36,7 +53,10 @@ function getSafeClientIp(request: NextRequest): string {
     request.headers.get('x-real-ip') ??
     '127.0.0.1';
 
-  const firstCandidate = rawIp
+  // Bound: Truncate excessively long header values
+  const truncated = rawIp.substring(0, 256);
+  
+  const firstCandidate = truncated
     .split(',')[0]
     .trim()
     .replace(/\[|\]|\s+/g, '');
@@ -85,12 +105,48 @@ function requiresIdempotencyKey(request: NextRequest): boolean {
 }
 
 function applySecurityHeaders(response: NextResponse, nonce: string): void {
-  response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
+  // Bound: Ensure nonce length is within safe bounds (base64 encoded 16 bytes = ~24 chars)
+  const safeNonce = nonce.substring(0, 64);
+  
+  response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${safeNonce}';`);
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+}
+
+function logTelemetry(telemetry: MiddlewareTelemetry): void {
+  // Operational visibility: Log structured diagnostics without secrets
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Middleware Telemetry]', JSON.stringify({
+      requestId: telemetry.requestId,
+      path: telemetry.path.substring(0, 100), // Truncate long paths
+      method: telemetry.method,
+      rateLimitApplied: telemetry.rateLimitApplied,
+      rateLimitExceeded: telemetry.rateLimitExceeded,
+      securityHeadersApplied: telemetry.securityHeadersApplied,
+      durationMs: telemetry.durationMs,
+      error: telemetry.error,
+    }));
+  }
 }
 
 export function middleware(request: NextRequest) {
+  const startTime = Date.now();
   const { pathname } = request.nextUrl;
+  
+  // Bound: Enforce max path length
+  if (pathname.length > MAX_PATH_LENGTH) {
+    const response = new NextResponse(
+      JSON.stringify({
+        error: 'Bad Request',
+        message: 'Request path too long',
+      }),
+      { status: 414, headers: { 'Content-Type': 'application/json' } }
+    );
+    return response;
+  }
+  
   const safePathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
 
   // 1. Path Filter: Only apply to API routes
@@ -105,10 +161,22 @@ export function middleware(request: NextRequest) {
 
   const { requestId, requestHeaders, nonce } = getRequestIdHeaders(request);
 
+  const telemetry: MiddlewareTelemetry = {
+    requestId,
+    path: safePathname,
+    method: request.method,
+    rateLimitApplied: false,
+    rateLimitExceeded: false,
+    securityHeadersApplied: true,
+    durationMs: 0,
+  };
+
   // 2. Exemption: Health checks should never be rate limited
   if (safePathname === '/api/health') {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
     applySecurityHeaders(response, nonce);
+    telemetry.durationMs = Date.now() - startTime;
+    logTelemetry(telemetry);
     return response;
   }
 
@@ -121,6 +189,8 @@ export function middleware(request: NextRequest) {
   if (isAuth) {
     const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
     applySecurityHeaders(response, nonce);
+    telemetry.durationMs = Date.now() - startTime;
+    logTelemetry(telemetry);
     return response;
   }
 
@@ -128,11 +198,15 @@ export function middleware(request: NextRequest) {
   const ip = getSafeClientIp(request);
   const identifier = `api-ratelimit:${ip}`;
 
+  telemetry.rateLimitApplied = true;
+
   const { success, limit, remaining, reset } = rateLimit(
     identifier,
     appConfig.rateLimit.max,
     appConfig.rateLimit.window
   );
+
+  telemetry.rateLimitExceeded = !success;
 
   // 6. Prepare Response
   let response: NextResponse;
@@ -162,6 +236,9 @@ export function middleware(request: NextRequest) {
     const retryAfter = Math.max(0, Math.ceil((reset - Date.now()) / 1000));
     response.headers.set('Retry-After', retryAfter.toString());
   }
+
+  telemetry.durationMs = Date.now() - startTime;
+  logTelemetry(telemetry);
 
   return setRequestIdHeader(response, requestId);
 }
