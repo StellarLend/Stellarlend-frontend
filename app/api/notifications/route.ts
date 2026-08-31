@@ -4,25 +4,18 @@ import { getNotifications } from '@/lib/notifications/repository';
 
 export const runtime = 'nodejs';
 
-/** GET /api/notifications
- *
- *  Requires an authenticated session (session cookie).
- *  Returns the caller's notifications list and unread count.
- *
- *  Response shape:
- *    { notifications: Notification[], unreadCount: number }
- *
- *  Errors:
- *    401  – no valid session
- */
+/** GET /api/notifications - returns notifications and unread count. */
 export async function GET() {
-  const user = await getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const user = await getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const notifications = await getNotifications(user.id);
+    const unreadCount = notifications.filter((n) => !n.read).length;
+    return NextResponse.json({ notifications, unreadCount });
+  } catch (error) {
+    console.error('Failed to fetch notifications:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-
-  const notifications = await getNotifications(user.id);
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  return NextResponse.json({ notifications, unreadCount });
 }
