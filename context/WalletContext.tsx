@@ -71,6 +71,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       : "TESTNET";
 
   // Rehydrate state on mount
+  // TODO: improve wallet provider and session recovery
   useEffect(() => {
     const rehydrate = async () => {
       // Read storage only as a candidate. Sensitive UI is not unlocked until
