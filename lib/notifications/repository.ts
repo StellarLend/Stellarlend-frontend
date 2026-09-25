@@ -93,10 +93,30 @@ export async function getNotifications(
 /** Adds a new notification for userId, emits hub events, and returns it.
  * Validates that the notification ID is safe and the userId matches the expected owner.
  */
-export async function addNotification(
+export interface AddNotificationOutcome {
+  notification: Notification;
+  /** True when this call created the row, false when the id already existed. */
+  inserted: boolean;
+}
+
+/** Delivers a notification idempotently, reporting whether the row was created.
+ *
+ * Invariants:
+ * - A given `(userId, id)` pair produces exactly one row. Redelivery is a
+ *   no-op for identity, so retries can never duplicate a notification.
+ * - Redelivery refreshes presentation fields only. `read` and `createdAt`
+ *   are owned by the read path and the original delivery respectively, so a
+ *   retry can never resurrect an already-read notification or rewrite the
+ *   order of the user's inbox.
+ *
+ * Returns `inserted: false` when the notification already existed, which
+ * lets callers distinguish "delivered now" from "already delivered" without
+ * pattern-matching error strings.
+ */
+export async function addNotificationWithOutcome(
   userId: string,
   n: Omit<Notification, "userId">,
-): Promise<Notification> {
+): Promise<AddNotificationOutcome> {
   if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
     throw new Error("Invalid userId: must be a non-empty string");
   }
@@ -117,19 +137,22 @@ export async function addNotification(
     type: n.type,
   };
 
-  await db
+  const created = await db
     .insert(notificationsTable)
     .values(record)
-    .onConflictDoUpdate({
-      target: notificationsTable.id,
-      set: {
-        title: n.title,
-        message: n.message,
-        read: n.read,
-        createdAt: record.createdAt,
-        type: n.type,
-      },
-    });
+    .onConflictDoNothing({ target: notificationsTable.id })
+    .returning({ id: notificationsTable.id });
+
+  const inserted = created.length > 0;
+
+  if (!inserted) {
+    // Refresh presentation only. `read` and `createdAt` are deliberately
+    // excluded so a redelivery cannot contradict the read path.
+    await db
+      .update(notificationsTable)
+      .set({ title: n.title, message: n.message, type: n.type })
+      .where(eq(notificationsTable.id, dbId));
+  }
 
   const notification: Notification = {
     ...n,
@@ -150,6 +173,14 @@ export async function addNotification(
     // noop
   }
 
+  return { notification, inserted };
+}
+
+export async function addNotification(
+  userId: string,
+  n: Omit<Notification, "userId">,
+): Promise<Notification> {
+  const { notification } = await addNotificationWithOutcome(userId, n);
   return notification;
 }
 

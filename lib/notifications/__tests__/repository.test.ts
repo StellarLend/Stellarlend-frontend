@@ -18,7 +18,9 @@ vi.mock('../../db', () => {
 
   const mockInsert = vi.fn(() => ({
     values: vi.fn(() => ({
-      onConflictDoNothing: vi.fn(async () => ({})),
+      onConflictDoNothing: vi.fn(() => ({
+        returning: vi.fn(async () => [{ id: 'user-1-notif-1' }]),
+      })),
       onConflictDoUpdate: vi.fn(async () => ({})),
     })),
   }));

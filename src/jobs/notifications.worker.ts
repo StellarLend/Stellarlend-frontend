@@ -1,7 +1,7 @@
 import { Job, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import serverConfig from '@/lib/server-config';
-import { addNotification } from '@/lib/notifications/repository';
+import { addNotificationWithOutcome } from '@/lib/notifications/repository';
 import { logger } from '@/lib/logger';
 import crypto from 'crypto';
 import {
@@ -19,25 +19,43 @@ import {
 const ROUTE = 'jobs/notifications.worker';
 const redisUrl = serverConfig.redisUrl;
 
+/**
+ * Terminal state of a single delivery attempt chain.
+ *
+ * - `delivered`  the row was created by this run
+ * - `duplicate`  the notification already existed; nothing was created
+ * - `rejected`   the payload failed validation and will never be retried
+ * - `skipped`    delivery was suppressed, e.g. the user opted out
+ * - `failed`     every attempt errored; the job is handed to the DLQ
+ *
+ * The chain always terminates in exactly one of these. Only `rejected` is
+ * final without a delivery attempt, and only `failed` exhausts retries.
+ */
+export type NotificationDeliveryOutcome =
+  | 'delivered'
+  | 'duplicate'
+  | 'rejected'
+  | 'skipped'
+  | 'failed';
+
 export interface NotificationJobResult {
   delivered: boolean;
   duplicate: boolean;
   attempts: number;
   validationError?: string;
+  /** Terminal state of the chain. */
+  outcome: NotificationDeliveryOutcome;
 }
 
 export interface NotificationJobOptions {
   maxAttempts?: number;
   backoffMs?: number;
-}
-
-function isDuplicateNotificationError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  const message = error.message.toLowerCase();
-  return message.includes('duplicate') || message.includes('already sent');
+  /**
+   * Consulted before every delivery attempt. Returning false suppresses the
+   * notification, which is reported as `skipped` rather than `failed`, so an
+   * opt-out is never retried and never surfaces as an error to the user.
+   */
+  isDeliveryEnabled?: (userId: string, type: string) => Promise<boolean> | boolean;
 }
 
 function delay(ms: number): Promise<void> {
@@ -83,19 +101,38 @@ export async function handleNotificationJob(
       error: validation.error,
       userId: String(notification.userId).slice(0, 50),
     });
-    return { delivered: false, duplicate: false, attempts: 0, validationError: validation.error };
+    return {
+      delivered: false,
+      duplicate: false,
+      attempts: 0,
+      validationError: validation.error,
+      outcome: 'rejected',
+    };
   }
 
   const { userId, title, message, type, id } = validation.sanitized;
   const maxAttempts = options.maxAttempts ?? 3;
   const backoffMs = options.backoffMs ?? 1_000;
+  const isDeliveryEnabled = options.isDeliveryEnabled;
+
+  if (isDeliveryEnabled && !(await isDeliveryEnabled(userId, type))) {
+    logger.info(`Notification skipped: delivery disabled for user ${userId}`, ROUTE, {
+      userId,
+      type,
+    });
+    return { delivered: false, duplicate: false, attempts: 0, outcome: 'skipped' };
+  }
+
+  // The notification id is the idempotency key. Reusing it across attempts
+  // guarantees a retry converges on the same row instead of a second one.
+  const notificationId = id || crypto.randomUUID();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       logger.info(`Processing notification job for user ${userId}`, ROUTE);
-      await Promise.resolve(
-        addNotification(userId, {
-          id: id || crypto.randomUUID(),
+      const { inserted } = await Promise.resolve(
+        addNotificationWithOutcome(userId, {
+          id: notificationId,
           title,
           message,
           type,
@@ -103,16 +140,17 @@ export async function handleNotificationJob(
           createdAt: new Date().toISOString(),
         }),
       );
-      return { delivered: true, duplicate: false, attempts: attempt };
-    } catch (error) {
-      if (isDuplicateNotificationError(error)) {
+
+      if (!inserted) {
         logger.warn(`Notification already sent for user ${userId}`, ROUTE, {
           userId,
-          error: error instanceof Error ? error.message : String(error),
+          id: notificationId,
         });
-        return { delivered: false, duplicate: true, attempts: attempt };
+        return { delivered: false, duplicate: true, attempts: attempt, outcome: 'duplicate' };
       }
 
+      return { delivered: true, duplicate: false, attempts: attempt, outcome: 'delivered' };
+    } catch (error) {
       if (attempt < maxAttempts) {
         logger.warn(`Notification delivery failed for user ${userId}; retrying`, ROUTE, {
           userId,
