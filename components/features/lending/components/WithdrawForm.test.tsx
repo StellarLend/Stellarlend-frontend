@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor, within } from "@/test/test-utils";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { usePositions } from "@/hooks/usePositions";
 import WithdrawForm, {
@@ -747,6 +747,44 @@ describe("WithdrawForm", () => {
       expect(select).toBeInTheDocument();
       expect(screen.getByText(/XLM supply/i)).toBeInTheDocument();
       expect(screen.getByText(/USDC supply/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("DEFAULT_POSITIONS dev fallback", () => {
+    it("shows empty state when positions prop is omitted and hook returns empty", () => {
+      mockedUsePositions.mockReturnValue({
+        positions: [],
+        supplyPositions: [],
+        isLoading: false,
+        isStale: false,
+        isOffline: false,
+        error: null,
+        refetch: vi.fn(),
+      });
+
+      render(<WithdrawForm onSubmit={onSubmit} />);
+
+      expect(
+        screen.getByText(/No withdrawable supply positions found/i),
+      ).toBeInTheDocument();
+    });
+
+    it("always renders supplied positions when positions prop is provided", () => {
+      const realPositions: SupplyPosition[] = [
+        {
+          id: "real-1",
+          asset: "BTC",
+          suppliedAmount: 100,
+          lockedCollateral: 0,
+          outstandingDebt: 0,
+          healthFactor: 99,
+        },
+      ];
+
+      render(<WithdrawForm positions={realPositions} onSubmit={onSubmit} />);
+
+      expect(screen.getByText(/BTC supply/i)).toBeInTheDocument();
+      expect(screen.queryByText(/No withdrawable supply positions/i)).not.toBeInTheDocument();
     });
   });
 });

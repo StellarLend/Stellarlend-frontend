@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from "@testing-library/react";
-import { vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EmptyState } from "./EmptyState";
 
 describe("EmptyState", () => {
@@ -92,5 +93,17 @@ describe("EmptyState", () => {
     fireEvent.click(button);
 
     expect(onAction).toHaveBeenCalledTimes(2);
+  it("announces error empty states as alerts", () => {
+    render(
+      <EmptyState
+        title="Unable to load markets"
+        description="Failed to fetch market data."
+        tone="error"
+      />
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveAttribute("aria-live", "assertive");
+    expect(screen.getByText("Unable to load markets")).toBeInTheDocument();
   });
 });

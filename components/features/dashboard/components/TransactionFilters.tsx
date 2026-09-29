@@ -165,8 +165,9 @@ export default function TransactionFilters({ totalCount }: TransactionFiltersPro
             >
               <option value="">All Assets</option>
               <option value="XLM">XLM</option>
+              <option value="USDC">USDC</option>
               <option value="BTC">BTC</option>
-              <option value="STRK">STRK</option>
+              <option value="ETH">ETH</option>
             </select>
           </div>
 

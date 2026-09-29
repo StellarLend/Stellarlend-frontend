@@ -106,9 +106,11 @@ describe("POST /api/webhooks/transactions – valid requests", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/webhooks/transactions – signature verification", () => {
-  it("returns 401 when signature header is missing", async () => {
+  it("returns 401 when the signature header is omitted entirely", async () => {
     const body = JSON.stringify(makePayload());
-    const req = makeWebhookRequest(body); // no signature header
+    const req = makeWebhookRequest(body);
+    expect(req.headers.get(SIGNATURE_HEADER)).toBeNull();
+
     const res = await POST(req);
     expect(res.status).toBe(401);
 

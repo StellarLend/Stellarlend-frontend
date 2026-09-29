@@ -18,7 +18,8 @@ function wrapper({ children }: { children: ReactNode }) {
   return createElement(WalletProvider, null, children);
 }
 
-const TEST_ADDRESS = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ";
+const TEST_ADDRESS = "GAUFVBMULU2CJRE5IGVPEOXRYZGU5YDAOSQ3UQTBM3Y7ARUPFSXZUHN5";
+const OTHER_ADDRESS = "GBCKQ7BCF4O7SWKH3GF7G2KRPSURA2HU5WQJRHMIFR3P6DBGVT45XLR3";
 
 function mockResponse(ok: boolean, body: any = {}, status = ok ? 200 : 500) {
   return {
@@ -26,6 +27,17 @@ function mockResponse(ok: boolean, body: any = {}, status = ok ? 200 : 500) {
     status,
     json: async () => body,
   } as Response;
+}
+
+function sessionBody(walletAddress = TEST_ADDRESS, network = "TESTNET") {
+  return {
+    session: {
+      active: true,
+      network,
+      user: { walletAddress },
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    },
+  };
 }
 
 function setupStellar() {
@@ -87,9 +99,9 @@ describe("WalletProvider", () => {
   });
 
   describe("rehydration", () => {
-    it("restores from sessionStorage on mount", async () => {
+    it("does not restore from sessionStorage until the server confirms the same wallet", async () => {
       sessionStorage.setItem("walletAddress", TEST_ADDRESS);
-      vi.mocked(fetch).mockResolvedValueOnce(mockResponse(false));
+      vi.mocked(fetch).mockResolvedValueOnce(mockResponse(true, sessionBody()));
 
       const { result } = renderHook(() => useWalletContext(), { wrapper });
 
@@ -101,9 +113,7 @@ describe("WalletProvider", () => {
 
     it("restores from server session on mount", async () => {
       vi.mocked(fetch).mockResolvedValueOnce(
-        mockResponse(true, {
-          session: { user: { walletAddress: TEST_ADDRESS } },
-        }),
+        mockResponse(true, sessionBody()),
       );
 
       const { result } = renderHook(() => useWalletContext(), { wrapper });
@@ -114,20 +124,19 @@ describe("WalletProvider", () => {
       });
     });
 
-    it("prefers sessionStorage over server session", async () => {
+    it("clears tampered storage when it does not match the server session wallet", async () => {
       sessionStorage.setItem("walletAddress", TEST_ADDRESS);
       vi.mocked(fetch).mockResolvedValueOnce(
-        mockResponse(true, {
-          session: { user: { walletAddress: "GOTHERADDRESS" } },
-        }),
+        mockResponse(true, sessionBody(OTHER_ADDRESS)),
       );
 
       const { result } = renderHook(() => useWalletContext(), { wrapper });
 
       await waitFor(() => {
-        expect(result.current.address).toBe(TEST_ADDRESS);
-        expect(result.current.status).toBe("connected");
+        expect(result.current.address).toBeNull();
+        expect(result.current.status).toBe("disconnected");
       });
+      expect(sessionStorage.getItem("walletAddress")).toBeNull();
     });
 
     it("clears state when server has no session", async () => {
@@ -165,8 +174,37 @@ describe("WalletProvider", () => {
       const { result } = renderHook(() => useWalletContext(), { wrapper });
 
       await waitFor(() => {
-        expect(result.current.address).toBe(TEST_ADDRESS);
+        expect(result.current.address).toBeNull();
+        expect(result.current.status).toBe("disconnected");
       });
+    });
+
+    it("clears state when the server response is malformed", async () => {
+      sessionStorage.setItem("walletAddress", TEST_ADDRESS);
+      vi.mocked(fetch).mockResolvedValueOnce(
+        mockResponse(true, { session: { active: true, network: "TESTNET", user: {} } }),
+      );
+
+      const { result } = renderHook(() => useWalletContext(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.address).toBeNull();
+        expect(result.current.status).toBe("disconnected");
+      });
+      expect(sessionStorage.getItem("walletAddress")).toBeNull();
+    });
+
+    it("clears state when the session is for the wrong network", async () => {
+      sessionStorage.setItem("walletAddress", TEST_ADDRESS);
+      vi.mocked(fetch).mockResolvedValueOnce(mockResponse(true, sessionBody(TEST_ADDRESS, "PUBLIC")));
+
+      const { result } = renderHook(() => useWalletContext(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.address).toBeNull();
+        expect(result.current.status).toBe("disconnected");
+      });
+      expect(sessionStorage.getItem("walletAddress")).toBeNull();
     });
   });
 
@@ -353,7 +391,7 @@ describe("WalletProvider", () => {
     it("transitions from connected to disconnected", async () => {
       sessionStorage.setItem("walletAddress", TEST_ADDRESS);
       vi.mocked(fetch)
-        .mockResolvedValueOnce(mockResponse(false))
+        .mockResolvedValueOnce(mockResponse(true, sessionBody()))
         .mockResolvedValueOnce(mockResponse(true));
 
       renderApp();
@@ -376,7 +414,7 @@ describe("WalletProvider", () => {
     it("clears state even when server session DELETE fails", async () => {
       sessionStorage.setItem("walletAddress", TEST_ADDRESS);
       vi.mocked(fetch)
-        .mockResolvedValueOnce(mockResponse(false))
+        .mockResolvedValueOnce(mockResponse(true, sessionBody()))
         .mockRejectedValueOnce(new Error("Network error"));
 
       renderApp();
@@ -525,9 +563,7 @@ describe("WalletProvider", () => {
       // Server confirms session so state stays "connected" after rehydration
       vi.mocked(fetch)
         .mockResolvedValueOnce(
-          mockResponse(true, {
-            session: { user: { walletAddress: TEST_ADDRESS } },
-          }),
+          mockResponse(true, sessionBody()),
         )
         .mockResolvedValueOnce(mockResponse(true));
 

@@ -134,5 +134,5 @@ export function formatCurrency(value: number): string {
  * Determines if a schedule should be collapsed based on length
  */
 export function shouldCollapseSchedule(periods: AmortizationPeriod[]): boolean {
-  return periods.length > 6;
+  return periods.length > 4;
 }

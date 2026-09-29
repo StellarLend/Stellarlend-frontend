@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { LendingData } from "@/lib/lending/types";
-import type { LendingData } from "@/lib/lending/types";
 import type { SupplyPosition as HookSupplyPosition } from "@/hooks/usePositions";
 import { usePositions } from "@/hooks/usePositions";
 import { Input } from "@/components/shared/ui/Input";
@@ -30,7 +29,7 @@ interface WithdrawFormProps {
   refetch?: () => void;
 }
 
-export const DEFAULT_POSITIONS: SupplyPosition[] = [
+const DEV_DEFAULT_POSITIONS: SupplyPosition[] = [
   {
     id: "xlm-supply-001",
     asset: "XLM",
@@ -48,6 +47,9 @@ export const DEFAULT_POSITIONS: SupplyPosition[] = [
     healthFactor: 99,
   },
 ];
+
+export const DEFAULT_POSITIONS =
+  process.env.NODE_ENV !== "production" ? DEV_DEFAULT_POSITIONS : [];
 
 const formatAmount = (amount: number, asset: string) =>
   `${amount.toLocaleString(undefined, {
@@ -86,7 +88,14 @@ export default function WithdrawForm({
     refetch: hookRefetch,
   } = usePositions();
 
-  const resolvedPositions = propPositions ?? hookPositions;
+  const resolvedPositions =
+    propPositions ?? hookPositions ?? (process.env.NODE_ENV !== "production" ? DEV_DEFAULT_POSITIONS : []);
+
+  if (!propPositions && process.env.NODE_ENV !== "production") {
+    console.warn(
+      "WithdrawForm: positions prop not provided. Falling back to dev defaults.",
+    );
+  }
   const isLoading = propIsLoading ?? (propPositions === undefined ? hookIsLoading : false);
   const error = propError ?? (propPositions === undefined ? hookError : null);
   const refetch = propRefetch ?? hookRefetch;

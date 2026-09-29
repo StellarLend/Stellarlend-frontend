@@ -5,6 +5,10 @@
       "maxSize": "150kb"
     },
     {
+      "path": ".next/static/chunks/app/dashboard/**/*.js",
+      "maxSize": "200kb"
+    },
+    {
       "path": ".next/static/chunks/pages/*.js",
       "maxSize": "250kb"
     },

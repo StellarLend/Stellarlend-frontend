@@ -140,6 +140,14 @@ describe('DELETE /api/account/delete', () => {
       makeRequest('DELETE', 'http://localhost/api/account/delete', { body: { challenge: 'test' } })
     );
     expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json).toEqual({ error: 'Unauthorized' });
+  });
+
+  test('does not throw an unhandled exception when unauthenticated', async () => {
+    await expect(
+      DeleteDELETE(makeRequest('DELETE', 'http://localhost/api/account/delete'))
+    ).resolves.toBeDefined();
   });
 
   test('returns 401 for invalid token', async () => {
@@ -150,6 +158,8 @@ describe('DELETE /api/account/delete', () => {
       })
     );
     expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json).toEqual({ error: 'Unauthorized' });
   });
 
   test('returns 400 when challenge is missing', async () => {
@@ -436,6 +446,20 @@ describe('DELETE /api/account/delete', () => {
       })
     );
     expect(res2.status).toBe(401);
+  });
+
+  test('unexpected runtime errors propagate correctly', async () => {
+    const authMod = await import('@/lib/auth');
+    const spy = vi.spyOn(authMod, 'requireAuth').mockImplementation(() => {
+      throw new Error('unexpected auth failure');
+    });
+
+    const res = await DeleteDELETE(
+      makeRequest('DELETE', 'http://localhost/api/account/delete', { body: { challenge: 'test' } })
+    );
+    expect(res.status).toBe(500);
+
+    spy.mockRestore();
   });
 });
 

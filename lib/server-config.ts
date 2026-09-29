@@ -28,13 +28,13 @@ interface ServerConfig {
   db: {
     url: string;
   };
-  sentry?: {
-    dsn?: string;
+  sentry: {
+    dsn: string;
   };
 }
 
 function normalizeUrl(url: string): string {
-  return url.trim().replace(/\/+$/, "");
+  return url.trim().replace(/\/+$/, '');
 }
 
 function parseHorizonUrls(rawValue?: string): string[] {
@@ -97,12 +97,6 @@ const serverConfig: ServerConfig = {
   horizon: {
     urls: horizonUrls,
     primaryUrl: horizonUrls[0] || "https://horizon-testnet.stellar.org",
-  },
-  stellar: {
-    sorobanRpcUrl:
-      process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ||
-      process.env.SOROBAN_RPC_URL ||
-      "https://soroban-testnet.stellar.org",
   },
   stellar: {
     sorobanRpcUrl,

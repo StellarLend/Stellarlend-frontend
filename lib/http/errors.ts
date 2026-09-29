@@ -3,7 +3,8 @@ export type HttpErrorCode =
   | 'NETWORK_ERROR'
   | 'HTTP_ERROR'
   | 'PARSE_ERROR'
-  | 'RETRY_EXHAUSTED';
+  | 'RETRY_EXHAUSTED'
+  | 'ALL_ENDPOINTS_UNHEALTHY';
 
 export class HttpError extends Error {
   constructor(

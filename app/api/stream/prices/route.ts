@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupportedAsset } from "@/lib/prices/types";
 import { SUPPORTED_ASSETS } from "@/lib/prices/constants";
+import { withControllerCleanup } from "@/lib/streams/with-controller-cleanup";
 
 export const runtime = "nodejs";
 
@@ -15,8 +16,8 @@ function formatSSE(data: PriceUpdate): string {
 }
 
 export async function GET() {
-  const stream = new ReadableStream({
-    async start(controller) {
+  const stream = new ReadableStream(
+    withControllerCleanup((controller, onCleanup) => {
       controller.enqueue(
         new TextEncoder().encode("retry: 3000\n\n"),
       );
@@ -61,21 +62,11 @@ export async function GET() {
         );
       }, 3000);
 
-      (controller as any).cleanup = () => {
+      onCleanup(() => {
         clearInterval(interval);
-      };
-    },
-    cancel() {
-      try {
-        const anyController = this as any;
-        if (typeof anyController.cleanup === "function") {
-          anyController.cleanup();
-        }
-      } catch {
-        // noop
-      }
-    },
-  });
+      });
+    }),
+  );
 
   return new NextResponse(stream, {
     headers: {

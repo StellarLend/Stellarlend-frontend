@@ -1,16 +1,22 @@
+import type { SVGProps } from "react";
 import React from "react";
 
-interface CoinIconProps {
+interface CoinIconProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
   color?: string;
+  title?: string;
 }
 export const CoinIcon = ({
   className,
   width = "24",
   height = "24",
   color,
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: CoinIconProps) => {
   return (
     <svg
@@ -19,7 +25,12 @@ export const CoinIcon = ({
       viewBox="0 0 20 20"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         d="M12.9167 10.8333C15.9082 10.8333 18.3333 10.0871 18.3333 9.16667C18.3333 8.24619 15.9082 7.5 12.9167 7.5C9.92512 7.5 7.5 8.24619 7.5 9.16667C7.5 10.0871 9.92512 10.8333 12.9167 10.8333Z"
         stroke="#E5E5E5"

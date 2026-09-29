@@ -6,6 +6,7 @@ import { SearchBar } from "@/components/molecules/SearchBar";
 import { useSidebar } from "@/context/SidebarContext";
 import { Menu, WalletCards } from "lucide-react";
 import NotificationBell from "@/components/shared/layout/NotificationBell";
+import StreamStatusIndicator from "./StreamStatusIndicator";
 import { useWallet } from "@/hooks/useWallet";
 import {
   fetchWalletBalances,
@@ -21,6 +22,7 @@ declare global {
         xdr: string,
         opts?: { network: string },
       ) => Promise<string>;
+      getAccounts?: () => Promise<string[]>;
     };
   }
 }
@@ -236,6 +238,7 @@ const TopNav = () => {
           <div className="flex gap-3 items-center">
             <NotificationBell />
             {/* StreamStatusIndicator removed — see note below */}
+
             <button
               type="button"
               className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}
@@ -263,6 +266,8 @@ const TopNav = () => {
 
         <div className="flex gap-3 items-center">
           <NotificationBell />
+          {/* StreamStatusIndicator removed — see note below */}
+
           <button
             type="button"
             className={`rounded-full hover:ring-2 hover:ring-white/50 transition-all ${focusClasses}`}

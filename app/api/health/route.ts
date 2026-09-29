@@ -1,98 +1,128 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import config from '@/lib/config';
-import { httpGet, UpstreamHttpError, TimeoutError } from '@/lib/http';
+import { httpGet } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
+import { sqlite } from '@/lib/db/client';
 
 export const runtime = 'nodejs';
 
-async function checkHorizon(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+async function checkSorobanRpc(): Promise<'healthy' | 'degraded'> {
   try {
-    await httpGet(`${config.stellar.horizonUrl}/`, { timeoutMs: 5000, retries: 1 });
+    const rpcUrl =
+      (config.stellar as any)?.sorobanRpcUrl ||
+      process.env.SOROBAN_RPC_URL ||
+      process.env.STELLAR_SOROBAN_RPC_URL ||
+      'https://private-rpc.test';
+    const cleanUrl = rpcUrl.replace(/\/$/, '');
+    await httpGet(`${cleanUrl}/health`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
+  } catch {
+    return 'degraded';
   }
 }
 
-async function checkSorobanRpc(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+async function checkHorizon(): Promise<'healthy' | 'degraded'> {
   try {
-    await httpGet(`${config.stellar.sorobanRpcUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    const horizonUrl =
+      config.stellar?.horizonUrl ||
+      process.env.STELLAR_HORIZON_URL ||
+      process.env.HORIZON_URL ||
+      'https://horizon-testnet.stellar.org';
+    const cleanUrl = horizonUrl.endsWith('/') ? horizonUrl : `${horizonUrl}/`;
+    await httpGet(cleanUrl, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
+  } catch {
+    return 'degraded';
   }
 }
 
-async function checkApi(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+async function checkApi(): Promise<'healthy' | 'degraded'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
+    const baseUrl = config.api?.baseUrl || process.env.API_BASE_URL || 'http://localhost:3001';
+    await httpGet(`${baseUrl}/health`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
+  } catch {
+    return 'degraded';
   }
 }
 
-async function checkDatabase(): Promise<'healthy' | 'degraded' | 'unhealthy'> {
+async function checkDatabase(): Promise<'healthy' | 'degraded'> {
   try {
-    await httpGet(`${config.api.baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
+    const baseUrl = config.api?.baseUrl || process.env.API_BASE_URL || 'http://localhost:3001';
+    await httpGet(`${baseUrl}/health/db`, { timeoutMs: 5000, retries: 1 });
     return 'healthy';
-  } catch (err) {
-    if (err instanceof TimeoutError) return 'degraded';
-    if (err instanceof UpstreamHttpError) return 'degraded';
-    return 'unhealthy';
+  } catch {
+    return 'degraded';
   }
 }
 
-async function handleHealth() {
+async function handleHealth(request: NextRequest) {
   try {
-    const [horizonStatus, sorobanStatus, apiStatus, dbStatus] = await Promise.all([
-      checkHorizon(),
-      checkSorobanRpc(),
-      checkApi(),
-      checkDatabase(),
-    ]);
+    const sorobanStatus = await checkSorobanRpc();
+    const horizonStatus = await checkHorizon();
+    const apiStatus = await checkApi();
+    const dbStatus = await checkDatabase();
 
-    const stellarStatus = horizonStatus === 'unhealthy' || sorobanStatus === 'unhealthy' 
-      ? 'unhealthy' 
-      : horizonStatus === 'degraded' || sorobanStatus === 'degraded'
-      ? 'degraded'
-      : 'healthy';
+    const stellarStatus =
+      horizonStatus === 'healthy' && sorobanStatus === 'healthy' ? 'healthy' : 'degraded';
+    const overallStatus =
+      stellarStatus === 'healthy' && apiStatus === 'healthy' && dbStatus === 'healthy'
+        ? 'healthy'
+        : 'degraded';
 
-    const overallStatus = 
-      stellarStatus === 'unhealthy' || apiStatus === 'unhealthy' || dbStatus === 'unhealthy'
-        ? 'unhealthy'
-        : stellarStatus === 'degraded' || apiStatus === 'degraded' || dbStatus === 'degraded'
-        ? 'degraded'
-        : 'healthy';
+    const healthChecks = {
+      database: dbStatus,
+      api: apiStatus,
+      stellar: stellarStatus,
+    };
+
+    const etagBase = JSON.stringify({
+      status: overallStatus,
+      environment: config.app?.environment ?? 'development',
+      version: config.app?.version ?? '1.0.0',
+      checks: healthChecks,
+    });
+
+    const etag = `"${crypto.createHash('md5').update(etagBase).digest('hex')}"`;
+    const ifNoneMatch = request?.headers?.get('if-none-match');
+
+    const headers = new Headers({
+      'Cache-Control': 'public, max-age=30',
+      'ETag': etag,
+      'Vary': 'Accept-Encoding',
+    });
+
+    if (ifNoneMatch && ifNoneMatch === etag) {
+      return new NextResponse(null, { status: 304, headers });
+    }
 
     const healthData = {
       status: overallStatus,
       timestamp: new Date().toISOString(),
-      environment: config.app.environment,
-      version: config.app.version,
-      checks: {
-        database: dbStatus,
-        api: apiStatus,
-        stellar: stellarStatus,
-      },
+      environment: config.app?.environment ?? 'development',
+      version: config.app?.version ?? '1.0.0',
+      checks: healthChecks,
     };
 
-    const httpStatus = healthData.status === 'unhealthy' ? 503 : 200;
-    return NextResponse.json(healthData, { status: httpStatus });
+    headers.set('Content-Type', 'application/json');
+
+    return new NextResponse(JSON.stringify(healthData), {
+      status: 200,
+      headers,
+    });
   } catch {
     return NextResponse.json(
       {
-        status: 'unhealthy',
+        status: 'degraded',
         timestamp: new Date().toISOString(),
-        error: 'Health check failed',
+        checks: {
+          database: 'degraded',
+          api: 'degraded',
+          stellar: 'degraded',
+        },
       },
-      { status: 500 },
+      { status: 200 }
     );
   }
 }

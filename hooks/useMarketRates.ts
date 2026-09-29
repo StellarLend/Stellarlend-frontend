@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { MarketsResponse } from "@/lib/markets/types";
+import { getMarketsResponse } from "./useMarketsData";
 
 export interface UseMarketRatesResult {
   rate: number | null;
@@ -29,7 +29,6 @@ export function useMarketRates(asset?: string | null): UseMarketRatesResult {
     }
 
     let isCancelled = false;
-    const controller = new AbortController();
 
     setIsLoading(true);
     setError(null);
@@ -37,16 +36,8 @@ export function useMarketRates(asset?: string | null): UseMarketRatesResult {
     setLastUpdated(null);
     setSource(null);
 
-    fetch(`/api/markets?asset=${encodeURIComponent(normalizedAsset)}`, {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Markets request failed with status ${response.status}`);
-        }
-
-        const data = (await response.json()) as MarketsResponse;
-
+    getMarketsResponse()
+      .then((data) => {
         if (isCancelled) {
           return;
         }
@@ -88,7 +79,6 @@ export function useMarketRates(asset?: string | null): UseMarketRatesResult {
 
     return () => {
       isCancelled = true;
-      controller.abort();
     };
   }, [asset]);
 

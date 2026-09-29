@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET } from './route';
+import { notificationHub } from '@/lib/streams/notification-hub';
 
 vi.mock('@/lib/auth', () => ({
   getUser: vi.fn(),
@@ -24,5 +25,26 @@ describe('GET /api/notifications/stream', () => {
     expect(res.status).toBe(200);
     const ct = res.headers.get('Content-Type') || res.headers.get('content-type');
     expect(ct).toMatch(/text\/event-stream/i);
+  });
+
+  it('runs notification hub cleanup when the stream is cancelled', async () => {
+    const userId = 'user-cancel-cleanup';
+    mockGetUser.mockResolvedValue({ id: userId } as any);
+
+    const unsubscribe = vi.fn();
+    const subscribeSpy = vi
+      .spyOn(notificationHub, 'subscribe')
+      .mockReturnValue(unsubscribe);
+
+    const res = await GET();
+    expect(res.status).toBe(200);
+    expect(subscribeSpy).toHaveBeenCalledWith(userId, expect.any(Function));
+
+    const reader = res.body!.getReader();
+    await reader.cancel();
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+
+    subscribeSpy.mockRestore();
   });
 });

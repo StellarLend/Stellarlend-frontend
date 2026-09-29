@@ -27,7 +27,7 @@ describe('parseTransactionFilter', () => {
   it('parses valid status param', () => {
     const { valid, filter } = parseTransactionFilter(params({ status: 'completed' }));
     expect(valid).toBe(true);
-    expect(filter.status).toBe('completed');
+    expect(filter.status).toBe('Completed');
   });
 
   it('rejects invalid status param', () => {

@@ -59,6 +59,49 @@ describe("AmortizationSchedule component", () => {
     expect(screen.getByText("$790.00")).toBeInTheDocument();
   });
 
+  it("shows all periods when the schedule has exactly 4 periods", () => {
+    const fourPeriodSchedule: AmortizationScheduleType = {
+      ...mockSchedule,
+      periods: Array.from({ length: 4 }, (_, i) => ({
+        period: i + 1,
+        principal: 200,
+        interest: 10,
+        remainingBalance: 1000 - (i + 1) * 200,
+      })),
+    };
+
+    render(<AmortizationSchedule schedule={fourPeriodSchedule} />);
+
+    expect(screen.getByTestId("period-1")).toBeInTheDocument();
+    expect(screen.getByTestId("period-2")).toBeInTheDocument();
+    expect(screen.getByTestId("period-3")).toBeInTheDocument();
+    expect(screen.getByTestId("period-4")).toBeInTheDocument();
+    expect(screen.queryByText(/more periods/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Show Full Schedule/)).not.toBeInTheDocument();
+  });
+
+  it("collapses schedules with exactly 5 periods to first two and last two rows", () => {
+    const fivePeriodSchedule: AmortizationScheduleType = {
+      ...mockSchedule,
+      periods: Array.from({ length: 5 }, (_, i) => ({
+        period: i + 1,
+        principal: 200,
+        interest: 10,
+        remainingBalance: 1000 - (i + 1) * 200,
+      })),
+    };
+
+    render(<AmortizationSchedule schedule={fivePeriodSchedule} />);
+
+    expect(screen.getByTestId("period-1")).toBeInTheDocument();
+    expect(screen.getByTestId("period-2")).toBeInTheDocument();
+    expect(screen.getByTestId("period-4")).toBeInTheDocument();
+    expect(screen.getByTestId("period-5")).toBeInTheDocument();
+    expect(screen.queryByTestId("period-3")).not.toBeInTheDocument();
+    expect(screen.getByText(/1 more periods/)).toBeInTheDocument();
+    expect(screen.getByText(/Show Full Schedule/)).toBeInTheDocument();
+  });
+
   it("shows expand button for long schedules", () => {
     const longSchedule: AmortizationScheduleType = {
       ...mockSchedule,

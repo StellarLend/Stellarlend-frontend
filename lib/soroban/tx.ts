@@ -1,10 +1,7 @@
 import type { LendingData } from '@/lib/lending/types';
+import type { SorobanRpcError } from './types';
 
-export type SorobanRpcError = {
-  code: number | string;
-  message: string;
-  data?: unknown;
-};
+export type { SorobanRpcError };
 
 export type SorobanRpcBuildResult = {
   transaction?: string;

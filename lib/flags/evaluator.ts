@@ -1,7 +1,9 @@
 // lib/flags/evaluator.ts
 /**
  * Feature flag evaluator.
- * Loads flag definitions from a JSON config file and provides deterministic per‑user bucketing.
+ * Loads flag definitions from a JSON config file and provides deterministic per-user bucketing.
+ * Flags are cached in memory and re-read from disk every 60 seconds (FLAGS_TTL_MS)
+ * so operators can toggle flags without a full server restart.
  */
 
 import fs from 'fs';
@@ -9,7 +11,7 @@ import path from 'path';
 
 export type FlagConfig = {
   enabled: boolean;
-  rollout?: number; // 0‑100 percentage of users for which the flag is true
+  rollout?: number; // 0-100 percentage of users for which the flag is true
   overrides?: Record<string, boolean>; // userId -> boolean override
 };
 
@@ -17,12 +19,15 @@ export type Flags = Record<string, FlagConfig>;
 
 const CONFIG_PATH = path.resolve(process.cwd(), 'config', 'feature-flags.json');
 let flags: Flags = {};
+let flagsLoadedAt = 0;
+const FLAGS_TTL_MS = 60 * 1000; // 60s cache then re-read from disk
 
 export function getFlags(): Flags {
-  if (process.env.NODE_ENV === 'test' || Object.keys(flags).length === 0) {
+  if (process.env.NODE_ENV === 'test' || Object.keys(flags).length === 0 || Date.now() - flagsLoadedAt > FLAGS_TTL_MS) {
     try {
       const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
       flags = JSON.parse(raw) as Flags;
+      flagsLoadedAt = Date.now();
     } catch (e) {
       flags = {};
     }
@@ -30,13 +35,13 @@ export function getFlags(): Flags {
   return flags;
 }
 
-/** Simple deterministic hash – djb2 algorithm. */
+/** Simple deterministic hash - djb2 algorithm. */
 function hashString(str: string): number {
   let hash = 5381;
   for (let i = 0; i < str.length; i++) {
     hash = (hash * 33) ^ str.charCodeAt(i);
   }
-  // Convert to positive 32‑bit integer
+  // Convert to positive 32-bit integer
   return hash >>> 0;
 }
 
@@ -44,14 +49,14 @@ function hashString(str: string): number {
  * Evaluate a single flag for a given user.
  * @param flagKey the key of the flag defined in the config
  * @param userId a stable identifier for the caller (e.g. UUID, email hash)
- * @returns boolean – true if the flag is active for this user
+ * @returns boolean - true if the flag is active for this user
  */
 export function evaluateFlag(flagKey: string, userId: string): boolean {
   const currentFlags = getFlags();
   const flag = currentFlags[flagKey];
   if (!flag) return false;
 
-  // Per‑user override takes precedence.
+  // Per-user override takes precedence.
   if (flag.overrides && Object.prototype.hasOwnProperty.call(flag.overrides, userId)) {
     return !!flag.overrides[userId];
   }
@@ -68,7 +73,7 @@ export function evaluateFlag(flagKey: string, userId: string): boolean {
 }
 
 /**
- * Evaluate **all** flags for a user and return a map of flagKey → boolean.
+ * Evaluate **all** flags for a user and return a map of flagKey -> boolean.
  */
 export function evaluateAllFlags(userId: string): Record<string, boolean> {
   const currentFlags = getFlags();

@@ -25,6 +25,9 @@ export const envSchema = z.object({
   NEXT_PUBLIC_SOROBAN_RPC_URL: isProd
     ? z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' }).optional()
     : z.string().url({ message: 'SOROBAN_RPC_URL must be a valid URL' }).default('https://soroban-testnet.stellar.org'),
+  NEXT_PUBLIC_SOROBAN_CONTRACT_ID: isProd
+    ? z.string().min(1, { message: 'SOROBAN_CONTRACT_ID is required in production' })
+    : z.string().default(''),
   // Optional analytics ids
   NEXT_PUBLIC_GA_TRACKING_ID: z.string().optional(),
   NEXT_PUBLIC_MIXPANEL_TOKEN: z.string().optional(),
@@ -34,6 +37,18 @@ export const envSchema = z.object({
   MEMO_SALT: isProd
     ? z.string().min(1, { message: 'MEMO_SALT is required' })
     : z.string().min(1, { message: 'MEMO_SALT is required' }).default('stellarlend-default-salt'),
+  DATABASE_URL: isProd
+    ? z.string().min(1, { message: 'DATABASE_URL is required in production' })
+    : z.string().optional(),
+  WEBHOOK_SECRET: isProd
+    ? z.string().min(1, { message: 'WEBHOOK_SECRET is required in production' })
+    : z.string().optional(),
+  PRICE_ORACLE_API_KEY: isProd
+    ? z.string().min(1, { message: 'PRICE_ORACLE_API_KEY is required in production' })
+    : z.string().optional(),
+  STELLAR_SIGNING_SECRET: isProd
+    ? z.string().min(1, { message: 'STELLAR_SIGNING_SECRET is required in production' })
+    : z.string().optional(),
 });
 
 // Parse and validate the environment at import time. Throws on error.

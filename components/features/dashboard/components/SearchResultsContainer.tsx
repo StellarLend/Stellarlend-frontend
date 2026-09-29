@@ -15,7 +15,7 @@ import type { SearchResultsProps } from './SearchResults';
 const SearchResultsContainer = React.forwardRef<
   HTMLDivElement,
   Omit<SearchResultsProps, 'onNavigate'>
->(({ ...props }, ref) => {
+>(({ onRetry, ...props }, ref) => {
   const router = useRouter();
 
   const handleNavigate = useCallback(
@@ -30,6 +30,7 @@ const SearchResultsContainer = React.forwardRef<
       ref={ref}
       {...props}
       onNavigate={handleNavigate}
+      onRetry={onRetry}
     />
   );
 });

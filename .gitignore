@@ -41,5 +41,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# local sqlite db (lib/db/client.ts)
+sqlite.db
+sqlite.db-shm
+sqlite.db-wal
+
 *storybook.log
 storybook-static
+.opencode

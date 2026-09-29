@@ -53,8 +53,12 @@ Stellarlend includes five distinct background worker modules located in the `src
 
 ### Transactional Outbox Dispatcher
 - **Triggers**: Polls the SQLite/PostgreSQL `outboxEvents` table every 1000ms.
+- **Boundary Validation**: Payloads are parsed and validated (`lib/validation/outbox.ts`) before anything is enqueued. Malformed JSON, over-sized payloads, unknown event types, and tampered payloads (strict schemas reject unknown fields) are marked `FAILED` and never reach a queue. Consumers re-validate job data as defense in depth.
 - **Deduplication & Idempotency**: Installs the DB Outbox Event ID as the BullMQ `jobId`. Because BullMQ de-duplicates jobs with identical IDs in the queue, this guarantees that even if a network outage causes a crash mid-dispatch, no duplicate transactions or notifications will be executed.
-- **Status Transitions**: `PENDING`/`FAILED` $\rightarrow$ `PROCESSING` (during execution) $\rightarrow$ `COMPLETED` (on success) OR `FAILED` (error threshold incremented, up to 3 times).
+- **Bounded Retries**: `PENDING`/`FAILED` (with attempts below the 3-attempt budget) events are claimed in a transaction, stamped with a lease timestamp (`claimedAt`), and dispatched. On success the event moves to `COMPLETED`; on failure `attempts` increments up to the 3-attempt budget, after which the event stays `FAILED` and is no longer retried.
+- **Crash Recovery**: Events left in `PROCESSING` after a crash are recovered via an expired claim lease (`claimedAt` older than 60s) or by a missing lease timestamp (legacy rows), so a crash between claim and dispatch cannot strand an event permanently.
+- **Status Transitions**: `PENDING`/`FAILED`/stale `PROCESSING` $\rightarrow$ `PROCESSING` (lease stamped) $\rightarrow$ `COMPLETED` (on success) OR `FAILED` (error threshold incremented, up to 3 times).
+- **Visibility**: Dispatch success/failure/rejection and stale-recovery events are logged with event ID, type, and attempt count, and tracked via exported `dispatcherMetrics` counters.
 
 ### Retention Worker
 - **Triggers**: Scheduled daily at `02:00 UTC`.
@@ -62,6 +66,7 @@ Stellarlend includes five distinct background worker modules located in the `src
 
 ### Snapshot Worker
 - **Triggers**: Scheduled daily at `00:00 UTC`.
+- **Boundary Validation**: Wallet identity (Stellar account ID via `StrKey`), numeric values (finite, non-negative amounts; finite APYs within range), timestamps (positive integers within a plausible window), and job data are validated strictly (`lib/validation/snapshots.ts`) before storage or processing. Tampered records and malformed job payloads are rejected.
 - **Tuning**: Pulls positions from contracts/indexers and stores daily balance histories. Retains exactly the last 365 daily snapshots per wallet address, auto-purging anything older.
 
 ---

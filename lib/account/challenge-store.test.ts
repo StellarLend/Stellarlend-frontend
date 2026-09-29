@@ -51,6 +51,12 @@ describe('DeletionChallenge store', () => {
     expect(result).toBe(false);
   });
 
+  it('rejects a valid unexpired challenge issued for user A when presented with user B (cross-user challenge-replay)', () => {
+    const { challenge } = createDeletionChallenge('userA');
+    const result = verifyDeletionChallenge(challenge, 'userB');
+    expect(result).toBe(false);
+  });
+
   it('mismatched userId fails verification', () => {
     const { challenge } = createDeletionChallenge('correctUser');
     const result = verifyDeletionChallenge(challenge, 'wrongUser');

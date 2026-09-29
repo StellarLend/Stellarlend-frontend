@@ -3,19 +3,20 @@ import { getSession } from "@/lib/auth";
 import { getStoredSession, revokeStoredSession } from "@/lib/auth/session-store";
 
 type RouteContext = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
   const session = await getSession();
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const target = getStoredSession(context.params.id);
+  const target = getStoredSession(id);
 
   if (!target || target.userId !== session.user.id) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -31,10 +32,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     );
   }
 
-  revokeStoredSession(context.params.id);
+  revokeStoredSession(id);
 
   console.info("audit.session.revoked", {
-    sessionId: context.params.id,
+    sessionId: id,
     userId: session.user.id,
     revokedAt: new Date().toISOString(),
   });

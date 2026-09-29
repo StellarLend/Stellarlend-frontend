@@ -11,6 +11,7 @@ declare global {
     stellar?: {
       getPublicKey: () => Promise<string>;
       signTransaction: (xdr: string, opts?: { network: string }) => Promise<string>;
+      getAccounts?: () => Promise<string[]>;
     };
     mockSignTransaction: (xdr: string) => Promise<string>;
   }

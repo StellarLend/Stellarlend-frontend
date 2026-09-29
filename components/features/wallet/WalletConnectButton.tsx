@@ -1,7 +1,10 @@
+"use client";
+
 import React, { useState } from "react";
 import { useWalletContext } from "@/context/WalletContext";
-import { copyToClipboard } from "@/lib/utils/clipboard";
+import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
 import { navClasses } from "@/constants/design-tokens";
+import { Toast, type ToastVariant } from "@/components/shared/common";
 
 // Focus ring styling consistent with ICON_BUTTON_ACCESSIBILITY.md
 const focusClasses = `${navClasses.iconButtonFocusClasses} focus-visible:ring-offset-black`;
@@ -13,14 +16,47 @@ const truncateAddress = (addr: string) => `${addr.slice(0, 5)}…${addr.slice(-4
  * WalletConnectButton – handles connecting, disconnecting, displaying the address,
  * copying to clipboard, and showing any connection errors.
  */
-const WalletConnectButton: React.FC = () => {
+export const WalletConnectButton: React.FC = () => {
   const { address, status, error, connect, disconnect } = useWalletContext();
+  const [isCopied, setIsCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    variant: ToastVariant;
+    title: string;
+    description: string;
+  } | null>(null);
+
   const loading = status === "connecting";
 
   const handleCopy = async () => {
     if (!address) return;
-    await copyToClipboard(address);
+
+    const result = await copyToClipboard(address);
+
+    if (result.success) {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+      return;
+    }
+
+    const messages: Record<CopyFailureReason, { title: string; description: string }> = {
+      invalid_address: {
+        title: "Invalid Address",
+        description: "The wallet address could not be validated before copying.",
+      },
+      clipboard_error: {
+        title: "Copy Failed",
+        description: "Clipboard access is unavailable. Try copying the address manually.",
+      },
+    };
+
+    const failureReason = result.reason || "clipboard_error";
+
+    setToast({
+      variant: "error",
+      ...messages[failureReason],
+    });
+    setTimeout(() => setToast(null), 4000);
   };
 
   return (
@@ -63,7 +99,7 @@ const WalletConnectButton: React.FC = () => {
                 onClick={handleCopy}
                 className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-800 text-gray-300 focus:outline-none focus:bg-gray-800 transition-colors"
               >
-                Copy Address
+                {isCopied ? "Address Copied!" : "Copy Address"}
               </button>
             </div>
           )}
@@ -86,6 +122,13 @@ const WalletConnectButton: React.FC = () => {
         >
           {error}
         </span>
+      )}
+      {toast && (
+        <Toast
+          variant={toast.variant}
+          title={toast.title}
+          description={toast.description}
+        />
       )}
     </div>
   );

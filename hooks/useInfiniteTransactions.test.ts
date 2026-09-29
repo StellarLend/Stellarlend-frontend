@@ -210,4 +210,149 @@ describe("useInfiniteTransactions", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("prevents race conditions from rapid successive loadMore triggers", async () => {
+    let resolveFirstRequest: ((value: any) => void) | null = null;
+    let resolveSecondRequest: ((value: any) => void) | null = null;
+    let firstRequestStarted = false;
+    let secondRequestStarted = false;
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      // Initial page load
+      if (!url.includes("cursor=")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => mockPage1,
+        });
+      }
+      
+      // First loadMore call - delayed response
+      if (url.includes("cursor=cursor-page-2") && !firstRequestStarted) {
+        firstRequestStarted = true;
+        return new Promise((resolve) => {
+          resolveFirstRequest = resolve;
+        });
+      }
+      
+      // Second loadMore call (should be blocked)
+      secondRequestStarted = true;
+      return new Promise((resolve) => {
+        resolveSecondRequest = resolve;
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useInfiniteTransactions());
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.transactions).toHaveLength(2);
+    expect(result.current.hasMore).toBe(true);
+
+    // Trigger loadMore twice in rapid succession
+    act(() => {
+      result.current.loadMore();
+      result.current.loadMore(); // This should be ignored due to loadingRef guard
+    });
+
+    // Wait a bit to ensure second call would have been processed if not guarded
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Only the first request should have been initiated
+    expect(firstRequestStarted).toBe(true);
+    expect(secondRequestStarted).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2); // Initial + first loadMore only
+
+    // Resolve the first request
+    act(() => {
+      resolveFirstRequest?.({
+        ok: true,
+        json: async () => mockPage2,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoadingMore).toBe(false);
+    });
+
+    // Verify results are correct and not duplicated
+    expect(result.current.transactions).toHaveLength(3);
+    expect(result.current.transactions[0].id).toBe("t1");
+    expect(result.current.transactions[1].id).toBe("t2");
+    expect(result.current.transactions[2].id).toBe("t3");
+    expect(result.current.hasMore).toBe(false);
+
+    // Verify no second request was ever made
+    expect(secondRequestStarted).toBe(false);
+  });
+
+  it("allows subsequent loadMore after previous request completes", async () => {
+    const mockPage3: FetchTransactionsResponse = {
+      transactions: [
+        { id: "t4", type: "Withdraw", amount: 75, asset: "XLM", date: "2023-12-31", time: "13:00", status: "Completed" },
+      ],
+      total: 6,
+      nextCursor: null,
+    };
+
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("cursor=cursor-page-3")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => mockPage3,
+        });
+      }
+      if (url.includes("cursor=cursor-page-2")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ...mockPage2,
+            nextCursor: "cursor-page-3",
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => mockPage1,
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useInfiniteTransactions());
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // First loadMore
+    await act(async () => {
+      result.current.loadMore();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoadingMore).toBe(false);
+    });
+
+    expect(result.current.transactions).toHaveLength(3);
+    expect(result.current.hasMore).toBe(true);
+
+    // Second loadMore (should succeed now that first is complete)
+    await act(async () => {
+      result.current.loadMore();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoadingMore).toBe(false);
+    });
+
+    expect(result.current.transactions).toHaveLength(4);
+    expect(result.current.hasMore).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(3); // Initial + 2 loadMore calls
+  });
 });

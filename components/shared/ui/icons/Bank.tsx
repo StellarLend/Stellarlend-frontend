@@ -1,10 +1,12 @@
+import type { SVGProps } from "react";
 import React from "react";
 
-interface BankProps {
+interface BankProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
   color?: string;
+  title?: string;
 }
 
 export const Bank = ({
@@ -12,6 +14,10 @@ export const Bank = ({
   width = "24",
   height = "24",
   color,
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: BankProps) => {
   return (
     <svg
@@ -20,7 +26,12 @@ export const Bank = ({
       viewBox="0 0 20 20"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         d="M1.66669 7.1409C1.66669 6.14408 2.06867 5.53319 2.90055 5.07024L6.32491 3.16454C8.11927 2.16596 9.01644 1.66667 10 1.66667C10.9836 1.66667 11.8808 2.16596 13.6751 3.16454L17.0995 5.07024C17.9314 5.53319 18.3334 6.14409 18.3334 7.1409C18.3334 7.4112 18.3334 7.54635 18.3039 7.65745C18.1488 8.24121 17.6198 8.33334 17.1089 8.33334H2.89109C2.38025 8.33334 1.85129 8.2412 1.6962 7.65745C1.66669 7.54635 1.66669 7.4112 1.66669 7.1409Z"
         stroke="#E5E5E5"
