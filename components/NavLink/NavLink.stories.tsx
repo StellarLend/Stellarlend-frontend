@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-// ...existing code...
+import { expect, within } from "@storybook/test";
+import { userEvent } from "@storybook/test";
 import "@testing-library/jest-dom";
-// ...existing code...
 import NavLink from "../shared/layout/NavLink";
 
 const meta: Meta<typeof NavLink> = {
@@ -15,7 +15,9 @@ const meta: Meta<typeof NavLink> = {
   argTypes: {
     href: { control: "text" },
     isActive: { control: "boolean" },
-
+    disabled: { control: "boolean" },
+    loading: { control: "boolean" },
+    error: { control: "boolean" },
     children: { control: "text" },
   },
 };
@@ -33,6 +35,7 @@ export const Default: Story = {
 export const Active: Story = {
   args: {
     href: "/dashboard",
+    isActive: true,
     children: "Dashboard",
   },
   parameters: { docs: { storyDescription: "Current route indicator" } },
@@ -64,32 +67,95 @@ export const Focus: Story = {
 export const Disabled: Story = {
   args: {
     href: "/admin",
+    disabled: true,
     children: "Admin",
   },
   play: async ({ canvasElement }) => {
-    const link = canvasElement.querySelector("a");
+    const canvas = within(canvasElement);
+    const link = canvas.getByRole("link");
     expect(link).toHaveAttribute("aria-disabled", "true");
+    expect(link).toHaveAttribute("tabindex", "-1");
   },
 };
 
 export const Loading: Story = {
   args: {
     href: "/data",
+    loading: true,
     children: "Analytics",
   },
   play: async ({ canvasElement }) => {
-    const spinner = canvasElement.querySelector('[role="status"]');
-    expect(spinner).toBeInTheDocument();
+    const canvas = within(canvasElement);
+    const spinner = canvas.getByRole("status");
+    expect(spinner).toBeITheDocument();
+    expect(spinner).toHaveAttribute("aria-live", "polite");
   },
 };
 
 export const Error: Story = {
   args: {
     href: "/broken",
+    error: true,
     children: "Broken Link",
   },
   parameters: {
     docs: { storyDescription: "Route failed to load or is unreachable" },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const link = canvas.getByRole("link");
+    expect(link).toHaveAttribute("data-state", "error");
+  },
+};
+
+export const MissingHref: Story = {
+  args: {
+    href: "",
+    children: "No Destination",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const link = canvas.getByRole("link");
+    expect(link).toHaveAttribute("aria-disabled", "true");
+  },
+};
+
+export const EmptyChildren: Story = {
+  args: {
+    href: "/empty",
+    children: "",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const link = canvas.getByRole("link");
+    expect(link).toHaveAttribute("aria-label");
+  },
+};
+
+export const ExternalLink: Story = {
+  args: {
+    href: "https://example.com/docs",
+    children: "External Docs",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const link = canvas.getByRole("link");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveAttribute("target", "_blank");
+  },
+};
+
+export const KeyboardNavigation: Story = {
+  args: {
+    href: "/keyboard",
+    children: "Keyboard",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const link = canvas.getByRole("link");
+    link.focus();
+    expect(link).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
   },
 };
 
@@ -115,10 +181,10 @@ export const StateMatrix: Story = {
   render: () => (
     <div className="flex flex-col gap-2 w-48">
       <NavLink href="/a">Default</NavLink>
-      <NavLink href="/b">Active</NavLink>
-      <NavLink href="/c">Disabled</NavLink>
-      <NavLink href="/d">Loading</NavLink>
-      <NavLink href="/e">Error</NavLink>
+      <NavLink href="/b" isActive>Active</NavLink>
+      <NavLink href="/c" disabled>Disabled</NavLink>
+      <NavLink href="/d" loading>Loading</NavLink>
+      <NavLink href="/e" error>Error</NavLink>
     </div>
   ),
 };
