@@ -1,15 +1,14 @@
 import React from "react";
-import { render, screen, fireEvent, afterEach, waitFor } from "@/test/test-utils";
+import { render, screen, fireEvent } from "@/test/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Sidebar from "./Sidebar";
 import NavLink from "./NavLink";
 import { NavigationMenu } from "./NavigationMenu";
 import { SideNav } from "./SideNav";
 import { SidebarProvider } from "@/context/SidebarContext";
-import { NavigationMenu } from "./NavigationMenu";
-import "@testing-library/jest-dom";
-import { vi } from "vitest";
 import { clientLog } from "@/lib/utils/client-log";
 
+// ─── Shared pathname mock ──────────────────────────────────────────────────────
 const mockPathname = vi.fn().mockReturnValue("/");
 
 vi.mock("next/navigation", () => ({
@@ -17,7 +16,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+// ─── Navigation UI/UX ─────────────────────────────────────────────────────────
 describe("Navigation UI/UX", () => {
+  afterEach(() => {
+    mockPathname.mockReturnValue("/");
+  });
+
   it("Sidebar renders all nav items with correct roles", () => {
     render(
       <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
@@ -77,6 +81,36 @@ describe("Navigation UI/UX", () => {
   it("accepts optional className without error", () => {
     render(<NavLink href="/dashboard" className="extra-class">Dashboard</NavLink>);
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveClass("extra-class");
+  });
+
+  // ─── Failure-path & boundary coverage ────────────────────────────────────────
+
+  it("does not set aria-current when inactive (pathname mismatch)", () => {
+    mockPathname.mockReturnValue("/other");
+    render(<NavLink href="/dashboard">Dashboard</NavLink>);
+    const link = screen.getByRole("link", { name: /dashboard/i });
+    expect(link).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not set aria-current when isActive is false even if pathname matches", () => {
+    mockPathname.mockReturnValue("/dashboard");
+    render(<NavLink href="/dashboard" isActive={false}>Dashboard</NavLink>);
+    const link = screen.getByRole("link", { name: /dashboard/i });
+    expect(link).not.toHaveAttribute("aria-current");
+  });
+
+  it("renders hash links as <a> without next/link", () => {
+    render(<NavLink href="#section">Jump</NavLink>);
+    const link = screen.getByRole("link", { name: /jump/i });
+    expect(link.tagName).toBe("A");
+    expect(link).toHaveAttribute("href", "#section");
+  });
+
+  it("warn is not called for a valid href", () => {
+    const warn = vi.spyOn(clientLog, "warn").mockImplementation(() => {});
+    render(<NavLink href="/valid">Valid</NavLink>);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 
@@ -138,11 +172,48 @@ describe("NavigationMenu", () => {
     render(<NavigationMenu />);
     expect(screen.getAllByRole("listitem").length).toBeGreaterThan(1);
   });
+
+  // ─── Failure-path & boundary coverage ────────────────────────────────────────
+
+  it("renders no list items when visibleLinks is an empty array", () => {
+    render(<NavigationMenu visibleLinks={[]} />);
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  it("ignores unknown entries in visibleLinks gracefully", () => {
+    render(<NavigationMenu visibleLinks={["NonExistentLink"]} />);
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  it("does not throw when onLinkClick is undefined", () => {
+    expect(() => {
+      render(<NavigationMenu visibleLinks={["Dashboard"]} />);
+      fireEvent.click(screen.getByText("Dashboard").closest("a")!);
+    }).not.toThrow();
+  });
+
+  it("concurrent rapid clicks call onLinkClick each time without error", () => {
+    const onLinkClick = vi.fn();
+    render(<NavigationMenu visibleLinks={["Dashboard", "Settings"]} onLinkClick={onLinkClick} />);
+    const link = screen.getByText("Settings").closest("a")!;
+    fireEvent.click(link);
+    fireEvent.click(link);
+    fireEvent.click(link);
+    expect(onLinkClick).toHaveBeenCalledTimes(3);
+  });
+
+  it("localStorage read failure is handled gracefully", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    expect(() => render(<NavigationMenu visibleLinks={["Dashboard"]} />)).not.toThrow();
+    vi.restoreAllMocks();
+  });
 });
 
 // ─── SideNav ─────────────────────────────────────────────────────────────────
 describe("SideNav", () => {
-  it("renders the close button with aria-label and focus-visible ring", () => {
+  it("renders the close button with aria-label and focus ring when mobile drawer is open", () => {
     render(
       <SidebarProvider initialSidebarOpen={true} initialIsMobile={true}>
         <SideNav />
@@ -152,6 +223,35 @@ describe("SideNav", () => {
     expect(closeBtn).toBeInTheDocument();
     expect(closeBtn.className).toContain("focus:outline-none");
     expect(closeBtn.className).toContain("focus:ring-2");
+  });
+
+  it("renders desktop collapsed rail when sidebar is closed and not mobile", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={false} initialIsMobile={false}>
+        <SideNav />
+      </SidebarProvider>
+    );
+    // Collapsed rail: desktop aside is rendered
+    expect(screen.getByRole("complementary")).toBeInTheDocument();
+  });
+
+  it("does not render mobile drawer when sidebar is closed on mobile", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={false} initialIsMobile={true}>
+        <SideNav />
+      </SidebarProvider>
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("renders dialog with aria-modal when mobile drawer is open", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={true}>
+        <SideNav />
+      </SidebarProvider>
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
   });
 });
 
@@ -164,5 +264,37 @@ describe("Sidebar", () => {
       </SidebarProvider>
     );
     expect(screen.getByRole("navigation", { name: /sidebar navigation/i })).toBeInTheDocument();
+  });
+
+  it("renders nav items as links with accessible names", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
+    const links = screen.getAllByRole("link");
+    expect(links.length).toBeGreaterThanOrEqual(5);
+    links.forEach((link) => {
+      expect(link).toHaveAttribute("href");
+    });
+  });
+
+  it("applies aria-current to the active route link", () => {
+    mockPathname.mockReturnValue("/account/profile");
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
+    expect(screen.getByRole("link", { name: /profile settings/i })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows collapse/expand toggle button with aria-label", () => {
+    render(
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
+        <Sidebar />
+      </SidebarProvider>
+    );
+    expect(screen.getByRole("button", { name: /collapse sidebar/i })).toBeInTheDocument();
   });
 });
