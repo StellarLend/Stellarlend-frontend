@@ -24,6 +24,7 @@ This reference keeps `.env.example`, client bundle safety checks, and server-onl
 | Variable | Required | Default/example | Purpose |
 | --- | --- | --- | --- |
 | `SOROBAN_RPC_URL` | Yes for relay routes | testnet RPC URL | Server-only Soroban RPC endpoint for transaction relay routes. |
+| `SOROBAN_TRANSACTION_FEE` | No | `100` (stroops) | Server-only default per-transaction fee passed to the Soroban RPC `build_soroban_transaction` call. Increase during network congestion to avoid fee-too-low / `tx_bad_seq` failures. Callers may override per request via the `fee` field on `TxBuildRequest`. |
 | `STELLAR_HORIZON_URLS` | No | comma-separated testnet URLs | Ordered Horizon fallback list for server-side calls. |
 | `PRICE_ORACLE_API_KEY` | Production | placeholder secret | Server-side price oracle credential. |
 | `AUTH_SIGNING_SECRET` | Production | placeholder secret | Server auth signing secret used by server config. |

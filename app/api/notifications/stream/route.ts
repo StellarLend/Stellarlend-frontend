@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth';
 import { notificationHub } from '@/lib/streams/notification-hub';
+import { withControllerCleanup } from '@/lib/streams/with-controller-cleanup';
 
 export const runtime = 'nodejs';
 
@@ -20,8 +21,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const stream = new ReadableStream({
-    start(controller) {
+  const stream = new ReadableStream(
+    withControllerCleanup((controller, onCleanup) => {
       // Send a comment and retry hint to help clients
       controller.enqueue(new TextEncoder().encode('retry: 5000\n\n'));
 
@@ -33,19 +34,9 @@ export async function GET() {
         }
       });
 
-      // When the consumer closes, unsubscribe
-      (controller as any).unsubscribe = unsubscribe;
-    },
-    cancel() {
-      // cancel is called when the downstream terminates
-      try {
-        const anyController = this as any;
-        if (typeof anyController.unsubscribe === 'function') anyController.unsubscribe();
-      } catch (e) {
-        // noop
-      }
-    },
-  });
+      onCleanup(unsubscribe);
+    }),
+  );
 
   return new NextResponse(stream, {
     headers: {

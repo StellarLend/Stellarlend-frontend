@@ -1,10 +1,7 @@
 import type { LendingData } from '@/lib/lending/types';
+import type { SorobanRpcError } from './types';
 
-export type SorobanRpcError = {
-  code: number | string;
-  message: string;
-  data?: unknown;
-};
+export type { SorobanRpcError };
 
 export type SorobanRpcBuildResult = {
   transaction?: string;
@@ -22,10 +19,33 @@ export interface TxBuildRequest {
   type: 'lend' | 'borrow';
   sourceAccount: string;
   data: LendingData;
+  /**
+   * Optional per-transaction fee override expressed in stellar stroops.
+   * When omitted, the server-side default (`SOROBAN_TRANSACTION_FEE` env var,
+   * or `DEFAULT_SOROBAN_TRANSACTION_FEE`) is used.
+   */
+  fee?: number;
 }
 
 export interface TxSubmitRequest {
   signedEnvelopeXdr: string;
+}
+
+/**
+ * Default per-transaction fee in stellar stroops. Mirrors the legacy hardcoded
+ * value so that existing callers continue to behave the same way; operators can
+ * override the value server-side via the `SOROBAN_TRANSACTION_FEE` env var, or
+ * on a per-request basis by passing a `fee` override on `TxBuildRequest`.
+ */
+export const DEFAULT_SOROBAN_TRANSACTION_FEE = 100;
+
+export interface BuildSorobanTransactionOptions {
+  /**
+   * Optional override for the transaction fee, expressed in stroops. Must be
+   * a non-negative finite number; otherwise `buildSorobanTransactionRpcRequest`
+   * throws an `Error`.
+   */
+  fee?: number;
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -36,6 +56,33 @@ const isNonEmptyString = (value: unknown): value is string =>
 
 const isValidStellarPublicKey = (value: unknown): value is string =>
   typeof value === 'string' && /^[G][A-Z2-7]{55}$/.test(value);
+
+const isFiniteNonNegativeNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
+/**
+ * Coerces an arbitrary value into the `string | number` contract of
+ * `SorobanRpcError.code`. JSON deserializers normally surface scalar codes, but
+ * upstream RPC errors occasionally include objects, arrays or `bigint`s; those
+ * values previously leaked through the `string | number` type contract. We
+ * fall back to `'UNKNOWN_ERROR'` to keep the response shape predictable.
+ */
+function coerceErrorCode(value: unknown): string | number {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'bigint') return value.toString();
+  return 'UNKNOWN_ERROR';
+}
+
+function resolveTransactionFee(options: BuildSorobanTransactionOptions | undefined): number {
+  const candidate = options?.fee ?? DEFAULT_SOROBAN_TRANSACTION_FEE;
+  if (!isFiniteNonNegativeNumber(candidate)) {
+    throw new Error(
+      `Invalid Soroban transaction fee: expected a non-negative finite number, received ${String(candidate)}.`,
+    );
+  }
+  return candidate;
+}
 
 export function isTxBuildRequest(value: unknown): value is TxBuildRequest {
   if (!isObject(value)) return false;
@@ -50,6 +97,7 @@ export function isTxBuildRequest(value: unknown): value is TxBuildRequest {
   if (data.duration != null && typeof data.duration !== 'number') return false;
   if (data.collateral != null && !isNonEmptyString(data.collateral)) return false;
   if (data.collateralAmount != null && typeof data.collateralAmount !== 'number') return false;
+  if (value.fee !== undefined && !isFiniteNonNegativeNumber(value.fee)) return false;
 
   return true;
 }
@@ -71,7 +119,9 @@ export function buildSorobanTransactionRpcRequest(
   request: TxBuildRequest,
   contractId: string,
   network: string,
+  options: BuildSorobanTransactionOptions = {},
 ): Record<string, unknown> {
+  const fee = resolveTransactionFee(options);
   return {
     jsonrpc: '2.0',
     id: 'build_soroban_transaction',
@@ -80,7 +130,7 @@ export function buildSorobanTransactionRpcRequest(
       {
         source: request.sourceAccount,
         network_passphrase: getSorobanNetworkPassphrase(network),
-        fee: 100,
+        fee,
         instructions: [buildLendingInstruction(request.type, request.data, contractId)],
       },
     ],
@@ -117,7 +167,7 @@ export function buildSorobanRpcError(error: unknown): SorobanRpcError {
   }
 
   return {
-    code: error.code ?? 'UNKNOWN_ERROR',
+    code: coerceErrorCode(error.code),
     message: typeof error.message === 'string' ? error.message : 'Unknown Soroban RPC error',
     data: error.data,
   };

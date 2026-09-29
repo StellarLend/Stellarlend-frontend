@@ -18,7 +18,9 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'staging' }}
-    
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -70,17 +72,21 @@ jobs:
           
           echo "🔄 Rollback completed"
 
+      # Slack notification step disabled: this repo has no SLACK_WEBHOOK_URL
+      # secret configured, so `8398a7/action-slack@v3` unconditionally fails
+      # with "Specify secrets.SLACK_WEBHOOK_URL" and (with `if: always()`)
+      # takes the whole job down with it regardless of migration outcome.
+      # Re-enable once a real Slack webhook secret is provisioned.
       - name: Notify team of migration status
-        if: always()
+        if: always() && env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           text: |
             🗄️ **Database Migration ${{ job.status == 'success' && 'Completed' || 'Failed' }}**
-            
+
             **Environment**: ${{ github.event.inputs.environment || 'staging' }}
             **Branch**: ${{ github.ref_name }}
             **Commit**: ${{ github.sha }}
-            
+
             ${{ job.status == 'success' && '✅ All migrations applied successfully' || '❌ Migration failed - check logs for details' }}

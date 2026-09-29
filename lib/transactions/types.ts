@@ -1,5 +1,8 @@
+import type { AssetSymbol } from '@/types/enums';
+
 export type TransactionStatus = 'Completed' | 'Processing' | 'Failed';
-export type TransactionAsset = 'XLM' | 'BTC' | 'STRK';
+export type TransactionAsset = AssetSymbol;
+
 
 export interface Transaction {
   id: string;

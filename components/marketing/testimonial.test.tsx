@@ -13,14 +13,14 @@ describe('TestimonialsSection', () => {
   });
 
   it('resizes mid-carousel and asserts cards are always visible', () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     render(<TestimonialsSection />);
 
     // Initially at desktop width (cardsPerView = 3)
     // There are 6 testimonials total. Max slides = 2.
     // Let's trigger next slide to go to slide index 1 (the last slide for desktop)
     act(() => {
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
     });
 
     // Now currentSlide is 1.
@@ -36,10 +36,10 @@ describe('TestimonialsSection', () => {
 
     act(() => {
       // Advance to slide 5
-      jest.advanceTimersByTime(5000); // 2
-      jest.advanceTimersByTime(5000); // 3
-      jest.advanceTimersByTime(5000); // 4
-      jest.advanceTimersByTime(5000); // 5
+      vi.advanceTimersByTime(5000); // 2
+      vi.advanceTimersByTime(5000); // 3
+      vi.advanceTimersByTime(5000); // 4
+      vi.advanceTimersByTime(5000); // 5
     });
 
     // Now currentSlide is 5.
@@ -57,6 +57,6 @@ describe('TestimonialsSection', () => {
     // Testimonial 3 has text "The non-custodial nature"
     expect(screen.getByText(/The non-custodial nature/i)).toBeInTheDocument();
     
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 });

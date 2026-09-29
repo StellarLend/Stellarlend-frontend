@@ -207,4 +207,44 @@ describe('BullMQ queue integration', () => {
     await expect(gracefulShutdownIndexerWorker()).resolves.not.toThrow();
     await expect(gracefulShutdownNotificationsWorker()).resolves.not.toThrow();
   });
+
+  describe('shape-mismatch detection — catches regressions the `as any` casts silently let through', () => {
+    it('rejects indexer jobs with missing accountId', async () => {
+      // Simulate a malformed payload enqueued via as any bypass — missing accountId
+      const handler = (indexerWorker as any).handler;
+      await expect(
+        handler({ data: { } as any }),
+      ).rejects.toThrow('Missing accountId in job data');
+    });
+
+    it('rejects notification jobs with missing required fields', async () => {
+      // Simulate a malformed payload enqueued via as any bypass — missing title, message, type
+      const handler = (notificationsWorker as any).handler;
+      await expect(
+        handler({ data: { userId: 'u1' } as any }),
+      ).rejects.toThrow('Missing required notification fields: userId, title, message, type');
+    });
+
+    it('accepts valid indexer payload without throwing', async () => {
+      const handler = (indexerWorker as any).handler;
+      await expect(
+        handler({ data: { accountId: 'GABC' } }),
+      ).resolves.not.toThrow();
+    });
+
+    it('accepts valid notification payload without throwing', async () => {
+      const handler = (notificationsWorker as any).handler;
+      await expect(
+        handler({
+          id: 'notif-job-valid',
+          data: {
+            userId: 'user-1',
+            title: 'Hello',
+            message: 'World',
+            type: 'success',
+          },
+        }),
+      ).resolves.not.toThrow();
+    });
+  });
 });

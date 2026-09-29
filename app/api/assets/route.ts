@@ -1,61 +1,21 @@
-/**
- * Asset Registry API Route
- * GET /api/assets - Serves canonical asset metadata
- *
- * Query Parameters:
- *   - symbols: Comma-separated list of asset symbols (XLM, USDC, BTC, ETH)
- *     If omitted, all supported assets are returned
- *
- * Response Format:
- *   - assets: Array of asset metadata with symbol, name, decimals, issuer, and logo URL
- *   - timestamp: ISO 8601 timestamp of response
- *
- * Caching Strategy:
- *   - TTL: 60 seconds (fresh cache)
- *   - SWR: 300 seconds (stale-while-revalidate)
- *   - Static data cached for performance
- *
- * @example
- * GET /api/assets - Get all supported assets
- * GET /api/assets?symbols=XLM,USDC - Get specific assets
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { globalCache } from '@/lib/cache';
-import { getAssets, isValidAsset, type AssetMetadata } from '@/lib/assets';
-import { withRequestLogging } from '@/lib/api/handler';
+import { getAssets, isValidAsset, type AssetMetadata } from '@/lib/assets/registry';
 
 export const runtime = 'nodejs';
 
-// Cache configuration for static asset data
 const ASSETS_CACHE_CONFIG = {
-  ttl: 60000, // 60 seconds
-  swr: 300000, // 5 minutes stale-while-revalidate
+  ttl: 60000,
+  swr: 300000,
 } as const;
 
-interface AssetsResponse {
-  assets: AssetMetadata[];
-  timestamp: string;
-}
-
-interface AssetsErrorResponse {
-  error: string;
-  code: string;
-  timestamp: string;
-}
-
-/**
- * Validates and normalizes the symbols query parameter
- */
 function validateSymbolsQuery(
   symbolsParam: string | null
 ): { valid: true; symbols?: string[] } | { valid: false; error: string } {
-  // If no parameter provided, return all symbols
   if (symbolsParam === null) {
-    return { valid: true }; // All symbols
+    return { valid: true };
   }
 
-  // If empty string or only whitespace, reject
   if (!symbolsParam.trim()) {
     return { valid: false, error: 'symbols parameter cannot be empty' };
   }
@@ -73,7 +33,6 @@ function validateSymbolsQuery(
     return { valid: false, error: 'Too many symbols requested (max 20)' };
   }
 
-  // Validate each symbol
   const invalidSymbols = symbols.filter(symbol => !isValidAsset(symbol));
   if (invalidSymbols.length > 0) {
     return {
@@ -85,62 +44,41 @@ function validateSymbolsQuery(
   return { valid: true, symbols };
 }
 
-/**
- * Generates cache key for assets query
- */
 function generateAssetsCacheKey(symbols?: string[]): string {
   if (!symbols || symbols.length === 0) {
     return 'assets:all';
   }
-  return `assets:${symbols.sort().join(',')}`;
+  return `assets:${[...symbols].sort().join(',')}`;
 }
 
-/**
- * Fetches assets from registry
- */
-async function fetchAssetsData(symbols?: string[]): Promise<AssetsResponse> {
-  const assets = getAssets(symbols);
-
-  return {
-    assets,
-    timestamp: new Date().toISOString(),
-  };
-}
-
-/**
- * Handles GET requests to /api/assets
- */
-async function handleGetAssets(request: NextRequest): Promise<NextResponse<AssetsResponse | AssetsErrorResponse>> {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const symbolsParam = searchParams.get('symbols');
 
-    // Validate query parameters
     const validation = validateSymbolsQuery(symbolsParam);
 
     if (!validation.valid) {
-      const errorResponse: AssetsErrorResponse = {
-        error: validation.error,
-        code: 'INVALID_QUERY',
-        timestamp: new Date().toISOString(),
-      };
-      return NextResponse.json(errorResponse, {
-        status: 400,
-        headers: {
-          'Cache-Control': 'no-cache, no-store',
-        },
-      });
+      return NextResponse.json(
+        { error: validation.error, code: 'INVALID_QUERY', timestamp: new Date().toISOString() },
+        { status: 400, headers: { 'Cache-Control': 'no-cache, no-store' } }
+      );
     }
 
     const symbols = validation.symbols;
     const cacheKey = generateAssetsCacheKey(symbols);
 
-    // Use cache with TTL and SWR for static data
-    const { value: assetsData, status: cacheStatus } = await globalCache.getOrFetch(
+    const cacheResult = await globalCache.getOrFetch(
       cacheKey,
-      () => fetchAssetsData(symbols),
+      async () => ({
+        assets: getAssets(symbols),
+        timestamp: new Date().toISOString(),
+      }),
       ASSETS_CACHE_CONFIG
     );
+
+    const assetsData = cacheResult?.value ?? cacheResult;
+    const cacheStatus = cacheResult?.status ?? 'MISS';
 
     return NextResponse.json(assetsData, {
       status: 200,
@@ -151,21 +89,13 @@ async function handleGetAssets(request: NextRequest): Promise<NextResponse<Asset
       },
     });
   } catch (error) {
-    console.error('Assets route error:', error);
-
-    const errorResponse: AssetsErrorResponse = {
-      error: error instanceof Error ? error.message : 'Failed to fetch assets',
-      code: 'INTERNAL_ERROR',
-      timestamp: new Date().toISOString(),
-    };
-
-    return NextResponse.json(errorResponse, {
-      status: 500,
-      headers: {
-        'Cache-Control': 'no-cache, no-store',
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : 'Failed to fetch assets',
+        code: 'INTERNAL_ERROR',
+        timestamp: new Date().toISOString(),
       },
-    });
+      { status: 500, headers: { 'Cache-Control': 'no-cache, no-store' } }
+    );
   }
 }
-
-export const GET = withRequestLogging('/api/assets', handleGetAssets);

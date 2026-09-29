@@ -1,9 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axe from "axe-core";
 import { render, screen, waitFor } from "@/test/test-utils";
-import DashboardPage from "./page";
+import DashboardClient from "./DashboardClient";
 
-describe("DashboardPage A11y", () => {
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/dashboard",
+  useRouter: () => ({
+    push: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+describe("DashboardClient A11y", () => {
   const fetchMock = vi.fn();
 
   beforeEach(() => {
@@ -30,13 +39,19 @@ describe("DashboardPage A11y", () => {
       if (url.includes("/api/transactions")) {
         return Promise.resolve({
           ok: true,
-          json: async () => ([]),
+          json: async () => ({ transactions: [], total: 0 }),
         });
       }
       if (url.includes("/api/notifications")) {
         return Promise.resolve({
           ok: true,
           json: async () => ([]),
+        });
+      }
+      if (url.includes("/api/liquidations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ positions: [] }),
         });
       }
       // default mock
@@ -55,7 +70,7 @@ describe("DashboardPage A11y", () => {
   });
 
   it("passes axe checks on the dashboard route shell (loaded state)", async () => {
-    render(<DashboardPage />);
+    render(<DashboardClient />);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
 
@@ -82,18 +97,110 @@ describe("DashboardPage A11y", () => {
           }),
         });
       }
+      if (url.includes("/api/liquidations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ positions: [] }),
+        });
+      }
+      if (url.includes("/api/transactions")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ transactions: [], total: 0 }),
+        });
+      }
       return Promise.resolve({
         ok: true,
-        json: async () => ([]),
+        json: async () => ({}),
       });
     });
 
-    render(<DashboardPage />);
+    render(<DashboardClient />);
     
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
     
     const alert = await screen.findByText(/Immediate action required|Collateral is critically weak/i);
     expect(alert).toBeInTheDocument();
+
+    const results = await axe.run(document.body);
+    const seriousOrCritical = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical"
+    );
+    expect(seriousOrCritical).toEqual([]);
+  });
+
+  it("handles fetch failure gracefully and renders a user-visible error banner", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("/api/positions")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      if (url.includes("/api/liquidations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ positions: [] }),
+        });
+      }
+      if (url.includes("/api/transactions")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ transactions: [], total: 0 }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({}),
+      });
+    });
+
+    render(<DashboardClient />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
+
+    const errorAlert = await screen.findByText(/Failed to load positions data/i);
+    expect(errorAlert).toBeInTheDocument();
+    expect(screen.getAllByText("Error").length).toBeGreaterThan(0);
+
+    const results = await axe.run(document.body);
+    const seriousOrCritical = results.violations.filter(
+      (v) => v.impact === "serious" || v.impact === "critical"
+    );
+    expect(seriousOrCritical).toEqual([]);
+  });
+
+  it("handles fetch response not ok gracefully and renders a user-visible error banner", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("/api/positions")) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+        });
+      }
+      if (url.includes("/api/liquidations")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ positions: [] }),
+        });
+      }
+      if (url.includes("/api/transactions")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ transactions: [], total: 0 }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({}),
+      });
+    });
+
+    render(<DashboardClient />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
+
+    const errorAlert = await screen.findByText(/Failed to load positions data/i);
+    expect(errorAlert).toBeInTheDocument();
+    expect(screen.getAllByText("Error").length).toBeGreaterThan(0);
 
     const results = await axe.run(document.body);
     const seriousOrCritical = results.violations.filter(

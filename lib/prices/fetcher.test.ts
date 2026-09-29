@@ -3,12 +3,26 @@
  * Tests for upstream price fetching and response validation
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchUpstreamPrices, isValidUpstreamResponse } from '@/lib/prices/fetcher';
 
 describe('fetchUpstreamPrices', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalPriceOracleApiKey = process.env.PRICE_ORACLE_API_KEY;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.NODE_ENV = 'test';
+    delete process.env.PRICE_ORACLE_API_KEY;
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    if (originalPriceOracleApiKey === undefined) {
+      delete process.env.PRICE_ORACLE_API_KEY;
+    } else {
+      process.env.PRICE_ORACLE_API_KEY = originalPriceOracleApiKey;
+    }
   });
 
   describe('Mock Implementation', () => {
@@ -74,6 +88,76 @@ describe('fetchUpstreamPrices', () => {
       expect(typeof result1.prices.XLM).toBe('number');
       expect(typeof result2.prices.XLM).toBe('number');
     });
+
+    describe('Jitter Bounds', () => {
+      const BASE_PRICES: Record<string, { base: number; maxJitter: number }> = {
+        XLM: { base: 0.1245, maxJitter: 0.001 },
+        USDC: { base: 1.0, maxJitter: 0 },
+        BTC: { base: 67340.5, maxJitter: 50 },
+        ETH: { base: 3480.2, maxJitter: 5 },
+      };
+
+      const MAX_JITTER_PCT = 0.02;
+      const SAMPLES = 200;
+      const ALL_ASSETS: Array<'XLM' | 'USDC' | 'BTC' | 'ETH'> = ['XLM', 'USDC', 'BTC', 'ETH'];
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        vi.spyOn(global, 'setTimeout').mockImplementation((fn) => {
+          (fn as () => void)();
+          return 0 as unknown as ReturnType<typeof setTimeout>;
+        });
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should keep every supported asset within jitter bounds across many random samples', async () => {
+        for (let i = 0; i < SAMPLES; i++) {
+          const result = await fetchUpstreamPrices(ALL_ASSETS);
+
+          for (const asset of ALL_ASSETS) {
+            const { base, maxJitter } = BASE_PRICES[asset];
+            const price = result.prices[asset];
+
+            expect(typeof price).toBe('number');
+            expect(price).toBeGreaterThanOrEqual(base - maxJitter);
+            expect(price).toBeLessThanOrEqual(base + maxJitter);
+          }
+        }
+      });
+
+      it('should never produce a price with jitter exceeding 2 % of base', async () => {
+        for (let i = 0; i < SAMPLES; i++) {
+          const result = await fetchUpstreamPrices(ALL_ASSETS);
+
+          for (const asset of ALL_ASSETS) {
+            const { base } = BASE_PRICES[asset];
+            const price = result.prices[asset];
+            const pctDeviation = Math.abs(price - base) / base;
+
+            expect(pctDeviation).toBeLessThanOrEqual(MAX_JITTER_PCT);
+          }
+        }
+      });
+
+      it('should always return USDC at exactly 1.0', async () => {
+        for (let i = 0; i < SAMPLES; i++) {
+          const result = await fetchUpstreamPrices(['USDC']);
+          expect(result.prices.USDC).toBe(1.0);
+        }
+      });
+
+      it('should produce some price variation (not stuck at one value)', async () => {
+        const seen = new Set<number>();
+        for (let i = 0; i < SAMPLES; i++) {
+          const result = await fetchUpstreamPrices(['XLM']);
+          seen.add(result.prices.XLM);
+        }
+        expect(seen.size).toBeGreaterThan(1);
+      });
+    });
   });
 
   describe('Error Handling', () => {
@@ -86,6 +170,15 @@ describe('fetchUpstreamPrices', () => {
     it('should validate response structure', async () => {
       const result = await fetchUpstreamPrices(['XLM']);
       expect(isValidUpstreamResponse(result)).toBe(true);
+    });
+
+    it('should throw when PRICE_ORACLE_API_KEY is missing in production', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.PRICE_ORACLE_API_KEY;
+
+      await expect(fetchUpstreamPrices(['XLM'])).rejects.toThrow(
+        'PRICE_ORACLE_API_KEY not configured',
+      );
     });
   });
 

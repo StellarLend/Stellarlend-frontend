@@ -2,6 +2,13 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from "@/test/test-utils";
 import LendingForm from "./LendingForm";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { ASSETS } from "@/lib/assets";
+
+const mockUseWalletBalances = vi.hoisted(() => vi.fn());
+
+vi.mock("@/hooks/useWalletBalances", () => ({
+  useWalletBalances: mockUseWalletBalances,
+}));
 
 describe("LendingForm Component", () => {
   const mockInitialData = {
@@ -13,6 +20,12 @@ describe("LendingForm Component", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    mockOnSubmit.mockClear();
+    mockUseWalletBalances.mockReturnValue({
+      assetsWithBalances: ASSETS,
+      loading: false,
+      error: null,
+    });
     // Stub a benign fetch globally so the debounced /api/quote preview effect
     // never touches the real network or surfaces as an unhandled rejection
     // when an existing test advances the fake clock.
@@ -37,6 +50,23 @@ describe("LendingForm Component", () => {
     
     expect(screen.getByText(/Lend Your Assets/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Amount to Lend/i)).toBeInTheDocument();
+  });
+
+  it("exposes interactive controls with accessible names and focus", () => {
+    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+    const maxButton = screen.getByRole("button", { name: /^MAX$/i });
+    const submitButton = screen.getByRole("button", { name: /Review Lending Offer/i });
+
+    expect(maxButton).toBeInTheDocument();
+    expect(submitButton).toBeInTheDocument();
+    expect(screen.getByLabelText(/Amount to Lend/i)).toBeInTheDocument();
+
+    maxButton.focus();
+    expect(document.activeElement).toBe(maxButton);
+
+    submitButton.focus();
+    expect(document.activeElement).toBe(submitButton);
   });
 
   it("validates amount is positive", async () => {
@@ -95,6 +125,31 @@ describe("LendingForm Component", () => {
     });
   });
 
+  it("preserves draft values from initialData on successful submit", async () => {
+    render(
+      <LendingForm
+        initialData={{ ...mockInitialData, amount: 100 }}
+        onSubmit={mockOnSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: 100,
+          asset: "XLM",
+          interestRate: 8.5,
+        }),
+      );
+    });
+  });
+
   it("rejects zero and negative amounts", async () => {
     render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
 
@@ -129,6 +184,63 @@ describe("LendingForm Component", () => {
     expect(await screen.findByText(/Interest rate must be between/)).toBeInTheDocument();
   });
 
+  it("validates against live wallet balance when wallet is connected", async () => {
+    const liveBalances = ASSETS.map((a) =>
+      a.symbol === "XLM" ? { ...a, balance: 50 } : a,
+    );
+    mockUseWalletBalances.mockReturnValue({
+      assetsWithBalances: liveBalances,
+      loading: false,
+      error: null,
+    });
+
+    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+    const amountInput = screen.getByLabelText(/Amount to Lend/i);
+
+    fireEvent.change(amountInput, { target: { value: "100" } });
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+
+    expect(
+      await screen.findByText(/Insufficient balance/i),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Maximum available: 50 XLM/i),
+    ).toBeInTheDocument();
+
+    fireEvent.change(amountInput, { target: { value: "25" } });
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Insufficient balance/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("does not submit when live wallet balance is insufficient", async () => {
+    const liveBalances = ASSETS.map((a) =>
+      a.symbol === "XLM" ? { ...a, balance: 50 } : a,
+    );
+    mockUseWalletBalances.mockReturnValue({
+      assetsWithBalances: liveBalances,
+      loading: false,
+      error: null,
+    });
+
+    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "100" } });
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+
+    expect(await screen.findByText(/Insufficient balance/i)).toBeInTheDocument();
+    expect(mockOnSubmit).not.toHaveBeenCalled();
+  });
+
   it("updates default interest rate when asset changes", async () => {
     render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
 
@@ -158,6 +270,26 @@ describe("LendingForm Component", () => {
 
     await waitFor(() => {
       expect(screen.queryByText(/Please enter a valid amount/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it("allows retrying after fixing a validation error", async () => {
+    render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+    expect(await screen.findByText(/Please enter a valid amount/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Amount to Lend/i), { target: { value: "100" } });
+    fireEvent.click(screen.getByText(/Review Lending Offer/i));
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 100 }),
+      );
     });
   });
 

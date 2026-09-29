@@ -11,6 +11,7 @@ import AccountDeletionDialog from "@/components/shared/common/AccountDeletionDia
 describe("AccountDeletionUndo", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));
   });
 
   afterEach(() => {
@@ -30,6 +31,17 @@ describe("AccountDeletionUndo", () => {
 
     act(() => vi.advanceTimersByTime(1000));
     expect(screen.getByTestId("undo-countdown")).toHaveTextContent("3");
+  });
+
+  it("adjusts correctly when timer fires late due to throttling", () => {
+    render(<AccountDeletionUndo durationSeconds={10} onUndo={vi.fn()} onElapsed={vi.fn()} />);
+
+    // Simulate throttling where the 1000ms timeout fires 3000ms late (total 4000ms elapsed)
+    vi.setSystemTime(new Date("2024-01-01T00:00:03Z"));
+    act(() => vi.advanceTimersByTime(1000));
+    
+    // 4000ms elapsed -> 10 - 4 = 6 seconds remaining
+    expect(screen.getByTestId("undo-countdown")).toHaveTextContent("6");
   });
 
   it("shows the Undo button", () => {
@@ -149,6 +161,7 @@ function openAndConfirm() {
 describe("AccountDeletionDialog – undo window integration", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));
   });
 
   afterEach(() => {

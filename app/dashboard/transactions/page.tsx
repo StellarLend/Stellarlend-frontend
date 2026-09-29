@@ -1,13 +1,17 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { IconPlaceholder } from "@/components";
 import { DashboardLayout } from "@/components";
+import { TransactionExportButton } from "@/components/features/dashboard/components/TransactionExportButton";
+import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
+import FilterPresets from "@/components/features/dashboard/components/FilterPresets";
+import { TransactionsSummaryHeader } from "@/components/features/dashboard/components";
 import { Transactions } from "@/components/shared/common/Transaction";
 import { PageHeader } from "@/components/shared/common";
-import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
-import { TransactionsSummaryHeader } from "@/components/features/dashboard/components";
 import { useTransactionSummary } from "@/hooks/useTransactionSummary";
+
+const IconPlaceholder = () => <span className="inline-block w-4 h-4 bg-slate-200 animate-pulse rounded" />;
 
 // Lazy load Bank icon to reduce initial bundle size
 const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod => ({ default: mod.Bank })), {
@@ -18,6 +22,12 @@ const Bank = dynamic(() => import("@/components/shared/ui/icons/Bank").then(mod 
 export default function TransactionsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const { inflow, outflow, net, isLoading } = useTransactionSummary();
+  const searchParams = useSearchParams();
+  const filters = {
+    status: searchParams.get('status') ?? undefined,
+    type: searchParams.get('type') ?? undefined,
+    search: searchParams.get('search') ?? undefined,
+  };
 
   return (
     <DashboardLayout>
@@ -29,6 +39,7 @@ export default function TransactionsPage() {
         />
       </div>
       <div className="px-6 md:px-12 mt-4">
+        <FilterPresets />
         <TransactionFilters totalCount={totalCount} />
       </div>
       <TransactionsSummaryHeader inflow={inflow} outflow={outflow} net={net} isLoading={isLoading} />
@@ -36,3 +47,4 @@ export default function TransactionsPage() {
     </DashboardLayout>
   );
 }
+

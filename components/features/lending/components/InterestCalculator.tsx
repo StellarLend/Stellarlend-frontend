@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { LendingData, CalculationResult } from "@/lib/lending/types";
 import { calculateQuote } from "@/lib/lending/quote";
+import type { QuoteError } from "@/lib/lending/quote";
 import { generateAmortizationSchedule } from "@/lib/lending/amortization";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
@@ -32,6 +33,7 @@ export default function InterestCalculator({
   const [calculation, setCalculation] = useState<CalculationResult | null>(
     null,
   );
+  const [quoteError, setQuoteError] = useState<QuoteError | null>(null);
   const [schedule, setSchedule] = useState<ReturnType<
     typeof generateAmortizationSchedule
   > | null>(null);
@@ -39,6 +41,7 @@ export default function InterestCalculator({
   useEffect(() => {
     if (data.amount <= 0 || data.interestRate <= 0) {
       setCalculation(null);
+      setQuoteError(null);
       setSchedule(null);
       return;
     }
@@ -47,10 +50,12 @@ export default function InterestCalculator({
 
     if (!outcome.ok) {
       setCalculation(null);
+      setQuoteError(outcome.error);
       setSchedule(null);
       return;
     }
 
+    setQuoteError(null);
     setCalculation(outcome.result);
     onCalculate(outcome.result);
 
@@ -63,6 +68,46 @@ export default function InterestCalculator({
     }
   }, [data.amount, data.interestRate, data.duration, type, onCalculate]);
 
+  // Calculation failed with a specific error — surface it distinctly so the
+  // user knows their input was rejected, not just empty.
+  if (quoteError) {
+    return (
+      <div
+        role="alert"
+        className="bg-white rounded-xl shadow-sm border border-red-200 p-6 h-full flex flex-col justify-center"
+      >
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          {type === "lend" ? "Earnings Calculator" : "Loan Calculator"}
+        </h3>
+        <div className="text-center py-8">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+            <svg
+              className="w-8 h-8 text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+              />
+            </svg>
+          </div>
+          <p className="text-red-600 text-sm font-medium">
+            Unable to calculate: {quoteError.message}
+          </p>
+          <p className="text-gray-400 text-xs mt-1">
+            Error code: {quoteError.code}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Still waiting for a first calculation result after the user typed a value.
   if (!calculation && data.amount > 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse h-full flex flex-col justify-center">

@@ -1,7 +1,8 @@
 import React from "react";
 import { render, screen } from "@/test/test-utils";
 import PositionSummary from "./PositionSummary";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import * as UsePositionsHook from "@/hooks/usePositions";
 
 describe("PositionSummary Component", () => {
   const mockHealthyData = {
@@ -129,6 +130,56 @@ describe("PositionSummary Component", () => {
 
       healthCard = screen.getByRole("article");
       expect(healthCard).toHaveClass("bg-red-950");
+    });
+
+    it("uses shared getHealthBand thresholds for boundary values", () => {
+      const { rerender } = render(
+        <PositionSummary
+          data={{
+            suppliedFunds: "$5,000.00 XLM",
+            borrowedAmount: "$1,000.00 XLM",
+            healthFactor: 2.0,
+          }}
+        />
+      );
+
+      expect(screen.getByRole("region")).toHaveAttribute(
+        "data-health-band",
+        "healthy"
+      );
+      expect(screen.getByText("Healthy")).toBeInTheDocument();
+
+      rerender(
+        <PositionSummary
+          data={{
+            suppliedFunds: "$5,000.00 XLM",
+            borrowedAmount: "$3,000.00 XLM",
+            healthFactor: 1.0,
+          }}
+        />
+      );
+
+      expect(screen.getByRole("region")).toHaveAttribute(
+        "data-health-band",
+        "at-risk"
+      );
+      expect(screen.getByText("At Risk")).toBeInTheDocument();
+
+      rerender(
+        <PositionSummary
+          data={{
+            suppliedFunds: "$5,000.00 XLM",
+            borrowedAmount: "$5,000.00 XLM",
+            healthFactor: 0.99,
+          }}
+        />
+      );
+
+      expect(screen.getByRole("region")).toHaveAttribute(
+        "data-health-band",
+        "critical"
+      );
+      expect(screen.getByText("Critical")).toBeInTheDocument();
     });
   });
 
@@ -394,6 +445,26 @@ describe("PositionSummary Component", () => {
 
       const grid = document.querySelector(".grid");
       expect(grid).toHaveClass("grid-cols-2", "md:grid-cols-2");
+    });
+  });
+
+  describe("Stale Data Indicator", () => {
+    it("renders the stale data warning when useCollateralShares reports isStale", () => {
+      // Force the hook to return isStale: true for this specific test
+      const spy = vi.spyOn(UsePositionsHook, "useCollateralShares").mockReturnValue({
+        shares: [],
+        isLoading: false,
+        isStale: true,
+      });
+
+      render(<PositionSummary data={mockHealthyData} />);
+
+      // Assert the banner is visible
+      expect(screen.getByRole("alert", { name: "Stale data warning" })).toBeInTheDocument();
+      expect(screen.getByText("Data May Be Outdated")).toBeInTheDocument();
+
+      // Clean up the mock so other tests don't fail
+      spy.mockRestore();
     });
   });
 

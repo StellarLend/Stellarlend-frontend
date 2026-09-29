@@ -75,7 +75,7 @@ export async function verifyWalletSignature(transactionXdr: string): Promise<str
       NETWORK_PASSPHRASE,
       HOME_DOMAIN,
       HOME_DOMAIN
-    ) as any;
+    );
 
     const signersFound = WebAuth.verifyChallengeTxSigners(
       transactionXdr,
@@ -91,7 +91,8 @@ export async function verifyWalletSignature(transactionXdr: string): Promise<str
     }
 
     return clientAccountID;
-  } catch (error: any) {
-    throw new Error(`Signature verification failed: ${error.message || "Unknown error"}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`Signature verification failed: ${message}`);
   }
 }

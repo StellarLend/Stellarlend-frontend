@@ -1,4 +1,6 @@
-import { pgTable, text, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgEnum, pgTable, text, boolean, timestamp } from 'drizzle-orm/pg-core';
+
+export const notificationTypeEnum = pgEnum('notification_type', ['info', 'success', 'warning', 'error']);
 
 export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),
@@ -7,7 +9,7 @@ export const notifications = pgTable('notifications', {
   message: text('message').notNull(),
   read: boolean('read').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-  type: text('type').notNull().default('info'), // 'info' | 'success' | 'warning' | 'error'
+  type: notificationTypeEnum('type').notNull().default('info'),
 });
 
 export type DBNotification = typeof notifications.$inferSelect;

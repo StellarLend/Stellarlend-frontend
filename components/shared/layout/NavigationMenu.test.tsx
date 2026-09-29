@@ -278,6 +278,15 @@ describe("buildCrumbs (pure helper)", () => {
     expect(buildCrumbs("/dashboard/transactions/42").at(-1)?.label).toBe("Details");
   });
 
+  it("dynamic segment (64-char hex hash) renders as 'Details'", () => {
+    const hash = "c03260cc51347b2c53d0e9061df40003ec1c8fbbab08fcf9a3eef93845c4fc06";
+    expect(buildCrumbs(`/dashboard/transactions/${hash}`).at(-1)?.label).toBe("Details");
+  });
+
+  it("dynamic segment (mock TXN id) renders as 'Details'", () => {
+    expect(buildCrumbs("/dashboard/transactions/TXN12345").at(-1)?.label).toBe("Details");
+  });
+
   it("strips trailing slash", () => {
     expect(buildCrumbs("/dashboard/")).toEqual([
       { label: "Home", href: "/" },
@@ -350,6 +359,12 @@ describe("Breadcrumbs component", () => {
 
   it("handles dynamic segment (transaction id) with readable label", () => {
     mockPathname = "/dashboard/transactions/abc-123-def";
+    render(<Breadcrumbs />);
+    expect(screen.getByText("Details")).toBeInTheDocument();
+  });
+
+  it("handles dynamic segment (64-char hex hash) with readable label", () => {
+    mockPathname = "/dashboard/transactions/c03260cc51347b2c53d0e9061df40003ec1c8fbbab08fcf9a3eef93845c4fc06";
     render(<Breadcrumbs />);
     expect(screen.getByText("Details")).toBeInTheDocument();
   });

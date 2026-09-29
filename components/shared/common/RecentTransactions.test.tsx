@@ -58,6 +58,19 @@ vi.mock("@/types/Transaction", async (importOriginal) => {
   return { ...original, fetchTransactions: mockFetchTransactions };
 });
 
+function makeTxn(overrides: Partial<Transaction> = {}): Transaction {
+  return {
+    id: "TXN-000",
+    type: "Deposit",
+    amount: 100,
+    asset: "XLM",
+    date: "2024-04-01",
+    time: "10:00AM",
+    status: "Completed",
+    ...overrides,
+  };
+}
+
 const inflowTxn = makeTxn({
   id: "txn-in",
   type: "Deposit",

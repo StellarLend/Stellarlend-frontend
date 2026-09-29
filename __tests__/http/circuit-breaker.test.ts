@@ -55,11 +55,14 @@ describe('CircuitBreaker', () => {
     expect(breaker.shouldAllow(host, path)).toBe(true);
   });
 
-  test('skips breaker for health probe', () => {
-    // Force open state
-    (process.env as any).CIRCUIT_FAILURE_RATE = '0';
-    (process.env as any).CIRCUIT_MIN_CALLS = '0';
+  test('blocks health probe paths when circuit is open', () => {
+    // Verify that /api/health paths are NOT exempt from circuit breaker protection.
+    // Force the circuit open via failures.
+    (process.env as any).CIRCUIT_FAILURE_RATE = '0.5';
+    (process.env as any).CIRCUIT_MIN_CALLS = '2';
     breaker.recordFailure(host);
-    expect(breaker.shouldAllow(host, healthPath)).toBe(true);
+    breaker.recordFailure(host);
+    // Circuit should now be OPEN — health paths must also be blocked.
+    expect(breaker.shouldAllow(host, healthPath)).toBe(false);
   });
 });

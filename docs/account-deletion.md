@@ -109,6 +109,42 @@ Audit events are stored in-memory and can be queried via `getAuditEvents()`. In 
 | 401 | No authentication, invalid token, invalid/expired challenge, or challenge belongs to a different user |
 | 500 | No profile found for user, or anonymization failed |
 
+## UI Flow
+
+The frontend provides an `AccountDeletionPanel` component at `components/features/account/components/AccountDeletionPanel.tsx` that implements a two-step deletion flow with typed confirmation:
+
+### Step 1: Initiate
+
+The user clicks **"Delete My Account"** which triggers a `GET /api/account/delete/challenge` request. A loading state (`"Requesting..."`) and `aria-busy` prevent double-submits during the fetch.
+
+On success, a challenge token is received and the confirmation dialog opens.
+
+On failure:
+- **429 (rate limit)**: Shows a rate-limit error toast.
+- **Other errors**: Shows a generic "Challenge failed" toast with the server's message or a fallback.
+- **Network error**: Shows a "Network error" toast.
+
+### Step 2: Typed Confirmation
+
+The confirmation dialog requires the user to type the exact phrase `DELETE` into a text input. The **"Delete My Account"** button remains disabled until the typed phrase matches. A focus trap manages keyboard navigation within the dialog, and `Escape` closes it.
+
+On confirm:
+- Sends `DELETE /api/account/delete` with the challenge token in the JSON body.
+- A `"Deleting..."` loading state with `aria-busy` prevents double-submits.
+- On success, the dialog closes and the user is redirected to `/`.
+- On failure, an error toast is shown and the dialog remains open so the user can retry.
+
+### Error handling
+
+All errors are surfaced via the `useToast` system. The component never exposes raw server error strings to the user — status-code-specific or generic fallback messages are used instead.
+
+### Accessibility
+
+- Danger styling (red backgrounds, red text) for all deletion-related UI.
+- Focus management: auto-focuses the confirmation input on dialog open, restores focus on close.
+- `aria-modal="true"` and `aria-labelledby` on the dialog.
+- `aria-busy` on buttons during async operations.
+
 ## Implementation Files
 
 - Route: `app/api/account/delete/route.ts` (DELETE handler)

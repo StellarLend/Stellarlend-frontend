@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import {
   usePrices,
   loadPrices,
@@ -198,5 +198,37 @@ describe("usePrices", () => {
     await waitFor(() => expect(result.current.hasError).toBe(true));
 
     expect(result.current.getPriceLabel("XLM")).toBe("Price unavailable");
+  });
+
+  it("does not refetch when re-rendered with a new-but-equivalent assets array", async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        prices: { XLM: 0.12, USDC: 1 },
+        timestamp: new Date().toISOString(),
+        source: "test",
+      }),
+    } as Response);
+
+    // Passing a fresh array literal on every render is the exact scenario
+    // that used to defeat caching: `assets` in the effect's dependency array
+    // always differs by reference even when its contents are identical.
+    const { result, rerender } = renderHook(
+      ({ assets }: { assets: string[] }) => usePrices(assets),
+      { initialProps: { assets: ["XLM", "USDC"] } },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    rerender({ assets: ["XLM", "USDC"] });
+    rerender({ assets: ["XLM", "USDC"] });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(result.current.hasError).toBe(false);
   });
 });

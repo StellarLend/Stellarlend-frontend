@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { CurrencyProvider, useCurrencyPreference } from "./CurrencyContext";
 
@@ -11,23 +11,24 @@ const TestComponent = () => {
 
 describe("CurrencyContext", () => {
   beforeEach(() => {
-    global.fetch = jest.fn();
+    global.fetch = vi.fn();
   });
 
   afterEach(() => {
-    jest.resetAllMocks();
+    vi.resetAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it("fetches and provides the currency preference", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+  it("fetches and provides the displayCurrency preference", async () => {
+    global.fetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ currency: "EUR" }),
+      json: async () => ({ displayCurrency: "EUR" }),
     });
 
     render(
       <CurrencyProvider>
         <TestComponent />
-      </CurrencyProvider>
+      </CurrencyProvider>,
     );
 
     expect(screen.getByTestId("loading")).toBeInTheDocument();
@@ -36,8 +37,25 @@ describe("CurrencyContext", () => {
     });
   });
 
+  it("picks up a non-USD displayCurrency from the preferences endpoint", async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ displayCurrency: "BTC" }),
+    });
+
+    render(
+      <CurrencyProvider>
+        <TestComponent />
+      </CurrencyProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("currency")).toHaveTextContent("BTC");
+    });
+  });
+
   it("falls back to USD if preference is unset", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    global.fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({}),
     });
@@ -45,7 +63,7 @@ describe("CurrencyContext", () => {
     render(
       <CurrencyProvider>
         <TestComponent />
-      </CurrencyProvider>
+      </CurrencyProvider>,
     );
 
     await waitFor(() => {
@@ -54,17 +72,92 @@ describe("CurrencyContext", () => {
   });
 
   it("falls back to USD on invalid preference or fetch error", async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+    global.fetch.mockRejectedValueOnce(new Error("Network error"));
 
     render(
       <CurrencyProvider>
         <TestComponent />
-      </CurrencyProvider>
+      </CurrencyProvider>,
     );
 
     await waitFor(() => {
       expect(screen.getByTestId("error")).toHaveTextContent("Network error");
     });
-    // The state currency is technically still USD internally though.
+  });
+
+  it("aborts in-flight request on unmount", () => {
+    const abortMock = vi.fn();
+    vi.stubGlobal(
+      "AbortController",
+      vi.fn().mockImplementation(() => ({
+        abort: abortMock,
+        signal: {},
+      })),
+    );
+
+    vi.mocked(global.fetch).mockImplementation(() => new Promise(() => {}));
+
+    const { unmount } = render(
+      <CurrencyProvider>
+        <TestComponent />
+      </CurrencyProvider>,
+    );
+
+    unmount();
+
+    expect(abortMock).toHaveBeenCalled();
+  });
+
+  it("stale in-flight response does not overwrite newer response", async () => {
+    let resolveOld: (value: unknown) => void;
+    const oldPromise = new Promise((resolve) => {
+      resolveOld = resolve;
+    });
+
+    let resolveNew: (value: unknown) => void;
+    const newPromise = new Promise((resolve) => {
+      resolveNew = resolve;
+    });
+
+    global.fetch = vi
+      .fn()
+      .mockReturnValueOnce(oldPromise)
+      .mockReturnValueOnce(newPromise);
+
+    const { rerender } = render(
+      <CurrencyProvider key="1">
+        <TestComponent />
+      </CurrencyProvider>,
+    );
+
+    expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+    rerender(
+      <CurrencyProvider key="2">
+        <TestComponent />
+      </CurrencyProvider>,
+    );
+
+    expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveOld!({
+        ok: true,
+        json: async () => ({ displayCurrency: "EUR" }),
+      });
+    });
+
+    expect(screen.getByTestId("loading")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveNew!({
+        ok: true,
+        json: async () => ({ displayCurrency: "BTC" }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("currency")).toHaveTextContent("BTC");
+    });
   });
 });

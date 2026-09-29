@@ -21,7 +21,14 @@ export interface CleanupJob {
 
 const jobQueue: CleanupJob[] = [];
 let jobCounter = 0;
-const processingInterval = 100;
+
+/**
+ * Terminal (completed/failed) jobs are kept in the in-memory queue for this
+ * duration after they are processed, then pruned. This bounds memory growth
+ * in long-running processes — completed/failed jobs are no longer actionable
+ * and only serve as short-lived diagnostics after their terminal status.
+ */
+const TERMINAL_JOB_RETENTION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 function generateJobId(): string {
   jobCounter += 1;
@@ -98,12 +105,56 @@ export function getJobsByUserId(userId: string): CleanupJob[] {
   return jobQueue.filter((j) => j.userId === userId);
 }
 
+/**
+ * Remove terminal (completed or failed) jobs whose `processedAt` is older
+ * than `maxAgeMs` ago. Pending and processing jobs are never pruned here;
+ * only terminal jobs age out, since they are no longer actionable.
+ *
+ * Defaults to `TERMINAL_JOB_RETENTION_MS` (24h) when no `maxAgeMs` is given.
+ *
+ * @returns The number of jobs removed.
+ */
+export function pruneTerminalJobs(
+  maxAgeMs: number = TERMINAL_JOB_RETENTION_MS,
+): number {
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs < 0) {
+    throw new Error(
+      `pruneTerminalJobs: maxAgeMs must be a finite, non-negative number, got ${maxAgeMs}`,
+    );
+  }
+
+  const cutoff = Date.now() - maxAgeMs;
+  let removed = 0;
+
+  for (let i = jobQueue.length - 1; i >= 0; i--) {
+    const job = jobQueue[i];
+    const isTerminal = job.status === 'completed' || job.status === 'failed';
+    if (!isTerminal || !job.processedAt) continue;
+
+    if (new Date(job.processedAt).getTime() < cutoff) {
+      jobQueue.splice(i, 1);
+      removed += 1;
+    }
+  }
+
+  if (removed > 0) {
+    logger.info(
+      `pruned ${removed} terminal cleanup job(s) older than ${maxAgeMs}ms`,
+      '/lib/queue/cleanup-queue',
+    );
+  }
+
+  return removed;
+}
+
 export function clearJobQueue(): void {
   jobQueue.length = 0;
   jobCounter = 0;
 }
 
 export async function startQueueProcessor(): Promise<void> {
+  pruneTerminalJobs();
+
   const pending = getPendingJobs();
   for (const job of pending) {
     try {

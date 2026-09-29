@@ -78,7 +78,7 @@ export const NavigationMenu = ({
     },
     {
       link: "Cash and receipt",
-      path: "/dashboard",
+      path: "/dashboard/cash",
       icon: (color: string) => <ReceiptFill color={color} />,
     },
     {
@@ -88,7 +88,7 @@ export const NavigationMenu = ({
     },
     {
       link: "Notification",
-      path: "/dashboard",
+      path: "/dashboard/notifications",
       icon: (color: string) => <Notification color={color} />,
     },
     {

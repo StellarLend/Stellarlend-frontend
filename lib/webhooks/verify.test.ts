@@ -197,3 +197,73 @@ describe("NonceStore", () => {
     expect(store.has("recent-nonce")).toBe(true);
   });
 });
+
+describe("NonceStore maximum entries cap", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-06-01T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("evicts oldest entry when exceeding maxEntries", () => {
+    const store = new NonceStore(DEFAULT_TOLERANCE_MS, 5);
+
+    // Add 6 entries with sequential timestamps
+    const now = Date.now();
+    for (let i = 0; i < 6; i++) {
+      store.add("nonce-" + i, now + i);
+    }
+
+    // The first entry (nonce-0) should be evicted
+    expect(store.has("nonce-0")).toBe(false);
+
+    // Entries 1-5 should still be present
+    for (let i = 1; i < 6; i++) {
+      expect(store.has("nonce-" + i)).toBe(true);
+    }
+
+    // Size must not exceed the cap
+    expect(store.size).toBe(5);
+  });
+
+  it("does not evict when at exactly maxEntries", () => {
+    const store = new NonceStore(DEFAULT_TOLERANCE_MS, 3);
+    const now = Date.now();
+
+    store.add("a", now);
+    store.add("b", now + 1);
+    store.add("c", now + 2);
+
+    expect(store.size).toBe(3);
+    expect(store.has("a")).toBe(true);
+    expect(store.has("b")).toBe(true);
+    expect(store.has("c")).toBe(true);
+  });
+
+  it("evicts oldest-first across multiple overflows", () => {
+    const store = new NonceStore(DEFAULT_TOLERANCE_MS, 3);
+    const now = Date.now();
+
+    // First batch: fill to 3
+    store.add("a", now);
+    store.add("b", now + 1);
+    store.add("c", now + 2);
+
+    // Overflow twice
+    store.add("d", now + 3);
+    store.add("e", now + 4);
+
+    // First two should be gone
+    expect(store.has("a")).toBe(false);
+    expect(store.has("b")).toBe(false);
+
+    // Last three should remain
+    expect(store.has("c")).toBe(true);
+    expect(store.has("d")).toBe(true);
+    expect(store.has("e")).toBe(true);
+    expect(store.size).toBe(3);
+  });
+});

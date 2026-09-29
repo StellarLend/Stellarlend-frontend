@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { POST, resetThrottleRegistry } from '../app/api/account/export/route';
+import { POST } from '../app/api/account/export/route';
+import { resetThrottleRegistry } from '../lib/account/export-bundle';
 
 describe('GDPR DSAR Account Export API Route Flow', () => {
   beforeEach(() => {

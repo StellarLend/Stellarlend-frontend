@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { AlertCircle, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 import { formatCurrency, formatPercentage } from "@/lib/utils/format";
 import { usePositionHistory, TimeWindow } from "@/hooks/usePositionHistory";
-import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
 
 export interface NetWorthTrendProps {
   window?: TimeWindow;
@@ -20,7 +20,7 @@ interface CalculatedTrend {
 export function NetWorthTrend({ window: initialWindow = "7d", onWindowChange }: NetWorthTrendProps) {
   const [window, setWindow] = useState<TimeWindow>(initialWindow);
 
-  const { data, isLoading, error } = usePositionHistory(window);
+  const { data, isLoading, isStale, error } = usePositionHistory(window);
 
   const trend: CalculatedTrend | null = useMemo(() => {
     if (!data || data.snapshots.length === 0) return null;
@@ -167,6 +167,18 @@ export function NetWorthTrend({ window: initialWindow = "7d", onWindowChange }: 
       className="rounded-xl border border-[#71B48D33] bg-[#0A3D1E] p-6 text-white mb-6"
       aria-labelledby="networth-title"
     >
+      {/* Stale-data advisory shown while retries are in-flight */}
+      {isStale && (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-lg border border-amber-700 bg-amber-950 px-3 py-2"
+          role="status"
+          aria-label="Retrying to load latest net worth data"
+        >
+          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" aria-hidden="true" />
+          <p className="text-xs text-amber-300">Displaying last known data</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <h2 id="networth-title" className="text-lg font-bold">
           Net Worth Trend

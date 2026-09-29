@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUser } from '../../../lib/auth';
 import { globalCache } from '@/lib/cache';
 import { withRequestLogging } from '@/lib/api/handler';
+import { indexAccountTransactions } from '@/lib/indexer';
 
 async function handlePositions(request: NextRequest) {
   try {
@@ -35,10 +36,30 @@ async function handlePositions(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    let xlmBalance = 0;
+    
+    if (userId && userId !== 'anonymous' && userId !== 'authenticated-user') {
+      try {
+        const txs = await indexAccountTransactions(userId);
+        for (const tx of txs) {
+          if (tx.asset === 'XLM') {
+            xlmBalance += tx.amount;
+          }
+        }
+      } catch (err) {
+        console.error('Positions route failed to fetch transactions:', err);
+      }
+    } else {
+      xlmBalance = 3750;
+    }
+
+    const formattedBalance = `$${xlmBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} XLM`;
+    const copyAddr = userId && userId.length > 8 ? `${userId.substring(0, 10)}...${userId.substring(userId.length - 7)}` : 'BaDE1b2U45...670UzZ';
+
     const mockPositions = [
       {
-        availableBalance: '$3,750.00 XLM',
-        copyAddress: 'BaDE1b2U45...670UzZ',
+        availableBalance: formattedBalance,
+        copyAddress: copyAddr,
         borrowedAmount: '$1,500.00 XLM',
         nextDue: '$250.00 in 4 days',
         suppliedFunds: '$5,000.00 XLM',

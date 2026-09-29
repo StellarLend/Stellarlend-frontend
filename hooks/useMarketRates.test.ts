@@ -1,9 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { clearMarketsResponseCache } from "./useMarketsData";
 import { useMarketRates } from "./useMarketRates";
 
 describe("useMarketRates", () => {
   afterEach(() => {
+    clearMarketsResponseCache();
     vi.unstubAllGlobals();
   });
 
@@ -112,5 +114,45 @@ describe("useMarketRates", () => {
     });
 
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it("dedupes concurrent mounts and issues a single markets fetch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        markets: [
+          {
+            asset: "XLM",
+            supplyApr: 5.5,
+            borrowApr: 9.5,
+            utilization: 0.7,
+            totalSupply: 1000,
+            totalBorrow: 700,
+          },
+          {
+            asset: "USDC",
+            supplyApr: 4.2,
+            borrowApr: 8.1,
+            utilization: 0.6,
+            totalSupply: 1200,
+            totalBorrow: 720,
+          },
+        ],
+        timestamp: "2026-06-29T12:00:00.000Z",
+        source: "test",
+      }),
+    } as Response);
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result: resultA } = renderHook(() => useMarketRates("USDC"));
+    const { result: resultB } = renderHook(() => useMarketRates("XLM"));
+
+    await waitFor(() => {
+      expect(resultA.current.rate).toBe(8.1);
+      expect(resultB.current.rate).toBe(9.5);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

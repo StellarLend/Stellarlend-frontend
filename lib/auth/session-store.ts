@@ -206,6 +206,96 @@ export function clearRevocations(): void {
   userRevocations.clear();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-device session store
+//
+// Stores one record per active device session so the Active Sessions UI can
+// list, inspect, and individually revoke sessions.  The in-memory map is keyed
+// by a stable, per-device session id that callers supply (typically the value
+// held in session.user.id or a UUID minted at login time).
+//
+// In production this should be backed by Redis / the sessions DB table, but the
+// interface is intentionally kept identical so the store can be swapped without
+// touching the route layer.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface StoredSession {
+  /** Stable per-device identifier */
+  id: string;
+  /** Owning user's identifier */
+  userId: string;
+  /** User-Agent header captured at login */
+  userAgent: string;
+  /** Client IP captured at login */
+  ipAddress: string;
+  /** ISO-8601 timestamp when the session was first created */
+  createdAt: string;
+  /** ISO-8601 timestamp of the most recent activity (updated by touchStoredSession) */
+  lastSeenAt: string;
+}
+
+/** In-memory per-device session store (keyed by StoredSession.id) */
+const deviceSessionStore = new Map<string, StoredSession>();
+
+/**
+ * Add (or upsert) a per-device session record.
+ * Callers should invoke this immediately after a successful login.
+ */
+export function addStoredSession(session: StoredSession): void {
+  deviceSessionStore.set(session.id, { ...session });
+  logger.info('Stored session added', 'session-store', { sessionId: session.id, userId: session.userId });
+}
+
+/**
+ * Return the stored session with the given id, or null if it does not exist.
+ */
+export function getStoredSession(sessionId: string): StoredSession | null {
+  return deviceSessionStore.get(sessionId) ?? null;
+}
+
+/**
+ * Return all stored sessions belonging to a specific user.
+ */
+export function listStoredSessions(userId: string): StoredSession[] {
+  const results: StoredSession[] = [];
+  for (const session of deviceSessionStore.values()) {
+    if (session.userId === userId) {
+      results.push({ ...session });
+    }
+  }
+  return results;
+}
+
+/**
+ * Update lastSeenAt for the session with the given id.
+ * No-op if the session does not exist.
+ */
+export function touchStoredSession(sessionId: string): void {
+  const existing = deviceSessionStore.get(sessionId);
+  if (existing) {
+    deviceSessionStore.set(sessionId, {
+      ...existing,
+      lastSeenAt: new Date().toISOString(),
+    });
+  }
+}
+
+/**
+ * Remove (revoke) the per-device session record with the given id.
+ * No-op if the session does not exist (idempotent).
+ */
+export function revokeStoredSession(sessionId: string): void {
+  deviceSessionStore.delete(sessionId);
+  logger.info('Stored session revoked', 'session-store', { sessionId });
+}
+
+/**
+ * Remove all per-device session records (for testing only).
+ */
+export function clearStoredSessions(): void {
+  deviceSessionStore.clear();
+}
+
 /**
  * Get revocation stats for monitoring
  */
