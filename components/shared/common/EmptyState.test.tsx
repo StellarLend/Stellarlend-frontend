@@ -38,4 +38,47 @@ describe("EmptyState", () => {
     expect(alert).toHaveAttribute("aria-live", "assertive");
     expect(screen.getByText("Unable to load markets")).toBeInTheDocument();
   });
+
+  it("does not render an action when its handler is missing", () => {
+    render(
+      <EmptyState
+        title="No activity yet"
+        description="Your history will appear here."
+        actionLabel="Start lending"
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: "Start lending" })).not.toBeInTheDocument();
+  });
+
+  it("does not render an action when its label is missing", () => {
+    render(
+      <EmptyState
+        title="No activity yet"
+        description="Your history will appear here."
+        onAction={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("keeps the default tone non-alerting and supports empty content and custom presentation", () => {
+    const { container } = render(
+      <EmptyState
+        title=""
+        description=""
+        icon={<span>Custom icon</span>}
+        className="custom-empty-state"
+      />
+    );
+
+    const section = container.querySelector("section");
+    expect(section).toHaveClass("custom-empty-state");
+    expect(section).not.toHaveAttribute("role", "alert");
+    expect(section).not.toHaveAttribute("aria-live", "assertive");
+    expect(screen.getByRole("heading", { name: "" })).toBeInTheDocument();
+    expect(screen.getByText("Custom icon")).toBeInTheDocument();
+    expect(section?.querySelector("p")).toBeEmptyDOMElement();
+  });
 });
