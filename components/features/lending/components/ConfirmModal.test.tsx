@@ -506,3 +506,226 @@ describe("ConfirmModal protocol fee breakdown", () => {
   });
 });
 
+describe("ConfirmModal failure paths and boundaries", () => {
+  const baseData: LendingData = {
+    asset: "XLM",
+    amount: 250,
+    interestRate: 4.5,
+  };
+
+  function renderModal(props: Partial<React.ComponentProps<typeof ConfirmModal>> = {}) {
+    return render(
+      <ConfirmModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        data={baseData}
+        calculation={{ dailyEarnings: 0.03, totalEarnings: 4.2 }}
+        type="lend"
+        {...props}
+      />,
+    );
+  }
+
+  it("does not render a dialog when isOpen is false", () => {
+    renderModal({ isOpen: false });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not fire onConfirm when the confirm button is disabled", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    renderModal({ onConfirm });
+
+    const confirmButton = screen.getByRole("button", { name: /confirm lending/i });
+    expect(confirmButton).toBeDisabled();
+
+    await user.click(confirmButton);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("does not fire onConfirm twice for rapid duplicate clicks", async () => {
+    const user = userEvent.setup();
+    let resolveConfirm: (() => void) | undefined;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConfirm = resolve;
+        }),
+    );
+    renderModal({ onConfirm });
+
+    await user.click(screen.getByRole("checkbox"));
+    const confirmButton = screen.getByRole("button", { name: /confirm lending/i });
+
+    await user.click(confirmButton);
+    await user.click(confirmButton);
+    await user.click(confirmButton);
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+
+    resolveConfirm?.();
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  });
+
+  it("re-enables confirm after a rejected onConfirm so the user can retry", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce(undefined);
+    renderModal({ onConfirm });
+
+    await user.click(screen.getByRole("checkbox"));
+    const confirmButton = screen.getByRole("button", { name: /confirm lending/i });
+
+    await user.click(confirmButton);
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+
+    await user.click(confirmButton);
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(2));
+  });
+
+  it("does not close the modal while a confirm is in flight", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    let resolveConfirm: (() => void) | undefined;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConfirm = resolve;
+        }),
+    );
+    renderModal({ onConfirm, onClose });
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /confirm lending/i }));
+
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: /close modal/i }));
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    resolveConfirm?.();
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  });
+
+  it("resets the terms checkbox when the modal is reopened", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+
+    function Harness() {
+      const [isOpen, setIsOpen] = useState(true);
+      return (
+        <div>
+          <button type="button" onClick={() => setIsOpen(true)}>
+            Reopen
+          </button>
+          <ConfirmModal
+            isOpen={isOpen}
+            onClose={() => setIsOpen(false)}
+            onConfirm={onConfirm}
+            data={baseData}
+            calculation={{ dailyEarnings: 0.03, totalEarnings: 4.2 }}
+            type="lend"
+          />
+        </div>
+      );
+    }
+
+    render(<Harness />);
+
+    await user.click(screen.getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: /confirm lending/i })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: /close modal/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: /reopen/i }));
+    expect(screen.getByRole("button", { name: /confirm lending/i })).toBeDisabled();
+  });
+
+  it("handles a zero-amount lend without firing confirm until terms accepted", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    renderModal({
+      data: { asset: "XLM", amount: 0, interestRate: 5 },
+      calculation: null,
+      onConfirm,
+    });
+
+    const confirmButton = screen.getByRole("button", { name: /confirm lending/i });
+    expect(confirmButton).toBeDisabled();
+    await user.click(confirmButton);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(confirmButton);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles a negative-amount input without throwing", () => {
+    expect(() =>
+      renderModal({
+        data: { asset: "XLM", amount: -100, interestRate: 5 },
+        calculation: null,
+      }),
+    ).not.toThrow();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("handles a missing calculation object without throwing", () => {
+    expect(() =>
+      renderModal({ calculation: null }),
+    ).not.toThrow();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("handles an unknown asset without throwing and without a fee breakdown", () => {
+    expect(() =>
+      renderModal({
+        data: { asset: "UNKNOWN", amount: 100, interestRate: 5 },
+        calculation: null,
+      }),
+    ).not.toThrow();
+    expect(screen.queryByTestId("fee-breakdown")).not.toBeInTheDocument();
+  });
+
+  it("does not close the terms modal when the underlying confirmation is closed", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    await user.click(screen.getByRole("button", { name: /terms and conditions/i }));
+    expect(screen.getByRole("dialog", { name: /terms and conditions/i })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: /terms and conditions/i })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("dialog", { name: /confirm lending transaction/i })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("does not leak focus outside the dialog when tabbing past the last control", async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    const dialog = screen.getByRole("dialog", { name: /confirm lending transaction/i });
+    const focusables = within(dialog).getAllByRole("button");
+    const last = focusables[focusables.length - 1];
+    last.focus();
+    expect(last).toHaveFocus();
+
+    await user.tab();
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    await user.tab({ shift: true });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+});
+
