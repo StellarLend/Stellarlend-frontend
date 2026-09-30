@@ -4,6 +4,8 @@ import {
   AWS_ACCESS_KEY_PATTERN,
   AWS_SECRET_KEY_PATTERN,
   SECRET_PATTERNS,
+  SERVER_ENV_PATTERN,
+  STELLAR_SECRET_KEY_PATTERN,
 } from '../../lib/security/secret-patterns';
 
 vi.mock('fs', () => ({
@@ -64,5 +66,34 @@ describe('scanFile', () => {
     expect(matches[0].line).toBe(3);
     expect(matches[0].column).toBe(14);
     expect(matches[0].match).toBe('AKIAIOSFODNN7EXAMPLE');
+  });
+
+  it('returns empty array and does not throw when the file cannot be read', () => {
+    mockReadFileSync.mockImplementation(() => { throw new Error('EACCES: permission denied'); });
+    expect(() => scanFile('/fake/unreadable.js', SECRET_PATTERNS)).not.toThrow();
+    expect(scanFile('/fake/unreadable.js', SECRET_PATTERNS)).toEqual([]);
+  });
+
+  it('detects a leaked server env var name in a bundle', () => {
+    mockReadFileSync.mockReturnValue('var t="AUTH_SIGNING_SECRET",r=process.env[t]');
+    const matches = scanFile('/fake/chunk.js', [SERVER_ENV_PATTERN]);
+
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches[0].severity).toBe('critical');
+  });
+
+  it('detects a Stellar secret key', () => {
+    const stellarKey = 'S' + 'A'.repeat(55);
+    mockReadFileSync.mockReturnValue(`const sk = "${stellarKey}"`);
+    const matches = scanFile('/fake/wallet.js', [STELLAR_SECRET_KEY_PATTERN]);
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].pattern).toBe('Stellar Secret Key');
+    expect(matches[0].severity).toBe('critical');
+  });
+
+  it('returns no matches for a clean file', () => {
+    mockReadFileSync.mockReturnValue('console.log("hello world");');
+    expect(scanFile('/fake/clean.js', SECRET_PATTERNS)).toHaveLength(0);
   });
 });

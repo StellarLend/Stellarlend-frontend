@@ -102,6 +102,8 @@ export default function BorrowingForm({
   );
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
+  const [durationMode, setDurationMode] = useState<"fixed" | "custom">("fixed");
+  const [customDays, setCustomDays] = useState<string>("");
 
   const { assetsWithBalances } = useWalletBalances();
   const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
@@ -267,6 +269,27 @@ export default function BorrowingForm({
    * Returns an error message string on failure, or `""` on success.
    * When valid, it also calls the `onValid` callback with the parsed integer.
    */
+  const validateCustomDays = (
+    value: string,
+    onValid?: (days: number) => void,
+  ): string => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "Please enter a custom duration";
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed)) {
+      return "Duration must be a whole number of days";
+    }
+    if (parsed < CUSTOM_DURATION_MIN_DAYS) {
+      return `Duration must be at least ${CUSTOM_DURATION_MIN_DAYS} day`;
+    }
+    if (parsed > CUSTOM_DURATION_MAX_DAYS) {
+      return `Duration must be at most ${CUSTOM_DURATION_MAX_DAYS} days`;
+    }
+    onValid?.(parsed);
+    return "";
+  };
 
   const formatCollateralUnits = (amount: number): string =>
     amount.toLocaleString(undefined, {

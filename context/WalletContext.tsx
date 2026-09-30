@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import config from "@/lib/config";
 import { safeRedirectPath } from "@/lib/security/safe-redirect";
 import { connectWallet, isValidStellarAddress, type StellarNetwork } from "@/lib/wallet/connectHandshake";
+import {
+  assertWalletMatchesSession,
+  validateClientSessionResponse,
+} from "@/lib/auth/session-boundary";
 
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error";
 export type { StellarNetwork };
@@ -45,6 +49,20 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const clearWalletIdentity = () => {
+    setAddress(null);
+    setAccounts([]);
+    setActiveAccount(null);
+    sessionStorage.removeItem("walletAddress");
+    sessionStorage.removeItem(ACCOUNTS_STORAGE_KEY);
+    sessionStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+  };
+
+  const clearWalletState = () => {
+    clearWalletIdentity();
+    setStatus("disconnected");
+  };
+
   // Map config network to PUBLIC or TESTNET
   const network: StellarNetwork =
     config.stellar.network.toUpperCase() === "MAINNET" ||
@@ -55,71 +73,42 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Rehydrate state on mount
   useEffect(() => {
     const rehydrate = async () => {
-      // 1. Read from sessionStorage first for immediate hydration
+      // Read storage only as a candidate. Sensitive UI is not unlocked until
+      // the server confirms the same active wallet session.
       const storedAddress = sessionStorage.getItem("walletAddress");
-      if (storedAddress) {
-        setAddress(storedAddress);
-        setStatus("connected");
 
-        const storedAccounts = readStoredAccounts();
-        const storedActive = sessionStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
-        const resolvedAccounts = storedAccounts.length > 0 ? storedAccounts : [storedAddress];
-        setAccounts(resolvedAccounts);
-        setActiveAccount(
-          storedActive && resolvedAccounts.includes(storedActive) ? storedActive : storedAddress,
-        );
-      }
-
-      // 2. Fetch session from server to verify/sync
+      // Fetch session from server to verify/sync.
       try {
         const response = await fetch("/api/auth/session");
         if (response.ok) {
           const data = await response.json();
-          const sessionAddress = data?.session?.user?.walletAddress;
-          if (sessionAddress) {
-            setAddress(sessionAddress);
-            setStatus("connected");
-            sessionStorage.setItem("walletAddress", sessionAddress);
+          const session = validateClientSessionResponse(data, network);
+          assertWalletMatchesSession(storedAddress, session.walletAddress);
 
-            const storedAccounts = readStoredAccounts();
-            const resolvedAccounts = storedAccounts.includes(sessionAddress)
-              ? storedAccounts
-              : [sessionAddress];
-            setAccounts(resolvedAccounts);
-            sessionStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(resolvedAccounts));
+          setAddress(session.walletAddress);
+          setStatus("connected");
+          sessionStorage.setItem("walletAddress", session.walletAddress);
 
-            const storedActive = sessionStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
-            const nextActive =
-              storedActive && resolvedAccounts.includes(storedActive) ? storedActive : sessionAddress;
-            setActiveAccount(nextActive);
-            sessionStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, nextActive);
-          } else {
-            // Server has no session, clear client state
-            setAddress(null);
-            setStatus("disconnected");
-            setAccounts([]);
-            setActiveAccount(null);
-            sessionStorage.removeItem("walletAddress");
-            sessionStorage.removeItem(ACCOUNTS_STORAGE_KEY);
-            sessionStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
-          }
+          const storedAccounts = readStoredAccounts();
+          const resolvedAccounts = storedAccounts.includes(session.walletAddress)
+            ? storedAccounts.filter(isValidStellarAddress)
+            : [session.walletAddress];
+          setAccounts(resolvedAccounts);
+          sessionStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(resolvedAccounts));
+
+          setActiveAccount(session.walletAddress);
+          sessionStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, session.walletAddress);
         } else {
-          // If session request fails (e.g., unauthorized), clear state
-          setAddress(null);
-          setStatus("disconnected");
-          setAccounts([]);
-          setActiveAccount(null);
-          sessionStorage.removeItem("walletAddress");
-          sessionStorage.removeItem(ACCOUNTS_STORAGE_KEY);
-          sessionStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+          clearWalletState();
         }
       } catch (err) {
         console.error("Failed to fetch session during rehydration:", err);
+        clearWalletState();
       }
     };
 
     rehydrate();
-  }, []);
+  }, [network]);
 
   const connect = async () => {
     if (status === "connecting") return;
@@ -147,6 +136,10 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
         console.error("Failed to enumerate wallet accounts:", accountsErr);
         resolvedAccounts = [verifiedAddress];
       }
+      resolvedAccounts = Array.from(new Set(resolvedAccounts)).filter(isValidStellarAddress);
+      if (!resolvedAccounts.includes(verifiedAddress)) {
+        resolvedAccounts = [verifiedAddress];
+      }
 
       setAddress(verifiedAddress);
       setAccounts(resolvedAccounts);
@@ -164,12 +157,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       console.error("Wallet connection failed:", err);
       setError(err.message || "Wallet connection failed");
       setStatus("error");
-      setAddress(null);
-      setAccounts([]);
-      setActiveAccount(null);
-      sessionStorage.removeItem("walletAddress");
-      sessionStorage.removeItem(ACCOUNTS_STORAGE_KEY);
-      sessionStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+      clearWalletIdentity();
     }
   };
 
@@ -183,13 +171,7 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
       console.error("Logout failed during disconnect:", err);
     } finally {
       // Always clear local state on disconnect to ensure the user is logged out locally
-      setAddress(null);
-      setAccounts([]);
-      setActiveAccount(null);
-      setStatus("disconnected");
-      sessionStorage.removeItem("walletAddress");
-      sessionStorage.removeItem(ACCOUNTS_STORAGE_KEY);
-      sessionStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+      clearWalletState();
     }
 
     const returnUrl = new URL(window.location.href).searchParams.get("returnUrl");
@@ -204,6 +186,11 @@ export const WalletProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const switchAccount = async (nextAddress: string) => {
     if (!nextAddress || !accounts.includes(nextAddress)) {
       setError("Unknown account: cannot switch to an address not exposed by the wallet");
+      return;
+    }
+
+    if (nextAddress !== address) {
+      setError("Switching accounts requires reconnecting so the server can authorize the wallet");
       return;
     }
 

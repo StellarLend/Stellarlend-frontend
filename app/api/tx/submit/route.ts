@@ -107,11 +107,11 @@ export async function POST(request: NextRequest) {
 
   const payload = buildSorobanSubmitRpcRequest((body as any).signedEnvelopeXdr);
   const shouldSimulate = new URL(request.url).searchParams.get('simulate') === 'true';
-  const rpcUrl = serverConfig.stellar.sorobanRpcUrl || config.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
+  const rpcUrl = serverConfig.stellar.sorobanRpcUrl || 'https://soroban-testnet.stellar.org';
 
   try {
     if (shouldSimulate) {
-      await simulateSorobanTransaction(config.stellar.sorobanRpcUrl, (body as any).signedEnvelopeXdr);
+      await simulateSorobanTransaction(serverConfig.stellar.sorobanRpcUrl, (body as any).signedEnvelopeXdr);
     }
 
     const start = Date.now();

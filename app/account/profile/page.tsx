@@ -1,5 +1,5 @@
 "use client"
-import { DisplayProfileForm, DataExportButton, PreferencesForm, AccountDeletion } from "@/components/features/account/components";
+import { DisplayProfileForm, DataExportButton, PreferencesForm, AccountDeletion, AccountDeletionPanel } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
 import { PageHeader } from "@/components/shared/common";
 
@@ -28,6 +28,9 @@ export default function Account() {
               </div>
               <div className="mt-8 pt-6 border-t border-red-100">
                 <AccountDeletion />
+              </div>
+              <div className="mt-8 pt-6 border-t border-red-100">
+                <AccountDeletionPanel />
               </div>
             </>
           )}

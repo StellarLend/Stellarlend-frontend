@@ -5,6 +5,7 @@ import { IconPlaceholder } from "@/components";
 import { DashboardLayout } from "@/components";
 import { TransactionExportButton } from "@/components/features/dashboard/components/TransactionExportButton";
 import TransactionFilters from "@/components/features/dashboard/components/TransactionFilters";
+import FilterPresets from "@/components/features/dashboard/components/FilterPresets";
 import { TransactionsSummaryHeader } from "@/components/features/dashboard/components";
 import { Transactions } from "@/components/shared/common/Transaction";
 import { PageHeader } from "@/components/shared/common";
@@ -38,6 +39,7 @@ export default function TransactionsPage() {
         />
       </div>
       <div className="px-6 md:px-12 mt-4">
+        <FilterPresets />
         <TransactionFilters totalCount={totalCount} />
       </div>
       <TransactionsSummaryHeader inflow={inflow} outflow={outflow} net={net} isLoading={isLoading} />

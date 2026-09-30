@@ -147,9 +147,8 @@ describe('config modules', () => {
     expect(config.stellar.horizonUrl).toBe(
       'https://horizon-testnet.stellar.org'
     );
-    expect(config.stellar.sorobanRpcUrl).toBe(
-      'https://soroban-testnet.stellar.org'
-    );
+    // sorobanRpcUrl must not appear on the shared config — it is server-only
+    expect((config.stellar as any).sorobanRpcUrl).toBeUndefined();
     expect(config.stellar.sorobanContractId).toBe('');
     expect(config.analytics.googleAnalyticsId).toBeUndefined();
     expect(config.analytics.mixpanelToken).toBeUndefined();

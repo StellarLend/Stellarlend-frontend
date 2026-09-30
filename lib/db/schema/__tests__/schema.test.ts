@@ -6,6 +6,7 @@ import { notifications } from '../notifications';
 import { transactions } from '../transactions';
 import { auditEvents } from '../audit_events';
 import { eq, and } from 'drizzle-orm';
+import type { ProfileRecord } from '../../../account/repository';
 
 describe('Drizzle Schemas - SQL Compilation Verification', () => {
   describe('accounts schema', () => {
@@ -104,5 +105,79 @@ describe('Drizzle Schemas - SQL Compilation Verification', () => {
       expect(compiled.sql).toContain('"entity_type"');
       expect(compiled.sql).toContain('"details"');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Schema ↔ ProfileRecord alignment (runtime)
+// ---------------------------------------------------------------------------
+//
+// This describe block is the runtime companion to the compile-time guard in
+// lib/account/profile-schema-alignment.ts.  It extracts the column keys that
+// Drizzle exposes on the accounts table object at runtime and compares them
+// (sorted) against the keys declared on a ProfileRecord-shaped value.
+//
+// Why both layers?
+// • The compile-time guard catches mismatches whenever `tsc --noEmit` runs
+//   (CI type-check step, editor).
+// • This runtime test catches cases where the TypeScript build is skipped or
+//   the guard file is accidentally excluded from tsconfig.json, and also
+//   provides a human-readable diff in the test output.
+
+describe('accounts table ↔ ProfileRecord key alignment', () => {
+  /**
+   * Drizzle exposes every column as an enumerable property on the table
+   * object.  We filter out the internal Drizzle symbols/metadata keys
+   * (which are non-enumerable or start with '_') so we get only the
+   * TypeScript-friendly camelCase column names that callers use.
+   */
+  function accountsColumnKeys(): string[] {
+    return Object.keys(accounts)
+      .filter((k) => !k.startsWith('_') && !k.startsWith('$') && k !== 'enableRLS' && typeof (accounts as any)[k] !== 'function')
+      .sort();
+  }
+
+  /**
+   * Returns the keys of a complete ProfileRecord literal.
+   * Because ProfileRecord is an interface (erased at runtime) we assert
+   * against a typed constant — the compiler guarantees this object has
+   * exactly the fields declared by ProfileRecord (no extras, thanks to
+   * excess-property checking; no missing ones, thanks to the interface).
+   */
+  function profileRecordKeys(): string[] {
+    // This object literal is type-checked against ProfileRecord.
+    // Add/remove a field from either side and tsc will complain here too.
+    const sample: ProfileRecord = {
+      userId: 'u',
+      displayName: 'd',
+      bio: 'b',
+      website: 'w',
+      timezone: 'UTC',
+      updatedAt: new Date(),
+    };
+    return Object.keys(sample).sort();
+  }
+
+  it('has the same column keys as ProfileRecord — no extra or missing fields', () => {
+    const schemaKeys = accountsColumnKeys();
+    const recordKeys = profileRecordKeys();
+
+    expect(schemaKeys).toEqual(recordKeys);
+  });
+
+  it('every ProfileRecord key maps to a column in the accounts table', () => {
+    const schemaKeys = new Set(accountsColumnKeys());
+    const recordKeys = profileRecordKeys();
+
+    const missingFromSchema = recordKeys.filter((k) => !schemaKeys.has(k));
+    expect(missingFromSchema).toEqual([]);
+  });
+
+  it('every accounts column maps to a key in ProfileRecord', () => {
+    const recordKeys = new Set(profileRecordKeys());
+    const schemaKeys = accountsColumnKeys();
+
+    const missingFromRecord = schemaKeys.filter((k) => !recordKeys.has(k));
+    expect(missingFromRecord).toEqual([]);
   });
 });

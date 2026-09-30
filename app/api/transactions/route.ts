@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Transaction } from '@/types/Transaction';
+import type { Transaction as StoredTransaction } from '@/lib/transactions/types';
 import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
 import { withIdempotency } from '@/lib/api/idempotency';
@@ -63,7 +64,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const allTransactions = await fetchTransactionRecords();
-  let transactions = filterTransactions(allTransactions as any, {
+  let transactions = filterTransactions(allTransactions as StoredTransaction[], {
     search: search ?? undefined,
     status: status ?? undefined,
     dateFrom: dateFrom ?? undefined,
@@ -108,7 +109,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const total = transactions.length;
-  const sorted = sortTransactions(transactions as any, sortBy, sortDir);
+  const sorted = sortTransactions(transactions as Transaction[], sortBy, sortDir);
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return NextResponse.json({ transactions: paginated, total });

@@ -79,6 +79,92 @@ describe("TransactionDetail Modal", () => {
     expect(screen.getByText("Completed")).toBeInTheDocument();
   });
 
+  describe("Detail Fetch States", () => {
+    it("shows a loading indicator while transaction detail fetch is in flight", async () => {
+      let resolveFetch: (value: unknown) => void = () => {};
+      mockFetch.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+
+      render(
+        <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Loading additional details...")).toBeInTheDocument();
+      });
+
+      resolveFetch({ ok: true, json: async () => ({ transaction: { memo: "Invoice #1" } }) });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Loading additional details...")).not.toBeInTheDocument();
+      });
+      expect(screen.getByText("Memo:")).toBeInTheDocument();
+    });
+
+    it("does not crash and still renders the core transaction fields when the detail fetch fails", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockFetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+
+      render(
+        <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          "Error loading transaction details:",
+          expect.any(Error),
+        );
+      });
+
+      // Core fields sourced from the `transaction` prop must still render even
+      // though the optional detail fetch (memo/explorer link) failed.
+      expect(screen.getByText("TXN-001")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
+      expect(screen.queryByText("Memo:")).not.toBeInTheDocument();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("does not display stale details from a previous transaction while the new fetch is loading", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ transaction: { memo: "First memo" } }),
+      });
+
+      const { rerender } = render(
+        <TransactionDetail transaction={buildTransaction({ id: "TXN-A" })} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("First memo")).toBeInTheDocument();
+      });
+
+      let resolveSecondFetch: (value: unknown) => void = () => {};
+      mockFetch.mockReturnValue(
+        new Promise((resolve) => {
+          resolveSecondFetch = resolve;
+        }),
+      );
+
+      rerender(
+        <TransactionDetail transaction={buildTransaction({ id: "TXN-B" })} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByText("First memo")).not.toBeInTheDocument();
+      });
+
+      resolveSecondFetch({ ok: true, json: async () => ({ transaction: { memo: "Second memo" } }) });
+
+      await waitFor(() => {
+        expect(screen.getByText("Second memo")).toBeInTheDocument();
+      });
+    });
+  });
+
   it("formats positive amounts with a leading plus sign and raw value", async () => {
     render(
       <TransactionDetail
