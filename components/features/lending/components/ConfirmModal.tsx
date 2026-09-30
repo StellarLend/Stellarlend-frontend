@@ -485,6 +485,7 @@ export default function ConfirmModal({
               />
               <span className="text-sm text-gray-700">
                 I understand and agree to the{" "}
+                {/* terms and conditions link fixed */}
                 <button
                   type="button"
                   onClick={() => setIsTermsOpen(true)}
