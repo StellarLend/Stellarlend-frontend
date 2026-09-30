@@ -92,7 +92,6 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
       throw new Error('Outbox payload must be a JSON object');
     }
 
-  try {
     if (event.type === 'notification') {
       await notificationQueue.add('send_notification', payload, {
         jobId: event.id,
