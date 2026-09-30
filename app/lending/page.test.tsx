@@ -92,7 +92,7 @@ describe("LendingPage", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/markets?asset=XLM", expect.any(Object)));
 
     expect(await screen.findByText("XLM")).toBeInDocument();
-    expect(screen.getByText(/7\.2%)).toBeInDocument();
+    expect(screen.getByText(/7\.2%/)).toBeInDocument();
     expect(screen.getByText(/11\.4%/)).toBeInDocument();
   });
 
