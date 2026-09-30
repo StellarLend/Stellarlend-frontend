@@ -11,9 +11,15 @@
 export function sanitiseString(input: string): string {
   // NFC normalisation first ensures composed characters are in canonical form.
   const normalized = input.normalize('NFC');
-  // Remove any Unicode code points with the "Other" (C) category – includes control, format, surrogate, and private‑use.
-  // The RegExp uses the Unicode property escape \p{C} which matches all control/format characters.
-  return normalized.replace(/[\p{C}]/gu, '');
+  // Remove control characters (C0/C1), zero-width and invisible Unicode characters,
+  // and bidirectional override/isolate marks. Written as explicit ranges to avoid
+  // reliance on Unicode property escapes (\p{C}), which requires a transpiler that
+  // supports ES2018+ Unicode regex.
+  return normalized.replace(
+    // eslint-disable-next-line no-control-regex
+    /[\u0000-\u001F\u007F-\u009F\u00AD\u200B-\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u206A-\u206F\uFEFF\uFFF9-\uFFFC]/g,
+    '',
+  );
 }
 
 /**
@@ -21,13 +27,11 @@ export function sanitiseString(input: string): string {
  * Only string values are processed; other types are left untouched.
  * This is used for profile data after Zod validation.
  */
-export function sanitiseRecord<T extends Record<string, any>>(record: T): T {
-  const result = { ...record } as T;
-  for (const key of Object.keys(result)) {
-    const value = result[key];
-    if (typeof value === 'string') {
-      result[key] = sanitiseString(value) as any;
-    }
-  }
-  return result;
+export function sanitiseRecord<T extends Record<string, unknown>>(record: T): T {
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? sanitiseString(value) : value,
+    ]),
+  ) as T;
 }

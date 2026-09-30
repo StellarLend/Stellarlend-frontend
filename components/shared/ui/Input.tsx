@@ -1,5 +1,5 @@
-import React, { InputHTMLAttributes, TextareaHTMLAttributes, useId } from 'react';
-import { cn } from '@/lib/utils/cn';
+import React, { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import { cn } from "@/lib/utils/cn";
 
 export interface BaseProps {
   label?: string;
@@ -10,111 +10,111 @@ export interface BaseProps {
   containerClassName?: string;
 }
 
-export interface TextInputProps extends InputHTMLAttributes<HTMLInputElement>, BaseProps {
+export interface TextInputProps
+  extends InputHTMLAttributes<HTMLInputElement>, BaseProps {
   multiline?: false;
 }
 
-export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement>, BaseProps {
+export interface TextAreaProps
+  extends TextareaHTMLAttributes<HTMLTextAreaElement>, BaseProps {
   multiline: true;
   rows?: number;
 }
 
 export type InputProps = TextInputProps | TextAreaProps;
 
-export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, InputProps>(
-  (props, ref) => {
-    const {
-      label,
-      error,
-      helperText,
-      required,
-      fullWidth = true,
-      className,
-      containerClassName,
-      id,
-      multiline,
-      ...rest
-    } = props;
+export const Input = React.forwardRef<
+  HTMLInputElement | HTMLTextAreaElement,
+  InputProps
+>((props, ref) => {
+  const {
+    label,
+    error,
+    helperText,
+    required,
+    fullWidth = true,
+    className,
+    containerClassName,
+    id,
+    multiline,
+    ...rest
+  } = props;
 
-    // `useId` provides a stable, unique fallback when neither `id` prop nor
-    // `label` is supplied, so ARIA descriptions never dangle.
-    const generatedId = useId();
+  const inputId =
+    id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
+  const describedBy = error
+    ? `${inputId}-error`
+    : helperText
+      ? `${inputId}-helper`
+      : undefined;
+  const ariaInvalid = error ? "true" : "false";
 
-    // When no explicit `id` and no `label` are provided, we still need a
-    // stable id anchor so that `aria-describedby` can point at the error /
-    // helper text paragraph without producing a dangling reference.
-    const inputId =
-      id ||
-      (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined) ||
-      ((error || helperText) ? generatedId : undefined);
+  const baseInputStyles = cn(
+    "w-full px-4 py-2.5 rounded-lg border transition-all duration-200 outline-none text-sm",
+    "bg-white text-gray-900 placeholder:text-gray-400",
+    error
+      ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+      : "border-gray-300 focus:border-[#2600FF] focus:ring-1 focus:ring-[#2600FF]",
+    props.disabled &&
+      "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed",
+    className,
+  );
 
-    // Compute ARIA description reference: error takes priority over helper text.
-    const describedById = error
-      ? inputId
-        ? `${inputId}-error`
-        : undefined
-      : helperText
-        ? inputId
-          ? `${inputId}-helper`
-          : undefined
-        : undefined;
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-1.5",
+        fullWidth ? "w-full" : "w-auto",
+        containerClassName,
+      )}
+    >
+      {label && (
+        <label
+          htmlFor={inputId}
+          className="text-sm font-medium text-gray-700 flex items-center gap-1"
+        >
+          {label}
+          {required && (
+            <span className="text-red-500" aria-hidden="true">
+              *
+            </span>
+          )}
+        </label>
+      )}
 
-    const baseInputStyles = cn(
-      'w-full px-4 py-2.5 rounded-lg border transition-all duration-200 outline-none text-sm',
-      'bg-white text-gray-900 placeholder:text-gray-400',
-      error
-        ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-        : 'border-gray-300 focus:border-[#2600FF] focus:ring-1 focus:ring-[#2600FF]',
-      props.disabled && 'bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed',
-      className
-    );
+      {multiline ? (
+        <textarea
+          id={inputId}
+          ref={ref as React.ForwardedRef<HTMLTextAreaElement>}
+          className={cn(baseInputStyles, "resize-none")}
+          required={required}
+          aria-invalid={ariaInvalid}
+          aria-describedby={describedBy}
+          {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
+        />
+      ) : (
+        <input
+          id={inputId}
+          ref={ref as React.ForwardedRef<HTMLInputElement>}
+          className={baseInputStyles}
+          required={required}
+          aria-invalid={ariaInvalid}
+          aria-describedby={describedBy}
+          {...(rest as InputHTMLAttributes<HTMLInputElement>)}
+        />
+      )}
 
-    return (
-      <div className={cn('flex flex-col gap-1.5', fullWidth ? 'w-full' : 'w-auto', containerClassName)}>
-        {label && (
-          <label
-            htmlFor={inputId}
-            className="text-sm font-medium text-gray-700 flex items-center gap-1"
-          >
-            {label}
-            {required && <span className="text-red-500" aria-hidden="true">*</span>}
-          </label>
-        )}
+      {error ? (
+        <p className="text-xs text-red-500 mt-0.5" id={`${inputId}-error`}>
+          {error}
+        </p>
+      ) : helperText ? (
+        <p className="text-xs text-gray-500 mt-0.5" id={`${inputId}-helper`}>
+          {helperText}
+        </p>
+      ) : null}
+    </div>
+  );
+});
 
-        {multiline ? (
-          <textarea
-            id={inputId}
-            ref={ref as React.ForwardedRef<HTMLTextAreaElement>}
-            className={cn(baseInputStyles, 'resize-none')}
-            required={required}
-            aria-invalid={error ? 'true' : 'false'}
-            aria-describedby={describedById}
-            {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
-          />
-        ) : (
-          <input
-            id={inputId}
-            ref={ref as React.ForwardedRef<HTMLInputElement>}
-            className={baseInputStyles}
-            required={required}
-            aria-invalid={error ? 'true' : 'false'}
-            aria-describedby={describedById}
-            {...(rest as InputHTMLAttributes<HTMLInputElement>)}
-          />
-        )}
-
-        {error ? (
-          <p className="text-xs text-red-500 mt-0.5" id={`${inputId}-error`}>
-            {error}
-          </p>
-        ) : helperText ? (
-          <p className="text-xs text-gray-500 mt-0.5" id={`${inputId}-helper`}>
-            {helperText}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-);
-
-Input.displayName = 'Input';
+Input.displayName = "Input";

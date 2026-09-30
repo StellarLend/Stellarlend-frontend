@@ -4,6 +4,10 @@ This document outlines the standard patterns for fetching data on the client, ma
 
 Following these conventions ensures consistency across the codebase and prevents fragmented error-handling or loading states.
 
+Real-time push flows (notifications, session-expiry warnings, etc.) intentionally bypass the request/response patterns below. See
+[`docs/notifications.md`](./notifications.md) for the end-to-end SSE-backed
+notification pipeline and its conventions.
+
 ## 1. Hook Location and Naming
 
 - **Transaction and Core Domain Hooks**: Hooks that manage core domain operations, transactions, and on-chain interactions should live in `lib/tx/` or `lib/` (e.g., `lib/tx/useTxStatus.ts`).

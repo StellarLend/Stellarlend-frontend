@@ -1,4 +1,4 @@
-import { getMarket } from '@/lib/markets/registry';
+import { getMarket } from '@/lib/registry';
 
 export type ActionType = 'lend' | 'borrow' | 'repay';
 

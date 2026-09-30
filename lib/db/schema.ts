@@ -1,5 +1,14 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
+export const subscribers = sqliteTable('subscribers', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  email: text('email').notNull().unique(),
+  subscribedAt: integer('subscribed_at', { mode: 'timestamp' }).notNull(),
+});
+
+export type Subscriber = typeof subscribers.$inferSelect;
+export type NewSubscriber = typeof subscribers.$inferInsert;
+
 export const profiles = sqliteTable('profiles', {
   userId: text('userId').primaryKey(),
   displayName: text('displayName').notNull(),
@@ -18,4 +27,7 @@ export const outboxEvents = sqliteTable('outbox_events', {
   lastError: text('lastError'),
   createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
   processedAt: integer('processedAt', { mode: 'timestamp' }),
+  // Lease timestamp for the PROCESSING claim; used to recover events left
+  // PROCESSING after a crash between claim and dispatch.
+  claimedAt: integer('claimedAt', { mode: 'timestamp' }),
 });

@@ -1,6 +1,6 @@
 # Borrow Health Preview
 
-The borrowing form now shows a projected health preview before submission. The preview is intentionally advisory: it warns when a position is close to liquidation, but it keeps the existing 150% minimum-collateral validation as the hard form rule.
+The borrowing form shows a projected health preview before submission. The preview explains how close a position is to liquidation, while the 150% initial collateral ratio remains a hard form rule.
 
 ## Formula
 
@@ -21,7 +21,17 @@ The `1.2` multiplier matches the displayed 120% liquidation threshold. Health ba
 
 ## Price Source
 
-`BorrowingForm` fetches `/api/prices?assets=<borrow>,<collateral>` after asset changes with a short debounce. If the request fails, the preview uses local fallback prices so the user still sees an estimate instead of a blank section.
+`BorrowingForm` fetches `/api/prices?assets=<borrow>,<collateral>` after asset changes with a short debounce. If the request fails, the preview uses local fallback prices so the user still sees an estimate instead of a blank section. A successful response that omits either requested price is treated as incomplete and blocks submission.
+
+## Cross-asset collateral
+
+Borrow and collateral amounts are not compared token-for-token. The form first converts the requested loan to USD, then converts the 150% requirement into units of the selected collateral asset:
+
+```text
+requiredCollateral = (loanAmount * borrowAssetPrice * 1.5) / collateralAssetPrice
+```
+
+For example, borrowing `100 USDC` against XLM at `$0.12` requires `1,250 XLM`, not `150 XLM`. Changing either selector recalculates the suggested minimum while preserving a collateral amount the user entered manually. The same asset may be selected on both sides, but zero collateral, missing prices, insufficient balance, and collateral below 150% of the borrowed USD value all prevent submission.
 
 ## Example
 

@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify, type JWTPayload } from 'jose';
+import { validatedEnv } from '../configValidation';
 
 // ---------------------------------------------------------------------------
 // Role definitions
@@ -55,7 +56,7 @@ export interface AdminUser {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const AUTH_SECRET = process.env.AUTH_SECRET ?? 'dev-secret-change-in-production';
+const AUTH_SECRET = validatedEnv.AUTH_SECRET;
 const SESSION_COOKIE = process.env.NEXT_PUBLIC_SESSION_COOKIE ?? 'session';
 
 /**

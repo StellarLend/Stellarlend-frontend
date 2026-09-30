@@ -3,10 +3,22 @@
 // This shows how to set session cookies after user authentication
 
 import { NextResponse, NextRequest } from "next/server";
+import { getSession } from "@/lib/auth";
 import { isAccountId } from '@/lib/validation/stellar';
 import { withIdempotency } from "@/lib/api/idempotency";
 import { withCsrfProtection } from "@/lib/api/handler";
 import { generateCsrfToken, setCsrfCookie } from "@/lib/security/csrf";
+import { normalizeStellarNetwork } from "@/lib/auth/session-boundary";
+import config from "@/lib/config";
+
+// Fall back to "no claim available" (null) instead of the epoch when the
+// JWT payload omitted iat/exp. lib/auth.ts:getSession falls back to
+// `new Date(0)` for missing claims; serialising that would falsely imply
+// a 50+ year-old session.
+function toIsoOrNull(date: Date | undefined | null): string | null {
+  if (!date || date.getTime() <= 0) return null;
+  return date.toISOString();
+}
 
 /**
  * Example payload structure for session creation
@@ -21,7 +33,7 @@ interface CreateSessionRequest {
 
 /**
  * Example: Create a session (POST /api/auth/session)
- * 
+ *
  * Usage:
  * const response = await fetch("/api/auth/session", {
  *   method: "POST",
@@ -34,8 +46,8 @@ interface CreateSessionRequest {
  *   })
  * });
  */
-const postHandler = async (request: NextRequest) => {
-  return withIdempotency(request, async (request) => {
+const postHandler = async (request: NextRequest): Promise<NextResponse> => {
+  const res = await withIdempotency(request, async (request) => {
     try {
       const body: CreateSessionRequest = await request.json();
 // Validate wallet address if provided
@@ -115,14 +127,21 @@ if (body.walletAddress && !isAccountId(body.walletAddress)) {
       );
     }
   });
+  return res as NextResponse;
 };
 
 export const POST = withCsrfProtection(postHandler);
 
 /**
  * Example: Get current session (GET /api/auth/session)
- * 
- * This endpoint would return session info from the server-side getSession()
+ *
+ * Returns session info from the server-side getSession().
+ * Includes `issuedAt` and `expiresAt` so the client can derive
+ * time-to-expiry and drive proactive UI like the session-expiry modal.
+ *
+ * Shape: `issuedAt` and `expiresAt` are nullable ISO strings. Clients
+ * should treat `null` as "unknown" (the JWT payload omitted the claim)
+ * rather than missing / 1970-01-01.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -136,12 +155,22 @@ export async function GET(request: NextRequest) {
     }
 
     const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
+    const network = normalizeStellarNetwork(config.stellar.network);
+    if (!network) {
+      return NextResponse.json(
+        { error: "Invalid Stellar network configuration" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       session: {
         active: true,
         cookie: cookieName,
+        network,
         user: session.user,
+        issuedAt: toIsoOrNull(session.issuedAt),
+        expiresAt: toIsoOrNull(session.expiresAt),
       },
     });
   } catch (error) {
@@ -155,12 +184,12 @@ export async function GET(request: NextRequest) {
 
 /**
  * Example: Clear session (DELETE /api/auth/session)
- * 
+ *
  * Usage:
  * await fetch("/api/auth/session", { method: "DELETE" });
  */
-const deleteHandler = async (request: NextRequest) => {
-  return withIdempotency(request, async () => {
+const deleteHandler = async (request: NextRequest): Promise<NextResponse> => {
+  const res = await withIdempotency(request, async () => {
     try {
       const response = NextResponse.json({
         success: true,
@@ -170,7 +199,7 @@ const deleteHandler = async (request: NextRequest) => {
       // Clear the session cookie
       const cookieName = process.env.NEXT_PUBLIC_SESSION_COOKIE || "session";
       response.cookies.delete(cookieName);
-      
+
       // Clear the CSRF cookie too
       const csrfCookieName = process.env.CSRF_COOKIE_NAME || "csrf-token";
       response.cookies.delete(csrfCookieName);
@@ -184,6 +213,7 @@ const deleteHandler = async (request: NextRequest) => {
       );
     }
   });
+  return res as NextResponse;
 };
 
 export const DELETE = withCsrfProtection(deleteHandler);

@@ -9,6 +9,8 @@ const makeRequest = (body: unknown, headers: Record<string, string> = {}) => {
     body: JSON.stringify(body),
     headers: {
       'Content-Type': 'application/json',
+      'x-csrf-token': 'test-csrf-token',
+      Cookie: 'csrf-token=test-csrf-token',
       ...headers,
     },
   });
@@ -24,7 +26,6 @@ describe('POST /api/auth/session', () => {
       userId: 'user-123',
       email: 'user@example.com',
       name: 'Jane Doe',
-      walletAddress: 'G123',
     };
 
     const first = await POST(makeRequest(body, { 'Idempotency-Key': 'session-123' }));
@@ -47,6 +48,8 @@ describe('DELETE /api/auth/session', () => {
       method: 'DELETE',
       headers: {
         'Idempotency-Key': 'session-clear-123',
+        'x-csrf-token': 'test-csrf-token',
+        Cookie: 'csrf-token=test-csrf-token',
       },
     });
 

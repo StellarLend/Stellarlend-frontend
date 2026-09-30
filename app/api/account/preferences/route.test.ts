@@ -1,3 +1,6 @@
+import { vi } from "vitest";
+vi.mock("server-only", () => ({}));
+
 import { NextRequest } from "next/server";
 import { GET, PUT } from "@/app/api/account/preferences/route";
 import { preferencesRepository } from "@/lib/account/preferences-repository";

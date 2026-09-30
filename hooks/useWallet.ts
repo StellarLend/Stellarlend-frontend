@@ -1,13 +1,26 @@
 import { useWalletContext } from "@/context/WalletContext";
 
 export const useWallet = () => {
-  const { address, network, status, error, connect, disconnect } = useWalletContext();
-  return {
+  const {
     address,
+    accounts,
+    activeAccount,
     network,
     status,
     error,
     connect,
     disconnect,
+    switchAccount,
+  } = useWalletContext();
+  return {
+    address,
+    accounts,
+    activeAccount,
+    network,
+    status,
+    error,
+    connect,
+    disconnect,
+    switchAccount,
   };
 };

@@ -58,4 +58,16 @@ describe("Pagination Component", () => {
     const nextButton = screen.getByLabelText("Next page");
     expect(nextButton).toBeDisabled();
   });
+
+  it("bounds the number of rendered page buttons regardless of totalPages", () => {
+    render(<Pagination totalItems={1000} itemsPerPage={10} currentPage={50} setCurrentPage={vi.fn()} />);
+    
+    // Filter out previous and next buttons
+    const buttons = screen.getAllByRole("button");
+    const pageButtons = buttons.filter(
+      (btn) => !btn.getAttribute("aria-label")?.includes("Previous") && !btn.getAttribute("aria-label")?.includes("Next")
+    );
+    
+    expect(pageButtons.length).toBeLessThanOrEqual(7);
+  });
 });

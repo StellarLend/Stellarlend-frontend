@@ -36,6 +36,16 @@ describe('Feature flag evaluator', () => {
     expect(result).toBe(true);
   });
 
+  it('returns false for 0% rollout', () => {
+    loadConfig({ zeroRolloutFlag: { enabled: true, rollout: 0 } });
+    expect(evaluateFlag('zeroRolloutFlag', 'anyUser')).toBe(false);
+  });
+
+  it('returns true for 100% rollout', () => {
+    loadConfig({ fullRolloutFlag: { enabled: true, rollout: 100 } });
+    expect(evaluateFlag('fullRolloutFlag', 'anyUser')).toBe(true);
+  });
+
   it('applies rollout percentage deterministically', () => {
     loadConfig({ rolloutFlag: { enabled: true, rollout: 50 } });
     const userA = evaluateFlag('rolloutFlag', 'userA');

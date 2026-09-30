@@ -4,12 +4,21 @@ export type { AssetSymbol, TransactionType, TransactionStatus };
 
 export interface Transaction {
   id: string;
+  txHash?: string;
+  hash?: string;
   type: TransactionType;
   amount: number;
   asset: AssetSymbol;
   date: string;
   time: string;
   status: TransactionStatus;
+}
+
+export interface InFlightTx {
+  hash: string;
+  type: TransactionType;
+  amount: number;
+  asset: AssetSymbol;
 }
 
 export type FetchTransactionsOptions = {
@@ -19,6 +28,8 @@ export type FetchTransactionsOptions = {
   limit?: number;
   search?: string;
   status?: TransactionStatus;
+  type?: string;
+  asset?: string;
   dateFrom?: string;
   dateTo?: string;
   sortBy?: "date" | "amount";
@@ -33,7 +44,7 @@ export type FetchTransactionsResponse = {
 };
 
 export const fetchTransactions = async (
-  params: FetchTransactionsOptions = {}
+  params: FetchTransactionsOptions = {},
 ): Promise<FetchTransactionsResponse> => {
   const searchParams = new URLSearchParams();
 

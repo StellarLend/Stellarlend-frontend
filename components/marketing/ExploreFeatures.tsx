@@ -110,7 +110,7 @@ export default function ExploreFeatures() {
                 Start Earning <ChevronRight className="h-4 w-4 ml-2" />
               </Link>
               <Link
-                href="/borrow"
+                href="/lending?tab=borrow"
                 className="border border-[#15A350] text-[#15A350] flex items-center py-3 px-8 rounded-lg
                  hover:bg-[#15A350] hover:text-white transition-all duration-300 font-medium"
               >

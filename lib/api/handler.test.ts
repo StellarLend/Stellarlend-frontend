@@ -7,6 +7,7 @@ import {
   RESPONSE_COMPRESSION_OPT_OUT_HEADER,
   applyResponseCompression,
   withRequestLogging,
+  withCsrfProtection,
 } from '@/lib/api/handler';
 
 const gunzipAsync = promisify(gunzip);
@@ -164,5 +165,28 @@ describe('applyResponseCompression', () => {
     expect(compressed.headers.get('Content-Encoding')).toBeNull();
     expect(compressed.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
     expect(await compressed.text()).toContain('txn-1,10');
+  });
+});
+
+describe('withCsrfProtection', () => {
+  it('asserts a garbage Authorization: Bearer x header alone doesn\'t grant access to a protected resource without separate auth verification failing it', async () => {
+    // The route handler must independently verify the bearer token,
+    // as withCsrfProtection exempts any request with a Bearer header from CSRF checks.
+    const handler = withCsrfProtection(async (req: NextRequest) => {
+      const auth = req.headers.get('authorization');
+      if (auth !== 'Bearer real-valid-token') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      return NextResponse.json({ ok: true });
+    });
+
+    const request = new NextRequest('http://localhost/api/protected', {
+      method: 'POST',
+      headers: { authorization: 'Bearer garbage-token-x' },
+    });
+
+    const response = await handler(request);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
   });
 });

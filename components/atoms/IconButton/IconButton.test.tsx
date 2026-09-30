@@ -202,6 +202,25 @@ describe('IconButton Accessibility', () => {
     expect(button).toHaveAttribute('title', 'Custom tooltip');
   });
 
+  it('forwards the ref to the underlying focusable button element', () => {
+    const ref = React.createRef<HTMLButtonElement>();
+
+    render(
+      <IconButton aria-label="Ref target" ref={ref}>
+        <svg />
+      </IconButton>,
+    );
+
+    const button = screen.getByRole('button');
+
+    button.focus();
+
+    expect(ref.current).toBe(button);
+    expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+    expect(ref.current).toHaveAttribute('type', 'button');
+    expect(ref.current).toHaveFocus();
+  });
+
   it('handles click events properly', () => {
     render(
       <IconButton aria-label="Click me" onClick={mockOnClick}>

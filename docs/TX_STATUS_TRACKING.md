@@ -52,3 +52,48 @@ Coverage:
 ```bash
 npx vitest run --config vitest.server.config.ts lib/tx/useTxStatus.test.ts --coverage
 ```
+
+## Optimistic pending row in RecentTransactions ([#418](https://github.com/StellarLend/Stellarlend-frontend/issues/418))
+
+> **Problem:** After submitting a transaction, users see a gap before it appears in RecentTransactions because the list only shows confirmed history. This creates confusion — users don't know if their action was submitted.
+
+`RecentTransactions` accepts an optional `inFlightTx` prop to show a just-submitted transaction as a pending row before it lands on-chain.
+
+### InFlightTx interface
+
+```ts
+interface InFlightTx {
+  hash: string;        // Soroban transaction hash – drives useTxStatus polling
+  type: TransactionType; // "Deposit" | "Withdrawal" | "Lend Funds" | "Loan Payment"
+  amount: number;
+  asset: AssetSymbol;  // "XLM" | "USDC" | "BTC" | "ETH"
+}
+```
+
+### Lifecycle
+
+1. Caller passes `inFlightTx={{ hash, type, amount, asset }}` to `<RecentTransactions />`.
+2. `RecentTransactions` calls `useTxStatus(hash)` and derives a `Transaction` with `status: "Processing"`.
+3. The pending row renders at the top of the table with distinct styling (dashed blue border, pulse animation, "Pending…" action text).
+4. When `useTxStatus` reaches `completed`, the pending row is removed. The caller is responsible for triggering a refetch of the transactions list so the real row appears.
+5. If the status becomes `failed`, the pending row transitions to `status: "Failed"`.
+
+### Deduplication
+
+If the fetched transactions list already contains a row matching the pending tx's `type`, `amount`, and `asset`, the pending row is suppressed to avoid duplicates.
+
+### Test coverage
+
+Optimistic row behavior is covered in `components/shared/common/RecentTransactions.test.tsx`:
+
+- No pending tx renders normally
+- Pending tx renders at top with "Processing" status
+- Pending → confirmed removes the pending row
+- Pending → failed transitions to "Failed"
+- Dedup suppresses pending row when real tx lands
+
+Run:
+
+```bash
+npx vitest run --project accessibility components/shared/common/RecentTransactions.test.tsx
+```

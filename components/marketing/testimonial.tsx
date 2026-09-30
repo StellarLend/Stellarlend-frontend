@@ -68,7 +68,12 @@ const TestimonialsSection = () => {
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-      setCardsPerView(width >= 1024 ? 3 : width >= 768 ? 2 : 1);
+      const newCardsPerView = width >= 1024 ? 3 : width >= 768 ? 2 : 1;
+      setCardsPerView(newCardsPerView);
+      setCurrentSlide(prev => {
+        const maxSlides = Math.ceil(testimonials.length / newCardsPerView);
+        return Math.min(prev, Math.max(0, maxSlides - 1));
+      });
     };
 
     // Set initial view

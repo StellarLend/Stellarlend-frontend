@@ -1,5 +1,8 @@
 # Wallet Context & useWallet Hook Documentation
 
+> [!NOTE]
+> For a comprehensive guide on wallet lifecycle, network mismatch handling, and copy-pasteable context consumers, please refer to the main [Wallet Integration Guide](wallet-integration.md).
+
 ## Overview
 
 The `WalletContext` provider and `useWallet` hook supply a single client-side source of truth for the connected Stellar wallet's state. It coordinates with Freighter (or other injected window-based Stellar wallet providers), triggers the challenge-response authentication flow, sets local and secure cookie sessions, and rehydrates connection state upon page reloads.

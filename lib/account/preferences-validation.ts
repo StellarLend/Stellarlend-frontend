@@ -16,6 +16,7 @@ export const notificationPreferencesSchema = z.object({
 });
 
 export const preferencesSchema = z.object({
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   locale: localeSchema.default("en-US"),
   displayCurrency: displayCurrencySchema.default("USD"),
   notifications: z.preprocess(

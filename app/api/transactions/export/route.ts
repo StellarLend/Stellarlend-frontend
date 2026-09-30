@@ -6,19 +6,25 @@ import {
   serializeTransactionsToCSV,
 } from '@/lib/transactions';
 import type { TransactionFilters, TransactionStatus } from '@/lib/transactions';
+import { parseTransactionFilter } from '@/lib/transactions/filters';
 import { withRequestLogging } from '@/lib/api/handler';
 
 export const runtime = 'nodejs';
 
-const VALID_STATUSES = new Set<string>(['All', 'Completed', 'Processing', 'Failed']);
-
 function parseFilters(searchParams: URLSearchParams): TransactionFilters {
-  const status = searchParams.get('status') ?? 'All';
+  const parsed = parseTransactionFilter(searchParams);
+  if (!parsed.valid) {
+    return {};
+  }
+
+  const status = parsed.filter.status ?? (searchParams.get('status') ?? 'All');
+  const normalizedStatus = status && status !== 'All' ? (status as TransactionStatus) : 'All';
+
   return {
-    search:   searchParams.get('search')   ?? undefined,
-    status:   VALID_STATUSES.has(status) ? (status as TransactionStatus | 'All') : 'All',
-    dateFrom: searchParams.get('dateFrom') ?? undefined,
-    dateTo:   searchParams.get('dateTo')   ?? undefined,
+    search: parsed.filter.search ?? searchParams.get('search') ?? undefined,
+    status: normalizedStatus,
+    dateFrom: searchParams.get('dateFrom') ?? parsed.filter.fromDate ?? undefined,
+    dateTo: searchParams.get('dateTo') ?? parsed.filter.toDate ?? undefined,
   };
 }
 
@@ -30,7 +36,18 @@ async function handleExportTransactions(request: NextRequest) {
 
   const filters = parseFilters(request.nextUrl.searchParams);
   const all = await fetchTransactions();
-  const filtered = filterTransactions(all, filters);
+  let filtered = filterTransactions(all, filters);
+
+  const asset = request.nextUrl.searchParams.get('asset');
+  const type = request.nextUrl.searchParams.get('type');
+
+  if (asset) {
+    filtered = filtered.filter((transaction) => transaction.asset.toLowerCase() === asset.toLowerCase());
+  }
+
+  if (type) {
+    filtered = filtered.filter((transaction) => transaction.type.toLowerCase().includes(type.toLowerCase()));
+  }
 
   const csv = serializeTransactionsToCSV(filtered);
   const filename = `transactions-${new Date().toISOString().slice(0, 10)}.csv`;

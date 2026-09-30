@@ -1,15 +1,21 @@
+import type { SVGProps } from "react";
 import React from "react";
-interface TransactionIconProps {
+interface TransactionIconProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
   color?: string;
+  title?: string;
 }
 export const TransactionIcon = ({
   className = "",
   width = "24",
   height = "24",
   color,
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: TransactionIconProps) => {
   return (
     <svg
@@ -18,7 +24,12 @@ export const TransactionIcon = ({
       viewBox="0 0 20 20"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         d="M15.8333 8.75V8.33329C15.8333 5.19063 15.8332 3.61926 14.857 2.64295C13.8806 1.66667 12.3093 1.66667 9.16662 1.66667C6.02403 1.66667 4.45267 1.66672 3.47636 2.64299C2.50008 3.61929 2.50006 5.1906 2.50003 8.33323L2.5 12.0833C2.49998 14.8228 2.49997 16.1927 3.25657 17.1146C3.3951 17.2834 3.54988 17.4382 3.71869 17.5768C4.64064 18.3333 6.01041 18.3333 8.74995 18.3333"
         stroke="#E5E5E5"

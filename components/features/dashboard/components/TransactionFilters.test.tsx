@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import TransactionFilters from './TransactionFilters';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -131,6 +131,33 @@ describe('TransactionFilters', () => {
     
     // page param should be removed
     expect(mockReplace).toHaveBeenCalledWith('/dashboard/transactions?asset=XLM&type=repay', { scroll: false });
+  });
+
+  it('re-syncs filter state from URL on external navigation (e.g., browser back button)', async () => {
+    // Start with asset=BTC in the URL
+    (useSearchParams as any).mockReturnValue(new URLSearchParams('?asset=BTC'));
+    const { rerender } = render(<TransactionFilters totalCount={10} />);
+
+    // Verify initial state matches URL
+    expect(screen.getByLabelText(/Asset/i)).toHaveValue('BTC');
+
+    // User changes asset to XLM
+    fireEvent.change(screen.getByLabelText(/Asset/i), { target: { value: 'XLM' } });
+
+    // Verify URL was updated by the component
+    expect(mockReplace).toHaveBeenLastCalledWith(
+      '/dashboard/transactions?asset=XLM',
+      { scroll: false }
+    );
+
+    // Simulate browser back: URL returns to ?asset=BTC
+    (useSearchParams as any).mockReturnValue(new URLSearchParams('?asset=BTC'));
+    rerender(<TransactionFilters totalCount={10} />);
+
+    // Wait for the re-sync effect to run and verify filter UI shows the restored value
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Asset/i)).toHaveValue('BTC');
+    });
   });
 
 });

@@ -4,4 +4,7 @@ export { default as TopNav } from './TopNav';
 export { default as NavLink } from './NavLink';
 export { NavigationMenu } from './NavigationMenu';
 export { default as DashboardLayout } from './DashboardLayout';
-export { SideNav } from './SideNav'; 
+export { SideNav } from './SideNav';
+export { Breadcrumbs } from './Breadcrumbs';
+export type { BreadcrumbItem, BreadcrumbsProps } from './Breadcrumbs'; 
+export { default as AccountMenu } from './AccountMenu'; 

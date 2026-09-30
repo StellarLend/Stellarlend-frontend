@@ -12,11 +12,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -25,16 +27,23 @@ jobs:
       - name: Update dependencies
         run: |
           npm update
-          npm audit fix --force
+          # Some transitive advisories have no available fix and `npm audit
+          # fix --force` exits 1 even after applying every safe update. Keep
+          # the updater moving so it can open a reviewable PR and report the
+          # remaining advisories in the job log.
+          npm audit fix --force || npm audit --omit=dev --audit-level=critical || true
 
       - name: Run tests after update
         run: |
           npm run lint
           npx tsc --noEmit
           npm run build
+        env:
+          ESLINT_USE_FLAT_CONFIG: "false"
         continue-on-error: true
 
       - name: Create Pull Request
+        id: cpr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

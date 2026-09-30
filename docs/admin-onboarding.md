@@ -2,6 +2,14 @@
 
 This document explains how to grant admin access, how the RBAC system works, and how to use the `/api/admin/users` endpoint.
 
+> **Need the runtime model?** This file focuses on the **operational** side of
+> admin access (how to grant it, how to audit it, how the `/api/admin/users`
+> endpoint behaves). For the code-level RBAC guide — the `Role` enum, the
+> `requireAdmin` / `requireOpsOrAdmin` guards, the JWT claim flow, and a
+> worked example of protecting a new route — see
+> [`docs/rbac.md`](./rbac.md). For session creation and JWT basics, see
+> [`docs/AUTH.md`](./AUTH.md).
+
 ---
 
 ## Overview
@@ -20,7 +28,7 @@ Stellarlend uses a **claim-based RBAC** model. The role is stored as a `role` cl
 
 The admin role is embedded in the session JWT at sign-in time. To grant admin access:
 
-1. **Set the `role` claim** when minting the JWT in your authentication flow (e.g. in `lib/auth.ts` → `createSession`):
+1. **Set the `role` claim** when minting the JWT in your authentication flow (e.g. in `lib/auth.ts` → `createSession` — see [docs/rbac.md § Claim Issuance](./rbac.md#claim-issuance) for the intended signing shape):
 
    ```ts
    // Example: promote a known ops user to admin at session creation

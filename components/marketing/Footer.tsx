@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { clientLog } from '@/lib/utils/client-log';
 import { Twitter, Github, Linkedin, Mail } from 'lucide-react';
 
 export default function Footer() {
@@ -44,7 +45,7 @@ export default function Footer() {
           setIsSubscribed(true);
           setEmail('');
         } catch (error) {
-          console.error('Error subscribing:', error);
+          clientLog.error('Error subscribing:', error);
           setError('Failed to subscribe. Please try again later.');
         } finally {
           setIsLoading(false);

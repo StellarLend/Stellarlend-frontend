@@ -46,7 +46,7 @@ All TTL values and operation modes are configured via environment variables insi
 
 The background job uses **BullMQ** and runs daily at **02:00 UTC** (`0 2 * * *`). 
 
-- The job is registered at Next.js startup via the root [instrumentation.ts](file:///c:/Users/HP/Stellarlend-frontend/instrumentation.ts) file.
+- The job is registered at Next.js startup via the root [instrumentation.ts](../instrumentation.ts) file.
 - It runs within a Node.js process using a `QueueScheduler` and `Worker` listening to the `retention-job` queue.
 - Deletions are processed in batches of `1,000` rows using parameterized transactions to prevent locking tables or causing database load spikes.
 
@@ -54,7 +54,7 @@ The background job uses **BullMQ** and runs daily at **02:00 UTC** (`0 2 * * *`)
 
 ## Observability & Metrics
 
-A lightweight metric tracker in [lib/metrics.ts](file:///c:/Users/HP/Stellarlend-frontend/lib/metrics.ts) counts deleted rows:
+A lightweight metric tracker in [lib/metrics.ts](../lib/metrics.ts) counts deleted rows:
 
 * **`recordDeletion(table, count)`** - Increments the deletion counter for a given table name.
 * **`getDeletionCounts()`** - Returns a dictionary of deletion counts since process start (e.g. `{ audit_events: 1000, sessions: 500 }`).

@@ -1,47 +1,77 @@
-export interface NotificationPreferences {
+export interface NotificationSettings {
   email: boolean;
   push: boolean;
   sms: boolean;
   inApp: boolean;
 }
 
-export interface PreferencesRecord {
+export interface UserPreferences {
   userId: string;
   locale: string;
   displayCurrency: string;
-  notifications: NotificationPreferences;
+  notifications: NotificationSettings;
+  createdAt: Date;
   updatedAt: Date;
 }
 
-export interface PreferencesRepository {
-  getByUserId(userId: string): Promise<PreferencesRecord | null>;
+export type UpsertPreferencesInput = {
+  userId: string;
+  locale?: string;
+  displayCurrency?: string;
+  notifications?: Partial<NotificationSettings>;
+};
 
-  upsert(
-    userId: string,
-    data: Omit<PreferencesRecord, "userId" | "updatedAt">
-  ): Promise<PreferencesRecord>;
-}
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  email: true,
+  push: true,
+  sms: false,
+  inApp: true,
+};
 
-class InMemoryPreferencesRepository implements PreferencesRepository {
-  private store = new Map<string, PreferencesRecord>();
+export class PreferencesRepository {
+  private store = new Map<string, UserPreferences>();
 
-  async getByUserId(userId: string): Promise<PreferencesRecord | null> {
+  getByUserId(userId: string): UserPreferences | null {
     return this.store.get(userId) ?? null;
   }
 
-  async upsert(
-    userId: string,
-    data: Omit<PreferencesRecord, "userId" | "updatedAt">
-  ): Promise<PreferencesRecord> {
-    const record: PreferencesRecord = {
-      userId,
-      ...data,
-      updatedAt: new Date(),
+  upsert(
+    userIdOrInput: string | UpsertPreferencesInput,
+    data?: Partial<UserPreferences>
+  ): UserPreferences {
+    const now = new Date();
+
+    let userId: string;
+    let inputData: Partial<UserPreferences>;
+
+    if (typeof userIdOrInput === 'string') {
+      userId = userIdOrInput;
+      inputData = data ?? {};
+    } else {
+      userId = userIdOrInput.userId;
+      inputData = userIdOrInput;
+    }
+
+    const existing = this.store.get(userId);
+
+    const mergedNotifications: NotificationSettings = {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...(existing?.notifications ?? {}),
+      ...(inputData.notifications ?? {}),
     };
+
+    const record: UserPreferences = {
+      userId,
+      locale: inputData.locale ?? existing?.locale ?? 'en-US',
+      displayCurrency: inputData.displayCurrency ?? existing?.displayCurrency ?? 'USD',
+      notifications: mergedNotifications,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+
     this.store.set(userId, record);
     return record;
   }
 }
 
-export const preferencesRepository: PreferencesRepository =
-  new InMemoryPreferencesRepository();
+export const preferencesRepository = new PreferencesRepository();

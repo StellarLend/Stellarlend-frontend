@@ -30,6 +30,23 @@ async function captureRequestError(
   }
 }
 
+export type ApiHandler = (
+  request: NextRequest,
+  ...args: unknown[]
+) => Promise<NextResponse> | NextResponse;
+
+export type RequestLogContext = {
+  method: string;
+  route: string;
+  query: string;
+  requestId: string;
+  headers: {
+    authorization: string | undefined;
+    'x-forwarded-for': string | undefined;
+    [REQUEST_ID_HEADER]: string;
+  };
+};
+
 function serializeError(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -43,51 +60,54 @@ function serializeError(error: unknown) {
 }
 
 export function withCsrfProtection<T extends (...args: any[]) => Promise<NextResponse> | NextResponse>(handler: T) {
-  return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
+  return async (...args: Parameters<T>): Promise<NextResponse> => {
     const request = args[0] as NextRequest | undefined;
     if (request) {
       const method = request.method;
       if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
         if (!verifyCsrfToken(request)) {
-          return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 }) as ReturnType<T>;
+          return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 });
         }
       }
     }
-    return handler(...args);
+    return await handler(...args);
   };
 }
 
 export function withRequestLogging<T extends (...args: any[]) => Promise<NextResponse> | NextResponse>(route: string, handler: T) {
-  return async (...args: Parameters<T>): Promise<ReturnType<T>> => {
+  return async (...args: Parameters<T>): Promise<NextResponse> => {
     const request = args[0] as NextRequest | undefined;
     const method = request?.method ?? 'UNKNOWN';
     const startedAt = Date.now();
-    const requestId = request?.headers ? getOrCreateRequestId(request.headers).requestId : 'internal-' + startedAt;
+    const requestId =
+      request instanceof NextRequest && request.headers
+        ? getOrCreateRequestId(request.headers).requestId
+        : 'internal-' + startedAt;
 
     return runWithRequestContext({ requestId }, async () => {
-      const chaosResponse = await chaosInject(request as NextRequest);
+      const chaosResponse = request instanceof NextRequest ? await chaosInject(request) : null;
       if (chaosResponse) {
         chaosResponse.headers.set(REQUEST_ID_HEADER, requestId);
-        return chaosResponse as ReturnType<T>;
+        return chaosResponse;
       }
 
-      let requestContext: any = null;
+      let requestContext: RequestLogContext | null = null;
       try {
         requestContext = {
           method,
           route,
-          query: request?.nextUrl?.searchParams.toString() ?? '',
+          query: request instanceof NextRequest ? request.nextUrl.searchParams.toString() : '',
           requestId,
           headers: {
-            authorization: request?.headers?.get('authorization') ?? undefined,
-            'x-forwarded-for': request?.headers?.get('x-forwarded-for') ?? undefined,
+            authorization: request instanceof NextRequest ? request.headers.get('authorization') ?? undefined : undefined,
+            'x-forwarded-for': request instanceof NextRequest ? request.headers.get('x-forwarded-for') ?? undefined : undefined,
             [REQUEST_ID_HEADER]: requestId,
           },
         };
 
         const response = await handler(...args);
         const durationMs = Date.now() - startedAt;
-        const status = typeof (response as any)?.status === 'number' ? (response as any).status : 0;
+        const status = response instanceof NextResponse && typeof response.status === 'number' ? response.status : 0;
 
         try {
           metrics.httpRequests.inc({ method, route, status: String(status) });
@@ -109,15 +129,15 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
       } catch (error) {
         if (error instanceof Response) {
           error.headers.set(REQUEST_ID_HEADER, requestId);
-          return error as ReturnType<T>;
+          return error;
         }
         const durationMs = Date.now() - startedAt;
 
         try {
           metrics.httpRequests.inc({ method, route, status: '500' });
           metrics.httpRequestDuration.observe(durationMs / 1000, { method, route, status: '500' });
-          metrics.httpErrors.inc({ route, error: (error as Error)?.name ?? 'Error' });
-        } catch (e) {
+          metrics.httpErrors.inc({ route, error: (error instanceof Error ? error : new Error(String(error))).name });
+        } catch {
           // swallow metrics errors
         }
 
@@ -125,10 +145,10 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
           captureServerError(error, {
             route,
             method,
-            query: request?.nextUrl?.searchParams.toString() ?? '',
+            query: request instanceof NextRequest ? request.nextUrl.searchParams.toString() : '',
             headers: {
-              authorization: request?.headers?.get('authorization') ?? undefined,
-              'x-forwarded-for': request?.headers?.get('x-forwarded-for') ?? undefined,
+              authorization: request instanceof NextRequest ? request.headers.get('authorization') ?? undefined : undefined,
+              'x-forwarded-for': request instanceof NextRequest ? request.headers.get('x-forwarded-for') ?? undefined : undefined,
               [REQUEST_ID_HEADER]: requestId,
             },
           });
@@ -142,12 +162,11 @@ export function withRequestLogging<T extends (...args: any[]) => Promise<NextRes
           request: requestContext,
         });
 
-        const errorResponse = NextResponse.json(
+        return NextResponse.json(
           { error: 'Internal server error' },
           { status: 500, headers: { [REQUEST_ID_HEADER]: requestId } },
         );
-        return errorResponse as ReturnType<T>;
       }
-    }) as Promise<ReturnType<T>>;
+    });
   };
 }

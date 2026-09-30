@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { getAuthUser } from "@/lib/auth";
 import { validatePreferences } from "@/lib/account/preferences-validation";
 import { preferencesRepository } from "@/lib/account/preferences-repository";
 import { withCsrfProtection } from "@/lib/api/handler";
 
-
-export async function GET(_req: NextRequest): Promise<NextResponse> {
-  let user;
-  try {
-    user = requireAuth(_req);
-  } catch (res) {
-    return res as NextResponse;
+export async function GET(request: NextRequest) {
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const prefs = await preferencesRepository.getByUserId(user.id);
@@ -26,20 +23,17 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   );
 }
 
-
-const putHandler = async (req: NextRequest): Promise<NextResponse> => {
-  let user;
-  try {
-    user = requireAuth(req);
-  } catch (res) {
-    return res as NextResponse;
+const putHandler = async (request: NextRequest) => {
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: unknown;
   try {
-    body = await req.json();
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const validation = validatePreferences(body);

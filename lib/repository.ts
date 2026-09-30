@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { notificationPreferences } from '@/lib/db/schema';
+import { notificationPreferences } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
 
 export type Channel = 'email' | 'sms' | 'push' | 'in_app';
