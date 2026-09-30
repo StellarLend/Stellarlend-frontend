@@ -93,6 +93,7 @@ export default defineConfig({
             "lib/search/**/*.test.ts",
             "lib/transactions/presets.test.ts",
             "components/features/lending/**/*.test.tsx",
+            "components/index.test.ts",
             "context/**/*.test.{ts,tsx}",
             "hooks/**/*.test.{ts,tsx}",
             "components/marketing/**/*.test.tsx",
