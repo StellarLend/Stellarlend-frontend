@@ -46,34 +46,23 @@ jobs:
           vercel-args: '--prod'
 
       - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
           body: |
-            🚀 **Stellarlend Frontend Release ${{ github.ref }}**
-            
-            **Changes in this Release:**
-            ${{ github.event.head_commit.message }}
-            
+            🚀 **Stellarlend Frontend Release ${{ github.ref_name }}**
+
             **Deployment:**
             - ✅ Production deployment successful
             - 🔗 Live at: https://stellarlend.com
-            
-            **What's New:**
-            - Bug fixes and improvements
-            - Performance optimizations
-            - Security updates
-          draft: false
-          prerelease: false
 
       - name: Notify team of deployment
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         uses: 8398a7/action-slack@v3
         with:
           status: success
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           text: |
-            🚀 Stellarlend Frontend ${{ github.ref }} deployed to production!
+            🚀 Stellarlend Frontend ${{ github.ref_name }} deployed to production!
             Live at: https://stellarlend.com
