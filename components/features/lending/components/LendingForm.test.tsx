@@ -530,6 +530,26 @@ describe("LendingForm Component", () => {
       expect(screen.queryByText(/Live API/i)).not.toBeInTheDocument();
     });
 
+it("rejects malformed server response and keeps local fallback", async () => {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      result: { totalEarnings: 1e13, dailyEarnings: -5 }, // out of bounds
+    }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+  fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+    target: { value: "100" },
+  });
+  act(() => {
+    vi.advanceTimersByTime(300);
+  });
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  // source should remain local estimate despite server ok response
+  expect(screen.getByTestId("lending-quote-source")).toHaveTextContent(/Local estimate/i);
+});
+
     it("aborts the previous in-flight request when input changes again", async () => {
       // First request stalled, second one resolves.
       let resolveFirst!: (value: Response) => void;
