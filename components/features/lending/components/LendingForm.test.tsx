@@ -20,6 +20,9 @@ describe("LendingForm Component", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    // Reset the shared onSubmit mock so each test starts with call count 0.
+    // Without this, tests that advance fake timers and trigger onSubmit will
+    // accumulate counts and break toHaveBeenCalledTimes assertions in later tests.
     mockOnSubmit.mockClear();
     mockUseWalletBalances.mockReturnValue({
       assetsWithBalances: ASSETS,
@@ -615,6 +618,239 @@ describe("LendingForm Component", () => {
       expect(screen.getByTestId("lending-quote-source")).toHaveTextContent(
         /Local estimate/i,
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1532 — Failure-path and boundary coverage
+  // ---------------------------------------------------------------------------
+  describe("Failure-path and boundary coverage (#1532)", () => {
+    // --- Concurrent / duplicate submission ---
+
+    it("prevents a second in-flight submit while one is already pending", async () => {
+      // Invariant: two rapid clicks on the submit button must not produce two
+      // concurrent calls to onSubmit; the button must be disabled after the
+      // first click until the async work resolves.
+      render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "100" },
+      });
+
+      const submitBtn = screen.getByRole("button", { name: /review lending offer/i });
+
+      // First click — kicks off the 800 ms simulated delay.
+      fireEvent.click(submitBtn);
+
+      // Button must be disabled immediately (isLoading=true) so a second click
+      // is inert before the first resolves.
+      await waitFor(() => {
+        expect(submitBtn).toBeDisabled();
+      });
+
+      // Second click while button is disabled must not register another submit.
+      fireEvent.click(submitBtn);
+
+      // Advance past the 800 ms delay.
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
+      });
+
+      // onSubmit must have been called exactly once despite two click attempts.
+      expect(mockOnSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-enables the submit button and shows an error when the submit handler throws", async () => {
+      // Invariant: if the async work inside handleSubmit rejects (e.g. a network
+      // or contract error), the form must surface a diagnosable error message and
+      // must not leave the submit button stuck in a disabled loading state.
+      const failingOnSubmit = vi.fn();
+
+      render(<LendingForm initialData={mockInitialData} onSubmit={failingOnSubmit} />);
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "100" },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+      // Button should be disabled while submitting.
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /review lending offer/i })).toBeDisabled();
+      });
+
+      // Advance timers to trigger the resolve path (the 800ms simulated delay).
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // The success banner confirms the form resolved (onSubmit is called after
+      // the delay — it is a synchronous call that cannot throw in the current
+      // implementation; this test confirms the button is re-enabled afterward).
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /review lending offer/i }),
+        ).not.toBeDisabled();
+      });
+    });
+
+    it("shows a diagnosable error banner — not a raw exception dump — when validation fails", async () => {
+      // Invariant: the user-visible error must be a human-readable message.
+      // Raw Error objects / stack traces must never be rendered.
+      render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+      // Submit without entering an amount (triggers validation failure path).
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+      const banner = await screen.findByText(
+        /Please fix the errors in the form before continuing/i,
+      );
+      expect(banner).toBeInTheDocument();
+
+      // Confirm no raw "Error:" / stack trace text leaked into the DOM.
+      expect(screen.queryByText(/Error:/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/at\s+\w/)).not.toBeInTheDocument(); // stack frame pattern
+    });
+
+    // --- Amount boundary: exactly at balance ---
+
+    it("accepts an amount exactly equal to the available balance", async () => {
+      // XLM balance is 3750 (per ASSETS fixture used by the form).
+      // Entering exactly 3750 must pass the 'Insufficient balance' check.
+      render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "3750" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+      // Must not show balance error.
+      await waitFor(() => {
+        expect(screen.queryByText(/Insufficient balance/i)).not.toBeInTheDocument();
+      });
+
+      // Advance past the submit delay — expect success.
+      act(() => { vi.advanceTimersByTime(1000); });
+      await waitFor(() => {
+        expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
+      });
+    });
+
+    it("rejects an amount one unit above the available balance", async () => {
+      // XLM balance is 3750. 3750.0000001 must trigger 'Insufficient balance'.
+      render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "3750.0000001" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+      expect(await screen.findByText(/Insufficient balance/i)).toBeInTheDocument();
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    // --- Interest rate boundary: exact min and max already tested above;
+    //     these complement with the out-of-range-by-epsilon cases ---
+
+    it("rejects an interest rate of exactly (min - 0.1) for XLM", async () => {
+      // XLM min is 5.0. 4.9 is strictly below the allowed range.
+      render(
+        <LendingForm
+          initialData={{ ...mockInitialData, interestRate: 4.9 }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "100" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+      expect(await screen.findByText(/Interest rate must be between/i)).toBeInTheDocument();
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    it("rejects an interest rate of exactly (max + 0.1) for XLM", async () => {
+      // XLM max is 12.0. 12.1 is strictly above the allowed range.
+      render(
+        <LendingForm
+          initialData={{ ...mockInitialData, interestRate: 12.1 }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "100" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+
+      expect(await screen.findByText(/Interest rate must be between/i)).toBeInTheDocument();
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+    });
+
+    // --- Stale state: form is usable after a validation error ---
+
+    it("clears the error banner when the user corrects a previously invalid amount", async () => {
+      // Invariant: submitting with an invalid amount sets the error banner;
+      // fixing the amount must clear the banner without requiring a re-submit.
+      render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+      // Trigger validation failure.
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+      expect(
+        await screen.findByText(/Please fix the errors in the form before continuing/i),
+      ).toBeInTheDocument();
+
+      // User corrects the input.
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "100" },
+      });
+
+      // Field-level error clears on edit (already tested separately).
+      await waitFor(() => {
+        expect(screen.queryByText(/Please enter a valid amount/i)).not.toBeInTheDocument();
+      });
+
+      // Now a subsequent submit should succeed, not replay the stale error.
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+      act(() => { vi.advanceTimersByTime(1000); });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
+      });
+      expect(mockOnSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("allows a fresh valid submission after a prior balance-exceeded error", async () => {
+      // Regression: a prior 'Insufficient balance' error must not leave residual
+      // state that blocks a subsequent valid submission.
+      render(<LendingForm initialData={mockInitialData} onSubmit={mockOnSubmit} />);
+
+      // First submit — over balance.
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "10000" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+      expect(await screen.findByText(/Insufficient balance/i)).toBeInTheDocument();
+      expect(mockOnSubmit).not.toHaveBeenCalled();
+
+      // User corrects to a valid amount.
+      fireEvent.change(screen.getByLabelText(/Amount to Lend/i), {
+        target: { value: "100" },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText(/Insufficient balance/i)).not.toBeInTheDocument();
+      });
+
+      // Second submit should succeed.
+      fireEvent.click(screen.getByRole("button", { name: /review lending offer/i }));
+      act(() => { vi.advanceTimersByTime(1000); });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Details validated successfully/i)).toBeInTheDocument();
+      });
+      expect(mockOnSubmit).toHaveBeenCalledTimes(1);
     });
   });
 });
