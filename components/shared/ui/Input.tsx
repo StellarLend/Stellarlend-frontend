@@ -1,4 +1,4 @@
-import React, { InputHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import React, { InputHTMLAttributes, TextareaHTMLAttributes, useId } from 'react';
 import { cn } from '@/lib/utils/cn';
 
 export interface BaseProps {
@@ -36,7 +36,28 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, In
       ...rest
     } = props;
 
-    const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+    // `useId` provides a stable, unique fallback when neither `id` prop nor
+    // `label` is supplied, so ARIA descriptions never dangle.
+    const generatedId = useId();
+
+    // When no explicit `id` and no `label` are provided, we still need a
+    // stable id anchor so that `aria-describedby` can point at the error /
+    // helper text paragraph without producing a dangling reference.
+    const inputId =
+      id ||
+      (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined) ||
+      ((error || helperText) ? generatedId : undefined);
+
+    // Compute ARIA description reference: error takes priority over helper text.
+    const describedById = error
+      ? inputId
+        ? `${inputId}-error`
+        : undefined
+      : helperText
+        ? inputId
+          ? `${inputId}-helper`
+          : undefined
+        : undefined;
 
     const baseInputStyles = cn(
       'w-full px-4 py-2.5 rounded-lg border transition-all duration-200 outline-none text-sm',
@@ -66,6 +87,8 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, In
             ref={ref as React.ForwardedRef<HTMLTextAreaElement>}
             className={cn(baseInputStyles, 'resize-none')}
             required={required}
+            aria-invalid={error ? 'true' : 'false'}
+            aria-describedby={describedById}
             {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
           />
         ) : (
@@ -74,6 +97,8 @@ export const Input = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, In
             ref={ref as React.ForwardedRef<HTMLInputElement>}
             className={baseInputStyles}
             required={required}
+            aria-invalid={error ? 'true' : 'false'}
+            aria-describedby={describedById}
             {...(rest as InputHTMLAttributes<HTMLInputElement>)}
           />
         )}
