@@ -76,6 +76,7 @@ export default defineConfig({
             "app/account/profile/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
             "components/atoms/Button/Button.test.tsx",
+            "components/atoms/Tooltip/Tooltip.test.tsx",
             "components/auth/**/*.test.tsx",
             "components/shared/layout/TopNav.test.tsx",
             "components/shared/layout/**/*.test.tsx",
