@@ -14,6 +14,19 @@ vi.mock("@/hooks/useWalletConnection", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useWalletBalances", () => ({
+  useWalletBalances: () => ({
+    assetsWithBalances: [
+      { symbol: "USDC", balance: 10000, precision: 2 },
+      { symbol: "XLM", balance: 50000, precision: 2 },
+      { symbol: "BTC", balance: 2, precision: 8 },
+      { symbol: "ETH", balance: 50, precision: 4 },
+    ],
+    isLoading: false,
+    error: null,
+  })
+}));
+
 describe("BorrowingForm Component", () => {
   const mockInitialData = {
     asset: "USDC",

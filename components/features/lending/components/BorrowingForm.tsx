@@ -104,6 +104,16 @@ export default function BorrowingForm({
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
   const [durationMode, setDurationMode] = useState<"fixed" | "custom">("fixed");
   const [customDays, setCustomDays] = useState<string>("");
+  const [customDaysError, setCustomDaysError] = useState<string>("");
+
+  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setCustomDays(raw);
+    const errorMsg = validateCustomDays(raw, (days) => {
+      setFormData((prev) => ({ ...prev, duration: days }));
+    });
+    setCustomDaysError(errorMsg);
+  };
 
   const { assetsWithBalances } = useWalletBalances();
   const selectedAsset = assetsWithBalances.find((a) => a.symbol === formData.asset);
@@ -275,7 +285,7 @@ export default function BorrowingForm({
   ): string => {
     const trimmed = value.trim();
     if (!trimmed) {
-      return "Please enter a custom duration";
+      return "Please enter a number of days";
     }
     const parsed = Number(trimmed);
     if (!Number.isInteger(parsed)) {
@@ -387,6 +397,7 @@ export default function BorrowingForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatus("idle");
     setSubmitMessage("");
     if (validateForm()) {
