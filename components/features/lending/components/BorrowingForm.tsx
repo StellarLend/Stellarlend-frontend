@@ -361,6 +361,7 @@ export default function BorrowingForm({
     // submit cannot race the customDaysError state update.
     if (durationMode === "custom") {
       const customDurationError = validateCustomDays(customDays);
+      console.log("validateForm duration check:", { durationMode, customDays, customDurationError });
       if (customDurationError) {
         newErrors.duration = customDurationError;
       }
@@ -392,12 +393,22 @@ export default function BorrowingForm({
     }
 
     setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      console.log("Validation failed with errors:", newErrors);
+    }
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("handleSubmit called. isSubmitting:", isSubmitting, "durationMode:", durationMode);
     if (isSubmitting) return;
+    // Guard: prevent submission when custom duration is active but input empty
+    if (durationMode === "custom" && (!customDays || !customDays.trim())) {
+      setStatus("error");
+      setSubmitMessage("Please fix the errors in the form before continuing.");
+      return;
+    }
     setStatus("idle");
     setSubmitMessage("");
     if (validateForm()) {

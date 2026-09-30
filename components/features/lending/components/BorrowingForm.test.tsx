@@ -17,6 +17,19 @@ vi.mock("@/hooks/useWalletConnection", () => ({
 vi.mock("@/hooks/useWalletBalances", () => ({
   useWalletBalances: () => ({
     assetsWithBalances: [
+      { symbol: "USDC", balance: 1250, precision: 2 },
+      { symbol: "XLM", balance: 3750, precision: 2 },
+      { symbol: "BTC", balance: 2, precision: 8 },
+      { symbol: "ETH", balance: 50, precision: 4 },
+    ],
+    isLoading: false,
+    error: null,
+  })
+}));
+
+vi.mock("@/hooks/useWalletBalances", () => ({
+  useWalletBalances: () => ({
+    assetsWithBalances: [
       { symbol: "USDC", balance: 10000, precision: 2 },
       { symbol: "XLM", balance: 50000, precision: 2 },
       { symbol: "BTC", balance: 2, precision: 8 },
@@ -50,7 +63,7 @@ describe("BorrowingForm Component", () => {
               ? input.toString()
               : input.url;
 
-        if (url.includes("/api/markets")) {
+        if (url.includes("/api/markets") && !url.includes("prices")) {
           return Promise.resolve({
             ok: true,
             json: async () => ({
@@ -254,9 +267,11 @@ describe("BorrowingForm Component", () => {
     });
 
     // Verify our new success banner
-    expect(
-      screen.getByText(/Details validated successfully/i),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Details validated successfully/i),
+      ).toBeInTheDocument();
+    });
     expect(mockOnSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 10,
@@ -548,7 +563,7 @@ describe("BorrowingForm Component", () => {
     const renderWithAmount = (amount = 10) => {
       render(
         <BorrowingForm
-          initialData={{ ...mockInitialData, amount }}
+          initialData={{ ...mockInitialData, amount, collateralAmount: 200 }}
           onSubmit={mockOnSubmit}
         />,
       );
@@ -699,17 +714,21 @@ describe("BorrowingForm Component", () => {
     it("blocks form submission when Custom chip is active but the input is empty", async () => {
       renderWithAmount();
       fireEvent.click(screen.getByRole("button", { name: /custom/i }));
-      // Do NOT type anything — input stays empty
+      
+      const input = screen.getByLabelText(/Custom loan duration in days/i);
+      fireEvent.change(input, { target: { value: "" } });
 
       fireEvent.click(
         screen.getByRole("button", { name: /Review Loan Request/i }),
       );
 
-      expect(
-        screen.getByText(
-          /Please fix the errors in the form before continuing/i,
-        ),
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            /Please fix the errors in the form before continuing/i,
+          ),
+        ).toBeInTheDocument();
+      });
       expect(mockOnSubmit).not.toHaveBeenCalled();
     });
 
