@@ -1,5 +1,4 @@
 "use client";
-
 export const Pagination = ({
   totalItems,
   itemsPerPage,
