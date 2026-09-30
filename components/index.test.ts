@@ -504,8 +504,9 @@ describe('components/index.ts — exported value types', () => {
     expect(typeof ComponentsBarrel.StatusBadge).toBe('function');
   });
 
-  it('Button is a function (React component)', () => {
-    expect(typeof ComponentsBarrel.Button).toBe('function');
+  it('Button is an object (React.forwardRef component)', () => {
+    // React.forwardRef returns an object (not a function) in React 17+
+    expect(typeof ComponentsBarrel.Button).toBe('object');
   });
 
   it('FeatureGate is a function (React component)', () => {
