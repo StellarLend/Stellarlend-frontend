@@ -13,7 +13,7 @@ import {
 // Mock store to control getTransaction in tests precisely
 vi.mock("@/lib/transactions/store", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/transactions/store")>();
-  let mockStore = new Map<string, any>();
+  const mockStore = new Map<string, any>();
 
   return {
     ...original,
