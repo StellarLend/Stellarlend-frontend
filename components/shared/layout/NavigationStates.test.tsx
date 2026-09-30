@@ -142,16 +142,18 @@ describe("NavigationMenu", () => {
 
 // ─── SideNav ─────────────────────────────────────────────────────────────────
 describe("SideNav", () => {
-  it("renders the close button with aria-label and focus-visible ring", () => {
+  it("renders the collapse/expand toggle button with aria-label and focus ring (desktop)", async () => {
     render(
-      <SidebarProvider initialSidebarOpen={true} initialIsMobile={true}>
+      <SidebarProvider initialSidebarOpen={true} initialIsMobile={false}>
         <SideNav />
       </SidebarProvider>
     );
-    const closeBtn = screen.getByRole("button", { name: /close navigation/i });
-    expect(closeBtn).toBeInTheDocument();
-    expect(closeBtn.className).toContain("focus:outline-none");
-    expect(closeBtn.className).toContain("focus:ring-2");
+    // In jsdom, window.innerWidth is 0 (<768) so SidebarContext forces isMobile=true
+    // and closes the sidebar. We wait for the desktop aside to mount instead.
+    const toggleBtn = await screen.findByRole("button", { name: /collapse navigation/i });
+    expect(toggleBtn).toBeInTheDocument();
+    expect(toggleBtn.className).toContain("focus:outline-none");
+    expect(toggleBtn.className).toContain("focus:ring-2");
   });
 });
 
