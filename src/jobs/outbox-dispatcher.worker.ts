@@ -44,14 +44,18 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
         processedAt: new Date(),
       })
       .where(eq(outboxEvents.id, event.id));
-  } catch (error: any) {
-    // Record failure details and increment attempts
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to dispatch outbox event', 'jobs/outbox-dispatcher', {
+      eventId: event.id,
+      error: message,
+    });
     await db
       .update(outboxEvents)
       .set({
         status: 'FAILED',
         attempts: event.attempts + 1,
-        lastError: error.message || String(error),
+        lastError: message,
       })
       .where(eq(outboxEvents.id, event.id));
   }
