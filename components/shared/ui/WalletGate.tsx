@@ -1,4 +1,5 @@
 import { useWalletConnection } from "@/hooks/useWalletConnection";
+import { useWalletContext } from "@/context/WalletContext";
 import React from "react";
 
 interface WalletGateProps {
@@ -7,7 +8,9 @@ interface WalletGateProps {
 }
 
 export const WalletGate = ({ children, fallbackText = "Connect wallet to continue" }: WalletGateProps) => {
-  const { isConnected, isLoading, connect, error } = useWalletConnection();
+  const context = useWalletContext();
+  const hook = useWalletConnection();
+  const { isConnected, isLoading, connect, error } = context ?? hook;
 
   if (isConnected) {
     return <>{children}</>;

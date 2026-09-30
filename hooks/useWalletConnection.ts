@@ -11,6 +11,16 @@ import {
 export type WalletStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 export type { StellarNetwork };
 
+/**
+ * Validate a Stellar public key format. Stellar addresses are
+ * 56-character base32 strings starting with 'G'. This is the same
+ * validation that was previously only present in WalletContext.connect().
+ */
+export const isValidPublicKey = (publicKey: unknown): publicKey is string =>
+  typeof publicKey === 'string' &&
+  publicKey.length === 56 &&
+  publicKey.startsWith('G');
+
 export const useWalletConnection = () => {
   const [address, setAddress] = useState<string | null>(null);
   const [status, setStatus] = useState<WalletStatus>('disconnected');
@@ -49,6 +59,10 @@ export const useWalletConnection = () => {
           const session = validateClientSessionResponse(data, network);
           assertWalletMatchesSession(storedAddress, session.walletAddress);
 
+          if (!isValidPublicKey(session.walletAddress)) {
+            throw new Error('Invalid wallet address format');
+          }
+
           setAddress(session.walletAddress);
           setStatus('connected');
           sessionStorage.setItem('walletAddress', session.walletAddress);
@@ -73,6 +87,11 @@ export const useWalletConnection = () => {
 
     try {
       const verifiedAddress = await connectWallet(network);
+
+      if (!isValidPublicKey(verifiedAddress)) {
+        throw new Error('Invalid wallet address format');
+      }
+
       setAddress(verifiedAddress);
       setStatus('connected');
       sessionStorage.setItem('walletAddress', verifiedAddress);

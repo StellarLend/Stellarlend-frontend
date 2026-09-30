@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useWalletContext } from "@/context/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
 import { navClasses } from "@/constants/design-tokens";
 import { Toast, type ToastVariant } from "@/components/shared/common";
@@ -17,7 +17,7 @@ const truncateAddress = (addr: string) => `${addr.slice(0, 5)}…${addr.slice(-4
  * copying to clipboard, and showing any connection errors.
  */
 export const WalletConnectButton: React.FC = () => {
-  const { address, status, error, connect, disconnect } = useWalletContext();
+  const { address, status, error, connect, disconnect } = useWalletConnection();
   const [isCopied, setIsCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [toast, setToast] = useState<{
@@ -108,7 +108,7 @@ export const WalletConnectButton: React.FC = () => {
         <button
           type="button"
           aria-label="Connect wallet"
-          onClick={connect}
+          onClick={() => connect()}
           disabled={loading}
           className={`flex items-center justify-center text-white bg-[#15A350] hover:bg-[#128F43] py-2 px-5 rounded-full text-sm font-medium transition-colors disabled:opacity-70 ${focusClasses}`}
         >
