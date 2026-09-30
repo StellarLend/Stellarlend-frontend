@@ -1,4 +1,4 @@
-import React, { forwardRef } from "react";
+import React, { forwardRef, useCallback } from "react";
 import { cn } from "../../../lib/utils/cn";
 import { navClasses } from "../../../constants/design-tokens";
 
@@ -35,22 +35,28 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
             loading = false,
             disabled,
             onClick,
+            onKeyDown,
             ...props
         },
         ref,
     ) => {
         const isDisabled = disabled || loading;
 
-        const handleKeyDown = (
-            e: React.KeyboardEvent<HTMLButtonElement>,
-        ) => {
-            if (isDisabled) return;
-
-            if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick?.(e as any);
-            }
-        };
+        const handleKeyDown = useCallback(
+            (e: React.KeyboardEvent<HTMLButtonElement>) => {
+                onKeyDown?.(e);
+                if (e.defaultPrevented) return;
+                if (isDisabled) {
+                    e.preventDefault();
+                    return;
+                }
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onClick?.(e as unknown as React.MouseEvent<HTMLButtonElement>);
+                }
+            },
+            [isDisabled, onClick, onKeyDown],
+        );
 
         return (
             <button
@@ -58,6 +64,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                 type="button"
                 disabled={isDisabled}
                 aria-disabled={isDisabled}
+                aria-busy={loading || undefined}
                 onKeyDown={handleKeyDown}
                 onClick={onClick}
                 className={cn(
@@ -76,6 +83,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
                     >
                         <circle
                             className="opacity-25"
