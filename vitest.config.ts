@@ -82,6 +82,7 @@ export default defineConfig({
             "components/shared/common/**/*.test.tsx",
             "components/shared/ui/**/*.test.tsx",
             "components/features/dashboard/components/FilterPresets.test.tsx",
+            "components/features/dashboard/components/index.test.tsx",
             "components/features/dashboard/components/LiquidationsPanel.test.tsx",
             "components/features/dashboard/components/TransactionReceipt.test.tsx",
             "components/features/dashboard/components/TransactionDetail.test.tsx",
