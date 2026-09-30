@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useId } from "react";
 import { cn } from "@/lib/utils/cn";
 
 export interface TooltipProps {
@@ -9,6 +9,13 @@ export interface TooltipProps {
   className?: string;
   wrapperClassName?: string;
 }
+
+/**
+ * The delay is clamped to a non-negative finite number. Negative or NaN
+ * values would otherwise cause `setTimeout` to fire immediately or in an
+ * unpredictable order, breaking the delay contract.
+ */
+export const MAX_TOOLTIP_DELAY = 10 * 60 * 1000;
 
 const positionClasses: Record<string, string> = {
   top: "bottom-full left-1/2 transform -translate-x-1/2 mb-2",
@@ -24,6 +31,32 @@ const arrowClasses: Record<string, string> = {
   right: "right-full top-1/2 transform -translate-y-1/2 -mr-1",
 };
 
+/**
+ * Resolves a valid position key, falling back to "top" for unknown values.
+ * This guarantees `positionClasses`/`arrowClasses` lookups always resolve.
+ */
+function resolvePosition(position: TooltipProps["position"]): keyof typeof positionClasses {
+  if (position && position in positionClasses) {
+    return position as keyof typeof positionClasses;
+  }
+  return "top";
+}
+
+/**
+ * Normalizes the delay input into a deterministic, non-negative ms value.
+ * NaN/Infinity/negative inputs are coerced to 0 (immediate show), which is
+ * the safest default and avoids unbounded timers.
+ */
+function normalizeDelay(delay: number | undefined): number {
+  if (typeof delay !== "number" || !Number.finite(delay)) {
+    return 0;
+  }
+  if (delay < 0) {
+    return 0;
+  }
+  return Math.min(delay, MAX_TOOLTIP_DELAY);
+}
+
 export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
@@ -33,55 +66,72 @@ export const Tooltip: React.FC<TooltipProps> = ({
   wrapperClassName,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef(ReturnType<typeof setTimeout> | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const generatedId = useId();
+  const tooltipId = `tooltip-${generatedId}`;
 
-  const showTooltip = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => setIsVisible(true), delay);
-  };
-
-  const hideTooltip = () => {
-    if (timeoutRef.current) {
+  // Stable reference so cleanup can always cancel the latest pending timer.
+  const clearPendingTimeout = React.useCallback(() => {
+    if (timeoutRef.current !== null) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+  }, []);
+
+  const showTooltip = React.useCallback(() => {
+    clearPendingTimeout();
+    const wait = normalizeDelay(delay);
+    if (wait === 0) {
+      // Avoid scheduling a macrotask for zero delay; show synchronously so
+      // behavior is deterministic and testable without timer advancing.
+      setIsVisible(true);
+      return;
+    }
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setIsVisible(true);
+    }, wait);
+  }, [clearPendingTimeout, delay]);
+
+  const hideTooltip = React.useCallback(() => {
+    clearPendingTimeout();
     setIsVisible(false);
-  };
+  }, [clearPendingTimeout]);
 
   useEffect(() => {
+    if (!isVisible) {
+      return undefined;
+    }
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         hideTooltip();
       }
     };
 
-    if (isVisible) {
-      document.addEventListener("keydown", handleEscape);
-    }
-
+    document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [isVisible]);
+  }, [isVisible, hideTooltip]);
 
+  // Cancel any pending timer on unmount to prevent state updates after disposal.
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearPendingTimeout();
     };
-  }, []);
+  }, [clearPendingTimeout]);
+
+  const safePosition = resolvePosition(position);
 
   const triggerElement = React.cloneElement(children, {
     onMouseEnter: showTooltip,
     onMouseLeave: hideTooltip,
     onFocus: showTooltip,
     onBlur: hideTooltip,
-    "aria-describedby": isVisible ? "tooltip-content" : undefined,
+    "aria-describedby": isVisible ? tooltipId : undefined,
   } as React.HTMLAttributes<HTMLElement>);
 
   return (
@@ -91,7 +141,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && (
         <div
           ref={tooltipRef}
-          id="tooltip-content"
+          id={tooltipId}
           role="tooltip"
           className={cn(
             // Base styles
@@ -99,12 +149,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
             "pointer-events-none opacity-0 transition-opacity duration-200",
 
             // Position
-            positionClasses[position],
+            positionClasses[safePosition],
 
             // Arrow
             "after:content-[''] after:absolute after:w-0 after:h-0",
             "after:border-l-4 after:border-r-4 after:border-b-4 after:border-transparent after:border-b-gray-900",
-            arrowClasses[position],
+            arrowClasses[safePosition],
 
             // Show animation
             "opacity-100",
