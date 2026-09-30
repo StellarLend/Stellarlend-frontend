@@ -16,14 +16,6 @@ import type { OutboxPayload } from '@/lib/validation/outbox';
 const ROUTE = 'jobs/outbox-dispatcher';
 
 const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
-const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
-
-const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
-const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
-
-const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
-
-const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
 
 // Redis connection options (pulled from environment)
 const connection = {
@@ -61,6 +53,13 @@ function getAttempts(event: { attempts?: number | null } | null | undefined): nu
   return Number.isFinite(value) ? value : 0;
 }
 
+/** Keeps `lastError` within the column budget regardless of upstream message size. */
+function truncateError(message: string): string {
+  return message.length > LAST_ERROR_MAX_LENGTH
+    ? `${message.slice(0, LAST_ERROR_MAX_LENGTH - 1)}…`
+    : message;
+}
+
 /**
  * Dispatches a single outbox event to its corresponding BullMQ queue.
  *
@@ -86,23 +85,41 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
     return;
   }
 
+  // Payload validation is deliberately outside the retryable try/catch below.
+  // A malformed or tampered payload is a permanent rejection, not a transient
+  // failure: retrying it would burn the retry budget on an event that can never
+  // succeed and delay the rejection forever.
+  let payload: OutboxPayload;
   try {
-    const payload = JSON.parse(event.payload);
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      throw new Error('Outbox payload must be a JSON object');
+    payload = parseOutboxPayload(event.type, event.payload);
+  } catch (error) {
+    if (error instanceof OutboxPayloadValidationError) {
+      dispatcherMetrics.rejected += 1;
+      await db
+        .update(outboxEvents)
+        .set({
+          status: 'FAILED',
+          processedAt: new Date(),
+          lastError: truncateError(`rejected: ${error.message}`),
+        })
+        .where(eq(outboxEvents.id, event.id));
+      return;
     }
+    throw error;
+  }
 
   try {
     if (event.type === 'notification') {
       await notificationQueue.add('send_notification', payload, {
         jobId: event.id,
       });
-    } else if (event.type === 'audit') {
+    } else {
       await auditQueue.add('log_audit', payload, {
         jobId: event.id,
       });
     }
 
+    dispatcherMetrics.dispatched += 1;
     await db
       .update(outboxEvents)
       .set({
@@ -111,14 +128,15 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
         lastError: null,
       })
       .where(eq(outboxEvents.id, event.id));
-  } catch (error: any) {
+  } catch (error) {
+    dispatcherMetrics.failed += 1;
     const nextAttempts = Math.min(attempts + 1, MAX_OUTBOX_RETRY_ATTEMPTS);
     await db
       .update(outboxEvents)
       .set({
         status: 'FAILED',
         attempts: nextAttempts,
-        lastError: error?.message || String(error),
+        lastError: truncateError(error instanceof Error ? error.message : String(error)),
       })
       .where(eq(outboxEvents.id, event.id));
   }
@@ -153,6 +171,13 @@ export async function processOutbox() {
             and(
               eq(outboxEvents.status, 'FAILED'),
               lt(outboxEvents.attempts, MAX_OUTBOX_RETRY_ATTEMPTS)
+            ),
+            // Recovery: a PROCESSING row whose claim lease expired was left
+            // mid-flight by a crash. Re-claim it. Legacy rows written before
+            // claimedAt existed carry a NULL lease and are also recoverable.
+            and(
+              eq(outboxEvents.status, 'PROCESSING'),
+              or(lt(outboxEvents.claimedAt, staleCutoff), isNull(outboxEvents.claimedAt))
             )
           )
         )
@@ -175,11 +200,16 @@ export async function processOutbox() {
           continue;
         }
 
+        const wasStale = event.status === 'PROCESSING';
+        if (wasStale) {
+          dispatcherMetrics.recoveredStale += 1;
+        }
+
         tx
           .update(outboxEvents)
           .set({
             status: 'PROCESSING',
-            claimedAt,
+            claimedAt: new Date(),
             lastError: wasStale ? 'recovered stale claim' : null,
           })
           .where(eq(outboxEvents.id, event.id))
