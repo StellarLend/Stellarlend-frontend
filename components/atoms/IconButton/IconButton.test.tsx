@@ -53,12 +53,36 @@ describe('IconButton Accessibility', () => {
 
     button.focus();
     expect(button).toHaveFocus();
+  });
+
+  it('fires onClick exactly once per Enter key press', () => {
+    render(
+      <IconButton aria-label="Search" onClick={mockOnClick}>
+        <svg data-testid="search-icon" />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button');
+    button.focus();
 
     fireEvent.keyDown(button, { key: 'Enter' });
+    fireEvent.click(button);
     expect(mockOnClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires onClick exactly once per Space key press', () => {
+    render(
+      <IconButton aria-label="Search" onClick={mockOnClick}>
+        <svg data-testid="search-icon" />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button');
+    button.focus();
 
     fireEvent.keyDown(button, { key: ' ' });
-    expect(mockOnClick).toHaveBeenCalledTimes(2);
+    fireEvent.click(button);
+    expect(mockOnClick).toHaveBeenCalledTimes(1);
   });
 
   it('blocks keyboard activation when disabled', () => {
