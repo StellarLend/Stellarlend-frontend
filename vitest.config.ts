@@ -131,6 +131,7 @@ export default defineConfig({
             "lib/indexer/**/*.test.ts",
             "lib/db/**/*.test.ts",
             "lib/configValidation.test.ts",
+            "lib/server-config.test.ts",
             "lib/lending/markets.test.ts",
             "lib/validation/*.test.ts",
             "scripts/**/*.test.ts",
