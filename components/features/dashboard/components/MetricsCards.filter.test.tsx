@@ -156,4 +156,18 @@ describe("MetricsCards – asset filter", () => {
     // Should show 0 of 0, no crash
     expect(screen.getByText(/Showing 0 of 0/i)).toBeTruthy();
   });
+
+  test("duplicate symbols are shown once and counted once", async () => {
+    const { getAssets } = await import("@/lib/assets/registry");
+    vi.mocked(getAssets).mockReturnValueOnce([
+      { symbol: "XLM", name: "Stellar Lumens", decimals: 7, issuer: "native", logoUrl: "xlm.png" },
+      { symbol: "xlm", name: "Duplicate Stellar Lumens", decimals: 7, issuer: "native", logoUrl: "xlm-duplicate.png" },
+      { symbol: "USDC", name: "USD Coin", decimals: 6, issuer: "GBUQ", logoUrl: "usdc.png" },
+    ]);
+
+    render(<MetricsCards />);
+    await screen.findByLabelText("Filter assets");
+    expect(screen.getByText(/Showing 2 of 2/i)).toBeTruthy();
+    expect(screen.getAllByText("XLM")).toHaveLength(1);
+  });
 });
