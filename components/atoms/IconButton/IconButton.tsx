@@ -1,4 +1,4 @@
-import React, { forwardRef } from "react";
+import React, { forwardRef, useCallback, useId, useState } from "react";
 import { cn } from "../../../lib/utils/cn";
 import { navClasses } from "../../../constants/design-tokens";
 
@@ -29,14 +29,14 @@ const sizeClasses: Record<string, string> = {
     sm: "p-1.5 w-8 h-8",
     md: "p-2 w-10 h-10",
     lg: "p-3 w-12 h-12",
-};
+} as const;
 
 const variantClasses: Record<string, string> = {
     default: "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
     ghost: "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
     outline:
         "text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900",
-};
+} as const;
 
 /**
  * Fallback classes used when an unknown size or variant key is supplied,
@@ -51,6 +51,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         {
             className,
             children,
+            "aria-label": ariaLabel,
+            "aria-describedby": ariaDescribedBy,
+            tooltip,
             size = "md",
             variant = "default",
             loading = false,
@@ -81,11 +84,22 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         }
 
         const isDisabled = disabled || loading;
+        const hasTooltip = typeof tooltip === "string" && tooltip.length > 0;
+        const tooltipId = `${useId()}-tooltip`;
+        const [tooltipVisible, setTooltipVisible] = useState(false);
 
-        const handleKeyDown = (
-            e: React.KeyboardEvent<HTMLButtonElement>,
-        ) => {
-            if (isDisabled) return;
+        if (
+            process.env.NODE_ENV !== "production" &&
+            (typeof ariaLabel !== "string" || ariaLabel.trim().length === 0)
+        ) {
+            // Invalid input is reported once per render, in development only.
+            // Never throw: a missing label must degrade to an unlabelled but
+            // still operable control rather than crash the whole tree.
+            console.warn(
+                "[IconButton] `aria-label` is required and must be a non-empty string; " +
+                    "icon-only controls are otherwise unusable with assistive technology.",
+            );
+        }
 
             if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
@@ -136,6 +150,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
                     >
                         <circle
                             className="opacity-25"
@@ -155,6 +171,30 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                     children
                 )}
             </button>
+        );
+
+        // Existing callers that do not pass `tooltip` keep the exact same DOM
+        // (a bare <button>), so this is purely additive.
+        if (!hasTooltip) {
+            return button;
+        }
+
+        return (
+            <span className="relative inline-flex">
+                {button}
+                <span
+                    id={tooltipId}
+                    role="tooltip"
+                    className={cn(
+                        "pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2",
+                        "whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white shadow-lg",
+                        "transition-opacity duration-150",
+                        tooltipVisible ? "opacity-100" : "opacity-0",
+                    )}
+                >
+                    {tooltip}
+                </span>
+            </span>
         );
     },
 );
