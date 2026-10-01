@@ -33,8 +33,8 @@ function req(path: string, options: { method?: string; headers?: Record<string, 
 
 describe('middleware', () => {
   beforeEach(() => {
-    mockRateLimit.mockReturn( { success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 });
-    mockGetSession.mockResolved(null);
+    mockRateLimit.mockReturnValue({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 });
+    mockGetSession.mockResolvedValue(null);
   });
 
   describe('non-API paths', () => {
@@ -99,7 +99,7 @@ describe('middleware', () => {
 
     it('exempts /api/health POST from idempotency requirement', async () => {
       const res = await middleware(req('/api/health', { method: 'POST' }));
-      expect(res.status).not.toBe422);
+      expect(res.status).not.toBe(422);
     });
 
     it('422 response includes x-request-id', async () => {
@@ -111,7 +111,7 @@ describe('middleware', () => {
 
   describe('rate limiting', () => {
     it('passes request when within rate limit', async () => {
-      mockRateLimit.mockReturn({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 });
+      mockRateLimit.mockReturnValue({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 });
       const res = await middleware(req('/api/markets'));
       expect(res.status).toBe(200);
       expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
@@ -120,7 +120,7 @@ describe('middleware', () => {
 
     it('returns 429 when rate limit exceeded', async () => {
       const reset = Date.now() + 30000;
-      mockRateLimit.mockReturn({ success: false, limit: 100, remaining: 0, reset });
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset });
       const res = await middleware(req('/api/markets'));
       expect(res.status).toBe(429);
       const body = await res.json();
@@ -129,7 +129,7 @@ describe('middleware', () => {
 
     it('Retry-After is never negative', async () => {
       // reset in the past simulates clock drift between rateLimit() and header write
-      mockRateLimit.mockReturn({ success: false, limit: 100, remaining: 0, reset: Date.now() - 5000 });
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() - 5000 });
       const res = await middleware(req('/api/markets'));
       expect(res.status).toBe(429);
       const retryAfter = parseInt(res.headers.get('Retry-After') || '-1', 10);
@@ -137,7 +137,7 @@ describe('middleware', () => {
     });
 
     it('skips rate limiting for /api/health', async () => {
-      mockRateLimit.mockReturn({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
       const res = await middleware(req('/api/health'));
       // health check should not be rate limited even when rateLimit() returns failure
       expect(res.status).toBe(200);
@@ -145,16 +145,16 @@ describe('middleware', () => {
     });
 
     it('skips rate limiting for authenticated requests', async () => {
-      mockGetSession.mockResolved({ userId: 'user-1' });
-      mockRateLimit.mockReturn( { success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
+      mockGetSession.mockResolvedValue({ userId: 'user-1' });
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
       const res = await middleware(req('/api/positions', { withSession: true }));
       expect(res.status).toBe(200);
       expect(mockRateLimit).not.toHaveBeenCalled();
     });
 
     it('does not bypass rate limiting for a forged session cookie', async () => {
-      mockGetSession.mockResolved(null);
-      mockRateLimit.mockReturn({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
+      mockGetSession.mockResolvedValue(null);
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
       const res = await middleware(req('/api/positions', { withSession: true }));
       expect(res.status).toBe(429);
       expect(mockRateLimit).toHaveBeenCalled();
@@ -184,8 +184,8 @@ describe('middleware', () => {
       const res2 = await middleware(req('/api/markets'));
       const csp1 = res1.headers.get('Content-Security-Policy') ?? '';
       const csp2 = res2.headers.get('Content-Security-Policy') ?? '';
-      const nonce1 = csp1.match(/nonce-([^;'\"]+)/)?.[1];
-      const nonce2 = csp2.match(/nonce-([^;'\"]+)/)?.[1];
+      const nonce1 = csp1.match(/nonce-([^;'"]+)/)?.[1];
+      const nonce2 = csp2.match(/nonce-([^;'"]+)/)?.[1];
       expect(nonce1).toBeDefined();
       expect(nonce2).toBeDefined();
       expect(nonce1).not.toBe(nonce2);
@@ -201,7 +201,7 @@ describe('middleware', () => {
 
     it('rate limit response includes standard headers', async () => {
       const reset = Date.now() + 60000;
-      mockRateLimit.mockReturn({ success: false, limit: 100, remaining: 0, reset });
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset });
       const res = await middleware(req('/api/markets'));
       expect(res.headers.get('X-RateLimit-Limit')).toBe('100');
       expect(res.headers.get('X-RateLimit-Remaining')).toBe('0');
@@ -214,7 +214,7 @@ describe('middleware', () => {
     });
 
     it('x-request-id is set on rate limit rejection', async () => {
-      mockRateLimit.mockReturn( { success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
       const res = await middleware(req('/api/markets'));
       expect(res.status).toBe(429);
       expect(res.headers.get('x-request-id')).toBe('test-request-id');
