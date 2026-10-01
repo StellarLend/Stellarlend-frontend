@@ -7,7 +7,7 @@ describe('sanitiseString', () => {
   });
 
   it('normalizes to NFC', () => {
-    expect(sanitiseString('\u00E9\u006A')).toBe(\u00E9\u006A'.normalize('NFC'));
+    expect(sanitiseString('\u00E9\u006A')).toBe('\u00E9\u006A'.normalize('NFC'));
   });
 });
 

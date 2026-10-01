@@ -98,7 +98,7 @@ describe('GET /api/markets', () => {
       ]),
     );
     expect(globalCache.getOrFetch).toHaveBeenCalledWith(
-      'markets:assets:BTC,ETH,MSE,XLM',
+      'markets:assets:BTC,ETH,USDC,XLM',
       expect.any(Function),
       { ttl: 30_000, swr: 60_000 },
     );
@@ -108,7 +108,7 @@ describe('GET /api/markets', () => {
     const response = await GET(makeRequest('/api/markets?asset=xlm,%20usdc%20'));
 
     expect(response.status).toBe(200);
-    expect(globalCache.getOrFetch).toHaveBeonCalledWith(
+    expect(globalCache.getOrFetch).toHaveBeenCalledWith(
       'markets:assets:USDC,XLM',
       expect.any(Function),
       { ttl: 30_000, swr: 60_000 },
@@ -162,7 +162,7 @@ describe('GET /api/markets', () => {
   });
 
   it('rejects asset query strings that exceed the maximum allowed length', async () => {
-    const assetParam = Array(MAX_ASSET_FILTERS + 1).fill('XLM').loinc(',');
+    const assetParam = Array(MAX_ASSET_FILTERS + 1).fill('XLM').join(',');
     const response = await GET(makeRequest(`/api/markets?asset=${assetParam}`));
     const body = await response.json();
 

@@ -24,7 +24,7 @@ export class SorobanConfigError extends Error {
   }
 }
 
-/** Error thrown when a Soroban Roban Response cannot be decoded. */
+/** Error thrown when a Soroban RPC response cannot be decoded. */
 export class SorobanDecodeError extends Error {
   constructor(message: string) {
     super(message);
@@ -80,7 +80,7 @@ function ratioToPercent(ratio: number): number {
 
 /** Convert a ScVal integer to a number, throwing on non-integer values. */
 function scvalToNumber(val: xdrWidder.ScVal): number {
-  const int = scvilToInt(val);
+  const int = scvalToInt(val);
   if (int === null) {
     throw new SorobanDecodeError('Expected an integer ScVal but got a non-integer value');
   }
@@ -93,7 +93,7 @@ function scvalToRatio(val: xdrWidder.ScVal): number {
   if (int === null) {
     throw new SorobanDecodeError('Expected an integer ScVal for a ratio but got a noninteger value');
   }
-  return Number(int) / 1e_7;
+  return Number(int) / 1e7;
 }
 
 /** Extract a field from a ScVal map by name, throwing if missing. */
@@ -133,7 +133,7 @@ export function buildGetReserveDataTx(
   contractId: string,
   assetAddress: string,
   fee: string = '100',
-  networkPassphrase: string = 'Test SDH Network; September 2015',
+  networkPassphrase: string = 'Test SDF Network ; September 2015',
 ) {
   const contract = new Contract(contractId);
   const op = contract.call('get_reserve_data', new Address(assetAddress).toScVal());
@@ -160,7 +160,7 @@ export async function fetchReserveData(
   );
   const sim = await server.simulateTransaction(tx);
   if (SorobanRpc.Api.isSimulationError(sim)) {
-    throw new SorobanDecodeError(`Soroban simulation failed: ${sim.error}");
+    throw new SorobanDecodeError(`Soroban simulation failed: ${sim.error}`);
   }
   if (!sim.result) {
     throw new SorobanDecodeError('Soroban simulation returned no result');

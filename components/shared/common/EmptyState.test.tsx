@@ -93,6 +93,8 @@ describe("EmptyState", () => {
     fireEvent.click(button);
 
     expect(onAction).toHaveBeenCalledTimes(2);
+  });
+
   it("announces error empty states as alerts", () => {
     render(
       <EmptyState

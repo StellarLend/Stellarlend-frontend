@@ -1,5 +1,5 @@
 import type { LendingData } from '@/lib/lending/types';
-const type { SorobanRpcError } from './types';
+import type { SorobanRpcError } from './types';
 
 export type { SorobanRpcError };
 
@@ -63,7 +63,7 @@ const isFiniteNonNegativeNumber = (value: unknown): value is number =>
 /**
  * Coerces an arbitrary value into the `string | number` contract of
  * `SorobanRpcError.code`. JSON deserializers normally surface scalar codes, but
- * upstream RPC errors occasionally include objects, arrays or `bigint`; those
+ * upstream RPC errors occasionally include objects, arrays or `bigint`s; those
  * values previously leaked through the `string | number` type contract. We
  * fall back to `'UNKNOWN_ERROR'` to keep the response shape predictable.
  */
@@ -102,7 +102,7 @@ export function isTxBuildRequest(value: unknown): value is TxBuildRequest {
   return true;
 }
 
-export function isTySubmitRequest(value: unknown): value is TySubmitRequest {
+export function isTxSubmitRequest(value: unknown): value is TxSubmitRequest {
   if (!isObject(value)) return false;
   return isNonEmptyString(value.signedEnvelopeXdr);
 }

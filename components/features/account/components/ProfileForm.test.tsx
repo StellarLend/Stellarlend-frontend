@@ -50,10 +50,10 @@ describe("ProfileForm Component", () => {
   it("renders all form fields", () => {
     render(<ProfileForm />);
 
-    expect(screen.getByLabelText(/First Name/i)).toBeInDocument();
-    expect(screen.getByLabelText(/Last Name/i)).toBeInDocument();
-    expect(screen.getByLabelText(/Email/i)).toBeInDocument();
-    expect(screen.getByLabelText(/Address/i)).toBeInDocument();
+    expect(screen.getByLabelText(/First Name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Last Name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Address/i)).toBeInTheDocument();
   });
 
   it("shows validation errors on empty submit", async () => {
@@ -63,9 +63,9 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/First name is required/i)).toBeInDocument();
-      expect(screen.getByText(/Email is required/i)).toBeInDocument();
-      expect(screen.getByText(/Gender is required/i)).toBeInDocument();
+      expect(screen.getByText(/First name is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/Email is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/Gender is required/i)).toBeInTheDocument();
     });
   });
 
@@ -80,7 +80,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Please enter a valid email address/i)).toBeInDocument();
+      expect(screen.getByText(/Please enter a valid email address/i)).toBeInTheDocument();
     });
   });
 
@@ -132,7 +132,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Profile saved/i)).toBeInDocument();
+      expect(screen.getByText(/Profile saved/i)).toBeInTheDocument();
     });
   });
 
@@ -147,7 +147,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
   });
 
@@ -166,7 +166,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
   });
 
@@ -185,7 +185,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
   });
 
@@ -209,12 +209,12 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
   });
 
   it("prevents concurrent submissions", async () => {
-    let resolveProfile: () => void 0;
+    let resolveProfile: () => void = () => {};
     const profilePromise = new Promise<Response>((resolve) => {
       resolveProfile = () => resolve({
         ok: true,
@@ -262,7 +262,7 @@ describe("ProfileForm Component", () => {
   });
 
   it("disables submit button during submission", async () => {
-    let resolveProfile: () => void 0;
+    let resolveProfile: () => void = () => {};
     const profilePromise = new Promise<Response>((resolve) => {
       resolveProfile = () => resolve({
         ok: true,
@@ -298,7 +298,7 @@ describe("ProfileForm Component", () => {
       resolveProfile();
     });
 
-    await waitFor(() ==> {
+    await waitFor(() => {
       expect(submitButton).not.toBeDisabled();
     });
   });
@@ -317,7 +317,7 @@ describe("ProfileForm Component", () => {
 
     // Should show validation error for too long email
     await waitFor(() => {
-      expect(screen.getByText(/Please enter a valid email address/i)).toBeInDocument();
+      expect(screen.getByText(/Please enter a valid email address/i)).toBeInTheDocument();
     });
   });
 
@@ -335,7 +335,7 @@ describe("ProfileForm Component", () => {
 
     // Should show validation error for too long name
     await waitFor(() => {
-      expect(screen.getByText(/First name is required/i)).toBeInDocument();
+      expect(screen.getByText(/First name is required/i)).toBeInTheDocument();
     });
   });
 
@@ -354,13 +354,13 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
 
     // Form data should still be present
-    expect(screen.getLabelText(/First Name/i)).toHaveValue("John");
-    expect(screen.getLabelText(/Last Name/i)).toHaveValue("Doe");
-    expect(screen.getLabelText(/Email/i)).toHaveValue("john@example.com");
+    expect(screen.getByLabelText(/First Name/i)).toHaveValue("John");
+    expect(screen.getByLabelText(/Last Name/i)).toHaveValue("Doe");
+    expect(screen.getByLabelText(/Email/i)).toHaveValue("john@example.com");
   });
 
   it("allows retry after failed submission", async () => {
@@ -398,13 +398,13 @@ describe("ProfileForm Component", () => {
     // First submit fails
     await act(async () => { fireEvent.submit(form); });
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
 
     // Second submit succeeds
     await act(async () => { fireEvent.submit(form); });
     await waitFor(() => {
-      expect(screen.getByText(/Profile saved/i)).toBeInDocument();
+      expect(screen.getByText(/Profile saved/i)).toBeInTheDocument();
     });
 
     // Verify two profile calls were made
@@ -427,7 +427,7 @@ describe("ProfileForm Component", () => {
 
     // Should show validation error for invalid tax ID
     await waitFor(() => {
-      expect(screen.getByText(/Tax Verification Number is required/i)).toBeInDocument();
+      expect(screen.getByText(/Tax Verification Number is required/i)).toBeInTheDocument();
     });
   });
 
@@ -444,7 +444,7 @@ describe("ProfileForm Component", () => {
 
     // Should show validation error for invalid phone
     await waitFor(() => {
-      expect(screen.getByText(/Phone Number is required/i)).toBeInDocument();
+      expect(screen.getByText(/Phone Number is required/i)).toBeInTheDocument();
     });
   });
 
@@ -463,11 +463,11 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
   });
 
-  it("shows error toast when the API returns 429 too\ many requests", async () => {
+  it("shows error toast when the API returns 429 too many requests", async () => {
     const fetchMock = makeFetchMock({ 
       ok: false, 
       status: 429, 
@@ -482,7 +482,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
     });
   });
 });

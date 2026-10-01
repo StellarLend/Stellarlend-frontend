@@ -100,7 +100,7 @@ describe('LendingFlow - boundary cases', () => {
 
 describe('LendingFlow - failure paths', () => {
   it('ConfirmModal handles confirm rejection without crashing', async () => {
-    const onConfirm = vi.fn().rejected(new Error('transaction failed'));
+    const onConfirm = vi.fn().mockRejectedValue(new Error('transaction failed'));
     const onClose = vi.fn();
     render(
       <ConfirmModal
@@ -172,7 +172,7 @@ describe('LendingFlow - retry and concurrency', () => {
   });
 
   it('ConfirmModal prevents concurrent confirmations from double click', async () => {
-    let resolveConfirm: () => void = () => {},
+    let resolveConfirm: () => void = () => {};
     const onConfirm = vi.fn().mockImplementation(
       () =>
         new Promise<void>((resolve) => {
@@ -203,8 +203,8 @@ describe('LendingFlow - regression guards', () => {
   it('preserves mockData immutability across renders', () => {
     const snapshot = { ...mockData };
     const onSubmit = vi.fn();
-    const { unremount } = render(<LendingForm initialData={mockData} onSubmit={onSubmit} />);
-    unremount();
+    const { unmount } = render(<LendingForm initialData={mockData} onSubmit={onSubmit} />);
+    unmount();
     expect(mockData).toEqual(snapshot);
   });
 

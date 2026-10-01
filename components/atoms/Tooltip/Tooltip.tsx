@@ -10,6 +10,13 @@ export interface TooltipProps {
   wrapperClassName?: string;
 }
 
+/**
+ * The delay is clamped to a non-negative finite number. Negative or NaN
+ * values would otherwise cause `setTimeout` to fire immediately or in an
+ * unpredictable order, breaking the delay contract.
+ */
+export const MAX_TOOLTIP_DELAY = 10 * 60 * 1000;
+
 const positionClasses: Record<string, string> = {
   top: "bottom-full left-1/2 transform -translate-x-1/2 mb-2",
   bottom: "top-full left-1/2 transform -translate-x-1/2 mt-2",
@@ -24,6 +31,32 @@ const arrowClasses: Record<string, string> = {
   right: "right-full top-1/2 transform -translate-y-1/2 -mr-1",
 };
 
+/**
+ * Resolves a valid position key, falling back to "top" for unknown values.
+ * This guarantees `positionClasses`/`arrowClasses` lookups always resolve.
+ */
+function resolvePosition(position: TooltipProps["position"]): keyof typeof positionClasses {
+  if (position && position in positionClasses) {
+    return position as keyof typeof positionClasses;
+  }
+  return "top";
+}
+
+/**
+ * Normalizes the delay input into a deterministic, non-negative ms value.
+ * NaN/Infinity/negative inputs are coerced to 0 (immediate show), which is
+ * the safest default and avoids unbounded timers.
+ */
+function normalizeDelay(delay: number | undefined): number {
+  if (typeof delay !== "number" || !Number.finite(delay)) {
+    return 0;
+  }
+  if (delay < 0) {
+    return 0;
+  }
+  return Math.min(delay, MAX_TOOLTIP_DELAY);
+}
+
 export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
@@ -33,54 +66,48 @@ export const Tooltip: React.FC<TooltipProps> = ({
   wrapperClassName,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isHoveredRef = useRef(false);
-  const isFocusedRef = useRef(false);
-  const isDismissedRef = useRef(false);
-  const tooltipId = useId();
-  const normalizedDelay = Number.isFinite(delay) && delay >= 0 ? delay : 0;
+  const timeoutRef = useRef(ReturnType<typeof setTimeout> | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const generatedId = useId();
+  const tooltipId = `tooltip-${generatedId}`;
 
-  const clearShowTimeout = () => {
+  // Stable reference so cleanup can always cancel the latest pending timer.
+  const clearPendingTimeout = React.useCallback(() => {
     if (timeoutRef.current !== null) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-  };
+  }, []);
 
-  const scheduleShow = () => {
-    clearShowTimeout();
+  const showTooltip = React.useCallback(() => {
+    clearPendingTimeout();
+    const wait = normalizeDelay(delay);
+    if (wait === 0) {
+      // Avoid scheduling a macrotask for zero delay; show synchronously so
+      // behavior is deterministic and testable without timer advancing.
+      setIsVisible(true);
+      return;
+    }
     timeoutRef.current = setTimeout(() => {
       timeoutRef.current = null;
       setIsVisible(true);
-    }, normalizedDelay);
-  };
+    }, wait);
+  }, [clearPendingTimeout, delay]);
 
-  const activate = (interaction: "hover" | "focus") => {
-    const wasActive = isHoveredRef.current || isFocusedRef.current;
-    if (interaction === "hover") isHoveredRef.current = true;
-    else isFocusedRef.current = true;
-
-    if (!wasActive && !isDismissedRef.current) scheduleShow();
-  };
-
-  const deactivate = (interaction: "hover" | "focus") => {
-    if (interaction === "hover") isHoveredRef.current = false;
-    else isFocusedRef.current = false;
-
-    if (!isHoveredRef.current && !isFocusedRef.current) {
-      clearShowTimeout();
-      setIsVisible(false);
-      isDismissedRef.current = false;
-    }
-  };
+  const hideTooltip = React.useCallback(() => {
+    clearPendingTimeout();
+    setIsVisible(false);
+  }, [clearPendingTimeout]);
 
   useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (
-        event.key !== "Escape" ||
-        (!isHoveredRef.current && !isFocusedRef.current && timeoutRef.current === null)
-      ) {
-        return;
+    if (!isVisible) {
+      return undefined;
+    }
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        hideTooltip();
       }
 
       clearShowTimeout();
@@ -91,9 +118,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
     document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("keydown", handleEscape);
-      clearShowTimeout();
     };
-  }, []);
+  }, [isVisible, hideTooltip]);
+
+  // Cancel any pending timer on unmount to prevent state updates after disposal.
+  useEffect(() => {
+    return () => {
+      clearPendingTimeout();
+    };
+  }, [clearPendingTimeout]);
+
+  const safePosition = resolvePosition(position);
 
   const childProps = children.props as React.HTMLAttributes<HTMLElement>;
   const describedBy = (childProps["aria-describedby"] ?? "")
@@ -102,23 +137,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
   if (isVisible && !describedBy.includes(tooltipId)) describedBy.push(tooltipId);
 
   const triggerElement = React.cloneElement(children, {
-    onMouseEnter: (event: React.MouseEvent<HTMLElement>) => {
-      childProps.onMouseEnter?.(event);
-      activate("hover");
-    },
-    onMouseLeave: (event: React.MouseEvent<HTMLElement>) => {
-      childProps.onMouseLeave?.(event);
-      deactivate("hover");
-    },
-    onFocus: (event: React.FocusEvent<HTMLElement>) => {
-      childProps.onFocus?.(event);
-      activate("focus");
-    },
-    onBlur: (event: React.FocusEvent<HTMLElement>) => {
-      childProps.onBlur?.(event);
-      deactivate("focus");
-    },
-    "aria-describedby": describedBy.length > 0 ? describedBy.join(" ") : undefined,
+    onMouseEnter: showTooltip,
+    onMouseLeave: hideTooltip,
+    onFocus: showTooltip,
+    onBlur: hideTooltip,
+    "aria-describedby": isVisible ? tooltipId : undefined,
   } as React.HTMLAttributes<HTMLElement>);
 
   return (
@@ -127,6 +150,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
       {isVisible && (
         <div
+          ref={tooltipRef}
           id={tooltipId}
           role="tooltip"
           className={cn(
@@ -135,12 +159,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
             "pointer-events-none opacity-0 transition-opacity duration-200",
 
             // Position
-            positionClasses[position],
+            positionClasses[safePosition],
 
             // Arrow
             "after:content-[''] after:absolute after:w-0 after:h-0",
             "after:border-l-4 after:border-r-4 after:border-b-4 after:border-transparent after:border-b-gray-900",
-            arrowClasses[position],
+            arrowClasses[safePosition],
 
             // Show animation
             "opacity-100",

@@ -1,4 +1,4 @@
-import { useCallback, useRef, type JeyboardEvent } from "react";
+import { useCallback, useRef, type KeyboardEvent } from "react";
 import type { LendingActionType } from "@/lib/lending/types";
 
 interface TabSelectorProps {
@@ -10,7 +10,7 @@ interface TabSelectorProps {
 // 1. TABS is the single source of truth for tab order and labels.
 // 2. Keyboard navigation is cyclic and clamped to [0, TABS.length - 1]; it never throws.
 // 3. onTabChange is only invoked with a valid tab value from TABS.
-// 4. Focus moves atmost once per user interaction and is cancelled on unmount.
+// 4. Focus moves at most once per user interaction and is cancelled on unmount.
 const TABS: Array<{ value: LendingActionType; label: string }> = [
   { value: "lend", label: "Lend Assets" },
   { value: "borrow", label: "Borrow Assets" },
@@ -30,7 +30,7 @@ export default function TabSelector({
   activeTab,
   onTabChange,
 }: TabSelectorProps) {
-  const frameRef = useRef(<number | null>(null));
+  const frameRef = useRef<number | null>(null);
 
   const focusTab = useCallback((value: LendingActionType) => {
     if (typeof window === "undefined") return;
@@ -97,7 +97,7 @@ export default function TabSelector({
             key={tab.value}
             type="button"
             role="tab"
-            id={`ending-tab-${tab.value}`}
+            id={`lending-tab-${tab.value}`}
             aria-selected={selected}
             aria-controls={`lending-panel-${tab.value}`}
             tabIndex={selected ? 0 : -1}

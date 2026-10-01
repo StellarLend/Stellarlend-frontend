@@ -4,12 +4,20 @@ import { navClasses } from "../../../constants/design-tokens";
 
 export interface IconButtonProps
     extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-    children?: React.ReactNode;
+    children: React.ReactNode;
+    /**
+     * Required accessible label for screen readers.
+     *
+     * Invariant: must be a non-empty string. An empty or missing label
+     * renders the button inaccessible to assistive technology. A dev-mode
+     * warning is emitted at render time if this invariant is violated.
+     */
     "aria-label": string;
     /**
-     * Text shown in an accessible tooltip on hover/focus. The tooltip is
-     * wired to the button through `aria-describedby`, so assistive technology
-     * announces it without polluting the button's accessible name.
+     * Tooltip text for the button. Currently rendered as a native `title`
+     * attribute so it appears as a browser tooltip on hover; it also serves
+     * as a fallback accessible name when aria-label is absent (though
+     * aria-label should always be provided explicitly).
      */
     tooltip?: string;
     size?: "sm" | "md" | "lg";
@@ -17,13 +25,13 @@ export interface IconButtonProps
     loading?: boolean;
 }
 
-const sizeClasses = {
+const sizeClasses: Record<string, string> = {
     sm: "p-1.5 w-8 h-8",
     md: "p-2 w-10 h-10",
     lg: "p-3 w-12 h-12",
 } as const;
 
-const variantClasses = {
+const variantClasses: Record<string, string> = {
     default: "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
     ghost: "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
     outline:
@@ -31,20 +39,13 @@ const variantClasses = {
 } as const;
 
 /**
- * Icon-only control.
- *
- * Determinism notes:
- * - The underlying `<button>` already activates on Enter/Space, so no
- *   synthetic `onKeyDown` click is dispatched here. Doing so would fire
- *   `onClick` twice per keypress in a real browser (once from the native
- *   activation, once from the handler) and could double-submit forms.
- * - `size`/`variant` are validated at compile time, but JS callers can still
- *   pass anything; unknown values fall back to the defaults instead of
- *   silently dropping all padding/colour.
- * - Keyboard activation is inert while `disabled`/`loading` because the
- *   native `disabled` attribute removes the button from the tab order and
- *   suppresses click events.
+ * Fallback classes used when an unknown size or variant key is supplied,
+ * so the button always renders with sensible defaults instead of stripping
+ * all size/variant classes silently.
  */
+const FALLBACK_SIZE_CLASS = sizeClasses.md;
+const FALLBACK_VARIANT_CLASS = variantClasses.default;
+
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     (
         {
@@ -58,14 +59,30 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
             loading = false,
             disabled,
             onClick,
-            onMouseEnter,
-            onMouseLeave,
-            onFocus,
-            onBlur,
+            tooltip,
+            // Destructure aria-label so it is always present in the rendered
+            // element even when the consumer provides it via spread.
+            "aria-label": ariaLabel,
+            onKeyDown: callerOnKeyDown,
             ...props
         },
         ref,
     ) => {
+        // ── Invariant: aria-label must be a non-empty string ─────────────────
+        // TypeScript enforces presence at compile time but cannot prevent an
+        // empty string or a runtime-only bypass (e.g. as any). Emit a warning
+        // in development so violations surface early without crashing users in
+        // production.
+        if (process.env.NODE_ENV !== "production") {
+            if (!ariaLabel || ariaLabel.trim() === "") {
+                console.warn(
+                    "[IconButton] Missing or empty `aria-label`. Every IconButton " +
+                    "must have a non-empty aria-label for screen-reader accessibility. " +
+                    "Provide a concise description of the button's action.",
+                );
+            }
+        }
+
         const isDisabled = disabled || loading;
         const hasTooltip = typeof tooltip === "string" && tooltip.length > 0;
         const tooltipId = `${useId()}-tooltip`;
@@ -84,60 +101,51 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
             );
         }
 
-        // No tooltip means no state to flip: this keeps hover/focus on the
-        // (many) plain icon buttons free of any re-render work.
-        const showTooltip = useCallback(() => {
-            if (hasTooltip) setTooltipVisible(true);
-        }, [hasTooltip]);
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.(e as any);
+            }
 
-        const hideTooltip = useCallback(() => setTooltipVisible(false), []);
+            // Always delegate to any caller-supplied handler so consumer
+            // logic (e.g. closing a menu on Escape) is never silently dropped.
+            callerOnKeyDown?.(e);
+        };
 
-        const resolvedSize = sizeClasses[size] ?? sizeClasses.md;
-        const resolvedVariant = variantClasses[variant] ?? variantClasses.default;
+        // Resolve size and variant classes with safe fallbacks so that an
+        // invalid/unknown value never produces undefined in the class string.
+        const resolvedSizeClass = sizeClasses[size] ?? FALLBACK_SIZE_CLASS;
+        const resolvedVariantClass = variantClasses[variant] ?? FALLBACK_VARIANT_CLASS;
 
-        const describedBy =
-            [ariaDescribedBy, hasTooltip ? tooltipId : null]
-                .filter(Boolean)
-                .join(" ") || undefined;
-
-        const button = (
+        return (
             <button
                 ref={ref}
-                type="button"
                 disabled={isDisabled}
-                aria-disabled={isDisabled}
-                aria-busy={loading || undefined}
                 aria-label={ariaLabel}
-                aria-describedby={describedBy}
+                onKeyDown={handleKeyDown}
                 onClick={onClick}
-                onMouseEnter={(event) => {
-                    onMouseEnter?.(event);
-                    showTooltip();
-                }}
-                onFocus={(event) => {
-                    onFocus?.(event);
-                    showTooltip();
-                }}
-                onBlur={(event) => {
-                    onBlur?.(event);
-                    hideTooltip();
-                }}
-                onMouseLeave={(event) => {
-                    onMouseLeave?.(event);
-                    hideTooltip();
-                }}
+                // Render tooltip as a native title attribute so it appears on
+                // hover and is available to assistive technology as a
+                // supplementary description.
+                title={tooltip}
                 className={cn(
                     "inline-flex items-center justify-center rounded-md transition-colors",
                     "disabled:opacity-50 disabled:cursor-not-allowed",
-                    resolvedSize,
-                    resolvedVariant,
+                    resolvedSizeClass,
+                    resolvedVariantClass,
                     navClasses.iconButtonFocusClasses,
                     className,
                 )}
                 {...props}
+                // Invariant: always override whatever the caller spread;
+                // a button that may be nested in a <form> must never
+                // accidentally submit it.
+                type="button"
+                // aria-disabled is set after the spread for the same reason.
+                aria-disabled={isDisabled || undefined}
             >
                 {loading ? (
                     <svg
+                        aria-hidden="true"
                         className="animate-spin h-4 w-4"
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
