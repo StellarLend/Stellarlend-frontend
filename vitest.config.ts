@@ -72,6 +72,7 @@ export default defineConfig({
           include: [
             "app/page.test.tsx",
             "app/lending/**/*.test.tsx",
+            "app/dashboard/transactions/**/*.test.tsx",
             "app/account/sessions/**/*.test.tsx",
             "app/account/profile/**/*.test.tsx",
             "components/atoms/IconButton/IconButton.test.tsx",
