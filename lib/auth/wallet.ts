@@ -69,13 +69,17 @@ export async function verifyWalletSignature(transactionXdr: string): Promise<str
   const activeKeypair = getServerKeypair();
   try {
     // Read the transaction to extract the client's public key
+    interface ReadChallengeTxResult {
+      clientAccountID: string;
+    }
+
     const { clientAccountID } = WebAuth.readChallengeTx(
       transactionXdr,
       activeKeypair.publicKey(),
       NETWORK_PASSPHRASE,
       HOME_DOMAIN,
       HOME_DOMAIN
-    );
+    ) as ReadChallengeTxResult;
 
     const signersFound = WebAuth.verifyChallengeTxSigners(
       transactionXdr,
