@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface AccountDeletionDialogProps {
   isOpen: boolean;
@@ -16,7 +17,8 @@ export default function AccountDeletionDialog({
   const [confirmed, setConfirmed] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useFocusTrap(dialogRef, { isActive: isOpen, onEscape: onCancel });
 
   useEffect(() => {
     if (isOpen) setConfirmed(false);
@@ -25,47 +27,8 @@ export default function AccountDeletionDialog({
   useEffect(() => {
     if (!isOpen) return;
 
-    previouslyFocusedRef.current = document.activeElement as HTMLElement;
     cancelButtonRef.current?.focus();
-
-    const focusableSelector = [
-      "button:not([disabled])",
-      "input:not([disabled])",
-      "a[href]",
-      "[tabindex]:not([tabindex='-1'])",
-    ].join(", ");
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-        return;
-      }
-      if (e.key !== "Tab") return;
-
-      const focusable = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []
-      );
-      if (!focusable.length) { e.preventDefault(); return; }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      previouslyFocusedRef.current?.focus();
-    };
-  }, [isOpen, onCancel]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -79,11 +42,15 @@ export default function AccountDeletionDialog({
         aria-labelledby="account-deletion-title"
         className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
       >
-        <h2 id="account-deletion-title" className="text-lg font-semibold text-red-700">
+        <h2
+          id="account-deletion-title"
+          className="text-lg font-semibold text-red-700"
+        >
           Delete Account
         </h2>
         <p className="mt-2 text-sm text-gray-600">
-          This action is permanent and cannot be undone. All your data will be deleted.
+          This action is permanent and cannot be undone. All your data will be
+          deleted.
         </p>
         <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
           <input

@@ -22,6 +22,11 @@ export interface PgPoolLike {
 
 function createPool(): PgPoolLike {
   try {
+    // `pg` is an optional runtime dependency, loaded lazily so the pool
+    // degrades gracefully when neither driver is installed. The directive is
+    // deliberately unqualified: `no-require-imports` is only defined when the
+    // @typescript-eslint plugin is resolvable.
+    // eslint-disable-next-line
     const pg = require('pg');
     const PoolClass = pg.Pool || pg.default?.Pool;
     if (PoolClass) {
@@ -35,6 +40,8 @@ function createPool(): PgPoolLike {
   }
 
   try {
+    // Same optional-dependency load as above.
+    // eslint-disable-next-line
     const postgres = require('postgres');
     const sql = postgres(process.env.DATABASE_URL || 'postgres://localhost:5432/stellarlend', {
       ssl: buildSslConfig(),

@@ -109,6 +109,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
       if (e.key === "Escape") {
         hideTooltip();
       }
+
+      clearShowTimeout();
+      setIsVisible(false);
+      isDismissedRef.current = true;
     };
 
     document.addEventListener("keydown", handleEscape);
@@ -126,6 +130,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   const safePosition = resolvePosition(position);
 
+  const childProps = children.props as React.HTMLAttributes<HTMLElement>;
+  const describedBy = (childProps["aria-describedby"] ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (isVisible && !describedBy.includes(tooltipId)) describedBy.push(tooltipId);
+
   const triggerElement = React.cloneElement(children, {
     onMouseEnter: showTooltip,
     onMouseLeave: hideTooltip,
@@ -135,7 +145,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   } as React.HTMLAttributes<HTMLElement>);
 
   return (
-    <div ref={triggerRef} className={cn("relative", wrapperClassName ?? "inline-block")}>
+    <div className={cn("relative", wrapperClassName ?? "inline-block")}>
       {triggerElement}
 
       {isVisible && (

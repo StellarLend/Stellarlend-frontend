@@ -48,13 +48,18 @@ class LayoutRegionBoundary extends Component<
 function RegionFallback({
   label,
   testId,
+  errorId,
 }: {
   label: string;
   testId: string;
+  /** Optional identifier for the error, useful for analytics */
+  errorId?: string;
 }) {
   return (
     <div
+      role="alert"
       data-testid={testId}
+      data-error-id={errorId}
       className="flex min-h-16 items-center rounded-md bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-sm"
     >
       {label}
@@ -62,10 +67,17 @@ function RegionFallback({
   );
 }
 
+// Runtime validation for DashboardLayout props
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
+  // Ensure a valid ReactNode is provided; null/undefined would indicate a misuse.
+  if (children === null || children === undefined) {
+    const errMsg = 'DashboardLayout requires a non-null children prop.';
+    console.error(errMsg);
+    throw new Error(errMsg);
+  }
   return (
     <div className="flex">
-      {/** Skip-to-content link */}
+      {/* Skip-to-content link */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[9999] focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#15A350] focus:shadow-lg"
