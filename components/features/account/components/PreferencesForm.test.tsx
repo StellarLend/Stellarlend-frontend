@@ -639,6 +639,8 @@ describe("PreferencesForm", () => {
       vi.useRealTimers();
     });
 
+  });
+
   describe("Client-side validation", () => {
     it("validates email format before submitting", async () => {
       mockFetchOnce(defaultPreferences);
