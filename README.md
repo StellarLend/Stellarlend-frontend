@@ -443,3 +443,8 @@ For questions, issues, or feature requests:
 ---
 
 **Built with ?? for the Stellar ecosystem**
+
+## Handsoff notes
+
+<!-- handsoff-issue-1465 -->
+- #1465: src/jobs/indexer.worker.ts has no unit test coverage
