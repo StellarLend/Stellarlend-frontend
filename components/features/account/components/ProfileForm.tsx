@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState, ChangeEvent } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, ChangeEvent } from "react";
 import Image, { StaticImageData } from "next/image";
 import { Save } from "lucide-react";
 import profile from "@/public/images/p-Picture.jpg";
@@ -30,6 +30,14 @@ const initialFormData: Record<string, string> = {
   address: "",
 };
 
+// Invariant: only these keys may be submitted to the profile API. Any extra
+// keys (e.g. injected via prototype pollution or stale state) are dropped.
+const ALLOWED_FIELDS = ["firstName", "lastName", "email", "phone", "id", "taxId", "country", "address"] as const;
+
+// Invariant: avatar uploads must be images and bounded in size to avoid
+// unbounded memory usage from FileReader.readAsDataURL.
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
 const ProfileForm: React.FC = () => {
   const [avatar, setAvatar] = useState<string | StaticImageData>(profile);
   const [gender, setGender] = useState<"male" | "female" | "">("");
@@ -42,10 +50,35 @@ const ProfileForm: React.FC = () => {
     description?: string;
   } | null>(null);
 
+  // Invariant: only the latest toast timer may clear the toast. Without this,
+  // a stale timer from a previous toast can clear a newer toast prematurely.
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Invariant: only one submit may be in flight at a time. Guards against
+  // concurrent/duplicate submissions producing inconsistent server state.
+  const inFlightRef = useRef(false);
+  // Invariant: state updates after unmount are suppressed to avoid leaks.
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const showToast = useCallback(
     (variant: ToastVariant, title: string, description?: string) => {
+      if (!mountedRef.current) return;
       setToast({ variant, title, description });
-      setTimeout(() => setToast(null), 5000);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => {
+        toastTimerRef.current = null;
+        if (mountedRef.current) setToast(null);
+      }, 5000);
     },
     []
   );
@@ -53,13 +86,34 @@ const ProfileForm: React.FC = () => {
   // fn to handle profile image manipulations
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (reader.result) setAvatar(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    // Reset the input so selecting the same file again still fires onChange.
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("error", "Invalid file", "Please choose an image file.");
+      return;
     }
+    if (file.size > MAX_AVATAR_BYTES) {
+      showToast("error", "File too large", "Profile pictures must be 5MB or smaller.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      if (mountedRef.current) {
+        showToast("error", "Upload failed", "We could not read that image. Please try again.");
+      }
+    };
+    reader.onloadend = () => {
+      if (!mountedRef.current) return;
+      if (typeof reader.result === "string") {
+        setAvatar(reader.result);
+      } else {
+        showToast("error", "Upload failed", "We could not read that image. Please try again.");
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // fn to handle inputs data
@@ -67,6 +121,7 @@ const ProfileForm: React.FC = () => {
     setFormData(prev => ({ ...prev, [id]: value }));
     if (errors[id]) {
       setErrors(prev => {
+        if (!(id in prev)) return prev;
         const newErrs = { ...prev };
         delete newErrs[id];
         return newErrs;
@@ -76,26 +131,27 @@ const ProfileForm: React.FC = () => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
+    const trimmed = (v: string | undefined) => (v ?? "").trim();
 
-    if (!formData.firstName?.trim()) newErrors.firstName = "First name is required.";
-    if (!formData.lastName?.trim()) newErrors.lastName = "Last name is required.";
+    if (!trimmed(formData.firstName)) newErrors.firstName = "First name is required.";
+    if (!trimmed(formData.lastName)) newErrors.lastName = "Last name is required.";
 
-    if (!formData.email?.trim()) {
+    if (!trimmed(formData.email)) {
       newErrors.email = "Email is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed(formData.email))) {
       newErrors.email = "Please enter a valid email address.";
     }
 
-    if (!formData.phone?.trim()) {
+    if (!trimmed(formData.phone)) {
       newErrors.phone = "Phone number is required.";
-    } else if (!/^\+?[\d\s\-()]{7,}$/.test(formData.phone)) {
+    } else if (!/^\+?[\d\s\-()]{7,}$/.test(trimmed(formData.phone))) {
       newErrors.phone = "Please enter a valid phone number.";
     }
 
-    if (!formData.id?.trim()) newErrors.id = "ID number is required.";
-    if (!formData.taxId?.trim()) newErrors.taxId = "Tax verification number is required.";
-    if (!formData.country?.trim()) newErrors.country = "Identification country is required.";
-    if (!formData.address?.trim()) newErrors.address = "Address is required.";
+    if (!trimmed(formData.id)) newErrors.id = "ID number is required.";
+    if (!trimmed(formData.taxId)) newErrors.taxId = "Tax verification number is required.";
+    if (!trimmed(formData.country)) newErrors.country = "Identification country is required.";
+    if (!trimmed(formData.address)) newErrors.address = "Address is required.";
 
     if (!gender) newErrors.gender = "Gender is required.";
 
@@ -105,34 +161,67 @@ const ProfileForm: React.FC = () => {
 
   // fn to submit form data to the profile API
   const handleSubmit = async () => {
+    // Guard against concurrent/duplicate submissions.
+    if (inFlightRef.current) return;
     if (!validateForm()) return;
 
+    inFlightRef.current = true;
     setSaving(true);
     setErrors({});
 
     try {
+      // Build a whitelisted payload so unknown keys cannot leak to the API.
+      const payload: Record<string, string> = { gender };
+      for (const key of ALLOWED_FIELDS) {
+        payload[key] = (formData[key] ?? "").trim();
+      }
+
       const res = await fetch("/api/account/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gender, ...formData }),
+        body: JSON.stringify(payload),
       });
 
       if (res.status === 422 || res.status === 400) {
-        const body = await res.json();
-        if (body.errors) setErrors(body.errors);
-        showToast("error", "Validation failed", "Please fix the highlighted fields.");
+        let body: unknown = null;
+        try {
+          body = await res.json();
+        } catch {
+          body = null;
+        }
+        const serverErrors =
+          body && typeof body === "object" && "errors" in body && (body as { errors?: unknown }).errors;
+        if (serverErrors && typeof serverErrors === "object") {
+          const sanitized: Record<string, string> = {};
+          for (const [key, value] of Object.entries(serverErrors as Record<string, unknown>)) {
+            if (typeof value === "string") sanitized[key] = value;
+          }
+          if (Object.keys(sanitized).length > 0) setErrors(sanitized);
+        }
+        if (mountedRef.current) {
+          showToast("error", "Validation failed", "Please fix the highlighted fields.");
+        }
         return;
       }
 
       if (!res.ok) {
-        throw new Error("Failed to update profile");
+        // Do not surface raw server messages; keep user-visible errors generic.
+        throw new Error(`Profile update failed with status ${res.status}`);
       }
 
-      showToast("success", "Profile saved", "Your profile has been updated successfully.");
-    } catch {
-      showToast("error", "Save failed", "An error occurred while saving your profile.");
+      if (mountedRef.current) {
+        showToast("success", "Profile saved", "Your profile has been updated successfully.");
+      }
+    } catch (err) {
+      // Log a diagnosable, non-sensitive error for observability.
+      // eslint-disable-next-line no-console
+      console.error("[ProfileForm] save failed", err instanceof Error ? err.message : "unknown error");
+      if (mountedRef.current) {
+        showToast("error", "Save failed", "An error occurred while saving your profile.");
+      }
     } finally {
-      setSaving(false);
+      inFlightRef.current = false;
+      if (mountedRef.current) setSaving(false);
     }
   };
 
@@ -151,6 +240,8 @@ const ProfileForm: React.FC = () => {
           className={`w-full text-gray-900 text-sm px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#2600FF] focus:border-transparent ${
             hasError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:border-[#2600FF]'
           }`}
+          aria-invalid={hasError || undefined}
+          aria-describedby={hasError ? `${id}-error` : helpText ? `${id}-help` : undefined}
           value={formData[id] || ""}
           onChange={(e) => handleInputChange(id, e.target.value)}
         />
@@ -207,7 +298,7 @@ const ProfileForm: React.FC = () => {
             </label>
             <button
               type="button"
-              onClick={() => setAvatar(profile)}
+              onClick={() => { if (mountedRef.current) setAvatar(profile); }}
               className="px-4 py-2 cursor-pointer bg-white border border-gray-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-gray-700 rounded-md text-sm font-medium transition-all duration-200"
             >
               Delete Avatar
@@ -244,6 +335,9 @@ const ProfileForm: React.FC = () => {
                       value={g}
                       checked={gender === g}
                       onChange={() => {
+                        // Guard: ignore changes while a save is in flight so
+                        // the submitted payload cannot diverge from the UI.
+                        if (inFlightRef.current) return;
                         setGender(g as "male" | "female");
                         if (errors.gender) {
                           setErrors(prev => {
@@ -253,6 +347,8 @@ const ProfileForm: React.FC = () => {
                           });
                         }
                       }}
+                      disabled={saving}
+                      aria-invalid={!!errors.gender || undefined}
                       className="h-4 w-4 text-[#2600FF] border-gray-300 focus:ring-[#2600FF]"
                     />
                     <span className="text-sm font-medium capitalize">{g}</span>
@@ -290,6 +386,8 @@ const ProfileForm: React.FC = () => {
                 className={`w-full px-3 py-2 border text-sm text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2600FF] focus:border-transparent ${
                   errors.address ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:border-[#2600FF]'
                 }`}
+                aria-invalid={!!errors.address || undefined}
+                aria-describedby={errors.address ? "address-error" : "address-help"}
                 value={formData["address"] || ""}
                 onChange={(e) => handleInputChange("address", e.target.value)}
               ></textarea>
@@ -320,12 +418,14 @@ const ProfileForm: React.FC = () => {
             leftIcon={<Save className="w-4 h-4" aria-hidden="true" />}
             className="sm:px-12 py-2.5 text-sm bg-[#2600FF] hover:bg-[#1a00cc] text-white rounded-md font-medium shadow-md transition-colors duration-200"
             data-testid="save-profile-btn"
+            disabled={saving}
           >
             Save Changes
           </Button>
 
           <button
             type="button"
+            disabled={saving}
             className="sm:px-12 py-2.5 text-sm cursor-pointer hover:bg-gray-50 bg-white border border-gray-200 text-gray-700 rounded-md font-medium transition-colors duration-200 text-center"
           >
             Cancel
@@ -338,6 +438,7 @@ const ProfileForm: React.FC = () => {
           title={toast.title}
           description={toast.description}
           variant={toast.variant}
+          onClose={() => setToast(null)}
         />
       )}
     </div>

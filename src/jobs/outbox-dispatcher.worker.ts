@@ -128,15 +128,17 @@ export async function dispatchEvent(event: typeof outboxEvents.$inferSelect) {
         lastError: null,
       })
       .where(eq(outboxEvents.id, event.id));
-  } catch (error) {
+  } catch (error: unknown) {
     dispatcherMetrics.failed += 1;
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to dispatch outbox event', ROUTE, { eventId: event.id, error: message });
     const nextAttempts = Math.min(attempts + 1, MAX_OUTBOX_RETRY_ATTEMPTS);
     await db
       .update(outboxEvents)
       .set({
         status: 'FAILED',
         attempts: nextAttempts,
-        lastError: truncateError(error instanceof Error ? error.message : String(error)),
+        lastError: truncateError(message),
       })
       .where(eq(outboxEvents.id, event.id));
   }

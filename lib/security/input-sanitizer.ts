@@ -7,7 +7,7 @@
  * - Provides a helper to sanitise an object record containing string fields.
  */
 
-/** Strip control and format characters from a string and NFC‑normalize it. */
+/** Strip control and format characters from a string and NFC—normalize it. */
 export function sanitiseString(input: string): string {
   // NFC normalisation first ensures composed characters are in canonical form.
   const normalized = input.normalize('NFC');
@@ -28,10 +28,9 @@ export function sanitiseString(input: string): string {
  * This is used for profile data after Zod validation.
  */
 export function sanitiseRecord<T extends Record<string, unknown>>(record: T): T {
-  return Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [
-      key,
-      typeof value === 'string' ? sanitiseString(value) : value,
-    ]),
-  ) as T;
+  const entries = Object.entries(record).map(([key, value]) => [
+    key,
+    typeof value === 'string' ? sanitiseString(value) : value,
+  ] as const);
+  return Object.fromEntries(entries) as T;
 }
