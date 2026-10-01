@@ -1,4 +1,6 @@
-import { ESLint } from 'eslint';
+// ESLint 9 defaults to flat config; .eslintrc.js is only understood by the
+// legacy (eslintrc) engine, so exercise the config through LegacyESLint.
+import { LegacyESLint as ESLint } from 'eslint/use-at-your-own-risk';
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 
