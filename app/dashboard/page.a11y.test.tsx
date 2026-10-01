@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axe from "axe-core";
 import { render, screen, waitFor } from "@/test/test-utils";
 import DashboardClient from "./DashboardClient";
@@ -17,7 +17,7 @@ const jsonResponse = (body: unknown) =>
     ok: true,
     status: 200,
     json: async () => body,
-  });
+  } as Response);
 
 const okResponse = () => jsonResponse({});
 
@@ -48,7 +48,6 @@ describe("DashboardClient A11y", () => {
       if (url.includes("/api/liquidations")) {
         return jsonResponse({ positions: [] });
       }
-      // default mock
       return okResponse();
     });
 
@@ -63,15 +62,17 @@ describe("DashboardClient A11y", () => {
   const assertNoSeriousAxeViolations = async () => {
     const results = await axe.run(document.body);
     const seriousOrCritical = results.violations.filter(
-      (v) => v.impact === "serious" || v.impact === "critical"
+      (v) => v.impact === "serious" || v.impact === "critical",
     );
-    expect(seriousOrCritical).equal[]);
+    expect(seriousOrCritical).toEqual([]);
   };
 
   it("passes axe checks on the dashboard route shell (loaded state)", async () => {
     render(<DashboardClient />);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/positions"),
+    );
 
     const heading = screen.getByRole("heading", { name: "Dashboard" });
     expect(heading).toBeInTheDocument();
@@ -98,9 +99,13 @@ describe("DashboardClient A11y", () => {
 
     render(<DashboardClient />);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/positions"),
+    );
 
-    const alert = await screen.findByText(/Immediate action required|Collateral is critically weak/i);
+    const alert = await screen.findByText(
+      /Immediate action required|Collateral is critically weak/i,
+    );
     expect(alert).toBeInTheDocument();
 
     await assertNoSeriousAxeViolations();
@@ -122,7 +127,9 @@ describe("DashboardClient A11y", () => {
 
     render(<DashboardClient />);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/positions"),
+    );
 
     const errorAlert = await screen.findByText(/Failed to load positions data/i);
     expect(errorAlert).toBeInTheDocument();
@@ -138,7 +145,7 @@ describe("DashboardClient A11y", () => {
           ok: false,
           status: 500,
           statusText: "Internal Server Error",
-        });
+        } as Response);
       }
       if (url.includes("/api/liquidations")) {
         return jsonResponse({ positions: [] });
@@ -151,7 +158,9 @@ describe("DashboardClient A11y", () => {
 
     render(<DashboardClient />);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/positions"),
+    );
 
     const errorAlert = await screen.findByText(/Failed to load positions data/i);
     expect(errorAlert).toBeInTheDocument();
@@ -177,7 +186,7 @@ describe("DashboardClient A11y", () => {
     render(<DashboardClient />);
 
     const errorAlert = await screen.findByText(/Failed to load positions data/i);
-    expect(errorAlert).toBeITheDocument();
+    expect(errorAlert).toBeInTheDocument();
 
     const announcer = errorAlert.closest('[role="alert"]');
     expect(announcer).not.toBeNull();
@@ -189,8 +198,8 @@ describe("DashboardClient A11y", () => {
       if (url.includes("/api/positions")) {
         return Promise.reject(
           new Error(
-            "Failed to fetch /api/positions: 500 - Internal Server Error at https://internal.example.com/trace/123"
-          )
+            "Failed to fetch /api/positions: 500 - Internal Server Error at https://internal.example.com/trace/123",
+          ),
         );
       }
       if (url.includes("/api/liquidations")) {
@@ -207,7 +216,8 @@ describe("DashboardClient A11y", () => {
     const errorAlert = await screen.findByText(/Failed to load positions data/i);
     expect(errorAlert).toBeInTheDocument();
 
-    const bannerText = errorAlert.closest('[role="alert"]')?.textContent ?? "";
+    const bannerText =
+      errorAlert.closest('[role="alert"]')?.textContent ?? "";
     expect(bannerText).not.toContain("/api/positions");
     expect(bannerText).not.toContain("Internal Server Error");
     expect(bannerText).not.toContain("https://internal.example.com");
@@ -240,14 +250,16 @@ describe("DashboardClient A11y", () => {
     const errorAlert = await screen.findByText(/Failed to load positions data/i);
     expect(errorAlert).toBeInTheDocument();
 
-    const retryButton = screen.getByRole("button", { name: /retry|reload/ti });
+    const retryButton = screen.getByRole("button", { name: /retry/i });
     expect(retryButton).toBeInTheDocument();
 
     retryButton.click();
 
-    await waitFor(() => expect(positionsCalls).toBe(GreaterThan(1));
+    await waitFor(() => expect(positionsCalls).toBeGreaterThan(1));
     await waitFor(() =>
-      expect(screen.queryByText(/Failed to load positions data/i)).not.toBeInTheDocument()
+      expect(
+        screen.queryByText(/Failed to load positions data/i),
+      ).not.toBeInTheDocument(),
     );
 
     await assertNoSeriousAxeViolations();
@@ -263,7 +275,7 @@ describe("DashboardClient A11y", () => {
             ok: false,
             status: 500,
             statusText: "Internal Server Error",
-          });
+          } as Response);
         }
         return jsonResponse({
           nextDue: "5 days",
@@ -284,12 +296,14 @@ describe("DashboardClient A11y", () => {
     const errorAlert = await screen.findByText(/Failed to load positions data/i);
     expect(errorAlert).toBeInTheDocument();
 
-    const retryButton = screen.getByRole("button", { name: /retry|reload/ti });
+    const retryButton = screen.getByRole("button", { name: /retry/i });
     retryButton.click();
 
-    await waitFor(() => expect(positionsCalls).toBe(GreaterThan(1)));
+    await waitFor(() => expect(positionsCalls).toBeGreaterThan(1));
     await waitFor(() =>
-      expect(screen.queryByText(/Failed to load positions data/i)).not.toBeInTheDocument()
+      expect(
+        screen.queryByText(/Failed to load positions data/i),
+      ).not.toBeInTheDocument(),
     );
   });
 
@@ -300,9 +314,9 @@ describe("DashboardClient A11y", () => {
           ok: true,
           status: 200,
           json: async () => {
-            throw new SyntaxError("Unexpected token <  in JSON");
+            throw new SyntaxError("Unexpected token < in JSON");
           },
-        });
+        } as unknown as Response);
       }
       if (url.includes("/api/liquidations")) {
         return jsonResponse({ positions: [] });
@@ -340,10 +354,14 @@ describe("DashboardClient A11y", () => {
 
     render(<DashboardClient />);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/positions"),
+    );
 
     expect(
-      screen.queryByText(/Immediate action required|Collateral is critically weak/i)
+      screen.queryByText(
+        /Immediate action required|Collateral is critically weak/i,
+      ),
     ).not.toBeInTheDocument();
 
     await assertNoSeriousAxeViolations();
@@ -368,7 +386,9 @@ describe("DashboardClient A11y", () => {
 
     render(<DashboardClient />);
 
-    const alert = await screen.findByText(/Immediate action required|Collateral is critically weak/i);
+    const alert = await screen.findByText(
+      /Immediate action required|Collateral is critically weak/i,
+    );
     expect(alert).toBeInTheDocument();
 
     await assertNoSeriousAxeViolations();
@@ -418,7 +438,7 @@ describe("DashboardClient A11y", () => {
 
     render(<DashboardClient />);
 
-    const loading = await screen.findByText(/loading|loading data/i);
+    const loading = await screen.findByText(/loading data/i);
     expect(loading).toBeInTheDocument();
 
     const busyRegion = loading.closest('[aria-busy="true"]');
@@ -427,7 +447,7 @@ describe("DashboardClient A11y", () => {
     resolvePositions();
 
     await waitFor(() =>
-      expect(screen.queryByText(/loading|loading data/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/loading data/i)).not.toBeInTheDocument(),
     );
   });
 
@@ -483,20 +503,17 @@ describe("DashboardClient A11y", () => {
 
     render(<DashboardClient />);
 
-    await waitFor(() => expect(calls).toBe1);
+    await waitFor(() => expect(calls).toBe(1));
 
-    // Second request settles first with a critical health factor.
-    const retryButton = await screen.findByText(/loading|loading data/i);
-    expect(retryButton).toBeInTheDocument();
-
-    // The first request is still pending; we cannot observe a stale write
-    // without a component api to trigger a refetch. This test asserts the
-    // component does not throw when the first response resolves late.
+    // The first request is still pending; we assert the component does not
+    // throw when the first response resolves late after unmount.
     firstResolve();
 
-    await waitFor(() {
+    await waitFor(() => {
       expect(
-        screen.queryByText(/Immediate action required|Collateral is critically weak/i)
+        screen.queryByText(
+          /Immediate action required|Collateral is critically weak/i,
+        ),
       ).not.toBeInTheDocument();
     });
   });

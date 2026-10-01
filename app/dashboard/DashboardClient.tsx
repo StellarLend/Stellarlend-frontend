@@ -276,11 +276,14 @@ const fetchPositionsWithRetry = async (
 export default function DashboardClient() {
   const [alertData, setAlertData] = useState<DashboardAlertData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     const controller = new AbortController();
     mountedRef.current = true;
+    setIsLoading(true);
 
     const load = async () => {
       try {
@@ -292,7 +295,7 @@ export default function DashboardClient() {
 
         setAlertData(getDashboardAlertData(metrics));
         setError(null);
-      } catch (error) {
+      } catch (err) {
         if (!mountedRef.current || controller.signal.aborted) {
           return;
         }
@@ -300,11 +303,15 @@ export default function DashboardClient() {
         // Observability: log the failure without exposing sensitive data.
         console.error(
           "[DashboardClient] Failed to load positions after retries",
-          error instanceof Error ? error.message : "Unknown error",
+          err instanceof Error ? err.message : "Unknown error",
         );
 
         setAlertData(null);
         setError("Failed to load positions data. Please try again later.");
+      } finally {
+        if (mountedRef.current && !controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -314,11 +321,18 @@ export default function DashboardClient() {
       mountedRef.current = false;
       controller.abort();
     };
-  }, []);
+  }, [retryCount]);
+
+  const handleRetry = () => {
+    setRetryCount((c) => c + 1);
+  };
 
   return (
     <div className="">
-      <div className="md:pt-10 md:border-t px-6 md:px-12 flex-col-reverse md:flex-col flex">
+      <div
+        className="md:pt-10 md:border-t px-6 md:px-12 flex-col-reverse md:flex-col flex"
+        aria-busy={isLoading}
+      >
         <PageHeader
           title="Dashboard"
           description="Track lending, borrowing, and collateral health at a glance."
@@ -347,13 +361,24 @@ export default function DashboardClient() {
           }
         />
 
-        {error ? (
+        {isLoading ? (
+          <div className="mb-6" aria-busy="true" aria-label="Loading data">
+            <p className="sr-only">Loading data</p>
+          </div>
+        ) : error ? (
           <div className="mb-6">
             <AlertBanner
               title="Error"
               message={error}
               severity="error"
             />
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              Retry
+            </button>
           </div>
         ) : alertData ? (
           <div className="mb-6">
