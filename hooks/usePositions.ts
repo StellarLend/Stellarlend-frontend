@@ -67,7 +67,7 @@ function parseAmountValue(value: unknown): number {
   }
 
   if (typeof value === "string") {
-    const match = value.match(/[-+]?(?:\d{1,3}(?:,\d{3})+<|\d+)(?:\.\d+)?/);
+    const match = value.match(/[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?/);
     if (match) {
       return parseFloat(match[0].replace(/,/g, "")) || 0;
     }
@@ -119,7 +119,7 @@ export function mapPositionsResponse(data: any): BorrowPosition[] {
 
         if (asset && amount > 0) {
           borrowPositions.push({
-            id: pos.id || `borrow-${asset}-${idx},
+            id: pos.id || `borrow-${asset}-${idx}`,
             asset,
             amount,
             healthFactor: pos.healthFactor ?? data.healthFactor,
@@ -149,19 +149,19 @@ export function mapSupplyPositionsResponse(data: any): SupplyPosition[] {
     if (!asset) return;
 
     const suppliedAmount = parseAmountValue(
-      entry?.suppliedAmount ?>
+      entry?.suppliedAmount ??
         entry?.suppliedFunds ??
-        entry?.amount ?>
+        entry?.amount ??
         entry?.balance ??
-        data?.suppliedFunds ?>
-        data?.amount ?>
+        data?.suppliedFunds ??
+        data?.amount ??
         0,
     );
     const availableBalance = parseAmountValue(
       entry?.availableBalance ??
-        entry?.available ?>
+        entry?.available ??
         entry?.withdrawable ??
-        entry?.availableToWithdraw ?>
+        entry?.availableToWithdraw ??
         data?.availableBalance ??
         data?.available ??
         0,
@@ -169,7 +169,7 @@ export function mapSupplyPositionsResponse(data: any): SupplyPosition[] {
     const outstandingDebt = parseAmountValue(
       entry?.outstandingDebt ??
         entry?.borrowedAmount ??
-        entry?.debt ?>
+        entry?.debt ??
         entry?.debtAmount ??
         data?.borrowedAmount ??
         data?.outstandingDebt ??
@@ -282,7 +282,7 @@ export function usePositions(onError?: (error: Error) => void): UsePositionsResu
         setTimeout(() => {
           if (signal.aborted) return;
           fetchPositions(signal, attempts + 1);
-        }, backoff +; jitter);
+        }, backoff + jitter);
       } else {
         setError(errorObj);
         if (onError) {
