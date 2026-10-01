@@ -504,7 +504,140 @@ describe("PreferencesForm", () => {
         screen.getByText("Please fix the highlighted fields."),
       ).toBeInTheDocument();
     });
+
+    it("displays and clears displayCurrency error on user correction", async () => {
+      mockFetchOnce(defaultPreferences);
+
+      render(<PreferencesForm />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("currency-select")).toBeInTheDocument(),
+      );
+
+      const currencySelect = screen.getByTestId("currency-select") as HTMLSelectElement;
+      fireEvent.change(currencySelect, { target: { value: "INVALID" } });
+
+      mockFetchOnce(
+        {
+          errors: {
+            displayCurrency: "Unsupported currency",
+          },
+        },
+        422,
+        false,
+      );
+
+      fireEvent.click(screen.getByTestId("save-preferences-btn"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("currency-error")).toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("currency-error")).toHaveTextContent(
+        "Unsupported currency",
+      );
+      expect(currencySelect).toHaveClass("border-red-500");
+
+      // User selects a valid currency
+      fireEvent.change(currencySelect, { target: { value: "EUR" } });
+
+      // Error and styling cleared
+      expect(screen.queryByTestId("currency-error")).not.toBeInTheDocument();
+    });
+
+    it("displays multiple field-level errors simultaneously", async () => {
+      mockFetchOnce(defaultPreferences);
+
+      render(<PreferencesForm />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("email-input")).toBeInTheDocument(),
+      );
+
+      mockFetchOnce(
+        {
+          errors: {
+            email: "Email already taken",
+            locale: "Invalid locale",
+            displayCurrency: "Invalid currency",
+          },
+        },
+        422,
+        false,
+      );
+
+      fireEvent.click(screen.getByTestId("save-preferences-btn"));
+
+      await waitFor(() =>
+        expect(screen.getByText("Validation failed")).toBeInTheDocument(),
+      );
+
+      expect(screen.getByText("Email already taken")).toBeInTheDocument();
+      expect(screen.getByTestId("locale-error")).toHaveTextContent("Invalid locale");
+      expect(screen.getByTestId("currency-error")).toHaveTextContent("Invalid currency");
+
+      // Clear email error on change
+      const emailInput = screen.getByTestId("email-input");
+      fireEvent.change(emailInput, { target: { value: "other@example.com" } });
+      expect(screen.queryByText("Email already taken")).not.toBeInTheDocument();
+    });
   });
+
+  describe("Notifications fallback", () => {
+    it("falls back to default notification settings if data.notifications is missing", async () => {
+      const prefsWithoutNotifications = {
+        userId: "user-123",
+        email: "user@example.com",
+        locale: "en-US",
+        displayCurrency: "USD",
+        notifications: undefined,
+        updatedAt: null,
+      };
+      mockFetchOnce(prefsWithoutNotifications);
+
+      render(<PreferencesForm />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("preferences-form")).toBeInTheDocument(),
+      );
+
+      expect(screen.getByTestId("notification-toggle-email")).toBeChecked();
+      expect(screen.getByTestId("notification-toggle-push")).toBeChecked();
+      expect(screen.getByTestId("notification-toggle-sms")).not.toBeChecked();
+      expect(screen.getByTestId("notification-toggle-inApp")).toBeChecked();
+    });
+  });
+
+  describe("Toast auto-dismissal", () => {
+    it("auto-dismisses success toast after 5 seconds", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      mockFetchOnce(defaultPreferences);
+
+      render(<PreferencesForm />);
+
+      await waitFor(() =>
+        expect(screen.getByTestId("email-input")).toBeInTheDocument(),
+      );
+
+      const emailInput = screen.getByTestId("email-input");
+      fireEvent.change(emailInput, { target: { value: "updated@example.com" } });
+
+      mockFetchOnce({ ...defaultPreferences, email: "updated@example.com" });
+
+      fireEvent.click(screen.getByTestId("save-preferences-btn"));
+
+      await waitFor(() =>
+        expect(screen.getByText("Preferences saved")).toBeInTheDocument(),
+      );
+
+      // Fast forward 5 seconds
+      vi.advanceTimersByTime(5000);
+
+      await waitFor(() =>
+        expect(screen.queryByText("Preferences saved")).not.toBeInTheDocument(),
+      );
+
+      vi.useRealTimers();
+    });
 
   describe("Client-side validation", () => {
     it("validates email format before submitting", async () => {
