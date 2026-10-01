@@ -10,7 +10,7 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   }
-  // @ts-ignore - test env global
+  // @ts-expect-error - test env global
   global.IntersectionObserver = MockIntersectionObserver as any;
 });
 

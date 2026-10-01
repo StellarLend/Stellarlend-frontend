@@ -22,6 +22,7 @@ declare global {
         xdr: string,
         opts?: { network: string },
       ) => Promise<string>;
+      getAccounts?: () => Promise<string[]>;
     };
   }
 }

@@ -1,4 +1,6 @@
 import React from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   render,
   screen,
@@ -77,6 +79,92 @@ describe("TransactionDetail Modal", () => {
     expect(screen.getByText("Lend")).toBeInTheDocument();
     expect(screen.getByText("XLM")).toBeInTheDocument();
     expect(screen.getByText("Completed")).toBeInTheDocument();
+  });
+
+  describe("Detail Fetch States", () => {
+    it("shows a loading indicator while transaction detail fetch is in flight", async () => {
+      let resolveFetch: (value: unknown) => void = () => {};
+      mockFetch.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+
+      render(
+        <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Loading additional details...")).toBeInTheDocument();
+      });
+
+      resolveFetch({ ok: true, json: async () => ({ transaction: { memo: "Invoice #1" } }) });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Loading additional details...")).not.toBeInTheDocument();
+      });
+      expect(screen.getByText("Memo:")).toBeInTheDocument();
+    });
+
+    it("does not crash and still renders the core transaction fields when the detail fetch fails", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockFetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+
+      render(
+        <TransactionDetail transaction={buildTransaction()} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          "Error loading transaction details:",
+          expect.any(Error),
+        );
+      });
+
+      // Core fields sourced from the `transaction` prop must still render even
+      // though the optional detail fetch (memo/explorer link) failed.
+      expect(screen.getByText("TXN-001")).toBeInTheDocument();
+      expect(screen.getByText("Completed")).toBeInTheDocument();
+      expect(screen.queryByText("Memo:")).not.toBeInTheDocument();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("does not display stale details from a previous transaction while the new fetch is loading", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ transaction: { memo: "First memo" } }),
+      });
+
+      const { rerender } = render(
+        <TransactionDetail transaction={buildTransaction({ id: "TXN-A" })} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("First memo")).toBeInTheDocument();
+      });
+
+      let resolveSecondFetch: (value: unknown) => void = () => {};
+      mockFetch.mockReturnValue(
+        new Promise((resolve) => {
+          resolveSecondFetch = resolve;
+        }),
+      );
+
+      rerender(
+        <TransactionDetail transaction={buildTransaction({ id: "TXN-B" })} isOpen onClose={vi.fn()} />,
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByText("First memo")).not.toBeInTheDocument();
+      });
+
+      resolveSecondFetch({ ok: true, json: async () => ({ transaction: { memo: "Second memo" } }) });
+
+      await waitFor(() => {
+        expect(screen.getByText("Second memo")).toBeInTheDocument();
+      });
+    });
   });
 
   it("formats positive amounts with a leading plus sign and raw value", async () => {
@@ -482,5 +570,83 @@ describe("TransactionDetail Modal", () => {
       expect(screen.getByText("Transaction Details")).toBeInTheDocument();
       expect(screen.queryByText("Transaction Receipt")).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * Source-level guard for the duplicate-declaration defect this component once
+ * shipped: `copyToClipboard` and `Toast` were each imported twice, and
+ * `const [toast, setToast] = useState(...)` was declared twice with two
+ * incompatible type annotations. The duplicated `useState` is caught for free
+ * (esbuild refuses to transform the module, so every test above fails to
+ * collect), but duplicated *imports* are not: esbuild accepts them, so the
+ * whole rendering suite still passes green. `tsc --noEmit` is not a reliable
+ * backstop either — it reports only syntactic diagnostics while any file in
+ * the program has a syntax error, and its CI step is `continue-on-error`.
+ *
+ * These assertions therefore read the component's source and fail the suite
+ * when a binding is declared more than once.
+ */
+describe("regression: TransactionDetail declares each import and state binding once", () => {
+  const source = readFileSync(
+    resolve(process.cwd(), "components/features/dashboard/components/TransactionDetail.tsx"),
+    "utf8",
+  );
+
+  /** Local names introduced by every top-level import in `src`, counting
+   *  default imports, named imports and `type` imports alike. */
+  function importedBindings(src: string): string[] {
+    const bindings: string[] = [];
+    const importPattern =
+      /^import\s+(?:type\s+)?([A-Za-z_$][\w$]*)?\s*(?:\{([^}]*)\})?\s*from\s+["'][^"']+["']/gm;
+    for (const [, defaultBinding, namedClause] of src.matchAll(importPattern)) {
+      if (defaultBinding) bindings.push(defaultBinding);
+      for (const specifier of (namedClause ?? "").split(",")) {
+        const name = specifier.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0];
+        if (name) bindings.push(name);
+      }
+    }
+    return bindings;
+  }
+
+  /** Local names bound by every `const [..] = useState(...)` in `src`. */
+  function useStateBindings(src: string): string[] {
+    const bindings: string[] = [];
+    for (const [, pattern] of src.matchAll(/const\s*\[\s*([^\]]+)\]\s*=\s*useState\b/g)) {
+      for (const name of pattern.split(",")) {
+        const trimmed = name.trim();
+        if (trimmed) bindings.push(trimmed);
+      }
+    }
+    return bindings;
+  }
+
+  const countOf = (names: string[], name: string) =>
+    names.filter((candidate) => candidate === name).length;
+
+  it.each(["copyToClipboard", "Toast"])(
+    "imports %s exactly once",
+    (name) => {
+      expect(countOf(importedBindings(source), name)).toBe(1);
+    },
+  );
+
+  it.each(["toast", "setToast"])(
+    "declares the %s state exactly once",
+    (name) => {
+      expect(countOf(useStateBindings(source), name)).toBe(1);
+    },
+  );
+
+  it("gives the toast state a single non-optional title/description/variant shape", () => {
+    // The two duplicated declarations disagreed: one made every field
+    // optional, the other made them all required. Exactly one declaration
+    // with a required shape is what the `<Toast>` call site below it needs.
+    const declarations = source.match(/const\s*\[toast,\s*setToast\]\s*=\s*useState<[\s\S]*?>\(null\);/g) ?? [];
+
+    expect(declarations).toHaveLength(1);
+    expect(declarations[0]).toContain("title: string;");
+    expect(declarations[0]).toContain("description: string;");
+    expect(declarations[0]).not.toContain("title?:");
   });
 });

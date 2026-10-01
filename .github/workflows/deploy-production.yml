@@ -1,4 +1,4 @@
-name: Deploy to Production
+﻿name: Deploy to Production
 
 on:
   push:
@@ -49,11 +49,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            🚀 **Stellarlend Frontend Release ${{ github.ref_name }}**
+            Stellarlend Frontend Release ${{ github.ref_name }}
 
-            **Deployment:**
-            - ✅ Production deployment successful
-            - 🔗 Live at: https://stellarlend.com
+            Deployment:
+            - Production deployment successful
+            - Live at: https://stellarlend.com
 
       - name: Notify team of deployment
         if: env.SLACK_WEBHOOK_URL != ''
@@ -64,5 +64,5 @@ jobs:
           status: success
           webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           text: |
-            🚀 Stellarlend Frontend ${{ github.ref_name }} deployed to production!
+            Stellarlend Frontend ${{ github.ref_name }} deployed to production!
             Live at: https://stellarlend.com

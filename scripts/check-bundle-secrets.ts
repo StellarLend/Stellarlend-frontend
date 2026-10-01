@@ -1,15 +1,4 @@
 #!/usr/bin/env ts-node
-/**
- * Build-Time Secret Scanner for Client Bundles
- * 
- * This script scans the .next/static output directory for leaked secrets
- * after the Next.js build process completes. It detects known secret patterns
- * and fails the build if any are found.
- * 
- * Usage: npm run check-bundle-secrets
- * Runs automatically after: npm run build
- */
-
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -66,56 +55,54 @@ function scanDirectory(dir: string, extensions: string[]): string[] {
  */
 export function scanFile(filePath: string, patterns: SecretPattern[]): SecretMatch[] {
   const matches: SecretMatch[] = [];
-  
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split('\n');
-    
-    for (const pattern of patterns) {
-      let match;
-      const regex = new RegExp(pattern.pattern.source, pattern.pattern.flags);
-      
-      // Reset regex state
-      regex.lastIndex = 0;
-      
-      while ((match = regex.exec(content)) !== null) {
-        // Skip false positives for AWS Secret Access Key (e.g. 40-char hex build/commit hashes)
-        if (pattern.name === 'AWS Secret Access Key' && /^[0-9a-fA-F]{40}$/.test(match[0])) {
-          continue;
-        }
 
-        // Find line and column
-        const matchStart = match.index;
-        const matchEnd = match.index + match[0].length;
-        
-        let lineNum = 1;
-        let columnNum = 1;
-        let currentPos = 0;
-        
-        for (let i = 0; i < lines.length; i++) {
-          const lineLength = lines[i].length + 1; // +1 for newline
-          if (currentPos + lineLength > matchStart) {
-            lineNum = i + 1;
-            columnNum = matchStart - currentPos + 1;
-            break;
-          }
-          currentPos += lineLength;
-        }
-        
-        matches.push({
-          pattern: pattern.name,
-          file: path.relative(process.cwd(), filePath),
-          line: lineNum,
-          column: columnNum,
-          match: match[0],
-          severity: pattern.severity
-        });
-      }
-    }
-  } catch (error) {
-    // Skip files that can't be read (e.g., binary files)
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, 'utf8');
+  } catch {
+    // Binary or unreadable file — skip cleanly
+    return matches;
   }
-  
+
+  const lines = content.split('\n');
+
+  for (const pattern of patterns) {
+    const regex = new RegExp(pattern.pattern.source, pattern.pattern.flags);
+    regex.lastIndex = 0;
+
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      // Skip false positives for AWS Secret Access Key (e.g. 40-char hex build/commit hashes)
+      if (pattern.name === 'AWS Secret Access Key' && /^[0-9a-fA-F]{40}$/.test(match[0])) {
+        continue;
+      }
+
+      const matchStart = match.index;
+      let lineNum = 1;
+      let columnNum = 1;
+      let currentPos = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const lineLength = lines[i].length + 1; // +1 for newline
+        if (currentPos + lineLength > matchStart) {
+          lineNum = i + 1;
+          columnNum = matchStart - currentPos + 1;
+          break;
+        }
+        currentPos += lineLength;
+      }
+
+      matches.push({
+        pattern: pattern.name,
+        file: path.relative(process.cwd(), filePath),
+        line: lineNum,
+        column: columnNum,
+        match: match[0],
+        severity: pattern.severity,
+      });
+    }
+  }
+
   return matches;
 }
 
@@ -128,32 +115,36 @@ function scanBundles(): ScanResult {
     filesScanned: 0,
     errors: []
   };
-  
-  // Scan .next/static directory
+
   const staticDir = path.join(process.cwd(), '.next', 'static');
-  
+
   if (!fs.existsSync(staticDir)) {
     result.errors.push('.next/static directory not found. Run "npm run build" first.');
     return result;
   }
-  
-  // File extensions to scan (JavaScript, JSON, CSS, etc.)
+
   const extensions = ['.js', '.json', '.css', '.txt', '.html'];
-  
+
   console.log('🔍 Scanning client bundles for leaked secrets...');
   console.log(`📁 Target directory: ${staticDir}`);
-  
-  const files = scanDirectory(staticDir, extensions);
+
+  let files: string[];
+  try {
+    files = scanDirectory(staticDir, extensions);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    result.errors.push(`Failed to enumerate bundle files: ${message}`);
+    return result;
+  }
+
   result.filesScanned = files.length;
-  
   console.log(`📄 Files to scan: ${result.filesScanned}`);
-  
-  // Scan each file
+
   for (const file of files) {
     const matches = scanFile(file, SECRET_PATTERNS);
     result.matches.push(...matches);
   }
-  
+
   return result;
 }
 
@@ -230,23 +221,9 @@ function displayResults(result: ScanResult): void {
   console.log('\n' + '='.repeat(80));
   console.log('REMEDIATION');
   console.log('='.repeat(80));
-  console.log(`
-If secrets were detected in your client bundles:
-
-1. Identify the source code that is importing or using the secret
-2. Move the secret to server-side code (API routes, server components)
-3. Use environment variables with NEXT_PUBLIC_ prefix only for public values
-4. For server secrets, use them only in server-side code:
-   - app/api/ routes
-   - getServerSideProps / getStaticProps
-   - Server components (marked with 'use server')
-5. Rebuild and rescan to verify the fix
-
-Common issues:
-- Importing server-config.ts in client components
-- Using process.env.SERVER_SECRET in client code
-- Hardcoding API keys in shared utilities
-`);
+  console.log('Move secrets to server-side code (API routes, server components).');
+  console.log('Use NEXT_PUBLIC_ prefix only for values safe to expose to clients.');
+  console.log('Rebuild and rescan to verify the fix.');
 }
 
 /**
