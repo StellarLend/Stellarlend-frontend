@@ -5,7 +5,7 @@ import Sidebar from "./Sidebar";
 import NavLink from "./NavLink";
 import { NavigationMenu } from "./NavigationMenu";
 import { SideNav } from "./SideNav";
-import { SidebarProvider } from "@/context/SidebarContext";
+import { SidebarProvider, useSidebar } from "@/context/SidebarContext";
 import { clientLog } from "@/lib/utils/client-log";
 
 // ─── Shared pathname mock ──────────────────────────────────────────────────────
@@ -246,14 +246,28 @@ describe("SideNav", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders dialog with aria-modal when mobile drawer is open", () => {
-    render(
-      <SidebarProvider initialSidebarOpen={true} initialIsMobile={true}>
-        <SideNav />
-      </SidebarProvider>
-    );
-    const dialog = screen.getByRole("dialog");
-    expect(dialog).toHaveAttribute("aria-modal", "true");
+  it("renders dialog with aria-modal when mobile drawer is open", async () => {
+    // SidebarContext re-evaluates window.innerWidth on mount and forces the
+    // drawer shut on mobile, so emulate a mobile viewport and open it afterwards.
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 375 });
+    const OpenDrawer = () => {
+      const { toggleSidebar } = useSidebar();
+      return <button onClick={toggleSidebar}>open drawer</button>;
+    };
+    try {
+      render(
+        <SidebarProvider initialSidebarOpen={true} initialIsMobile={true}>
+          <OpenDrawer />
+          <SideNav />
+        </SidebarProvider>
+      );
+      fireEvent.click(await screen.findByRole("button", { name: "open drawer" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveAttribute("aria-modal", "true");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: originalWidth });
+    }
   });
 });
 
