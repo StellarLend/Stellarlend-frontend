@@ -624,7 +624,15 @@ describe('IconButton failure paths and boundaries', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(() => fireEvent.click(button)).toThrow();
+    // React 19 reports handler errors via window "error" events instead of
+    // rethrowing from dispatch; contain the report so it does not leak.
+    const contain = (event: ErrorEvent) => event.preventDefault();
+    window.addEventListener('error', contain);
+    try {
+      expect(() => fireEvent.click(button)).not.toThrow();
+    } finally {
+      window.removeEventListener('error', contain);
+    }
     expect(throwing).toHaveBeenCalledTimes(1);
   });
 
@@ -683,7 +691,7 @@ describe('IconButton failure paths and boundaries', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button).not.toHaveAttribute('aria-disabled');
+    expect(button).toHaveAttribute('aria-disabled', 'false');
 
     rerender(
       <IconButton aria-label="Load" onClick={mockOnClick} loading>
