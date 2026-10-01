@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'cypto';
+import crypto from 'crypto';
 import config from '@/lib/config';
 import { httpGet } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
