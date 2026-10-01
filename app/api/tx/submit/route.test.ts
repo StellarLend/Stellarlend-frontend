@@ -31,8 +31,14 @@ vi.mock('@/lib/auth', () => ({
   getSession: vi.fn(),
 }));
 
+vi.mock('@/lib/audit/logger', () => ({
+  hashIp: vi.fn().mockReturnValue('mock-hash'),
+  appendAuditEvent: vi.fn(),
+}));
+
 import { getSession } from '@/lib/auth';
 import { clearAccountBucketCache } from '@/lib/rate-limit/account-bucket';
+import { appendAuditEvent } from '@/lib/audit/logger';
 import { POST } from './route';
 
 describe('POST /api/tx/submit', () => {
@@ -59,6 +65,12 @@ describe('POST /api/tx/submit', () => {
     expect(response.status).toBe(400);
     const json = await response.json();
     expect(json.error.code).toBe('INVALID_INPUT');
+    expect(appendAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'tx.submit',
+        status: 'failure',
+      })
+    );
   });
 
   it('returns hash when RPC submission succeeds', async () => {
@@ -85,6 +97,12 @@ describe('POST /api/tx/submit', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       'https://private-rpc.test',
       expect.objectContaining({ method: 'POST' }),
+    );
+    expect(appendAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'tx.submit',
+        status: 'success',
+      })
     );
   });
 
