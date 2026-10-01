@@ -1,8 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-// ...existing code...
-import "@testing-library/jest-dom";
-// ...existing code...
-import NavLink from "../shared/layout/NavLink";
+import { expect } from "storybook/test";
+import NavLink from "./NavLink";
 
 const meta: Meta<typeof NavLink> = {
   title: "Design System/NavLink",
@@ -15,7 +13,6 @@ const meta: Meta<typeof NavLink> = {
   argTypes: {
     href: { control: "text" },
     isActive: { control: "boolean" },
-
     children: { control: "text" },
   },
 };
