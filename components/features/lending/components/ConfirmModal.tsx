@@ -37,7 +37,12 @@ export default function ConfirmModal({
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useFocusTrap(dialogRef, { isActive: isOpen, onEscape: onClose });
+  const handleClose = () => {
+    if (isConfirming) return;
+    onClose();
+  };
+
+  useFocusTrap(dialogRef, { isActive: isOpen, onEscape: handleClose });
 
   useEffect(() => {
     if (isOpen) {
@@ -102,11 +107,6 @@ export default function ConfirmModal({
     } finally {
       setIsConfirming(false);
     }
-  };
-
-  const handleClose = () => {
-    if (isConfirming) return;
-    onClose();
   };
 
   const formatCurrency = (amount: number, currency: string) => {

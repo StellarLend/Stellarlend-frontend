@@ -716,7 +716,9 @@ describe("ConfirmModal failure paths and boundaries", () => {
     renderModal();
 
     const dialog = screen.getByRole("dialog", { name: /confirm lending transaction/i });
-    const focusables = within(dialog).getAllByRole("button");
+    const focusables = within(dialog)
+      .getAllByRole("button")
+      .filter((button) => !button.hasAttribute("disabled"));
     const last = focusables[focusables.length - 1];
     last.focus();
     expect(last).toHaveFocus();
