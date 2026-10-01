@@ -1,3 +1,8 @@
+/**
+ * Canonical Postgres schema file for managing user notification events.
+ * Note: Notification preferences (settings) are handled via lib/account/preferences-repository.ts
+ * rather than a Postgres schema table.
+ */
 import { pgEnum, pgTable, text, boolean, timestamp } from 'drizzle-orm/pg-core';
 
 export const notificationTypeEnum = pgEnum('notification_type', ['info', 'success', 'warning', 'error']);

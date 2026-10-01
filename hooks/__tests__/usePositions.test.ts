@@ -23,8 +23,8 @@ describe("usePositions", () => {
   it("retries on failure with backoff and eventually succeeds",  async () => {
     const fetchMock = vi
       .fn()
-      .mockRejectedOnce(new Error("network error"))
-      .mockResolved({
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           borrowedAmount: "$100 USD",
@@ -33,7 +33,7 @@ describe("usePositions", () => {
       });
     global.fetch = fetchMock as any;
 
-    const {.result } = renderHook(() => usePositions());
+    const { result } = renderHook(() => usePositions());
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
@@ -43,7 +43,7 @@ describe("usePositions", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(fetchMock.mockCalls.length).toBe1);
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBe(2));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.positions).toHaveLength(1);
@@ -57,7 +57,7 @@ describe("usePositions", () => {
       configurable: true,
     });
 
-    const fetchMock = vi.fn().mockRejected(new Error("network error"));
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     global.fetch = fetchMock as any;
 
     const { result } = renderHook(() => usePositions());
@@ -67,7 +67,7 @@ describe("usePositions", () => {
 
     expect(result.current.isOffline).toBe(true);
     expect(result.current.isStale).toBe(true);
-    expect(result.current.error).toBe.an(Error);
+    expect(result.current.error).toBeInstanceOf(Error);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

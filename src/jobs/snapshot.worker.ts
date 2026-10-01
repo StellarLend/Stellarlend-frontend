@@ -214,7 +214,6 @@ export interface SnapshotJobResult {
 export async function handleSnapshotJob(jobData: SnapshotJobData): Promise<SnapshotJobResult> {
   const startTime = Date.now();
   const now = Number.isFinite(jobData.timestamp) ? jobData.timestamp : Date.now();
-
   initializeStore();
 
   const normalizedWalletAddress =

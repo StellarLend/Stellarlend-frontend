@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'cypto';
+import crypto from 'crypto';
 import config from '@/lib/config';
 import { httpGet } from '@/lib/http';
 import { withRequestLogging } from '@/lib/api/handler';
@@ -143,7 +143,7 @@ export function computeEtag(checks: HealthChecks): string {
     version: config.app?.version ?? '1.0.0',
     checks,
   });
-  return `${crypto.createHash('md5').update(etagBase).toString('hex')}`;
+  return `"${crypto.createHash('md5').update(etagBase).digest('hex')}"`;
 }
 
 export function buildHealthResponse(checks: HealthChecks): HealthResponse {

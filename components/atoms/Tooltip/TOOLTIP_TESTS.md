@@ -1,7 +1,7 @@
 # Tooltip Test Plan
-
+ 
 ## Component Under Test
-`components/atoms/Tooltip/Tooltip.tsx`
+ `components/atoms/Tooltip/Tooltip.tsx`
 
 ## Test File
 `components/atoms/Tooltip/Tooltip.test.tsx`
@@ -34,18 +34,24 @@
 ### Accessibility
 | Test | Assertion |
 |---|---|
-| `aria-describedby` wiring when visible | Trigger has `aria-describedby="tooltip-content"` only while tooltip is shown |
+| `aria-describedby` wiring when visible | Trigger has `aria-describedby` identical to the tooltip's generated `id` only while tooltip is shown |
+| Unique tooltip ids across instances | Two tooltips render with distinct `id` values |
 | `role="tooltip"` present | Tooltip div has `role="tooltip"` |
 
 ### Delay Behaviour
 | Test | Assertion |
 |---|---|
 | Custom delay is respected | Tooltip appears only after the specified `delay` value |
+| Delay 0 shows immediately | Tooltip appears without advancing timers |
+| Negative delays are normalized to 0 | Tooltip appears immediately |
+| NaN delays are normalized to 0 | Tooltip appears immediately |
+| Excessive delays are clamped to `MAX_TOOLTIP_DELAY` | Tooltip appears at the clamped boundary |
 
 ### Positioning
 | Test | Assertion |
 |---|---|
 | All four positions (`top`, `bottom`, `left`, `right`) render | Tooltip is present for each |
+| Unknown position falls back to `top` | Tooltip renders with the top position classes |
 
 ### Custom Class Names
 | Test | Assertion |
@@ -57,11 +63,15 @@
 | Test | Assertion |
 |---|---|
 | Rapid hover in/out cancels pending timer | Tooltip does not appear after rapid in/out |
-| Hover in/out/in sequence works correctly | Tooltip re-appears on second hover |
+| Hover in/out/in sequence works correctly | Toolip re-appears on second hover |
 | Escape after focus open | Tooltip opens on `focus`, closes on `Escape` |
 | Non-Escape keys are ignored | Tooltip stays visible on `Enter` keydown |
 | Cleanup pending timeout on unmount | `clearTimeout` is called when component unmounts while timer is active |
+| No state update after unmount with pending timer | Advancing timers after unmount does not throw or warn |
 | Cleanup keydown listener on hide | `document.removeEventListener` is called when tooltip hides |
+| No keydown listener leak after unmount while visible | Every `keydown` add has a matching remove by unmount |
+| Repeated hover cycles remain consistent | Tooltip toggles correctly across many cycles |
+| Mouse leave cancels a longer pending delay | Tooltip never appears after cancellation |
 
 ## Running the Tests
 

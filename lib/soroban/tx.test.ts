@@ -1,1 +1,180 @@
-aW1wb3J0IHsgZGVzY3JpYmUsIGV4cGVjdCwgaXQgfSBmcm9tICd2aXRlc3QnOwppbXBvcnQgewogIGJ1aWxkU29yb2JhblJwY0Vycm9yLAogIGJ1aWxkU29yb2JhblRyYW5zYWN0aW9uUnBjUmVxdWVzdCwKICBERUZBVUxUX1NPUk9CQU5fVFJBTlNBQ1RJT05fRkVFLAogIGlzVHhCdWlsZFJlcXVlc3QsCiAgVHhCdWlsZFJlcXVlc3QsCn0gZnJvbSAnLi90eCc7Cgpjb25zdCBWQUxJRF9QVUJMSUNfS0VZID0gJ0cnICsgJ0EnLnJlcGVhdCg1NSk7Cgpjb25zdCBiYXNlUmVxdWVzdDogVHhCdWlsZFJlcXVlc3QgPSB7CiAgdHlwZTogJ2xlbmQnLAogIHNvdXJjZUFjY291bnQ6IFZBTElEX1BVQkxJQ19LRVksCiAgZGF0YTogewogICAgYXNzZXQ6ICdYTE0nLAogICAgYW1vdW50OiAxMDAsCiAgICBpbnRlcmVzdFJhdGU6IDUsCiAgfSwKfTsKCmZ1bmN0aW9uIHBhcmFtc09mKHBheWxvYWQ6IFJlY29yZDxzdHJpbmcsIHVua25vd24+KTogUmVjb3JkPHN0cmluZywgdW5rbm93bj4gewogIGNvbnN0IHBhcmFtcyA9IHBheWxvYWQucGFyYW1zIGFzIEFycmF5PFJlY29yZDxzdHJpbmcsIHVua25vd24+PjsKICByZXR1cm4gcGFyYW1zWzBdOwp9CgpkZXNjcmliZSgnYnVpbGRTb3JvYmFuUnBjRXJyb3InLCAoKSA9PiB7CiAgaXQoJ3JldHVybnMgVU5LTk9XTl9FUlJPUiB3aGVuIHRoZSBlcnJvciBpcyBub3QgYW4gb2JqZWN0JywgKCkgPT4gewogICAgZXhwZWN0KGJ1aWxkU29yb2JhblJwY0Vycm9yKG51bGwpLmNvZGUpLnRvQmUoJ1VOS05PV05fRVJST1InKTsKICAgIGV4cGVjdChidWlsZFNvcm9iYW5ScGNFcnJvcih1bmRlZmluZWQpLmNvZGUpLnRvQmUoJ1VOS05PV05fRVJST1InKTsKICAgIGV4cGVjdChidWlsZFNvcm9iYW5ScGNFcnJvcignYm9vbScpLmNvZGUpLnRvQmUoJ1VOS05PV05fRVJST1InKTsKICAgIGV4cGVjdChidWlsZFNvcm9iYW5ScGNFcnJvcig0MDQpLmNvZGUpLnRvQmUoJ1VOS05PV05fRVJST1InKTsKICAgIGV4cGVjdChidWlsZFNvcm9iYW5ScGNFcnJvcih0cnVlKS5jb2RlKS50b0JlKCdVTktOT1dOX0VSUk9SJyk7CiAgfSk7CgogIGl0KCdwcmVzZXJ2ZXMgcHJpbWl0aXZlIHN0cmluZyBhbmQgbnVtYmVyIGNvZGVzJywgKCkgPT4gewogICAgZXhwZWN0KAogICAgICBidWlsZFNvcm9iYW5ScGNFcnJvcih7IGNvZGU6ICdJTlZBTElEX0lOU1RSVUNUSU9OJywgbWVzc2FnZTogJ2JhZCcgfSkuY29kZSwKICAgICkudG9CZSgnSU5WQUxJRF9JTlNUUlVDVElPTicpOwogICAgZXhwZWN0KGJ1aWxkU29yb2JhblJwY0Vycm9yKHsgY29kZTogNTAwLCBtZXNzYWdlOiAnb29wcycgfSkuY29kZSkudG9CZSg1MDApOwogICAgZXhwZWN0KGJ1aWxkU29yb2JhblJwY0Vycm9yKHsgY29kZTogMCwgbWVzc2FnZTogJ3plcm8nIH0pLmNvZGUpLnRvQmUoMCk7CiAgICBleHBlY3QoYnVpbGRTb3JvYmFuUnBjRXJyb3IoeyBjb2RlOiAnJywgbWVzc2FnZTogJ2VtcHR5JyB9KS5jb2RlKS50b0JlKCcnKTsKICB9KTsKCiAgaXQoJ2NvZXJjZXMgbm9uLXByaW1pdGl2ZSBjb2RlcyB0byBVTktOT1dOX0VSUk9SIHNvIHRoZSB0eXBlIGNvbnRyYWN0IGhvbGRzJywgKCkgPT4gewogICAgZXhwZWN0KGJ1aWxkU29yb2JhblJwY0Vycm9yKHsgY29kZTogeyBmb286ICdiYXInIH0sIG1lc3NhZ2U6ICd4JyB9KS5jb2RlKS50b0JlKAogICAgICAnVU5LTk9XTl9FUlJPUicsCiAgICApOwogICAgZXhwZWN0KGJ1aWxkU29yb2JhblJwY0Vycm9yKHsgY29kZTogWzEsIDIsIDNdLCBtZXNzYWdlOiAneCcgfSkuY29kZSkudG9CZSgKICAgICAgJ1VOS05PV05fRVJST1InLAogICAgKTsKICAgIGV4cGVjdChidWlsZFNvcm9iYW5ScGNFcnJvcih7IGNvZGU6IHRydWUsIG1lc3NhZ2U6ICd4JyB9KS5jb2RlKS50b0JlKAogICAgICAnVU5LTk9XTl9FUlJPUicsCiAgICApOwogICAgZXhwZWN0KGJ1aWxkU29yb2JhblJwY0Vycm9yKHsgY29kZTogbnVsbCwgbWVzc2FnZTogJ3gnIH0pLmNvZGUpLnRvQmUoCiAgICAgICdVTktOT1dOX0VSUk9SJywKICAgICk7CiAgICBleHBlY3QoYnVpbGRTb3JvYmFuUnBjRXJyb3IoeyBjb2RlOiB1bmRlZmluZWQsIG1lc3NhZ2U6ICd4JyB9KS5jb2RlKS50b0JlKAogICAgICAnVU5LTk9XTl9FUlJPUicsCiAgICApOwogIH0pOwoKICBpdCgnY29lcmNlcyBiaWdpbnQgY29kZXMgdG8gYSBiYXNlLTEwIHN0cmluZyByZXByZXNlbnRhdGlvbicsICgpID0+IHsKICAgIGV4cGVjdChidWlsZFNvcm9iYW5ScGNFcnJvcih7IGNvZGU6IDQybiwgbWVzc2FnZTogJ3gnIH0pLmNvZGUpLnRvQmUoJzQyJyk7CiAgfSk7CgogIGl0KCd1c2VzIHRoZSBkZWZhdWx0IG1lc3NhZ2Ugd2hlbiB0aGUgdXBzdHJlYW0gbWVzc2FnZSBpcyBub3QgYSBzdHJpbmcnLCAoKSA9PiB7CiAgICBleHBlY3QoYnVpbGRTb3JvYmFuUnBjRXJyb3IoeyBjb2RlOiAnWCcsIG1lc3NhZ2U6IHVuZGVmaW5lZCB9KS5tZXNzYWdlKS50b0JlKAogICAgICAnVW5rbm93biBTb3JvYmFuIFJQQyBlcnJvcicsCiAgICApOwogICAgZXhwZWN0KGJ1aWxkU29yb2JhblJwY0Vycm9yKHsgY29kZTogJ1gnLCBtZXNzYWdlOiB7IHdlaXJkOiB0cnVlIH0gfSkubWVzc2FnZSkudG9CZSgKICAgICAgJ1Vua25vd24gU29yb2JhbiBSUEMgZXJyb3InLAogICAgKTsKICB9KTsKCiAgaXQoJ2NvZXJjZXMgYSBub24tcHJpbWl0aXZlIGNvZGUgd2hpbGUgZGVmYXVsdGluZyB0aGUgbWVzc2FnZSBhbmQgZHJvcHBpbmcgZGF0YScsICgpID0+IHsKICAgIGNvbnN0IHJlc3VsdCA9IGJ1aWxkU29yb2JhblJwY0Vycm9yKHsgY29kZTogeyBuZXN0ZWQ6IHsgZGVlcDogdHJ1ZSB9IH0gfSk7CiAgICBleHBlY3QocmVzdWx0LmNvZGUpLnRvQmUoJ1VOS05PV05fRVJST1InKTsKICAgIGV4cGVjdCh0eXBlb2YgcmVzdWx0LmNvZGUpLnRvQmUoJ3N0cmluZycpOwogICAgZXhwZWN0KHJlc3VsdC5tZXNzYWdlKS50b0JlKCdVbmtub3duIFNvcm9iYW4gUlBDIGVycm9yJyk7CiAgICBleHBlY3QocmVzdWx0LmRhdGEpLnRvQmVVbmRlZmluZWQoKTsKICB9KTsKCiAgaXQoJ3ByZXNlcnZlcyB0aGUgdXBzdHJlYW0gbWVzc2FnZSB3aGVuIGl0IGlzIGEgc3RyaW5nJywgKCkgPT4gewogICAgZXhwZWN0KAogICAgICBidWlsZFNvcm9iYW5ScGNFcnJvcih7IGNvZGU6ICdYJywgbWVzc2FnZTogJ3JlYWwgdXBzdHJlYW0gcHJvYmxlbScgfSkubWVzc2FnZSwKICAgICkudG9CZSgncmVhbCB1cHN0cmVhbSBwcm9ibGVtJyk7CiAgfSk7CgogIGl0KCdwcmVzZXJ2ZXMgdGhlIG9wdGlvbmFsIGRhdGEgZmllbGQgdGhyb3VnaCB0aGUgY29udmVyc2lvbicsICgpID0+IHsKICAgIGNvbnN0IGRhdGEgPSB7IGV4dHJhOiAnaW5mbycsIGNhdXNlOiAndHhfYmFkX3NlcScgfTsKICAgIGV4cGVjdCgKICAgICAgYnVpbGRTb3JvYmFuUnBjRXJyb3IoeyBjb2RlOiAnVFhfQkFEX1NFUScsIG1lc3NhZ2U6ICdtJywgZGF0YSB9KS5kYXRhLAogICAgKS50b0VxdWFsKGRhdGEpOwogIH0pOwp9KTsKCmRlc2NyaWJlKCdidWlsZFNvcm9iYW5UcmFuc2FjdGlvblJwY1JlcXVlc3QnLCAoKSA9PiB7CiAgaXQoJ3VzZXMgREVGQVVMVF9TT1JPQkFOX1RSQU5TQUNUSU9OX0ZFRSB3aGVuIG5vIGZlZSBvdmVycmlkZSBpcyBzdXBwbGllZCcsICgpID0+IHsKICAgIGV4cGVjdChERUZBVUxUX1NPUk9CQU5fVFJBTlNBQ1RJT05fRkVFKS50b0JlKDEwMCk7CiAgICBjb25zdCBwYXlsb2FkID0gYnVpbGRTb3JvYmFuVHJhbnNhY3Rpb25ScGNSZXF1ZXN0KGJhc2VSZXF1ZXN0LCAnY29udHJhY3QnLCAndGVzdG5ldCcpOwogICAgZXhwZWN0KHBhcmFtc09mKHBheWxvYWQpLmZlZSkudG9CZShERUZBVUxUX1NPUk9CQU5fVFJBTlNBQ1RJT05fRkVFKTsKICB9KTsKCiAgaXQoJ2hvbm9ycyBhIGN1c3RvbSBmZWUgcGFzc2VkIHZpYSBvcHRpb25zJywgKCkgPT4gewogICAgY29uc3QgcGF5bG9hZCA9IGJ1aWxkU29yb2JhblRyYW5zYWN0aW9uUnBjUmVxdWVzdCgKICAgICAgYmFzZVJlcXVlc3QsCiAgICAgICdjb250cmFjdCcsCiAgICAgICd0ZXN0bmV0JywKICAgICAgeyBmZWU6IDI1MCB9LAogICAgKTsKICAgIGV4cGVjdChwYXJhbXNPZihwYXlsb2FkKS5mZWUpLnRvQmUoMjUwKTsKICB9KTsKCiAgaXQoJ2FjY2VwdHMgYSBmZWUgb2YgemVybyBmb3IgZmVlLWJ1bXAgb3Igc3BvbnNvcmVkIHRyYW5zYWN0aW9ucycsICgpID0+IHsKICAgIGNvbnN0IHBheWxvYWQgPSBidWlsZFNvcm9iYW5UcmFuc2FjdGlvblJwY1JlcXVlc3QoCiAgICAgIGJhc2VSZXF1ZXN0LAogICAgICAnY29udHJhY3QnLAogICAgICAndGVzdG5ldCcsCiAgICAgIHsgZmVlOiAwIH0sCiAgICApOwogICAgZXhwZWN0KHBhcmFtc09mKHBheWxvYWQpLmZlZSkudG9CZSgwKTsKICB9KTsKCiAgaXQoJ3JlamVjdHMgbmVnYXRpdmUsIE5hTiwgYW5kIG5vbi1maW5pdGUgZmVlIHZhbHVlcycsICgpID0+IHsKICAgIGV4cGVjdCgoKSA9PgogICAgICBidWlsZFNvcm9iYW5UcmFuc2FjdGlvblJwY1JlcXVlc3QoYmFzZVJlcXVlc3QsICdjaWQnLCAndGVzdG5ldCcsIHsgZmVlOiAtMSB9KSwKICAgICkudG9UaHJvdygvSW52YWxpZCBTb3JvYmFuIHRyYW5zYWN0aW9uIGZlZS8pOwoKICAgIGV4cGVjdCgoKSA9PgogICAgICBidWlsZFNvcm9iYW5UcmFuc2FjdGlvblJwY1JlcXVlc3QoYmFzZVJlcXVlc3QsICdjaWQnLCAndGVzdG5ldCcsIHsKICAgICAgICBmZWU6IE51bWJlci5OYU4sCiAgICAgIH0pLAogICAgKS50b1Rocm93KC9JbnZhbGlkIFNvcm9iYW4gdHJhbnNhY3Rpb24gZmVlLyk7CgogICAgZXhwZWN0KCgpID0+CiAgICAgIGJ1aWxkU29yb2JhblRyYW5zYWN0aW9uUnBjUmVxdWVzdChiYXNlUmVxdWVzdCwgJ2NpZCcsICd0ZXN0bmV0JywgewogICAgICAgIGZlZTogTnVtYmVyLlBPU0lUSVZFX0lORklOSVRZLAogICAgICB9KSwKICAgICkudG9UaHJvdygvSW52YWxpZCBTb3JvYmFuIHRyYW5zYWN0aW9uIGZlZS8pOwogIH0pOwoKICBpdCgnc2VsZWN0cyB0aGUgYXBwcm9wcmlhdGUgbmV0d29yayBwYXNzcGhyYXNlJywgKCkgPT4gewogICAgY29uc3QgcHVibGljUGF5bG9hZCA9IGJ1aWxkU29yb2JhblRyYW5zYWN0aW9uUnBjUmVxdWVzdCgKICAgICAgYmFzZVJlcXVlc3QsCiAgICAgICdjaWQnLAogICAgICAncHVibGljJywKICAgICk7CiAgICBleHBlY3QocGFyYW1zT2YocHVibGljUGF5bG9hZCkubmV0d29ya19wYXNzcGhyYXNlKS50b0JlKAogICAgICAnUHVibGljIEdsb2JhbCBTdGVsbGFyIE5ldHdvcmsgOyBTZXB0ZW1iZXIgMjAxNScsCiAgICApOwoKICAgIGNvbnN0IHRlc3RuZXRQYXlsb2FkID0gYnVpbGRTb3JvYmFuVHJhbnNhY3Rpb25ScGNSZXF1ZXN0KAogICAgICBiYXNlUmVxdWVzdCwKICAgICAgJ2NpZCcsCiAgICAgICd0ZXN0bmV0JywKICAgICk7CiAgICBleHBlY3QocGFyYW1zT2YodGVzdG5ldFBheWxvYWQpLm5ldHdvcmtfcGFzc3BocmFzZSkudG9CZSgKICAgICAgJ1Rlc3QgU0RGIE5ldHdvcmsgOyBTZXB0ZW1iZXIgMjAxNScsCiAgICApOwogIH0pOwp9KTsKCmRlc2NyaWJlKCdpc1R4QnVpbGRSZXF1ZXN0JywgKCkgPT4gewogIGl0KCdhY2NlcHRzIHRoZSBiYXNlIHJlcXVlc3Qgd2l0aG91dCBhIGZlZScsICgpID0+IHsKICAgIGV4cGVjdChpc1R4QnVpbGRSZXF1ZXN0KGJhc2VSZXF1ZXN0KSkudG9CZS h0cnVlKTsKICB9KTsKCiAgaXQoJ2FjY2VwdHMgYSB2YWxpZCBvcHRpb25hbCBmZWUgb3ZlcnJpZGUnLCAoKSA9PiB7CiAgICBleHBlY3QoaXNUeEJ1aWxkUmVxdWVzdCh7IC4uLmJhc2VSZXF1ZXN0LCBmZWU6IDE1MCB9KSkudG9CZS h0cnVlKTsKICAgIGV4cGVjdChpc1R4QnVpbGRSZXF1ZXN0KHsgLi4uYmFzZVJlcXVlc3QsIGZlZTogMCB9KSkudG9CZS h0cnVlKTsKICB9KTsKCiAgaXQoJ3JlamVjdHMgaW52YWxpZCBvcHRpb25hbCBmZWUgb3ZlcnJpZGVzJywgKCkgPT4gewogICAgZXhwZWN0KGlzVHhCdWlsZFJlcXVlc3QoeyAuLi5iYXNlUmVxdWVzdCwgZmVlOiAtMTAgfSkpLnRvQmUoZmFsc2UpOwogICAgZXhwZWN0KGlzVHhCdWlsZFJlcXVlc3QoeyAuLi5iYXNlUmVxdWVzdCwgZmVlOiAnNTAwJyB9KSkudG9CZS hmYWxzZSk7CiAgICBleHBlY3QoaXNUeEJ1aWxkUmVxdWVzdCh7IC4uLmJhc2VSZXF1ZXN0LCBmZWU6IG51bGwgfSkpLnRvQmUoZmFsc2UpOwogICAgZXhwZWN0KGlzVHhCdWlsZFJlcXVlc3QoeyAuLi5iYXNlUmVxdWVzdCwgZmVlOiBOdW1iZXIuTmFOIH0pKS50b0JlKGZhbHNlKTsKICB9KTsKfSk7Cg==
+import { describe, expect, it } from 'vitest';
+import {
+  buildSorobanRpcError,
+  buildSorobanTransactionRpcRequest,
+  DEFAULT_SOROBAN_TRANSACTION_FEE,
+  isTxBuildRequest,
+  TxBuildRequest,
+} from './tx';
+
+const VALID_PUBLIC_KEY = 'G' + 'A'.repeat(55);
+
+const baseRequest: TxBuildRequest = {
+  type: 'lend',
+  sourceAccount: VALID_PUBLIC_KEY,
+  data: {
+    asset: 'XLM',
+    amount: 100,
+    interestRate: 5,
+  },
+};
+
+function paramsOf(payload: Record<string, unknown>): Record<string, unknown> {
+  const params = payload.params as Array<Record<string, unknown>>;
+  return params[0];
+}
+
+describe('buildSorobanRpcError', () => {
+  it('returns UNKNOWN_ERROR when the error is not an object', () => {
+    expect(buildSorobanRpcError(null).code).toBe('UNKNOWN_ERROR');
+    expect(buildSorobanRpcError(undefined).code).toBe('UNKNOWN_ERROR');
+    expect(buildSorobanRpcError('boom').code).toBe('UNKNOWN_ERROR');
+    expect(buildSorobanRpcError(404).code).toBe('UNKNOWN_ERROR');
+    expect(buildSorobanRpcError(true).code).toBe('UNKNOWN_ERROR');
+  });
+
+  it('preserves primitive string and number codes', () => {
+    expect(
+      buildSorobanRpcError({ code: 'INVALID_INSTRUCTION', message: 'bad' }).code,
+    ).toBe('INVALID_INSTRUCTION');
+    expect(buildSorobanRpcError({ code: 500, message: 'oops' }).code).toBe(500);
+    expect(buildSorobanRpcError({ code: 0, message: 'zero' }).code).toBe(0);
+    expect(buildSorobanRpcError({ code: '', message: 'empty' }).code).toBe('');
+  });
+
+  it('coerces non-primitive codes to UNKNOWN_ERROR so the type contract holds', () => {
+    expect(buildSorobanRpcError({ code: { foo: 'bar' }, message: 'x' }).code).toBe(
+      'UNKNOWN_ERROR',
+    );
+    expect(buildSorobanRpcError({ code: [1, 2, 3], message: 'x' }).code).toBe(
+      'UNKNOWN_ERROR',
+    );
+    expect(buildSorobanRpcError({ code: true, message: 'x' }).code).toBe(
+      'UNKNOWN_ERROR',
+    );
+    expect(buildSorobanRpcError({ code: null, message: 'x' }).code).toBe(
+      'UNKNOWN_ERROR',
+    );
+    expect(buildSorobanRpcError({ code: undefined, message: 'x' }).code).toBe(
+      'UNKNOWN_ERROR',
+    );
+  });
+
+  it('coerces bigint codes to a base-10 string representation', () => {
+    expect(buildSorobanRpcError({ code: 42n, message: 'x' }).code).toBe('42');
+  });
+
+  it('uses the default message when the upstream message is not a string', () => {
+    expect(buildSorobanRpcError({ code: 'X', message: undefined }).message).toBe(
+      'Unknown Soroban RPC error',
+    );
+    expect(buildSorobanRpcError({ code: 'X', message: { weird: true } }).message).toBe(
+      'Unknown Soroban RPC error',
+    );
+  });
+
+  it('coerces a non-primitive code while defaulting the message and dropping data', () => {
+    const result = buildSorobanRpcError({ code: { nested: { deep: true } } });
+    expect(result.code).toBe('UNKNOWN_ERROR');
+    expect(typeof result.code).toBe('string');
+    expect(result.message).toBe('Unknown Soroban RPC error');
+    expect(result.data).toBeUndefined();
+  });
+
+  it('preserves the upstream message when it is a string', () => {
+    expect(
+      buildSorobanRpcError({ code: 'X', message: 'real upstream problem' }).message,
+    ).toBe('real upstream problem');
+  });
+
+  it('preserves the optional data field through the conversion', () => {
+    const data = { extra: 'info', cause: 'tx_bad_seq' };
+    expect(
+      buildSorobanRpcError({ code: 'TX_BAD_SEQ', message: 'm', data }).data,
+    ).toEqual(data);
+  });
+});
+
+describe('buildSorobanTransactionRpcRequest', () => {
+  it('uses DEFAULT_SOROBAN_TRANSACTION_FEE when no fee override is supplied', () => {
+    expect(DEFAULT_SOROBAN_TRANSACTION_FEE).toBe(100);
+    const payload = buildSorobanTransactionRpcRequest(baseRequest, 'contract', 'testnet');
+    expect(paramsOf(payload).fee).toBe(DEFAULT_SOROBAN_TRANSACTION_FEE);
+  });
+
+  it('honors a custom fee passed via options', () => {
+    const payload = buildSorobanTransactionRpcRequest(
+      baseRequest,
+      'contract',
+      'testnet',
+      { fee: 250 },
+    );
+    expect(paramsOf(payload).fee).toBe(250);
+  });
+
+  it('accepts a fee of zero for fee-bump or sponsored transactions', () => {
+    const payload = buildSorobanTransactionRpcRequest(
+      baseRequest,
+      'contract',
+      'testnet',
+      { fee: 0 },
+    );
+    expect(paramsOf(payload).fee).toBe(0);
+  });
+
+  it('rejects negative, NaN, and non-finite fee values', () => {
+    expect(() =>
+      buildSorobanTransactionRpcRequest(baseRequest, 'cid', 'testnet', { fee: -1 }),
+    ).toThrow(/Invalid Soroban transaction fee/);
+
+    expect(() =>
+      buildSorobanTransactionRpcRequest(baseRequest, 'cid', 'testnet', {
+        fee: Number.NaN,
+      }),
+    ).toThrow(/Invalid Soroban transaction fee/);
+
+    expect(() =>
+      buildSorobanTransactionRpcRequest(baseRequest, 'cid', 'testnet', {
+        fee: Number.POSITIVE_INFINITY,
+      }),
+    ).toThrow(/Invalid Soroban transaction fee/);
+  });
+
+  it('selects the appropriate network passphrase', () => {
+    const publicPayload = buildSorobanTransactionRpcRequest(
+      baseRequest,
+      'cid',
+      'public',
+    );
+    expect(paramsOf(publicPayload).network_passphrase).toBe(
+      'Public Global Stellar Network ; September 2015',
+    );
+
+    const testnetPayload = buildSorobanTransactionRpcRequest(
+      baseRequest,
+      'cid',
+      'testnet',
+    );
+    expect(paramsOf(testnetPayload).network_passphrase).toBe(
+      'Test SDF Network ; September 2015',
+    );
+  });
+});
+
+describe('isTxBuildRequest', () => {
+  it('accepts the base request without a fee', () => {
+    expect(isTxBuildRequest(baseRequest)).toBe(true);
+  });
+
+  it('accepts a valid optional fee override', () => {
+    expect(isTxBuildRequest({ ...baseRequest, fee: 150 })).toBe(true);
+    expect(isTxBuildRequest({ ...baseRequest, fee: 0 })).toBe(true);
+  });
+
+  it('rejects invalid optional fee overrides', () => {
+    expect(isTxBuildRequest({ ...baseRequest, fee: -10 })).toBe(false);
+    expect(isTxBuildRequest({ ...baseRequest, fee: '500' })).toBe(false);
+    expect(isTxBuildRequest({ ...baseRequest, fee: null })).toBe(false);
+    expect(isTxBuildRequest({ ...baseRequest, fee: Number.NaN })).toBe(false);
+  });
+});

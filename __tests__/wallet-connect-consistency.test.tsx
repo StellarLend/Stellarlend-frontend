@@ -71,7 +71,7 @@ describe('wallet connect consistency', () => {
     mockConnectWallet.mockReset();
     sessionStorage.clear();
     global.fetch = jest.fn() as unknown as typeof fetch;
-    (global.fetch as jest.Mock).mockResolved({
+    (global.fetch as jest.Mock).mockResolvedValue({
       ok: false,
       status: 401,
       json: async () => ({}),
@@ -80,7 +80,7 @@ describe('wallet connect consistency', () => {
 
   it('rejects an invalid public key identically from both entry points', async () => {
     const invalidAddress = 'not-a-valid-stellar-address';
-    mockConnectWallet.mockRejected(new Error('Invalid public key'));
+    mockConnectWallet.mockRejectedValue(new Error('Invalid public key'));
 
     render(
       <WalletProvider>

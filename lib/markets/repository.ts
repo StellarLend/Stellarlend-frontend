@@ -1,5 +1,5 @@
 import { ASSET_SYMBOLS, type AssetSymbol } from '@/types/enums';
-type AssetMarket, MarketsResponse from './types';
+import type { AssetMarket, MarketsResponse } from './types';
 
 // Representative baseline market parameters per asset.
 // Used only when USE_MOCK_MARKETS = 'true'.
@@ -8,7 +8,7 @@ const BASE_MARKETS: Record<AssetSymbol, Omit<AssetMarket, 'asset'>> = {
   XLM:  { supplyApr: 8.5,  borrowApr: 12.0, utilization: 0.71, totalSupply: 2_500_000, totalBorrow: 1_775_000 },
   USDC: { supplyApr: 5.2,  borrowApr: 7.8,  utilization: 0.65, totalSupply: 10_000_000, totalBorrow: 6_500_000 },
   BTC:  { supplyApr: 2.1,  borrowApr: 4.5,  utilization: 0.47, totalSupply: 500_000, totalBorrow: 235_000 },
-  ETR:  { supplyApr: 3.8,  borrowApr: 6.2,  utilization: 0.58, totalSupply: 1_200_000, totalBorrow: 696_000 },
+  ETH:  { supplyApr: 3.8,  borrowApr: 6.2,  utilization: 0.58, totalSupply: 1_200_000, totalBorrow: 696_000 },
 };
 
 export interface SorobanReserveData {
@@ -90,7 +90,7 @@ async function fetchFromSoroban(assets: AssetSymbol[], options: FetchMarketsOpti
   const client = options.client ?? await createSorobanClient(options);
   const markets: AssetMarket[] = [];
   for (const symbol of assets) {
-    const assetAddress = options.assetAddressesUpdated(symbol);
+    const assetAddress = options.assetAddresses?.[symbol] ?? assetAddressesUpdated(symbol);
     const raw = await client.invokeContract(contractId, 'get_reserve_data', [assetAddress]);
     const decoded = decodeReserveData(raw);
     markets.push({

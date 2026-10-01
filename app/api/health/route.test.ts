@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 vi.mock('server-only', () => ({}));
 
-const httpGetMock = vi.fn().mockResolved({});
+const httpGetMock = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/http', () => ({
   httpGet: (...args: unknown[]) => httpGetMock(...args),
@@ -33,7 +33,7 @@ function makeRequest(headers: Record<string, string> = {}): NextRequest {
 describe('GET /api/health', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    httpGetMock.mockResolved({ ok: true });
+    httpGetMock.mockResolvedValue({ ok: true });
   });
 
   it('returns 200 with a healthy status body', async () => {
@@ -165,7 +165,7 @@ describe('GET /api/health', () => {
   });
 
   it('reports degraded for all checks when every dependency fails', async () => {
-    httpGetMock.mockRejected(new Error('network down'));
+    httpGetMock.mockRejectedValue(new Error('network down'));
 
     const res = await GET(makeRequest());
     const body = await res.json();
@@ -219,7 +219,7 @@ describe('GET /api/health', () => {
     const healthy = await GET(makeRequest());
     const healthyEtag = healthy.headers.get('ETag');
 
-    httpGetMock.mockRejected(new Error('down'));
+    httpGetMock.mockRejectedValue(new Error('down'));
     const degraded = await GET(makeRequest());
     expect(degraded.headers.get('ETag')).not.toBe(healthyEtag);
   });
