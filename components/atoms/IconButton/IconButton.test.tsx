@@ -42,6 +42,36 @@ describe("IconButton accessibility", () => {
     expect(button).toHaveAttribute("type", "button");
   });
 
+  it("fires onClick exactly once per Enter key press", () => {
+    render(
+      <IconButton aria-label="Search" onClick={mockOnClick}>
+        <svg data-testid="search-icon" />
+      </IconButton>,
+    );
+
+    const button = screen.getByRole("button");
+    button.focus();
+
+    fireEvent.keyDown(button, { key: "Enter" });
+    fireEvent.click(button);
+    expect(mockOnClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires onClick exactly once per Space key press", () => {
+    render(
+      <IconButton aria-label="Search" onClick={mockOnClick}>
+        <svg data-testid="search-icon" />
+      </IconButton>,
+    );
+
+    const button = screen.getByRole("button");
+    button.focus();
+
+    fireEvent.keyDown(button, { key: " " });
+    fireEvent.click(button);
+    expect(mockOnClick).toHaveBeenCalledTimes(1);
+  });
+
   it("applies the shared focus-visible ring tokens", () => {
     render(
       <IconButton aria-label="Menu" onClick={mockOnClick}>
