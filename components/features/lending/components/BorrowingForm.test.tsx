@@ -14,6 +14,14 @@ vi.mock("@/hooks/useWalletConnection", () => ({
   }),
 }));
 
+vi.mock("@/context/WalletContext", () => ({
+  useWalletContext: () => ({
+    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    status: "connected",
+    connect: vi.fn(),
+  }),
+}));
+
 // `BorrowingForm` reads collateral balances from `useWalletBalances()` (wired up
 // in #1057). These unit tests exercise the form in isolation, so the hook is
 // mocked to return the canonical asset list they assert against (e.g. the XLM
