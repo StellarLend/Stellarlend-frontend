@@ -139,6 +139,8 @@ describe("WalletConnectButton", () => {
     expect(screen.getByText("Address Copied!")).toBeInTheDocument();
   });
 
+  // Regression coverage: clipboard access can fail even when an address is present.
+  // The user should receive actionable feedback instead of a silent failure.
   it("shows error toast when copyToClipboard fails with clipboard_error", async () => {
     const fullAddress = "GBRPAME4HFAIMDOM4VES2SO24TEY246NNSUHE4WR37GBTT5CXYABXL7R";
     setupMockContext({

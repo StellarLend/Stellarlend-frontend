@@ -14,6 +14,29 @@ vi.mock("@/hooks/useWalletConnection", () => ({
   }),
 }));
 
+vi.mock("@/context/WalletContext", () => ({
+  useWalletContext: () => ({
+    address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    status: "connected",
+    connect: vi.fn(),
+  }),
+}));
+
+// `BorrowingForm` reads collateral balances from `useWalletBalances()` (wired up
+// in #1057). These unit tests exercise the form in isolation, so the hook is
+// mocked to return the canonical asset list they assert against (e.g. the XLM
+// balance of 3750) rather than requiring a live `WalletProvider` mount.
+vi.mock("@/hooks/useWalletBalances", async () => {
+  const { ASSETS } = await import("@/lib/assets");
+  return {
+    useWalletBalances: () => ({
+      assetsWithBalances: ASSETS,
+      loading: false,
+      error: null,
+    }),
+  };
+});
+
 describe("BorrowingForm Component", () => {
   const mockInitialData = {
     asset: "USDC",
@@ -250,6 +273,53 @@ describe("BorrowingForm Component", () => {
         collateral: "XLM",
       }),
     );
+  });
+
+  it("handles submission failure safely", async () => {
+    const errorSubmit = vi.fn().mockRejectedValue(new Error("Network Error"));
+    render(
+      <BorrowingForm initialData={mockInitialData} onSubmit={errorSubmit} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Amount to Borrow/i), {
+      target: { value: "10" },
+    });
+
+    const submitButton = screen.getByText(/Review Loan Request/i);
+    fireEvent.click(submitButton);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByText(/Network Error/i),
+    ).toBeInTheDocument();
+  });
+
+  it("prevents double submission while submitting", async () => {
+    let resolveSubmit: (value: void | PromiseLike<void>) => void;
+    const slowSubmit = vi.fn(() => new Promise<void>((resolve) => {
+      resolveSubmit = resolve;
+    }));
+    render(
+      <BorrowingForm initialData={mockInitialData} onSubmit={slowSubmit} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Amount to Borrow/i), {
+      target: { value: "10" },
+    });
+
+    const submitButton = screen.getByText(/Review Loan Request/i);
+    fireEvent.click(submitButton);
+    fireEvent.click(submitButton);
+
+    expect(slowSubmit).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSubmit!();
+      await Promise.resolve();
+    });
   });
 
   describe("cross-asset collateral", () => {

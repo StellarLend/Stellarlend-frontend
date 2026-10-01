@@ -14,9 +14,14 @@ vi.mock('@/lib/request-id', () => ({
   getOrCreateRequestId: vi.fn(() => ({ requestId: 'test-request-id' })),
   REQUEST_ID_HEADER: 'x-request-id',
 }));
+vi.mock('@/lib/auth/session', () => ({
+  getSession: vi.fn(async () => null),
+}));
 
 import { rateLimit } from '@/lib/rate-limit';
+import { getSession } from '@/lib/auth/session';
 const mockRateLimit = vi.mocked(rateLimit);
+const mockGetSession = vi.mocked(getSession);
 
 function req(path: string, options: { method?: string; headers?: Record<string, string>; withSession?: boolean } = {}) {
   const { method = 'GET', headers = {}, withSession } = options;
@@ -29,6 +34,7 @@ function req(path: string, options: { method?: string; headers?: Record<string, 
 describe('middleware', () => {
   beforeEach(() => {
     mockRateLimit.mockReturnValue({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 });
+    mockGetSession.mockResolvedValue(null);
   });
 
   describe('non-API paths', () => {
@@ -139,10 +145,19 @@ describe('middleware', () => {
     });
 
     it('skips rate limiting for authenticated requests', async () => {
+      mockGetSession.mockResolvedValue({ userId: 'user-1' });
       mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
       const res = await middleware(req('/api/positions', { withSession: true }));
       expect(res.status).toBe(200);
       expect(mockRateLimit).not.toHaveBeenCalled();
+    });
+
+    it('does not bypass rate limiting for a forged session cookie', async () => {
+      mockGetSession.mockResolvedValue(null);
+      mockRateLimit.mockReturnValue({ success: false, limit: 100, remaining: 0, reset: Date.now() + 1000 });
+      const res = await middleware(req('/api/positions', { withSession: true }));
+      expect(res.status).toBe(429);
+      expect(mockRateLimit).toHaveBeenCalled();
     });
   });
 

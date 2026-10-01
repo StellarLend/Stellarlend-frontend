@@ -22,8 +22,8 @@ function getTooltip() {
   return screen.getByRole("tooltip");
 }
 
-function openTooltip() {
-  fireEvent.mouseEnter(getTrigger());
+function openTooltip(trigger = getTrigger()) {
+  fireEvent.mouseEnter(trigger);
   act(() => {
     vi.advanceTimersByTime(300);
   });
@@ -140,7 +140,7 @@ describe("Tooltip", () => {
       expect(getTrigger()).not.toHaveAttribute("aria-describedby");
 
       openTooltip();
-      expect(getTrigger()).toHaveAttribute("aria-describedby", "tooltip-content");
+      expect(getTrigger()).toHaveAttribute("aria-describedby", getTooltip().id);
     });
   });
 
@@ -278,6 +278,126 @@ describe("Tooltip", () => {
       expect(getTooltip()).toBeInTheDocument();
     });
 
+    it("cancels a pending open when Escape is pressed", () => {
+      render(
+        <Tooltip content="Helpful text">
+          <button>Hover me</button>
+        </Tooltip>,
+      );
+
+      fireEvent.mouseEnter(getTrigger());
+      fireEvent.keyDown(document, { key: "Escape" });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(queryTooltip()).not.toBeInTheDocument();
+    });
+
+    it("stays open while either hover or focus remains active", () => {
+      render(
+        <Tooltip content="Helpful text">
+          <button>Hover me</button>
+        </Tooltip>,
+      );
+
+      fireEvent.mouseEnter(getTrigger());
+      fireEvent.focus(getTrigger());
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      fireEvent.mouseLeave(getTrigger());
+      expect(getTooltip()).toBeInTheDocument();
+
+      fireEvent.blur(getTrigger());
+      expect(queryTooltip()).not.toBeInTheDocument();
+    });
+
+    it("uses distinct tooltip IDs and descriptions for multiple instances", () => {
+      render(
+        <>
+          <Tooltip content="First tooltip">
+            <button>First trigger</button>
+          </Tooltip>
+          <Tooltip content="Second tooltip">
+            <button>Second trigger</button>
+          </Tooltip>
+        </>,
+      );
+      const [firstTrigger, secondTrigger] = screen.getAllByRole("button");
+
+      openTooltip(firstTrigger);
+      openTooltip(secondTrigger);
+
+      const tooltips = screen.getAllByRole("tooltip");
+      expect(tooltips[0].id).not.toBe(tooltips[1].id);
+      expect(firstTrigger).toHaveAttribute("aria-describedby", tooltips[0].id);
+      expect(secondTrigger).toHaveAttribute("aria-describedby", tooltips[1].id);
+    });
+
+    it("preserves existing trigger handlers and aria-describedby", () => {
+      const onMouseEnter = vi.fn();
+      const onMouseLeave = vi.fn();
+      render(
+        <Tooltip content="Helpful text">
+          <button
+            aria-describedby="existing-description"
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+          >
+            Hover me
+          </button>
+        </Tooltip>,
+      );
+
+      fireEvent.mouseEnter(getTrigger());
+      expect(onMouseEnter).toHaveBeenCalledOnce();
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(getTrigger()).toHaveAttribute(
+        "aria-describedby",
+        `existing-description ${getTooltip().id}`,
+      );
+
+      fireEvent.mouseLeave(getTrigger());
+      expect(onMouseLeave).toHaveBeenCalledOnce();
+      expect(getTrigger()).toHaveAttribute("aria-describedby", "existing-description");
+    });
+
+    it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
+      "treats invalid delay %s as zero",
+      (delay) => {
+        render(
+          <Tooltip content="Helpful text" delay={delay}>
+            <button>Hover me</button>
+          </Tooltip>,
+        );
+
+        fireEvent.mouseEnter(getTrigger());
+        act(() => {
+          vi.advanceTimersByTime(0);
+        });
+
+        expect(getTooltip()).toBeInTheDocument();
+      },
+    );
+
+    it("opens immediately for a zero delay", () => {
+      render(
+        <Tooltip content="Helpful text" delay={0}>
+          <button>Hover me</button>
+        </Tooltip>,
+      );
+
+      fireEvent.mouseEnter(getTrigger());
+      act(() => {
+        vi.advanceTimersByTime(0);
+      });
+
+      expect(getTooltip()).toBeInTheDocument();
+    });
+
     it("cleans up timeout on unmount while timer is pending", () => {
       const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
       const { unmount } = render(
@@ -295,19 +415,15 @@ describe("Tooltip", () => {
       clearTimeoutSpy.mockRestore();
     });
 
-    it("removes keydown listener when tooltip hides", () => {
+    it("removes keydown listener when unmounted", () => {
       const removeSpy = vi.spyOn(document, "removeEventListener");
-      render(
+      const { unmount } = render(
         <Tooltip content="Helpful text">
           <button>Hover me</button>
         </Tooltip>,
       );
 
-      openTooltip();
-
-      act(() => {
-        fireEvent.keyDown(document, { key: "Escape" });
-      });
+      unmount();
       expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
       removeSpy.mockRestore();
     });
