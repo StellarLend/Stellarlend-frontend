@@ -98,7 +98,7 @@ describe('GET /api/markets', () => {
       ]),
     );
     expect(globalCache.getOrFetch).toHaveBeenCalledWith(
-      'markets:assets:BTC,ETH,MSE,XLM',
+      'markets:assets:BTC,ETH,USDC,XLM',
       expect.any(Function),
       { ttl: 30_000, swr: 60_000 },
     );
