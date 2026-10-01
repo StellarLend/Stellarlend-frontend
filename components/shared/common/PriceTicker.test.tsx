@@ -185,11 +185,11 @@ describe("PriceTicker", () => {
 
     const { container } = render(<PriceTicker />);
 
-    const nav = container.querySelector("nav");
-    expect(nav?.className).not.toContain("transition-opacity");
+    const ticker = container.querySelector('[role="marquee"]');
+    expect(ticker?.className).not.toContain("transition-opacity");
   });
 
-  it("has accessible aria-label on nav element", () => {
+  it("has accessible aria-label on marquee element", () => {
     const mockPrices = createMockPrices([
       [
         "XLM",
@@ -209,8 +209,8 @@ describe("PriceTicker", () => {
 
     render(<PriceTicker />);
 
-    const nav = screen.getByRole("navigation", { name: "Live market prices" });
-    expect(nav).toBeInTheDocument();
+    const ticker = screen.getByRole("marquee", { name: "Live market prices" });
+    expect(ticker).toBeInTheDocument();
   });
 
   it("has aria-labels on individual price items describing symbol and price", () => {
@@ -282,5 +282,63 @@ describe("PriceTicker", () => {
     const symbolTexts = Array.from(symbols).map((s) => s.textContent);
 
     expect(symbolTexts).toEqual(["ETH", "XLM"]);
+  });
+});
+
+describe("PriceTicker accessibility", () => {
+  beforeEach(() => {
+    mockUseReducedMotion.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("does not expose a navigation landmark", () => {
+    const mockPrices = createMockPrices([
+      [
+        "XLM",
+        {
+          symbol: "XLM",
+          price: 0.1245,
+          direction: "up",
+          timestamp: "2026-06-28T10:00:00.000Z",
+        },
+      ],
+    ]);
+
+    mockUsePriceStream.mockReturnValue({
+      prices: mockPrices,
+      isLoading: false,
+    });
+
+    render(<PriceTicker />);
+
+    const navElements = screen.queryAllByRole("navigation");
+    expect(navElements).toHaveLength(0);
+  });
+
+  it("uses role marquee for the price list container", () => {
+    const mockPrices = createMockPrices([
+      [
+        "BTC",
+        {
+          symbol: "BTC",
+          price: 65000,
+          direction: "down",
+          timestamp: "2026-06-28T10:00:00.000Z",
+        },
+      ],
+    ]);
+
+    mockUsePriceStream.mockReturnValue({
+      prices: mockPrices,
+      isLoading: false,
+    });
+
+    render(<PriceTicker />);
+
+    const ticker = screen.getByRole("marquee");
+    expect(ticker).toHaveAttribute("aria-label", "Live market prices");
   });
 });

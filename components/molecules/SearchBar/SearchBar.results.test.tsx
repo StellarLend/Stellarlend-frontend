@@ -304,6 +304,118 @@ describe('SearchBar Live Results', () => {
       fireEvent.keyDown(options[0], { key: 'ArrowDown' });
       expect(options[0]).toHaveAttribute('aria-selected', 'true');
     });
+
+    it('should wrap focus around on ArrowUp at first result', () => {
+      const { container } = render(
+        <SearchBar
+          results={successResults('test', [mockTransaction], [])}
+          onSearch={vi.fn()}
+        />
+      );
+
+      const options = container.querySelectorAll('[role="option"]');
+      expect(options).toHaveLength(1);
+
+      // ArrowUp wraps from first to last (same element since only 1)
+      fireEvent.keyDown(options[0], { key: 'ArrowUp' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  describe('Integration: full keyboard wraparound and Escape focus', () => {
+    it('should arrow through 4 results both directions with wraparound and return focus to input on Escape', () => {
+      const onSearch = vi.fn();
+      const { rerender } = render(
+        <SearchBar
+          results={successResults('test', [
+            mockTransaction,
+            { ...mockTransaction, id: 'TXN124', title: 'Withdrawal - XLM' },
+            { ...mockTransaction, id: 'TXN125', title: 'Deposit - USDC' },
+            { ...mockTransaction, id: 'TXN126', title: 'Swap - XLM/USDC' },
+          ], [])}
+          onSearch={onSearch}
+        />
+      );
+
+      const input = screen.getByRole('combobox');
+      input.focus();
+
+      const options = screen.getAllByRole('option');
+      expect(options).toHaveLength(4);
+
+      // ArrowDown forward: 0→1→2→3→0
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(options[2]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(options[3]).toHaveAttribute('aria-selected', 'true');
+
+      // Wraparound: last → first
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+
+      // ArrowUp reverse: 0→3→2→1→0
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(options[3]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(options[2]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(options[0]).toHaveAttribute('aria-selected', 'true');
+
+      // Wraparound: first → last
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(options[3]).toHaveAttribute('aria-selected', 'true');
+
+      // Escape: should return focus to input and close the dropdown
+      fireEvent.keyDown(window, { key: 'Escape' });
+
+      expect(onSearch).toHaveBeenCalledWith('');
+
+      // Simulate parent handling: onSearch('') was called, so update results to idle
+      rerender(
+        <SearchBar
+          results={idleResults()}
+          onSearch={onSearch}
+        />
+      );
+
+      const searchInput = screen.getByRole('combobox');
+      expect(searchInput).toHaveFocus();
+      expect(screen.queryByRole('option')).not.toBeInTheDocument();
+
+      // Escape was handled exactly once (not repeatedly)
+      expect(onSearch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should have no effect pressing Escape again after dropdown is already closed', () => {
+      const onSearch = vi.fn();
+      render(
+        <SearchBar
+          results={idleResults()}
+          onSearch={onSearch}
+        />
+      );
+
+      const input = screen.getByRole('combobox');
+      input.focus();
+
+      // Press Escape while dropdown is already closed
+      fireEvent.keyDown(window, { key: 'Escape' });
+
+      // onSearch should not have been called
+      expect(onSearch).not.toHaveBeenCalled();
+    });
   });
 
   describe('Outside Click', () => {

@@ -130,6 +130,10 @@ class Registry {
     out += this.outboundRequests.collect();
     out += this.outboundRequestDuration.collect();
     out += this.horizonSelections.collect();
+    if (!this.schedulerIsLeader.collect().includes('scheduler_is_leader ')) {
+      this.schedulerIsLeader.set(0);
+    }
+    out += this.schedulerIsLeader.collect();
     out += this.circuitState.collect();
     out += this.deletionsTotal.collect();
     out += this.httpRetryTotal.collect();

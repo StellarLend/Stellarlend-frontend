@@ -19,6 +19,7 @@ function resetRelevantEnv() {
   delete process.env.AUTH_SIGNING_SECRET;
   delete process.env.SERVER_TOKEN;
   delete process.env.SOROBAN_RPC_URL;
+  delete process.env.MEMO_SALT;
 }
 
 describe('config modules', () => {
@@ -41,6 +42,7 @@ describe('config modules', () => {
     delete process.env.PRICE_ORACLE_API_KEY;
     delete process.env.AUTH_SIGNING_SECRET;
     delete process.env.SERVER_TOKEN;
+    delete process.env.MEMO_SALT;
   });
 
   afterEach(() => {
@@ -55,6 +57,7 @@ describe('config modules', () => {
     process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.stellarlend.com';
     process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
     process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID = 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
 
     const { envSchema } = await import('./configValidation');
     const result = envSchema.safeParse(process.env);
@@ -88,6 +91,7 @@ describe('config modules', () => {
     process.env.NEXT_PUBLIC_API_BASE_URL = 'not-a-url';
     process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
     process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+    process.env.NEXT_PUBLIC_SOROBAN_CONTRACT_ID = 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
 
     await expect(import('./configValidation')).rejects.toThrow();
   });
@@ -99,7 +103,21 @@ describe('config modules', () => {
     process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.stellarlend.com';
     process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
     process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+    process.env.MEMO_SALT = 'test-salt';
     delete process.env.AUTH_SECRET;
+
+    await expect(import('./configValidation')).rejects.toThrow();
+  });
+
+  it('rejects production config missing MEMO_SALT', async () => {
+    process.env.NEXT_PUBLIC_APP_NAME = 'Stellarlend Prod';
+    process.env.NEXT_PUBLIC_APP_VERSION = '2.0.0';
+    process.env.NEXT_PUBLIC_APP_ENV = 'production';
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.stellarlend.com';
+    process.env.NEXT_PUBLIC_STELLAR_NETWORK = 'public';
+    process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+    process.env.AUTH_SECRET = 'test-secret';
+    delete process.env.MEMO_SALT;
 
     await expect(import('./configValidation')).rejects.toThrow();
   });
@@ -129,9 +147,8 @@ describe('config modules', () => {
     expect(config.stellar.horizonUrl).toBe(
       'https://horizon-testnet.stellar.org'
     );
-    expect(config.stellar.sorobanRpcUrl).toBe(
-      'https://soroban-testnet.stellar.org'
-    );
+    // sorobanRpcUrl must not appear on the shared config — it is server-only
+    expect((config.stellar as any).sorobanRpcUrl).toBeUndefined();
     expect(config.stellar.sorobanContractId).toBe('');
     expect(config.analytics.googleAnalyticsId).toBeUndefined();
     expect(config.analytics.mixpanelToken).toBeUndefined();
@@ -161,6 +178,7 @@ describe('config modules', () => {
     expect(configModule.publicConfig.stellar).toEqual({
       network: 'public',
       horizonUrl: 'https://horizon.test.com',
+      sorobanContractId: 'GCONTRACTTESTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     });
   });
 

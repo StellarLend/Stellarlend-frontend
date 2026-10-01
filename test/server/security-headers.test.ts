@@ -44,4 +44,27 @@ describe('Security Headers Middleware', () => {
     expect(csp).toContain("script-src 'self' 'nonce-");
     expect(response.headers.get('x-csp-nonce')).toBeTruthy();
   });
+
+  it('sanitizes malicious x-forwarded-for and falls back to loopback', () => {
+    const response = middleware(
+      new NextRequest('http://localhost/api/test', {
+        headers: { 'x-forwarded-for': 'not-an-ip, 203.0.113.9' },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-RateLimit-Limit')).toBeTruthy();
+  });
+
+  it('ignores malformed session cookie names when evaluating authenticated requests', () => {
+    process.env.NEXT_PUBLIC_SESSION_COOKIE = 'session;evil';
+    const response = middleware(
+      new NextRequest('http://localhost/api/test', {
+        headers: { cookie: 'session;evil=abc' },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    delete process.env.NEXT_PUBLIC_SESSION_COOKIE;
+  });
 });

@@ -1,13 +1,19 @@
-interface UnionProps {
+import type { SVGProps } from "react";
+interface UnionProps extends Omit<SVGProps<SVGSVGElement>, "color"> {
   className?: string;
   width?: string | number;
   height?: string | number;
+  title?: string;
 }
 
 export const Union = ({
   className = "",
   width = "199",
   height = "84",
+  title,
+  "aria-label": ariaLabel,
+  role,
+  ...svgProps
 }: UnionProps) => {
   return (
     <svg
@@ -17,7 +23,12 @@ export const Union = ({
       viewBox="0 0 199 84"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      {...svgProps}
+      aria-hidden={title || ariaLabel ? undefined : true}
+      role={role ?? (title || ariaLabel ? "img" : undefined)}
+      aria-label={ariaLabel}
     >
+      {title ? <title>{title}</title> : null}
       <path
         fillRule="evenodd"
         clipRule="evenodd"

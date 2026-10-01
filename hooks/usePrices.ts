@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PRICE_CACHE_CONFIG } from "@/lib/prices/constants";
 import type { PriceResponse } from "@/lib/prices/types";
 import { formatCurrency } from "@/lib/utils/format";
@@ -43,7 +43,11 @@ async function fetchPricesFromApi(
 ): Promise<Record<string, number>> {
   const url = new URL("/api/prices", window.location.origin);
   if (assets.length > 0) {
-    url.searchParams.set("assets", assets.join(","));
+    // Sort + dedupe so the request URL is a deterministic function of the
+    // symbol *set*, exactly like the cache/in-flight key. Without this, two
+    // callers passing the same symbols in a different order would coalesce
+    // onto one request whose URL silently depended on mount order.
+    url.searchParams.set("assets", cacheKeyForAssets(assets));
   }
 
   const response = await fetch(url.toString());
@@ -55,11 +59,27 @@ async function fetchPricesFromApi(
   return data.prices;
 }
 
-export async function loadPrices(assets: string[]): Promise<CacheEntry> {
+export interface LoadPricesOptions {
+  /**
+   * Ignore the freshness window and always go to the network. The request is
+   * still de-duplicated against any identical call already in flight, so a
+   * forced refresh can never fan out into more than one network request.
+   */
+  force?: boolean;
+}
+
+export async function loadPrices(
+  assets: string[],
+  options: LoadPricesOptions = {},
+): Promise<CacheEntry> {
   const key = cacheKeyForAssets(assets);
   const cached = sessionCache.get(key);
+  const force = options.force ?? false;
 
-  if (cached && !isPriceCacheStale(cached)) {
+  // `refresh()` is documented as fetching current prices, so it must not be
+  // satisfied by a still-fresh cache entry. Only a forced call skips the
+  // freshness shortcut; ordinary reads keep the cheap cache hit.
+  if (!force && cached && !isPriceCacheStale(cached)) {
     return cached;
   }
 
@@ -103,10 +123,22 @@ export interface UsePricesResult {
 }
 
 export function usePrices(assets: string[]): UsePricesResult {
+  // The set of symbols is what actually matters, not the identity or the order
+  // of the caller's array. Joining first keeps the memo pure (it never closes
+  // over `assets`) while still recomputing when the symbol set changes.
+  const assetsKey = assets.join(",");
   const symbolsKey = useMemo(
-    () => cacheKeyForAssets(assets),
-    [assets.join(",")],
+    () => cacheKeyForAssets(assetsKey ? assetsKey.split(",") : []),
+    [assetsKey],
   );
+
+  // Callers typically pass a fresh array literal (e.g. usePrices(['XLM','USDC']))
+  // on every render, so `assets` itself is not a stable dependency. `symbolsKey`
+  // is the stable, memoized identity for a given set of symbols; the ref lets
+  // the effect and refresh() read the latest array contents without needing
+  // `assets` in their dependency lists.
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
 
   const [entry, setEntry] = useState<CacheEntry | null>(
     () => sessionCache.get(symbolsKey) ?? null,
@@ -126,7 +158,7 @@ export function usePrices(assets: string[]): UsePricesResult {
       setIsLoading(true);
     }
 
-    loadPrices(assets).then((result) => {
+    loadPrices(assetsRef.current).then((result) => {
       if (active) {
         setEntry(result);
         setIsLoading(false);
@@ -136,13 +168,17 @@ export function usePrices(assets: string[]): UsePricesResult {
     return () => {
       active = false;
     };
-  }, [symbolsKey, assets]);
+  }, [symbolsKey]);
 
   const refresh = useCallback(async () => {
-    const result = await loadPrices(assets);
-    setEntry(result);
-    setIsLoading(false);
-  }, [assets]);
+    setIsLoading(true);
+    try {
+      const result = await loadPrices(assetsRef.current, { force: true });
+      setEntry(result);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const getPriceLabel = useCallback(
     (symbol: string): string => {

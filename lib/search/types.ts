@@ -46,6 +46,10 @@ export type SearchState = 'idle' | 'loading' | 'success' | 'error';
 export interface SearchError {
   message: string;
   source?: 'transactions' | 'positions' | 'all';
+  /** HTTP status from the underlying search data source, when available. */
+  statusCode?: number;
+  /** True for transient failures (e.g. 5xx) that the UI should offer a retry for. */
+  retryable?: boolean;
 }
 
 /**

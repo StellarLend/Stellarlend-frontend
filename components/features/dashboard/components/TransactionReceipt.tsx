@@ -5,7 +5,10 @@ import Image from "next/image";
 import type { Transaction } from "@/types/Transaction";
 import { sanitiseString } from "@/lib/security/input-sanitizer";
 import { isValidTxHash } from "@/lib/validation/stellar";
+import { formatCurrency } from "@/lib/utils/format";
 import config from "@/lib/config";
+import { getTransactionHash, buildStellarExpertTransactionUrl } from "@/lib/utils/explorer";
+import type { StellarNetwork } from "@/context/WalletContext";
 
 interface TransactionReceiptProps {
   transaction: Transaction;
@@ -28,7 +31,17 @@ interface TransactionReceiptProps {
 /**
  * TransactionReceipt displays a print-friendly receipt view of a transaction.
  * Includes a print button that triggers window.print() with print-optimized styles.
- * 
+ *
+ * Contract:
+ * - `transaction` fields (id, type, amount, asset, date/time, status) always render.
+ * - `details` is optional; each of its fields (fee, memo, operations) renders only
+ *   when present, and a `null`/`undefined` `details` renders none of them.
+ * - The explorer link uses `details.explorerUrl` when provided; otherwise it is
+ *   derived from the transaction's hash via `getTransactionHash` +
+ *   `buildStellarExpertTransactionUrl`, and is omitted entirely when no valid
+ *   64-character hex hash can be found.
+ * - `onBack`, when provided, renders a "Back" button; otherwise it is omitted.
+ *
  * @param transaction - The transaction to display
  * @param details - Optional detailed transaction information (fee, memo, operations)
  * @param onBack - Optional callback to return to previous view
@@ -40,10 +53,10 @@ export default function TransactionReceipt({ transaction, details, onBack }: Tra
     window.print();
   };
 
-  const signedAmount = amount > 0 ? `+$${amount}` : `-$${Math.abs(amount)}`;
+  const signedAmount = amount > 0 ? `+$${formatCurrency(amount)}` : `-$${formatCurrency(Math.abs(amount))}`;
 
   const formatDateTime = (dateStr: string, timeStr: string) => {
-    let fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
+    const fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
     const d = new Date(dateStr + " " + fixedTime);
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
@@ -51,28 +64,25 @@ export default function TransactionReceipt({ transaction, details, onBack }: Tra
       year: "numeric",
     };
     const datePart = d.toLocaleDateString("en-US", options);
-    let [h, m] = [d.getHours(), d.getMinutes()];
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12;
-    h = h ? h : 12;
+    const [rawHours, m] = [d.getHours(), d.getMinutes()];
+    const ampm = rawHours >= 12 ? "PM" : "AM";
+    const h = rawHours % 12 || 12;
     const timePart = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
     return `${datePart} ${timePart}`;
   };
 
-  const getExplorerLink = () => {
-    if (!id || !isValidTxHash(id)) {
+  const explorerLink = (() => {
+    if (details?.explorerUrl) {
+      return details.explorerUrl;
+    }
+    const hash = getTransactionHash(transaction);
+    if (!hash) {
       return null;
     }
-    const net = config.stellar.network.toLowerCase() === 'public' || config.stellar.network.toLowerCase() === 'mainnet' ? 'public' : 'testnet';
-    const baseUrl = `https://stellar.expert/explorer/${net}/tx/`;
-    
-    // Ensure base URL starts with a safe https protocol and allowlisted domain
-    if (!baseUrl.startsWith("https://stellar.expert/")) {
-      return null;
-    }
-    
-    return `${baseUrl}${id}`;
-  };
+    const isMainnet = config.stellar.network.toLowerCase() === 'public' || config.stellar.network.toLowerCase() === 'mainnet';
+    const network: StellarNetwork = isMainnet ? 'PUBLIC' : 'TESTNET';
+    return buildStellarExpertTransactionUrl(hash, network);
+  })();
 
   return (
     <>
@@ -221,11 +231,11 @@ export default function TransactionReceipt({ transaction, details, onBack }: Tra
               </div>
             )}
 
-            {getExplorerLink() && (
+            {explorerLink && (
               <div className="grid grid-cols-2 gap-4 py-3 border-b border-gray-200">
                 <span className="font-semibold text-gray-700">Blockchain Explorer:</span>
                 <a
-                  href={getExplorerLink() || undefined}
+                  href={explorerLink}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline break-all text-sm no-print"
@@ -233,7 +243,7 @@ export default function TransactionReceipt({ transaction, details, onBack }: Tra
                   View on Stellar Expert
                 </a>
                 <span className="hidden print:inline text-gray-900 break-all text-sm">
-                  {getExplorerLink()}
+                  {explorerLink}
                 </span>
               </div>
             )}

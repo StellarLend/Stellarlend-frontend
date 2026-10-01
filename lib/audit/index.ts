@@ -69,6 +69,9 @@ let maxEvents = DEFAULT_MAX_AUDIT_EVENTS;
 const auditLog: AuditEvent[] = [];
 let eventIdCounter = 0;
 
+const MAX_AUDIT_PAYLOAD_BYTES = 4 * 1024;
+const MAX_AUDIT_PREVIEW_BYTES = 1_024;
+
 function generateId(): string {
   eventIdCounter += 1;
   return `audit-${Date.now()}-${eventIdCounter}`;
@@ -78,6 +81,35 @@ function evict(): void {
   if (auditLog.length > maxEvents) {
     auditLog.splice(0, auditLog.length - maxEvents);
   }
+}
+
+function sanitizeAuditPayload(
+  payload?: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!payload) {
+    return {};
+  }
+
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(payload);
+  } catch {
+    return {
+      __truncated: true,
+      __reason: 'audit payload could not be serialized',
+    };
+  }
+
+  if (serialized.length <= MAX_AUDIT_PAYLOAD_BYTES) {
+    return payload;
+  }
+
+  return {
+    __truncated: true,
+    __reason: 'audit payload exceeded maximum size',
+    __originalSizeBytes: serialized.length,
+    preview: serialized.slice(0, MAX_AUDIT_PREVIEW_BYTES),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +127,7 @@ export function emitAccountAuditEvent(
     type,
     userId,
     timestamp: new Date().toISOString(),
-    metadata,
+    metadata: sanitizeAuditPayload(metadata),
   };
 
   auditLog.push(event);
@@ -187,7 +219,7 @@ export function emitAdminAuditEvent(
     timestamp: new Date().toISOString(),
     action,
     actorId,
-    context,
+    context: sanitizeAuditPayload(context),
   };
 
   process.stdout.write(JSON.stringify(event) + '\n');

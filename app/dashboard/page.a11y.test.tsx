@@ -1,16 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import axe from "axe-core";
 import { render, screen, waitFor } from "@/test/test-utils";
-import DashboardPage from "./page";
-
-// Mock DashboardLayout to avoid loading TopNav, SideNav, and their providers
-vi.mock("@/components", () => ({
-  DashboardLayout: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="mock-dashboard-layout">
-      {children}
-    </div>
-  ),
-}));
+import DashboardClient from "./DashboardClient";
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
@@ -21,7 +12,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-describe("DashboardPage A11y", () => {
+describe("DashboardClient A11y", () => {
   const fetchMock = vi.fn();
 
   beforeEach(() => {
@@ -79,7 +70,7 @@ describe("DashboardPage A11y", () => {
   });
 
   it("passes axe checks on the dashboard route shell (loaded state)", async () => {
-    render(<DashboardPage />);
+    render(<DashboardClient />);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
 
@@ -124,7 +115,7 @@ describe("DashboardPage A11y", () => {
       });
     });
 
-    render(<DashboardPage />);
+    render(<DashboardClient />);
     
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
     
@@ -161,7 +152,7 @@ describe("DashboardPage A11y", () => {
       });
     });
 
-    render(<DashboardPage />);
+    render(<DashboardClient />);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
 
@@ -203,7 +194,7 @@ describe("DashboardPage A11y", () => {
       });
     });
 
-    render(<DashboardPage />);
+    render(<DashboardClient />);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/positions"));
 

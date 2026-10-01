@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Copy, Search, X } from "lucide-react";
 import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -46,14 +46,19 @@ const MetricCard: React.FC<MetricCardProps> = ({
       return;
     }
 
-    const messages: Record<CopyFailureReason, { title: string; description: string }> = {
+    const messages: Record<
+      CopyFailureReason,
+      { title: string; description: string }
+    > = {
       invalid_address: {
         title: "Invalid Address",
-        description: "The wallet address could not be validated before copying.",
+        description:
+          "The wallet address could not be validated before copying.",
       },
       clipboard_error: {
         title: "Copy Failed",
-        description: "Clipboard access is unavailable. Try copying the address manually.",
+        description:
+          "Clipboard access is unavailable. Try copying the address manually.",
       },
     };
 
@@ -84,9 +89,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
           </div>
           <span className={`${textColor} text-sm font-medium`}>{label}</span>
         </div>
-        <h3 className={`${textColor} text-[28px] font-bold mb-4`}>
-          {value}
-        </h3>
+        <h3 className={`${textColor} text-[28px] font-bold mb-4`}>{value}</h3>
       </div>
 
       {(subLabel || copyValue) && (
@@ -154,7 +157,12 @@ interface AssetFilterBarProps {
   total: number;
 }
 
-function AssetFilterBar({ query, onChange, showing, total }: AssetFilterBarProps) {
+function AssetFilterBar({
+  query,
+  onChange,
+  showing,
+  total,
+}: AssetFilterBarProps) {
   return (
     <div className="flex items-center gap-3 mb-4 flex-wrap">
       <div className="relative flex-1 min-w-[200px]">
@@ -184,7 +192,10 @@ function AssetFilterBar({ query, onChange, showing, total }: AssetFilterBarProps
           </button>
         )}
       </div>
-      <span className="text-[#AAABAB] text-sm whitespace-nowrap" aria-live="polite">
+      <span
+        className="text-[#AAABAB] text-sm whitespace-nowrap"
+        aria-live="polite"
+      >
         Showing {showing} of {total}
       </span>
     </div>
@@ -198,11 +209,17 @@ function AssetCard({ asset }: { asset: AssetMetadata }) {
   return (
     <div
       className={`bg-[#097C4C] rounded-xl p-4 border border-[#71B48D33] ${
-        shouldReduceMotion ? "" : "transform transition-transform hover:scale-[1.02]"
+        shouldReduceMotion
+          ? ""
+          : "transform transition-transform hover:scale-[1.02]"
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
-        <img src={asset.logoUrl} alt={`${asset.name} logo`} className="w-6 h-6 rounded-full" />
+        <img
+          src={asset.logoUrl}
+          alt={`${asset.name} logo`}
+          className="w-6 h-6 rounded-full"
+        />
         <span className="text-white text-sm font-semibold">{asset.symbol}</span>
       </div>
       <p className="text-[#D4F3E6] text-xs">{asset.name}</p>
@@ -222,41 +239,72 @@ interface PositionsData {
   healthFactor: number | string;
 }
 
+// Keep untrusted API data out of the render tree; healthFactor is the only
+// field that may be numeric, and copyAddress is optional for read-only cards.
+function isPositionsData(value: unknown): value is PositionsData {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  const textFields = [
+    "availableBalance",
+    "borrowedAmount",
+    "nextDue",
+    "suppliedFunds",
+    "earnings",
+  ];
+
+  return (
+    textFields.every((field) => typeof data[field] === "string") &&
+    (data.copyAddress === undefined || typeof data.copyAddress === "string") &&
+    ((typeof data.healthFactor === "number" && Number.isFinite(data.healthFactor)) ||
+      (typeof data.healthFactor === "string" && data.healthFactor.trim() !== "" &&
+        Number.isFinite(Number(data.healthFactor))))
+  );
+}
+
 function usePositionsData(): {
   data: PositionsData | null;
   isLoading: boolean;
   error: Error | null;
+  refetch: () => Promise<void>;
 } {
   const [data, setData] = useState<PositionsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const requestId = useRef(0);
 
   const fetchData = useCallback(async () => {
+    const id = ++requestId.current;
     setIsLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/positions");
-      if (!res.ok) throw new Error(`Failed to fetch positions: ${res.statusText}`);
+      if (!res.ok) throw new Error("Request failed");
       const json = await res.json();
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
+      if (!isPositionsData(json)) throw new Error("Invalid response");
+      if (requestId.current === id) setData(json);
+    } catch {
+      // Avoid rendering server details that may contain private information.
+      if (requestId.current === id) setError(new Error("Unable to load metrics."));
     } finally {
-      setIsLoading(false);
+      if (requestId.current === id) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchData();
+    return () => {
+      // Ignore late results after unmount; retry requests also supersede older ones.
+      requestId.current += 1;
+    };
   }, [fetchData]);
 
-  return { data, isLoading, error };
+  return { data, isLoading, error, refetch: fetchData };
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function MetricsCards() {
-  const { data, isLoading, error } = usePositionsData();
+  const { data, isLoading, error, refetch } = usePositionsData();
   const [filterQuery, setFilterQuery] = useState("");
 
   const allAssets = useMemo(() => {
@@ -267,48 +315,82 @@ export default function MetricsCards() {
     }
   }, []);
 
+  const uniqueAssets = useMemo(() => {
+    const seen = new Set<string>();
+    return allAssets.filter((asset) => {
+      if (!asset || typeof asset.symbol !== "string" || typeof asset.name !== "string") return false;
+      const key = asset.symbol.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [allAssets]);
+
   const filteredAssets = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
-    if (!q) return allAssets;
-    return allAssets.filter(
+    if (!q) return uniqueAssets;
+    return uniqueAssets.filter(
       (a) =>
-        a.symbol.toLowerCase().includes(q) ||
-        a.name.toLowerCase().includes(q),
+        a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q),
     );
-  }, [allAssets, filterQuery]);
+  }, [uniqueAssets, filterQuery]);
 
-  if (isLoading || !data) {
-    return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
+  if (isLoading) {
+    return (
+      <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>
+    );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
-      <div className="text-red-400 p-4 text-sm font-medium">
-        Failed to load metrics: {error.message}
+      <div className="text-red-400 p-4 text-sm font-medium" role="alert">
+        Failed to load metrics. <button className="underline" onClick={refetch}>Try again</button>
       </div>
     );
   }
 
   return (
     <div>
-      <ScrollCues className="w-full" role="region" aria-label="Scrollable metrics">
+      <ScrollCues
+        className="w-full"
+        role="region"
+        aria-label="Scrollable metrics"
+      >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <MetricCard
             isPrimary
-            icon={<img src="/icons/piggy.svg" alt="Wallet Icon" className="w-6 h-6" />}
+            icon={
+              <img
+                src="/icons/piggy.svg"
+                alt="Wallet Icon"
+                className="w-6 h-6"
+              />
+            }
             label="Available Balance"
             value={data.availableBalance}
             copyValue={data.copyAddress}
           />
           <MetricCard
-            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
+            icon={
+              <img
+                src="/icons/Icon-11.svg"
+                alt="Dollar Icon"
+                className="w-6 h-6"
+              />
+            }
             label="Total Borrowed Amount"
             value={data.borrowedAmount}
             subLabel="Next Due Payment"
             subValue={data.nextDue}
           />
           <MetricCard
-            icon={<img src="/icons/Icon-11.svg" alt="Dollar Icon" className="w-6 h-6" />}
+            icon={
+              <img
+                src="/icons/Icon-11.svg"
+                alt="Dollar Icon"
+                className="w-6 h-6"
+              />
+            }
             label={`Total Supplied (Health Factor: ${data.healthFactor})`}
             value={data.suppliedFunds}
             subLabel="Earnings from Lending"
@@ -323,7 +405,7 @@ export default function MetricsCards() {
           query={filterQuery}
           onChange={setFilterQuery}
           showing={filteredAssets.length}
-          total={allAssets.length}
+          total={uniqueAssets.length}
         />
 
         {filteredAssets.length === 0 ? (

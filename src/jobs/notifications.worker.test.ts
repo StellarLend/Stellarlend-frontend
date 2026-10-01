@@ -138,4 +138,212 @@ describe('src/jobs/notifications.worker', () => {
     expect(result.duplicate).toBe(true);
     expect(addNotificationMock).toHaveBeenCalledTimes(1);
   });
+
+  describe('input validation and adversarial scenarios', () => {
+    it('rejects payload with empty userId', async () => {
+      const payload = {
+        userId: '',
+        title: 'Welcome',
+        message: 'Test message',
+        type: 'info' as const,
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects payload with empty title', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: '',
+        message: 'Test message',
+        type: 'info' as const,
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects payload with invalid notification type', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: 'Welcome',
+        message: 'Test message',
+        type: 'invalid_type' as any,
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects payload with path traversal in notification ID', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: 'Welcome',
+        message: 'Test message',
+        type: 'info' as const,
+        id: '../../etc/passwd',
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects payload with excessively long title (potential DoS)', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: 'a'.repeat(201),
+        message: 'Test message',
+        type: 'info' as const,
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects payload with excessively long message (potential DoS)', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: 'Welcome',
+        message: 'a'.repeat(2001),
+        type: 'info' as const,
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects payload with non-string userId (type confusion)', async () => {
+      const payload = {
+        userId: 123,
+        title: 'Welcome',
+        message: 'Test message',
+        type: 'info' as const,
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+
+    it('trims whitespace from userId and title before processing', async () => {
+      const payload = {
+        userId: '  user-1  ',
+        title: '  Welcome  ',
+        message: 'Test message',
+        type: 'info' as const,
+        id: 'notif-1',
+      };
+
+      addNotificationMock.mockResolvedValue({
+        id: 'notif-1',
+        userId: 'user-1',
+        title: '  Welcome  ',
+        message: 'Test message',
+        type: 'info',
+        read: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(true);
+      expect(addNotificationMock).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({
+          id: 'notif-1',
+        }),
+      );
+    });
+
+    it('handles SQL injection attempt in notification ID gracefully', async () => {
+      const payload = {
+        userId: 'user-1',
+        title: 'Welcome',
+        message: 'Test message',
+        type: 'info' as const,
+        id: "'; DROP TABLE notifications;--",
+      };
+
+      const { handleNotificationJob } = await import('./notifications.worker');
+      const result = await handleNotificationJob(payload as any, { maxAttempts: 1, backoffMs: 0 });
+
+      expect(result.delivered).toBe(false);
+      expect(result.validationError).toBeDefined();
+      expect(addNotificationMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- #1466 additions ---
+
+  it('throws after all retry attempts are exhausted', async () => {
+    // Verifies the retry loop gives up and rethrows after maxAttempts consecutive
+    // non-duplicate failures — essential for BullMQ to mark the job as failed.
+    const payload = {
+      userId: 'user-4',
+      title: 'Final Notice',
+      message: 'All retries failed.',
+      type: 'error' as const,
+      id: 'notif-4',
+    };
+
+    const persistentError = new Error('storage unavailable');
+    addNotificationMock.mockRejectedValue(persistentError);
+
+    const { handleNotificationJob } = await import('./notifications.worker');
+
+    await expect(
+      handleNotificationJob(payload, { maxAttempts: 3, backoffMs: 0 }),
+    ).rejects.toThrow('storage unavailable');
+
+    // All three attempts must have been tried before giving up.
+    expect(addNotificationMock).toHaveBeenCalledTimes(3);
+    // The retry-warn path fires for attempts 1 and 2 (not the final throw).
+    expect(loggerWarnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns validationError and skips delivery when required fields are missing', async () => {
+    // Guards the invariant that the validation guard runs before any I/O.
+    // Since the worker now uses validateJobPayload, invalid payloads return
+    // { delivered: false, validationError } instead of throwing.
+    const { handleNotificationJob } = await import('./notifications.worker');
+
+    const result = await handleNotificationJob(
+      // Deliberately omit title, message, and type to trigger the guard.
+      { userId: 'user-5' } as Parameters<typeof handleNotificationJob>[0],
+      { maxAttempts: 3, backoffMs: 0 },
+    );
+
+    expect(result.delivered).toBe(false);
+    expect(result.validationError).toBeDefined();
+    expect(addNotificationMock).not.toHaveBeenCalled();
+  });
 });

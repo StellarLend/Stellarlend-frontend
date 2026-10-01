@@ -1,110 +1,140 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import config from '@/lib/config';
+import { safeRedirectPath } from '@/lib/security/safe-redirect';
+import { connectWallet, type StellarNetwork } from '@/lib/wallet/connectHandshake';
+import {
+  assertWalletMatchesSession,
+  validateClientSessionResponse,
+} from '@/lib/auth/session-boundary';
+
+export type WalletStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type { StellarNetwork };
+
+/**
+ * Validate a Stellar public key format. Stellar addresses are
+ * 56-character base32 strings starting with 'G'. This is the same
+ * validation that was previously only present in WalletContext.connect().
+ */
+export const isValidPublicKey = (publicKey: unknown): publicKey is string =>
+  typeof publicKey === 'string' &&
+  publicKey.length === 56 &&
+  publicKey.startsWith('G');
 
 export const useWalletConnection = () => {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [address, setAddress] = useState<string | null>(null);
+  const [status, setStatus] = useState<WalletStatus>('disconnected');
   const [error, setError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const router = useRouter();
 
-  const checkSession = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/auth/session');
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.session?.user?.walletAddress) {
-          setWalletAddress(data.session.user.walletAddress);
-        } else {
-          setWalletAddress(null);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch session:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const network: StellarNetwork =
+    config.stellar.network.toUpperCase() === 'MAINNET' ||
+    config.stellar.network.toUpperCase() === 'PUBLIC'
+      ? 'PUBLIC'
+      : 'TESTNET';
 
-  useEffect(() => {
-    checkSession();
+  const clearWalletIdentity = useCallback(() => {
+    setAddress(null);
+    sessionStorage.removeItem('walletAddress');
   }, []);
 
-  const connect = async () => {
-    setIsLoading(true);
+  const clearWalletState = useCallback(() => {
+    clearWalletIdentity();
+    setStatus('disconnected');
+  }, [clearWalletIdentity]);
+
+  // Rehydrate state on mount
+  useEffect(() => {
+    const rehydrate = async () => {
+      // Treat storage as a candidate only. The server session must confirm it
+      // before sensitive UI/actions are considered connected.
+      const storedAddress = sessionStorage.getItem('walletAddress');
+
+      // Fetch session from server to verify/sync.
+      try {
+        const response = await fetch('/api/auth/session');
+        if (response.ok) {
+          const data = await response.json();
+          const session = validateClientSessionResponse(data, network);
+          assertWalletMatchesSession(storedAddress, session.walletAddress);
+
+          if (!isValidPublicKey(session.walletAddress)) {
+            throw new Error('Invalid wallet address format');
+          }
+
+          setAddress(session.walletAddress);
+          setStatus('connected');
+          sessionStorage.setItem('walletAddress', session.walletAddress);
+        } else {
+          clearWalletState();
+        }
+      } catch (err) {
+        console.error('Failed to fetch session during rehydration:', err);
+        clearWalletState();
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    rehydrate();
+  }, [clearWalletState, network]);
+
+  const connect = useCallback(async () => {
+    if (status === 'connecting') return;
+    setStatus('connecting');
     setError(null);
+
     try {
-      const stellar = window.stellar;
-      if (!stellar) {
-        throw new Error("Stellar wallet provider (Freighter) not detected");
+      const verifiedAddress = await connectWallet(network);
+
+      if (!isValidPublicKey(verifiedAddress)) {
+        throw new Error('Invalid wallet address format');
       }
 
-      const pubKey = await stellar.getPublicKey();
-      if (!pubKey) {
-        throw new Error("No public key returned from wallet");
-      }
+      setAddress(verifiedAddress);
+      setStatus('connected');
+      sessionStorage.setItem('walletAddress', verifiedAddress);
 
-      const challengeResponse = await fetch("/api/auth/challenge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: pubKey }),
-      });
-
-      if (!challengeResponse.ok) {
-        const errData = await challengeResponse.json();
-        throw new Error(errData.error || "Failed to generate challenge");
-      }
-
-      const { transaction } = await challengeResponse.json();
-      const signedTransaction = await stellar.signTransaction(transaction, {
-        network: "TESTNET",
-      });
-
-      const verifyResponse = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transaction: signedTransaction }),
-      });
-
-      if (!verifyResponse.ok) {
-        const errData = await verifyResponse.json();
-        throw new Error(errData.error || "Verification failed");
-      }
-
-      const { walletAddress: verifiedAddress } = await verifyResponse.json();
-      setWalletAddress(verifiedAddress);
-    } catch (err: any) {
-      console.error("Wallet connection failed:", err);
-      setError(err.message || "Wallet connection failed");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const disconnect = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/auth/session", {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        setWalletAddress(null);
-      } else {
-        throw new Error("Failed to clear session");
+      const returnUrl = new URL(window.location.href).searchParams.get('returnUrl');
+      if (returnUrl) {
+        router.push(safeRedirectPath(returnUrl));
       }
     } catch (err: any) {
-      console.error("Logout failed:", err);
-      setError(err.message || "Failed to disconnect");
-    } finally {
-      setIsLoading(false);
+      console.error('Wallet connection failed:', err);
+      setError(err.message || 'Wallet connection failed');
+      setStatus('error');
+      clearWalletIdentity();
     }
-  };
+  }, [status, network, router, clearWalletIdentity]);
+
+  const disconnect = useCallback(async () => {
+    setError(null);
+    try {
+      await fetch('/api/auth/session', {
+        method: 'DELETE',
+      });
+    } catch (err: any) {
+      console.error('Logout failed during disconnect:', err);
+    } finally {
+      // Always clear local state on disconnect to ensure the user is logged out locally
+      clearWalletState();
+    }
+
+    const returnUrl = new URL(window.location.href).searchParams.get('returnUrl');
+    if (returnUrl) {
+      router.push(safeRedirectPath(returnUrl));
+    }
+  }, [clearWalletState, router]);
 
   return {
-    walletAddress,
-    isConnected: !!walletAddress,
-    isLoading,
+    address,
+    walletAddress: address,
+    network,
+    status,
     error,
+    isConnected: status === 'connected',
+    isLoading: isInitializing || status === 'connecting',
     connect,
     disconnect,
   };

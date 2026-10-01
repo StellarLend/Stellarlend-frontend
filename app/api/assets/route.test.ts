@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/assets/route';
 import { globalCache } from '@/lib/cache';
-import { getAssetSymbols } from '@/lib/assets';
+import { getAssetSymbols } from '@/lib/assets/registry';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+ ---------------------------------------------------------------------------
 
 function makeGetRequest(params: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/assets');

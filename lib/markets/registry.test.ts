@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ASSET_SYMBOLS } from '@/types/enums';
 import {
   getCollateralConfig,
   getCollateralFactor,
@@ -39,6 +40,19 @@ describe('getCollateralFactor', () => {
     expect(getCollateralFactor('USDC')).toBe(0.85);
     expect(getCollateralFactor('BTC')).toBe(0.80);
     expect(getCollateralFactor('ETH')).toBe(0.80);
+  });
+
+  it('asserts every canonical ASSET_SYMBOLS entry has a defined, sane collateral factor', () => {
+    ASSET_SYMBOLS.forEach((symbol) => {
+      const factor = getCollateralFactor(symbol);
+      expect(factor).toBeDefined();
+      expect(factor).toBeGreaterThan(0);
+      expect(factor).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('fails loudly for unrecognized assets', () => {
+    expect(() => getCollateralFactor('UNKNOWN_ASSET' as any)).toThrow(TypeError);
   });
 });
 

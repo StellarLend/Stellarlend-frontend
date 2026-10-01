@@ -97,7 +97,8 @@ export const PriceTicker: React.FC<PriceTickerProps> = ({ className }) => {
   }
 
   return (
-    <nav
+    <div
+      role="marquee"
       className={cn(
         "flex flex-wrap items-center gap-x-6 gap-y-2 text-sm",
         prefersReducedMotion ? "" : "transition-opacity duration-300",
@@ -116,7 +117,7 @@ export const PriceTicker: React.FC<PriceTickerProps> = ({ className }) => {
           <DirectionIndicator direction={data.direction} />
         </div>
       ))}
-    </nav>
+    </div>
   );
 };
 

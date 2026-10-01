@@ -4,9 +4,9 @@ This component surfaces near-due payment and collateral risk alerts at the top o
 
 ## Trigger thresholds
 
-- `critical` when a payment is due in 1 day or less, or when the health factor drops to `1.15` or below.
-- `warning` when a payment is due in 3 days or less, or when the health factor drops to `1.25` or below.
-- `info` when a payment is due in 7 days or less, or when the health factor drops to `1.35` or below.
+- `critical` when a payment is due in 1 day or less, or when the health factor reaches or falls below the critical threshold defined by `CRITICAL_HEALTH_FACTOR_THRESHOLD` in `lib/lending/health.ts`.
+- `warning` when a payment is due in 3 days or less, or when the health factor reaches or falls below the healthy threshold defined by `HEALTHY_HEALTH_FACTOR_THRESHOLD` in `lib/lending/health.ts`.
+- `info` when a payment is due in 7 days or less, or when the health factor reaches or falls below the same lending-health thresholds in `lib/lending/health.ts` for the banner’s health-based severity logic.
 
 ## Behavior
 

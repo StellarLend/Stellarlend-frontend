@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import {
   usePrices,
   loadPrices,
@@ -53,9 +53,11 @@ describe("loadPrices", () => {
 
     expect(entry.error).toBe(false);
     expect(entry.prices).toEqual({ XLM: 0.12, USDC: 1 });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/prices?assets=USDC,XLM"),
-    );
+    // The query string is percent-encoded by URLSearchParams (`,` -> %2C), so
+    // assert against the decoded URL rather than the raw serialization.
+    expect(
+      decodeURIComponent(String(vi.mocked(global.fetch).mock.calls[0][0])),
+    ).toContain("/api/prices?assets=USDC,XLM");
   });
 
   it("deduplicates concurrent requests for the same asset set", async () => {
@@ -137,6 +139,43 @@ describe("loadPrices", () => {
     expect(entry.error).toBe(true);
     expect(entry.prices).toEqual({});
   });
+
+  it("bypasses the freshness window when force is set", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        prices: { XLM: 0.12 },
+        timestamp: new Date().toISOString(),
+        source: "test",
+      }),
+    } as Response);
+
+    await loadPrices(["XLM"]);
+    await loadPrices(["XLM"]);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    await loadPrices(["XLM"], { force: true });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("still de-duplicates concurrent forced requests", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        prices: { XLM: 0.12 },
+        timestamp: new Date().toISOString(),
+        source: "test",
+      }),
+    } as Response);
+
+    const [first, second] = await Promise.all([
+      loadPrices(["XLM"], { force: true }),
+      loadPrices(["XLM"], { force: true }),
+    ]);
+
+    expect(first).toBe(second);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("isPriceCacheStale", () => {
@@ -198,5 +237,138 @@ describe("usePrices", () => {
     await waitFor(() => expect(result.current.hasError).toBe(true));
 
     expect(result.current.getPriceLabel("XLM")).toBe("Price unavailable");
+  });
+
+  it("does not refetch when re-rendered with a new-but-equivalent assets array", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        prices: { XLM: 0.12, USDC: 1 },
+        timestamp: new Date().toISOString(),
+        source: "test",
+      }),
+    } as Response);
+
+    // Passing a fresh array literal on every render is the exact scenario
+    // that used to defeat caching: `assets` in the effect's dependency array
+    // always differs by reference even when its contents are identical.
+    const { result, rerender } = renderHook(
+      ({ assets }: { assets: string[] }) => usePrices(assets),
+      { initialProps: { assets: ["XLM", "USDC"] } },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    // Drop the session + in-flight caches WITHOUT touching component state.
+    // A warm cache would mask a re-run of the effect (loadPrices would return
+    // the cached entry and never touch the network), which is exactly why the
+    // previous version of this test passed even with the bug present. Now the
+    // only thing that can trigger a second /api/prices call is the effect
+    // re-firing because an unstable `assets` reference is back in its deps.
+    resetPricesCache();
+
+    rerender({ assets: ["USDC", "XLM"] }); // same set, new order + identity
+    rerender({ assets: ["XLM", "USDC"] });
+    rerender({ assets: ["XLM", "USDC"] });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(result.current.hasError).toBe(false);
+  });
+
+  it("shares one network request between two consumers with equal symbol sets", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        prices: { XLM: 0.12, USDC: 1 },
+        timestamp: new Date().toISOString(),
+        source: "test",
+      }),
+    } as Response);
+
+    // Two independent components, each passing its own fresh array literal in
+    // a different order. They must coalesce into a single request.
+    const first = renderHook(() => usePrices(["XLM", "USDC"]));
+    const second = renderHook(() => usePrices(["USDC", "XLM"]));
+
+    await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+    await waitFor(() => expect(second.result.current.isLoading).toBe(false));
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes from the network even while the cache entry is still fresh", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          prices: { XLM: 0.12 },
+          timestamp: new Date().toISOString(),
+          source: "test",
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          prices: { XLM: 0.15 },
+          timestamp: new Date().toISOString(),
+          source: "test",
+        }),
+      } as Response);
+
+    const { result } = renderHook(() => usePrices(["XLM"]));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.getPriceLabel("XLM")).toBe("$0.12");
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(result.current.getPriceLabel("XLM")).toBe("$0.15");
+  });
+
+  it("reads the latest assets from the ref when refreshing", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        prices: { XLM: 0.12, USDC: 1 },
+        timestamp: new Date().toISOString(),
+        source: "test",
+      }),
+    } as Response);
+
+    const { result, rerender } = renderHook(
+      ({ assets }: { assets: string[] }) => usePrices(assets),
+      { initialProps: { assets: ["XLM"] } },
+    );
+
+    await waitFor(() =>
+      expect(
+        decodeURIComponent(String(vi.mocked(global.fetch).mock.calls[0][0])),
+      ).toContain("/api/prices?assets=XLM"),
+    );
+
+    // Widen the symbol set: the effect re-runs for the new key, and refresh()
+    // must follow the ref rather than the array captured on first render.
+    rerender({ assets: ["XLM", "USDC"] });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(
+      decodeURIComponent(
+        String(vi.mocked(global.fetch).mock.calls[2][0]),
+      ),
+    ).toContain("/api/prices?assets=USDC,XLM");
   });
 });

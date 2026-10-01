@@ -20,14 +20,20 @@ import { globalCache } from '@/lib/cache';
 vi.mock('@/lib/auth');
 vi.mock('@/src/jobs/snapshot.worker');
 
+// Valid Stellar testnet account IDs (StrKey-validated).
+const VALID_WALLET = 'GATTYSMDCYWYAWNJZXY2RGNHDZ7ZDEKRGJY4JOMHMDU6LANVFCI2U45X';
+const VALID_WALLET_2 = 'GC7TCOMWMSK6LPQBVXRGR3Q23VVS3ZRS7QWYBUCYH4375CG6X4I4MFSZ';
+const VALID_WALLET_3 = 'GDS2KKVQY62J2BNA3MQPQGNMVKQR6MB2OOMJBIORQSYLOJPQKOKPOHKD';
+
 describe('GET /api/positions/history', () => {
-  const testWallet = 'GBTEST123';
+  const testWallet = VALID_WALLET;
   const now = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
 
   beforeEach(() => {
     globalCache.clear();
     vi.clearAllMocks();
+    vi.mocked(auth.getUser).mockResolvedValue(createMockUser());
   });
 
   afterEach(() => {
@@ -89,6 +95,24 @@ describe('GET /api/positions/history', () => {
       expect(data.error).toBe('Unauthorized');
     });
 
+    it('returns 400 when the session wallet address is malformed', async () => {
+      vi.mocked(auth.getUser).mockResolvedValueOnce({
+        id: 'user-123',
+        email: 'test@example.com',
+        name: 'Test User',
+        walletAddress: 'GBTEST123',
+      } as any);
+
+      const request = createRequest();
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.message).toBe('Invalid wallet address');
+      // The worker must never be called with a malformed wallet identity
+      expect(snapshotWorker.getWalletSnapshots).not.toHaveBeenCalled();
+    });
+
     it('allows authenticated request with valid wallet', async () => {
       vi.mocked(auth.getUser).mockResolvedValueOnce(createMockUser());
       vi.mocked(snapshotWorker.getWalletSnapshots).mockResolvedValueOnce([]);
@@ -110,7 +134,6 @@ describe('GET /api/positions/history', () => {
       const to = now;
 
       globalCache.clear();
-      vi.clearAllMocks();
       vi.mocked(auth.getUser).mockResolvedValueOnce(createMockUser());
       vi.mocked(snapshotWorker.getWalletSnapshots).mockResolvedValueOnce([]);
 
@@ -191,7 +214,7 @@ describe('GET /api/positions/history', () => {
     });
 
     it('returns wallet address from authenticated user', async () => {
-      const wallet = 'GBCUSTOM123';
+      const wallet = VALID_WALLET_2;
       globalCache.clear();
       vi.clearAllMocks();
       vi.mocked(auth.getUser).mockResolvedValueOnce(createMockUser(wallet));
@@ -337,7 +360,7 @@ describe('GET /api/positions/history', () => {
     });
 
     it('uses wallet address in cache key', async () => {
-      const wallet1 = 'GBWALLET1';
+      const wallet1 = VALID_WALLET_3;
       const snapshots = [createMockSnapshot(now - dayMs)];
 
       globalCache.clear();

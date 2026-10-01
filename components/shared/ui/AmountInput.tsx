@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Input, InputProps } from '@/components/shared/ui/Input';
 import { cn } from '@/lib/utils/cn';

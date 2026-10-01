@@ -9,10 +9,16 @@ global.fetch = vi.fn();
 describe("DataExportButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.URL.createObjectURL = vi.fn().mockReturnValue("blob:mock-url");
+    window.URL.revokeObjectURL = vi.fn();
+    // Clear cookies
+    document.cookie = "csrf-token=; Max-Age=0; Path=/;";
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clear cookies
+    document.cookie = "csrf-token=; Max-Age=0; Path=/;";
   });
 
   it("renders button with correct text", () => {
@@ -66,18 +72,32 @@ describe("DataExportButton", () => {
     });
   });
 
-  it("shows success toast and triggers download on successful export", async () => {
+  it("shows success toast and triggers download on successful export with CSRF headers", async () => {
+    // Set CSRF cookie
+    document.cookie = "csrf-token=test-csrf-cookie-val; Path=/;";
+
     const mockCreateElement = vi.spyOn(document, "createElement");
     const mockAppendChild = vi.spyOn(document.body, "appendChild");
     const mockRemove = vi.spyOn(Element.prototype, "remove");
 
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        success: true,
-        downloadUrl: "https://example.com/export.zip",
-        expiresInSeconds: 900,
-      }),
+    // Stub dual-stage fetch
+    (global.fetch as any).mockImplementation((url: string, options?: any) => {
+      if (url === "/api/account/export") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            downloadUrl: "https://example.com/export.zip",
+            expiresInSeconds: 900,
+          }),
+        });
+      } else if (url === "https://example.com/export.zip") {
+        return Promise.resolve({
+          ok: true,
+          blob: async () => new Blob(["mock-data"], { type: "application/zip" }),
+        });
+      }
+      return Promise.reject(new Error("Unknown URL: " + url));
     });
 
     render(<DataExportButton />);
@@ -89,9 +109,26 @@ describe("DataExportButton", () => {
       expect(screen.getByText("Your data export has been downloaded successfully.")).toBeInTheDocument();
     });
 
+    // Assert CSRF token was read from cookie and appended to header
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/account/export",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "x-csrf-token": "test-csrf-cookie-val",
+        }),
+      })
+    );
+
+    // Assert second stage fetch downloaded from downloadUrl
+    expect(global.fetch).toHaveBeenCalledWith("https://example.com/export.zip");
+
+    // Assert download element trigger
     expect(mockCreateElement).toHaveBeenCalledWith("a");
     expect(mockAppendChild).toHaveBeenCalled();
     expect(mockRemove).toHaveBeenCalled();
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
 
     mockCreateElement.mockRestore();
     mockAppendChild.mockRestore();
@@ -189,6 +226,35 @@ describe("DataExportButton", () => {
     });
   });
 
+  it("shows error toast when the second stage file-blob download fails", async () => {
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url === "/api/account/export") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            downloadUrl: "https://example.com/export.zip",
+            expiresInSeconds: 900,
+          }),
+        });
+      } else {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+        });
+      }
+    });
+
+    render(<DataExportButton />);
+    const button = screen.getByRole("button", { name: /export my data/i });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Export failed")).toBeInTheDocument();
+    });
+  });
+
   it("has accessible busy state announced to screen readers", async () => {
     (global.fetch as any).mockImplementation(() => 
       new Promise(() => {}) // Never resolves
@@ -207,13 +273,23 @@ describe("DataExportButton", () => {
   });
 
   it("removes busy state after completion", async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        success: true,
-        downloadUrl: "https://example.com/export.zip",
-        expiresInSeconds: 900,
-      }),
+    // Mock successful dual-stage fetch
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url === "/api/account/export") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            downloadUrl: "https://example.com/export.zip",
+            expiresInSeconds: 900,
+          }),
+        });
+      } else {
+        return Promise.resolve({
+          ok: true,
+          blob: async () => new Blob(["mock-data"], { type: "application/zip" }),
+        });
+      }
     });
 
     render(<DataExportButton />);

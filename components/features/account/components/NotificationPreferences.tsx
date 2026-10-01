@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import Toast from "@/components/shared/common/Toast";
+import { useToast } from "@/components/shared/common/Toast";
 
 interface NotificationChannels {
   email: boolean;
@@ -10,11 +10,7 @@ interface NotificationChannels {
   inApp: boolean;
 }
 
-interface Toast {
-  variant: "success" | "error";
-  title: string;
-  description?: string;
-}
+
 
 const CHANNELS: { key: keyof NotificationChannels; label: string; description: string }[] = [
   { key: "email", label: "Email", description: "Receive notifications via email." },
@@ -27,12 +23,7 @@ export default function NotificationPreferences() {
   const [prefs, setPrefs] = useState<NotificationChannels | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast | null>(null);
-
-  const showToast = (t: Toast) => {
-    setToast(t);
-    setTimeout(() => setToast(null), 4000);
-  };
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetch("/api/account/preferences")
@@ -121,9 +112,6 @@ export default function NotificationPreferences() {
         ))}
       </ul>
 
-      {toast && (
-        <Toast variant={toast.variant} title={toast.title} description={toast.description} />
-      )}
     </div>
   );
 }

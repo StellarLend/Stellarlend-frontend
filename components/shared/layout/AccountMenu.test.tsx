@@ -45,7 +45,7 @@ describe("AccountMenu", () => {
   it("renders connected wallet trigger with truncated address", () => {
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     expect(trigger).toBeInTheDocument();
     expect(trigger).toHaveTextContent("GABCQ...5Z5A");
   });
@@ -53,22 +53,22 @@ describe("AccountMenu", () => {
   it("opens dropdown when trigger is clicked", async () => {
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     fireEvent.click(trigger);
 
     await waitFor(() => {
-      expect(screen.getByRole("menu", { name: /account options/i })).toBeInTheDocument();
+      expect(screen.getByRole("menu", { name: /connected wallet actions/i })).toBeInTheDocument();
     });
 
     expect(screen.getByText("Copy Address")).toBeInTheDocument();
     expect(screen.getByText("Account Settings")).toBeInTheDocument();
-    expect(screen.getByText("Disconnect")).toBeInTheDocument();
+    expect(screen.getByText("Disconnect Wallet")).toBeInTheDocument();
   });
 
   it("closes dropdown when Escape is pressed", async () => {
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     fireEvent.click(trigger);
 
     await waitFor(() => {
@@ -87,7 +87,7 @@ describe("AccountMenu", () => {
   it("copies address to clipboard when Copy Address is clicked", async () => {
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     fireEvent.click(trigger);
 
     await waitFor(() => {
@@ -115,7 +115,7 @@ describe("AccountMenu", () => {
 
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     fireEvent.click(trigger);
 
     await waitFor(() => {
@@ -139,14 +139,14 @@ describe("AccountMenu", () => {
 
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     fireEvent.click(trigger);
 
     await waitFor(() => {
       expect(screen.getByRole("menu")).toBeInTheDocument();
     });
 
-    const disconnectButton = screen.getByRole("menuitem", { name: /disconnect/i });
+    const disconnectButton = screen.getByRole("menuitem", { name: /disconnect wallet/i });
     fireEvent.click(disconnectButton);
 
     await waitFor(() => {
@@ -157,7 +157,7 @@ describe("AccountMenu", () => {
   it("navigates to account settings when link is clicked", async () => {
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     fireEvent.click(trigger);
 
     await waitFor(() => {
@@ -221,7 +221,7 @@ describe("AccountMenu", () => {
       </div>
     );
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     fireEvent.click(trigger);
 
     await waitFor(() => {
@@ -249,7 +249,7 @@ describe("AccountMenu", () => {
   it("focuses first menu item when opening with ArrowDown", async () => {
     render(<AccountMenu />);
 
-    const trigger = screen.getByRole("button", { name: /account menu/i });
+    const trigger = screen.getByRole("button", { name: /connected wallet/i });
     trigger.focus();
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
 

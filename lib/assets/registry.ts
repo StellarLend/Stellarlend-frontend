@@ -25,7 +25,7 @@ let registryError: Error | null = null;
  * Load and validate the asset registry at initialization
  * This is called once at boot time to ensure the registry is valid
  */
-function initializeRegistry(): void {
+export function initializeRegistry(): void {
   if (registryInstance !== null || registryError !== null) {
     return; // Already initialized
   }

@@ -21,8 +21,8 @@ function labelFor(segment: string): string {
 }
 
 function toTitleCase(s: string): string {
-  // If it looks like a UUID / numeric ID, return "Details"
-  if (/^[0-9a-f-]{8,}$/i.test(s) || /^\d+$/.test(s)) return "Details";
+  // If it looks like a UUID / numeric ID / mock TXN ID / 64-char hex hash, return "Details"
+  if (/^[0-9a-f-]{8,}$/i.test(s) || /^\d+$/.test(s) || /^txn\d+$/i.test(s)) return "Details";
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " ");
 }
 

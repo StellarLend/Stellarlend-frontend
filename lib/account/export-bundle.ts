@@ -6,6 +6,12 @@ export interface ExportDataPayload {
   notifications: any[];
 }
 
+export const exportThrottleStore = new Map<string, number>();
+
+export function resetThrottleRegistry() {
+  exportThrottleStore.clear();
+}
+
 export async function processAccountExport(payload: ExportDataPayload): Promise<string> {
   // Simulate assembling data fields into an archived ZIP buffer
   const archiveData = JSON.stringify({

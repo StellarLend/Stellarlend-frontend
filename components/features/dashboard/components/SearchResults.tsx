@@ -32,6 +32,12 @@ export interface SearchResultsProps {
   onClose?: () => void;
 
   /**
+   * Callback to retry the last search after a transient (e.g. 5xx) failure.
+   * When provided and the error is retryable, a "Try again" control is shown.
+   */
+  onRetry?: () => void;
+
+  /**
    * Callback to navigate to result (optional for testing)
    */
   onNavigate?: (path: string) => void;
@@ -108,6 +114,7 @@ const SearchResults = React.forwardRef<SearchResultsHandle, SearchResultsProps>(
       isOpen,
       onResultSelect,
       onClose,
+      onRetry,
       onNavigate,
       className = '',
       id,
@@ -315,23 +322,36 @@ const SearchResults = React.forwardRef<SearchResultsHandle, SearchResultsProps>(
     }
 
     /**
-     * Render error state
+     * Render error state (distinct from empty success — supports retry for 5xx)
      */
     if (results.state === 'error' && results.error) {
+      const canRetry = Boolean(onRetry && results.error.retryable !== false);
+
       return (
         <div
           ref={listboxRef}
+          role="alert"
+          data-testid="search-results-error"
           className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg z-50 p-4 ${className}`}
         >
           <div className="flex items-start gap-3 py-4">
             <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 Search Error
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                 {results.error.message}
               </p>
+              {canRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="mt-3 text-xs font-semibold text-[var(--New-outline,rgb(113,180,141))] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--New-outline,rgb(113,180,141))] rounded"
+                >
+                  Try again
+                </button>
+              )}
             </div>
           </div>
         </div>
