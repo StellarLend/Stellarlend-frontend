@@ -91,7 +91,7 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
   };
 
   const formatDateTime = (dateStr: string, timeStr: string) => {
-    let fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
+    const fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
     const d = new Date(dateStr + " " + fixedTime);
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
@@ -99,10 +99,9 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
       year: "numeric",
     };
     const datePart = d.toLocaleDateString("en-US", options);
-    let [h, m] = [d.getHours(), d.getMinutes()];
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12;
-    h = h ? h : 12;
+    const [rawHours, m] = [d.getHours(), d.getMinutes()];
+    const ampm = rawHours >= 12 ? "PM" : "AM";
+    const h = rawHours % 12 || 12;
     const timePart = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
     return `${datePart} ${timePart}`;
   };
