@@ -138,7 +138,11 @@ describe("InterestCalculator — error state (#1183)", () => {
     expect(screen.queryByText(/enter an amount above 0/i)).toBeNull();
   });
 
-  it("does NOT call onCalculate when calculateQuote fails", async () => {
+  it("notifies the parent with null (not a stale result) when calculateQuote fails", async () => {
+    // #1530 / invariant I2: on failure the parent must be told to clear, so it
+    // can never keep a previously-good CalculationResult that the calculator
+    // itself has rejected. Migration: this previously asserted
+    // "does NOT call onCalculate", which encoded the stale-parent bug.
     mockedCalculateQuote.mockReturnValue({
       ok: false,
       error: { code: "DIVIDE_BY_ZERO", message: "Denominator is zero." },
@@ -150,14 +154,21 @@ describe("InterestCalculator — error state (#1183)", () => {
       ({ onCalculate } = renderCalculator());
     });
 
-    expect(onCalculate).not.toHaveBeenCalled();
+    expect(onCalculate).toHaveBeenCalledWith(null);
+    // A calculation result must never be published alongside the failure.
+    expect(onCalculate).not.toHaveBeenCalledWith(
+      expect.objectContaining({ dailyEarnings: expect.any(Number) }),
+    );
   });
 
   it("shows the generic empty state when amount is 0 (no error)", async () => {
     // Pass-through to real implementation — amount 0 → early return, no call.
-    mockedCalculateQuote.mockImplementation(
-      (await import("@/lib/lending/quote")).calculateQuote,
+    // NOTE (#1530): use vi.importActual so we restore the *real* function;
+    // previously this passed the mock to itself, which recursed infinitely.
+    const actual = await vi.importActual<typeof import("@/lib/lending/quote")>(
+      "@/lib/lending/quote",
     );
+    mockedCalculateQuote.mockImplementation(actual.calculateQuote);
 
     await act(async () => {
       renderCalculator({ ...baseData, amount: 0 });
@@ -169,9 +180,11 @@ describe("InterestCalculator — error state (#1183)", () => {
 
   it("shows calculation results when calculateQuote succeeds", async () => {
     // Let the real implementation run — 1000 XLM at 10% for 30 days.
-    mockedCalculateQuote.mockImplementation(
-      (await import("@/lib/lending/quote")).calculateQuote,
+    // Use vi.importActual (see #1530 note above) instead of the mock itself.
+    const actual = await vi.importActual<typeof import("@/lib/lending/quote")>(
+      "@/lib/lending/quote",
     );
+    mockedCalculateQuote.mockImplementation(actual.calculateQuote);
 
     await act(async () => {
       renderCalculator();

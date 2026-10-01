@@ -48,7 +48,7 @@ function resolvePosition(position: TooltipProps["position"]): keyof typeof posit
  * the safest default and avoids unbounded timers.
  */
 function normalizeDelay(delay: number | undefined): number {
-  if (typeof delay !== "number" || !Number.finite(delay)) {
+  if (typeof delay !== "number" || !Number.isFinite(delay)) {
     return 0;
   }
   if (delay < 0) {
@@ -66,7 +66,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   wrapperClassName,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const timeoutRef = useRef(ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const generatedId = useId();

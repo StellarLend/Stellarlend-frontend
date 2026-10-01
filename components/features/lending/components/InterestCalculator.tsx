@@ -1,10 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LendingData, CalculationResult } from "@/lib/lending/types";
 import { calculateQuote } from "@/lib/lending/quote";
-import type { QuoteError } from "@/lib/lending/quote";
+import type { QuoteError, QuoteOutcome } from "@/lib/lending/quote";
 import { generateAmortizationSchedule } from "@/lib/lending/amortization";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";
 import { IconButton } from "@/components/atoms/IconButton/IconButton";
@@ -19,11 +19,51 @@ const AmortizationSchedule = dynamic(() => import("./AmortizationSchedule"), {
   ),
 });
 
+/**
+ * InterestCalculator — deterministic quote display for lend/borrow.
+ *
+ * Failure-path & boundary invariants (#1530):
+ *
+ * I1  Single terminal state: every calculation-effect run writes
+ *     `calculation`, `quoteError` and `schedule` together, so the render can
+ *     never observe a mix of stale and fresh values.
+ * I2  Parent sync: `onCalculate` fires on EVERY terminal transition — with the
+ *     fresh result on success and `null` when inputs are invalid or the quote
+ *     failed — so a parent (TransactionSummary/ConfirmModal) can never keep a
+ *     rejected or stale CalculationResult.
+ * I3  Validation routing: a non-finite or <= 0 amount clears to the friendly
+ *     empty state; every other invalid term (rate <= 0, NaN rate, bad
+ *     duration) surfaces as a distinct `role="alert"` error, never as a
+ *     permanently-shimmering "calculating" skeleton.
+ * I4  Exception containment: a throw from `calculateQuote` becomes a
+ *     diagnosable UNEXPECTED_ERROR alert plus a name/message-only log — the
+ *     tree never unmounts to an error boundary and no stack or input payload
+ *     reaches the DOM.
+ * I5  Callback isolation: internal state is committed before `onCalculate`
+ *     runs, and the call is guarded — a throwing parent callback cannot crash
+ *     the component or leave half-committed state.
+ * I6  Deterministic recompute: the effect re-runs only when the inputs
+ *     (`amount`, `interestRate`, `duration`, `type`) change, never when a
+ *     parent re-renders with a new inline `onCalculate` identity. Duplicate
+ *     input events are therefore no-ops.
+ * I7  Partial failure: a failed amortization schedule is logged and dropped
+ *     without blocking the loan summary render.
+ */
 interface InterestCalculatorProps {
   data: LendingData;
   type: "lend" | "borrow";
-  onCalculate: (result: CalculationResult) => void;
+  /**
+   * Fresh result on success; `null` whenever the current inputs are invalid
+   * or the quote failed (invariant I2, #1530).
+   */
+  onCalculate: (result: CalculationResult | null) => void;
 }
+
+/** Library quote errors plus the component-local contained-exception code (I4). */
+type CalculationError = {
+  code: QuoteError["code"] | "UNEXPECTED_ERROR";
+  message: string;
+};
 
 export default function InterestCalculator({
   data,
@@ -33,40 +73,111 @@ export default function InterestCalculator({
   const [calculation, setCalculation] = useState<CalculationResult | null>(
     null,
   );
-  const [quoteError, setQuoteError] = useState<QuoteError | null>(null);
+  const [quoteError, setQuoteError] = useState<CalculationError | null>(null);
   const [schedule, setSchedule] = useState<ReturnType<
     typeof generateAmortizationSchedule
   > | null>(null);
 
+  // Latest-callback ref (invariant I6): the calculation effect reads the
+  // callback through this ref so it can stay out of the dependency array and
+  // re-run only when the inputs change.
+  const onCalculateRef = useRef(onCalculate);
   useEffect(() => {
-    if (data.amount <= 0 || data.interestRate <= 0) {
+    onCalculateRef.current = onCalculate;
+  });
+
+  useEffect(() => {
+    // I1 — helpers always write the three state slots together.
+    const clear = () => {
       setCalculation(null);
       setQuoteError(null);
       setSchedule(null);
+    };
+
+    // I2 — the parent is notified of every terminal transition, including
+    // clearing, so it can never hold a stale CalculationResult.
+    const notify = (result: CalculationResult | null) => {
+      try {
+        onCalculateRef.current(result);
+      } catch (err) {
+        // I5 — a throwing parent callback must not crash the calculator.
+        // Log name + message only: no stack frames, no input payload.
+        console.error(
+          "[InterestCalculator] onCalculate callback threw:",
+          err instanceof Error
+            ? `${err.name}: ${err.message}`
+            : "unknown error",
+        );
+      }
+    };
+
+    const fail = (error: CalculationError) => {
+      clear();
+      setQuoteError(error);
+      notify(null);
+    };
+
+    // I3 — missing/non-finite principal resolves to the empty state.
+    if (!Number.isFinite(data.amount) || data.amount <= 0) {
+      clear();
+      notify(null);
       return;
     }
 
-    const outcome = calculateQuote(type, data);
+    // I4 — a thrown calculation is contained, not an app crash.
+    let outcome: QuoteOutcome;
+    try {
+      outcome = calculateQuote(type, data);
+    } catch (err) {
+      console.error(
+        "[InterestCalculator] calculateQuote threw:",
+        err instanceof Error ? `${err.name}: ${err.message}` : "unknown error",
+      );
+      fail({
+        code: "UNEXPECTED_ERROR",
+        message: "Unable to calculate — an unexpected error occurred.",
+      });
+      return;
+    }
 
     if (!outcome.ok) {
-      setCalculation(null);
-      setQuoteError(outcome.error);
-      setSchedule(null);
+      fail(outcome.error);
       return;
     }
 
+    // I7 — schedule generation is best-effort: a failure is logged and
+    // dropped without blocking the summary.
+    let nextSchedule: ReturnType<typeof generateAmortizationSchedule> | null =
+      null;
+    if (type === "borrow") {
+      try {
+        nextSchedule = generateAmortizationSchedule(data);
+        if (!nextSchedule.ok) {
+          console.warn(
+            "[InterestCalculator] amortization schedule unavailable:",
+            nextSchedule.error,
+          );
+        }
+      } catch (err) {
+        console.error(
+          "[InterestCalculator] generateAmortizationSchedule threw:",
+          err instanceof Error
+            ? `${err.name}: ${err.message}`
+            : "unknown error",
+        );
+        nextSchedule = null;
+      }
+    }
+
+    // I1/I5 — commit state before notifying the parent.
     setQuoteError(null);
     setCalculation(outcome.result);
-    onCalculate(outcome.result);
-
-    // Generate amortization schedule for borrow mode
-    if (type === "borrow") {
-      const scheduleResult = generateAmortizationSchedule(data);
-      setSchedule(scheduleResult);
-    } else {
-      setSchedule(null);
-    }
-  }, [data.amount, data.interestRate, data.duration, type, onCalculate]);
+    setSchedule(nextSchedule);
+    notify(outcome.result);
+    // `onCalculate` is read via the latest-callback ref (I6), so only the
+    // inputs are reactive dependencies.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.amount, data.interestRate, data.duration, type]);
 
   // Calculation failed with a specific error — surface it distinctly so the
   // user knows their input was rejected, not just empty.
@@ -107,8 +218,12 @@ export default function InterestCalculator({
     );
   }
 
-  // Still waiting for a first calculation result after the user typed a value.
-  if (!calculation && data.amount > 0) {
+  // Still waiting for the first calculation effect for a plausible amount.
+  // I3: non-finite amounts (NaN/Infinity) must fall through to the empty
+  // state instead of shimmering forever, and after the effect runs every
+  // finite positive amount has either a result or an error — so this
+  // skeleton only ever appears before the first calculation.
+  if (!calculation && Number.isFinite(data.amount) && data.amount > 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse h-full flex flex-col justify-center">
         <div className="h-6 bg-gray-200 rounded w-1/2 mb-6"></div>
