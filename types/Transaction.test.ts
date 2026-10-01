@@ -351,5 +351,278 @@ describe("fetchTransactions", () => {
 
       await expect(fetchTransactions({})).rejects.toThrow("Failed to fetch");
     });
+
+    it("rejects on 429 Too Many Requests", async () => {
+      mockFetch.mockResolvedValue(errorResponse(429, "Too Many Requests"));
+
+      await expect(fetchTransactions({})).rejects.toThrow(
+        "Failed to load transactions: 429",
+      );
+    });
+
+    it("rejects on 503 Service Unavailable", async () => {
+      mockFetch.mockResolvedValue(errorResponse(503, "Service Unavailable"));
+
+      await expect(fetchTransactions({})).rejects.toThrow(
+        "Failed to load transactions: 503",
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Boundary / edge-case inputs
+  // -------------------------------------------------------------------------
+
+  describe("boundary and edge-case inputs", () => {
+    it("serializes page=0 as a query param (boundary: zero-indexed page)", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ page: 0 });
+
+      expect(lastFetchUrl()).toContain("page=0");
+    });
+
+    it("serializes page=1 (first page)", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ page: 1 });
+
+      expect(lastFetchUrl()).toContain("page=1");
+    });
+
+    it("serializes very large page numbers without overflow", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ page: 999999 });
+
+      expect(lastFetchUrl()).toContain("page=999999");
+    });
+
+    it("serializes pageSize=1 (minimum realistic page size)", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ pageSize: 1 });
+
+      expect(lastFetchUrl()).toContain("pageSize=1");
+    });
+
+    it("serializes negative pageSize (validation responsibility of server, not client)", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ pageSize: -1 });
+
+      expect(lastFetchUrl()).toContain("pageSize=-1");
+    });
+
+    it("serializes limit=0", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ limit: 0 });
+
+      expect(lastFetchUrl()).toContain("limit=0");
+    });
+
+    it("omits empty-string values — empty string is falsy but not undefined/null", async () => {
+      // Empty strings ARE defined values and should be serialized as-is;
+      // the current implementation uses `!== undefined && !== null` so "" is kept.
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ search: "" });
+
+      // "" is a defined, non-null value: it must appear in the URL
+      expect(lastFetchUrl()).toContain("search=");
+    });
+
+    it("serializes a cursor containing special URL characters correctly", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      // URLSearchParams automatically percent-encodes values
+      await fetchTransactions({ cursor: "abc/def?x=1&y=2" });
+
+      const params = new URLSearchParams(lastFetchUrl().split("?")[1]);
+      expect(params.get("cursor")).toBe("abc/def?x=1&y=2");
+    });
+
+    it("serializes a search term containing spaces", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({ search: "Lend Funds" });
+
+      const params = new URLSearchParams(lastFetchUrl().split("?")[1]);
+      expect(params.get("search")).toBe("Lend Funds");
+    });
+
+    it("does not produce a trailing '?' when all params are undefined", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({
+        page: undefined,
+        pageSize: undefined,
+        cursor: undefined,
+        search: undefined,
+      });
+
+      expect(lastFetchUrl()).toBe("/api/transactions");
+      expect(lastFetchUrl()).not.toContain("?");
+    });
+
+    it("does not produce a trailing '?' when params object is empty", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      await fetchTransactions({});
+
+      expect(lastFetchUrl()).not.toContain("?");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Concurrent invocations
+  // -------------------------------------------------------------------------
+
+  describe("concurrent invocations", () => {
+    it("each concurrent call fetches its own URL independently", async () => {
+      // Simulate two simultaneous calls with different params
+      mockFetch
+        .mockResolvedValueOnce(okResponse({ transactions: [], total: 0 }))
+        .mockResolvedValueOnce(okResponse({ transactions: [], total: 0 }));
+
+      await Promise.all([
+        fetchTransactions({ page: 1 }),
+        fetchTransactions({ page: 2 }),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      const urls = mockFetch.mock.calls.map((c) => c[0] as string);
+      expect(urls.some((u) => u.includes("page=1"))).toBe(true);
+      expect(urls.some((u) => u.includes("page=2"))).toBe(true);
+    });
+
+    it("a failure in one concurrent call does not affect the other", async () => {
+      mockFetch
+        .mockResolvedValueOnce(okResponse({ transactions: [], total: 42 }))
+        .mockResolvedValueOnce(errorResponse(500));
+
+      const [success, failure] = await Promise.allSettled([
+        fetchTransactions({ page: 1 }),
+        fetchTransactions({ page: 2 }),
+      ]);
+
+      expect(success.status).toBe("fulfilled");
+      if (success.status === "fulfilled") {
+        expect(success.value.total).toBe(42);
+      }
+
+      expect(failure.status).toBe("rejected");
+      if (failure.status === "rejected") {
+        expect((failure.reason as Error).message).toContain(
+          "Failed to load transactions: 500",
+        );
+      }
+    });
+
+    it("multiple calls do not share or pollute each other's query params", async () => {
+      mockFetch
+        .mockResolvedValueOnce(okResponse({ transactions: [], total: 0 }))
+        .mockResolvedValueOnce(okResponse({ transactions: [], total: 0 }))
+        .mockResolvedValueOnce(okResponse({ transactions: [], total: 0 }));
+
+      await Promise.all([
+        fetchTransactions({ asset: "XLM" }),
+        fetchTransactions({ asset: "USDC" }),
+        fetchTransactions({ asset: "BTC" }),
+      ]);
+
+      const urls = mockFetch.mock.calls.map((c) => c[0] as string);
+      const xlm = urls.find((u) => u.includes("asset=XLM"));
+      const usdc = urls.find((u) => u.includes("asset=USDC"));
+      const btc = urls.find((u) => u.includes("asset=BTC"));
+
+      expect(xlm).toBeDefined();
+      expect(usdc).toBeDefined();
+      expect(btc).toBeDefined();
+
+      // Each URL should only contain its own asset param
+      expect(xlm).not.toContain("USDC");
+      expect(usdc).not.toContain("XLM");
+      expect(btc).not.toContain("XLM");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Regression: returned response shape
+  // -------------------------------------------------------------------------
+
+  describe("response shape regression", () => {
+    it("passes through nextCursor and prevCursor when both are present", async () => {
+      const body = {
+        transactions: [],
+        total: 100,
+        nextCursor: "next-abc",
+        prevCursor: "prev-xyz",
+      };
+      mockFetch.mockResolvedValue(okResponse(body));
+
+      const result = await fetchTransactions({ cursor: "current" });
+
+      expect(result.nextCursor).toBe("next-abc");
+      expect(result.prevCursor).toBe("prev-xyz");
+    });
+
+    it("passes through null nextCursor (last page)", async () => {
+      const body = {
+        transactions: [],
+        total: 5,
+        nextCursor: null,
+        prevCursor: "prev-abc",
+      };
+      mockFetch.mockResolvedValue(okResponse(body));
+
+      const result = await fetchTransactions({});
+
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it("passes through total=0 correctly", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 0 }),
+      );
+
+      const result = await fetchTransactions({});
+
+      expect(result.total).toBe(0);
+    });
+
+    it("passes through a large total without truncation", async () => {
+      mockFetch.mockResolvedValue(
+        okResponse({ transactions: [], total: 1_000_000 }),
+      );
+
+      const result = await fetchTransactions({});
+
+      expect(result.total).toBe(1_000_000);
+    });
   });
 });

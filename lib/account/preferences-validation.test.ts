@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { validatePreferences } from './preferences-validation';
+import {
+  validatePreferences,
+  preferencesSchema,
+  localeSchema,
+  displayCurrencySchema,
+} from './preferences-validation';
 
 describe('validatePreferences', () => {
   const validPreferences = {
@@ -78,5 +83,46 @@ describe('validatePreferences', () => {
     if (!result.success) {
       expect(Object.keys(result.errors).length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('preferencesSchema', () => {
+  it('defaults notifications when undefined', () => {
+    const parsed = preferencesSchema.parse({
+      email: 'alice@example.com',
+      locale: 'en-US',
+      displayCurrency: 'USD',
+    });
+
+    expect(parsed.notifications).toEqual({ email: true, push: true, sms: false, inApp: true });
+  });
+
+  it('defaults locale and displayCurrency when undefined', () => {
+    const parsed = preferencesSchema.parse({ email: 'alice@example.com' });
+
+    expect(parsed.locale).toBe('en-US');
+    expect(parsed.displayCurrency).toBe('USD');
+  });
+});
+
+describe('localeSchema', () => {
+  it('accepts supported locales', () => {
+    expect(localeSchema.safeParse('en-US').success).toBe(true);
+    expect(localeSchema.safeParse('de-DE').success).toBe(true);
+  });
+
+  it('rejects unsupported locales', () => {
+    expect(localeSchema.safeParse('xx-XX').success).toBe(false);
+  });
+});
+
+describe('displayCurrencySchema', () => {
+  it('accepts supported currencies', () => {
+    expect(displayCurrencySchema.safeParse('USD').success).toBe(true);
+    expect(displayCurrencySchema.safeParse('EUR').success).toBe(true);
+  });
+
+  it('rejects unsupported currencies', () => {
+    expect(displayCurrencySchema.safeParse('XYZ').success).toBe(false);
   });
 });

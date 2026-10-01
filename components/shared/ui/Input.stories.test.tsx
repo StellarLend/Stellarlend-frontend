@@ -11,34 +11,34 @@ import * as stories from "./Input.stories";
  * controls, Chromatic baselines and the Storybook URLs that docs link to. The
  * failure modes pinned down here are:
  *
- *  1. Dead wiring     - the meta points at a stale/duplicate copy of the
- *     component instead of `./Input`, so the stories document something that is
- *     not the shipped component. (Exactly how the orphan
- *     `components/Input/Input.stories.tsx` rot set in before it was removed in
- *     #1019.)
- *  2. Story drift     - a story is renamed/removed or a helper is exported, and
- *     Storybook silently renders it as a story, breaking deep links/baselines.
- *  3. Lying controls  - `argTypes` offers options the component does not support
- *     (e.g. boolean `error`, dead `loading`), so reviewers cannot trust the UI.
- *  4. Story breakage  - a story's args crash the component or render the wrong
- *     control, so the docs page/visual tests fail instead of the test suite.
- *  5. Arg boundaries  - conflicting (`error` + `helperText`) or partial
- *     (no label, unsupported `type`) args must not produce dangling ARIA
- *     references, ambiguous output or an exception.
+ * 1. Dead wiring - the meta points at a stale/duplicate copy of the
+ *    component instead of `./Input`, so the stories document something that is
+ *    not the shipped component. (Exactly how the orphan
+ *    `components/Input/Input.stories.tsx` rot set in before it was removed in
+ *    #1019.)
+ * 2. Story drift - a story is renamed/removed or a helper is exported, and
+ *    Storybook silently renders it as a story, breaking deep links/baselines.
+ * 3. Lying controls - `argTypes` offers options the component does not support
+ *    (e.g. boolean `error`, dead `loading`), so reviewers cannot trust the UI.
+ * 4. Story breakage - a story's args crash the component or render the wrong
+ *    control, so the docs page/visual tests fail instead of the test suite.
+ * 5. Arg boundaries - conflicting (`error` + `helperText`) or partial
+ *    (no label, unsupported `type`) args must not produce dangling ARIA
+ *    references, ambiguous output or an exception.
  */
 
 // The shared test renderer wraps components in `CurrencyProvider`, which fetches
 // account preferences on mount. Freeze the network so this suite stays
 // deterministic and no real request can leave the test.
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(() => new Promise<never>(() => {})));
+  vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const meta = stories.default as Meta<typeof Input>;
+const meta = stories.default as Meta;
 
 /** Pins the story inventory: renaming/removing a story is a docs-compat change. */
 const STORY_EXPORTS = [
@@ -52,12 +52,12 @@ const STORY_EXPORTS = [
 
 type StoryName = (typeof STORY_EXPORTS)[number];
 
-const story = (name: StoryName): StoryObj<typeof Input> =>
-  stories[name] as StoryObj<typeof Input>;
+const story = (name: StoryName): StoryObj =>
+  stories[name] as StoryObj;
 
 /** Renders a story the way Storybook does: meta args merged with story args. */
 const renderStory = (name: StoryName) =>
-  render(<Input {...({ ...meta.args, ...story(name).args } as InputProps)} />);
+  render(<Input {...(meta.args as InputProps)} {...(story(name).args as InputProps)} />);
 
 describe("Input stories: CSF / meta contract", () => {
   it("wires the meta to the shipped component, not a stale copy", () => {
@@ -66,7 +66,7 @@ describe("Input stories: CSF / meta contract", () => {
 
   it("keeps a stable story id (deep links and Chromatic baselines depend on it)", () => {
     expect(meta.title).toBe("Shared/UI/Input");
-    expect(meta.title).not.toMatch(/\s{2,}|^\/|\/$/);
+    expect(meta.title).not.toMatch(/\s{2,}|^\/|\/$/)
   });
 
   it("generates docs for every story", () => {
@@ -131,7 +131,7 @@ describe("Input stories: argTypes / controls contract", () => {
     const options = typeArg()?.options ?? [];
 
     for (const invalid of ["textarea", "select", "checkbox", "radio", "button"]) {
-      expect(options, `${invalid} is not an <input type>`).not.toContain(invalid);
+      expect(options, `${invalid} is not an <input>`).not.toContain(invalid);
     }
   });
 });
@@ -244,7 +244,12 @@ describe("Input stories: arg boundary and failure paths", () => {
 
   it("carries the error wiring on the textarea branch when multiline is set", () => {
     render(
-      <Input label="Bio" multiline rows={6} error="Too long" />,
+      <Input
+        label="Bio"
+        multiline
+        rows={6}
+        error="Too long"
+      />,
     );
 
     const control = screen.getByLabelText(/Bio/);
