@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Transaction } from '@/types/Transaction';
+import type { Transaction as StoredTransaction } from '@/lib/transactions/types';
 import { withRequestLogging } from '@/lib/api/handler';
 import { decodeTransactionCursor, parseCursorLimit } from '@/lib/api/cursor';
 import { withIdempotency } from '@/lib/api/idempotency';
 import { fetchTransactionRecords, filterTransactions, paginateTransactionsByCursor } from '@/lib/transactions/repository';
-import { parseTransactionParams } from '@/lib/transactions/validator';
+import { transactionQuerySchema, transactionBodySchema } from '@/lib/validation/schemas/transactions';
 
 export const runtime = 'nodejs';
 
@@ -31,19 +32,7 @@ function firstSchemaError(error: { issues: Array<{ message: string }> }): string
  */
 async function handleGetTransactions(req: NextRequest) {
   const { searchParams } = req.nextUrl;
-  const { params: validatedParams } = parseTransactionParams(searchParams);
-
-  const asset = searchParams.get('asset');
-  const type = searchParams.get('type');
-  const status = searchParams.get('status');
-  const search = searchParams.get('search');
-  const dateFrom = searchParams.get('dateFrom') ?? validatedParams.startDate;
-  const dateTo = searchParams.get('dateTo') ?? validatedParams.endDate;
-  const sortBy = parseSortBy(searchParams.get('sortBy'));
-  const sortDir = parseSortDir(searchParams.get('sortDir'));
-  const page = searchParams.has('page') ? validatedParams.page : DEFAULT_PAGE;
-  const pageSize = searchParams.has('pageSize') ? validatedParams.pageSize : DEFAULT_PAGE_SIZE;
-
+  const parsed = transactionQuerySchema.safeParse(Object.fromEntries(searchParams));
 
   if (!parsed.success) {
     return NextResponse.json({ error: firstSchemaError(parsed.error) }, { status: 400 });
@@ -75,7 +64,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const allTransactions = await fetchTransactionRecords();
-  let transactions = filterTransactions(allTransactions as any, {
+  let transactions = filterTransactions(allTransactions as StoredTransaction[], {
     search: search ?? undefined,
     status: status ?? undefined,
     dateFrom: dateFrom ?? undefined,
@@ -120,7 +109,7 @@ async function handleGetTransactions(req: NextRequest) {
   }
 
   const total = transactions.length;
-  const sorted = sortTransactions(transactions as any, sortBy, sortDir);
+  const sorted = sortTransactions(transactions as Transaction[], sortBy, sortDir);
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return NextResponse.json({ transactions: paginated, total });

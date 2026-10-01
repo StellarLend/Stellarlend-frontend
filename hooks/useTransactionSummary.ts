@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { Transaction } from '@/lib/transactions/types';
+import { fetchTransactions } from '@/types/Transaction';
+import type { FetchTransactionsOptions } from '@/types/Transaction';
+import { isTransactionStatus } from '@/types/enums';
+
+interface TransactionSummary {
+  inflow: number;
+  outflow: number;
+  net: number;
+}
 
 export function useTransactionSummary() {
   const searchParams = useSearchParams();
@@ -13,15 +21,26 @@ export function useTransactionSummary() {
     async function calculateSummary() {
       setIsLoading(true);
       try {
-        const query = searchParams.toString();
-        const response = await fetch(`/api/transactions${query ? `?${query}` : ''}`);
+        const filters: FetchTransactionsOptions = {};
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch transactions');
+        const status = searchParams.get('status');
+        const search = searchParams.get('search');
+        const dateFrom = searchParams.get('dateFrom');
+        const dateTo = searchParams.get('dateTo');
+        const type = searchParams.get('type');
+        const asset = searchParams.get('asset');
+
+        if (status && isTransactionStatus(status)) {
+          filters.status = status;
         }
+        if (search) filters.search = search;
+        if (dateFrom) filters.dateFrom = dateFrom;
+        if (dateTo) filters.dateTo = dateTo;
+        if (type) filters.type = type;
+        if (asset) filters.asset = asset;
 
-        const data = await response.json();
-        const transactions: Transaction[] = data.transactions || data;
+        const response = await fetchTransactions(filters);
+        const transactions = response.transactions;
 
         let inflow = 0;
         let outflow = 0;
@@ -34,15 +53,17 @@ export function useTransactionSummary() {
           }
         });
 
-        setSummary({
-          inflow,
-          outflow,
-          net: inflow - outflow,
-        });
+        if (!cancelled) {
+          setSummary({ inflow, outflow, net: inflow - outflow });
+        }
       } catch (error) {
-        console.error('Error fetching transaction summary:', error);
+        if (!cancelled) {
+          console.error('Error fetching transaction summary:', error);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     }
 

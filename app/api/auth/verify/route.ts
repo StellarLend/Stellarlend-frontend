@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       ipHash,
     });
 
-    return NextResponse.json({ success: true, walletAddress });
+    return response;
   } catch (error: any) {
     await appendAuditEvent({
       actorWallet: null,

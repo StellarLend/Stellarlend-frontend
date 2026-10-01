@@ -27,4 +27,7 @@ export const outboxEvents = sqliteTable('outbox_events', {
   lastError: text('lastError'),
   createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
   processedAt: integer('processedAt', { mode: 'timestamp' }),
+  // Lease timestamp for the PROCESSING claim; used to recover events left
+  // PROCESSING after a crash between claim and dispatch.
+  claimedAt: integer('claimedAt', { mode: 'timestamp' }),
 });

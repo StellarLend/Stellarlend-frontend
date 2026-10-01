@@ -18,7 +18,8 @@ interface Config {
   stellar: {
     network: string;
     horizonUrl: string;
-    sorobanRpcUrl: string;
+    // sorobanRpcUrl is intentionally absent — it is a server-only value.
+    // Use serverConfig.stellar.sorobanRpcUrl in API routes and server components.
     sorobanContractId: string;
   };
   rateLimit: {

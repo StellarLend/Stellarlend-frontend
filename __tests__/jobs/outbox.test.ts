@@ -84,12 +84,13 @@ vi.mock('bullmq', () => {
 import { Queue, Worker } from 'bullmq';
 import { db } from '@/lib/db/client';
 import { profiles, outboxEvents } from '@/lib/db/schema';
-import { profileRepository, ProfileRecord } from '@/lib/account/repository';
 import { getNotifications, clearStore as clearNotificationStore } from '@/lib/notifications/repository';
 import {
   processOutbox,
   startDispatcher,
   stopDispatcher,
+  dispatcherMetrics,
+  MAX_ATTEMPTS,
 } from '@/src/jobs/outbox-dispatcher.worker';
 import { eq } from 'drizzle-orm';
 
@@ -118,10 +119,22 @@ describe('Transactional Outbox', () => {
       timezone: 'UTC',
     };
 
-    // Run the transaction
+    // Run the transaction. Note: the profile is written to the sqlite
+    // `profiles` table directly because `profileRepository` targets the
+    // Postgres `accounts` table, which does not exist in the in-memory
+    // sqlite DB used by this test suite.
     const record = db.transaction((tx) => {
       // 1. Update the profile
-      const updatedRecord = profileRepository.upsert(userId, profileData, tx) as ProfileRecord;
+      tx.insert(profiles)
+        .values({
+          userId,
+          displayName: profileData.displayName,
+          bio: profileData.bio,
+          website: profileData.website,
+          timezone: profileData.timezone,
+          updatedAt: new Date(),
+        })
+        .run();
 
       // 2. Queue in-app notification event in the outbox
       tx.insert(outboxEvents).values({
@@ -153,15 +166,18 @@ describe('Transactional Outbox', () => {
         createdAt: new Date(),
       }).run();
 
-      return updatedRecord;
+      return { displayName: profileData.displayName };
     });
 
     expect(record.displayName).toBe('Alice Outbox');
 
     // Verify database has the profile
-    const dbProfile = await profileRepository.getByUserId(userId);
-    expect(dbProfile).not.toBeNull();
-    expect(dbProfile?.displayName).toBe('Alice Outbox');
+    const [dbProfile] = await db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.userId, userId));
+    expect(dbProfile).toBeDefined();
+    expect(dbProfile.displayName).toBe('Alice Outbox');
 
     // Verify outbox events are written
     const events = await db.select().from(outboxEvents);
@@ -303,6 +319,43 @@ describe('Transactional Outbox', () => {
     notifQueue.add = originalAdd;
   });
 
+  it('should stop retrying after the bounded retry limit is reached', async () => {
+    const userId = 'user-retry-limit-test';
+    const notifQueue = (Queue as any).instances['notification-queue'];
+    const originalAdd = notifQueue.add;
+    notifQueue.add = async () => {
+      throw new Error('Retry limit triggered');
+    };
+
+    await db.insert(outboxEvents).values({
+      id: 'evt-retry-limit',
+      type: 'notification',
+      payload: JSON.stringify({
+        userId,
+        title: 'Retry Limit',
+        message: 'This should not retry forever.',
+        type: 'warning',
+      }),
+      status: 'FAILED',
+      attempts: 3,
+      lastError: 'Retry limit triggered',
+      createdAt: new Date(),
+    });
+
+    await processOutbox();
+
+    const [dbEvent] = await db
+      .select()
+      .from(outboxEvents)
+      .where(eq(outboxEvents.id, 'evt-retry-limit'));
+
+    expect(dbEvent.status).toBe('FAILED');
+    expect(dbEvent.attempts).toBe(3);
+    expect(notifQueue.jobs).toHaveLength(0);
+
+    notifQueue.add = originalAdd;
+  });
+
   it('should process jobs through the consumers (workers)', async () => {
     const userId = 'user-worker-test';
     
@@ -434,5 +487,260 @@ describe('Transactional Outbox', () => {
 
     // Restore
     (db as any).transaction = originalTransaction;
+  });
+
+  describe('Authorization & hostile-input boundary', () => {
+    const validNotificationPayload = (overrides: Record<string, unknown> = {}) => ({
+      userId: 'user-hostile',
+      title: 'Boundary Test',
+      message: 'This payload is inspected at the dispatch boundary.',
+      type: 'info',
+      ...overrides,
+    });
+
+    async function insertEvent(overrides: Record<string, unknown> = {}) {
+      await db.insert(outboxEvents).values({
+        id: 'evt-boundary-1',
+        type: 'notification',
+        payload: JSON.stringify(validNotificationPayload()),
+        status: 'PENDING',
+        attempts: 0,
+        createdAt: new Date(),
+        ...overrides,
+      });
+    }
+
+    it('rejects malformed (non-JSON) payloads without enqueueing', async () => {
+      await insertEvent({ id: 'evt-bad-json', payload: '{not json' });
+
+      await processOutbox();
+
+      const [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-bad-json'));
+      expect(event.status).toBe('FAILED');
+      expect(event.lastError).toContain('rejected');
+      expect(event.lastError).toContain('not valid JSON');
+
+      const notifQueue = (Queue as any).instances['notification-queue'];
+      expect(notifQueue.jobs).toHaveLength(0);
+    });
+
+    it('rejects tampered payloads with unknown fields (strict schema)', async () => {
+      await insertEvent({
+        id: 'evt-tampered',
+        payload: JSON.stringify(
+          validNotificationPayload({ network: 'mainnet', chainId: 999 })
+        ),
+      });
+
+      await processOutbox();
+
+      const [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-tampered'));
+      expect(event.status).toBe('FAILED');
+      expect(event.lastError).toContain('rejected');
+      expect(event.lastError).toContain('Unrecognized keys');
+
+      const notifQueue = (Queue as any).instances['notification-queue'];
+      expect(notifQueue.jobs).toHaveLength(0);
+    });
+
+    it('rejects payloads with invalid notification type or missing identity', async () => {
+      await insertEvent({
+        id: 'evt-bad-type',
+        payload: JSON.stringify(validNotificationPayload({ type: 'malicious' })),
+      });
+      await insertEvent({
+        id: 'evt-no-user',
+        payload: JSON.stringify({ title: 'No user', message: 'x', type: 'info' }),
+      });
+
+      await processOutbox();
+
+      const [badType] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-bad-type'));
+      const [noUser] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-no-user'));
+      expect(badType.status).toBe('FAILED');
+      expect(noUser.status).toBe('FAILED');
+      expect((Queue as any).instances['notification-queue'].jobs).toHaveLength(0);
+    });
+
+    it('rejects over-sized payloads', async () => {
+      await insertEvent({
+        id: 'evt-oversized',
+        payload: JSON.stringify(validNotificationPayload({ message: 'x'.repeat(100_000) })),
+      });
+
+      await processOutbox();
+
+      const [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-oversized'));
+      expect(event.status).toBe('FAILED');
+      expect(event.lastError).toContain('exceeds');
+      expect((Queue as any).instances['notification-queue'].jobs).toHaveLength(0);
+    });
+
+    it('increments the rejection metric and never enqueues rejected events', async () => {
+      const before = dispatcherMetrics.rejected;
+      await insertEvent({ id: 'evt-metric', payload: '{broken' });
+
+      await processOutbox();
+
+      expect(dispatcherMetrics.rejected).toBe(before + 1);
+      expect((Queue as any).instances['notification-queue'].jobs).toHaveLength(0);
+    });
+  });
+
+  describe('Idempotency & crash recovery', () => {
+    it('does not dispatch the same event twice', async () => {
+      await db.insert(outboxEvents).values({
+        id: 'evt-idempotent',
+        type: 'notification',
+        payload: JSON.stringify({ userId: 'u', title: 'T', message: 'M', type: 'info' }),
+        status: 'PENDING',
+        attempts: 0,
+        createdAt: new Date(),
+      });
+
+      await processOutbox();
+      await processOutbox();
+
+      const [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-idempotent'));
+      expect(event.status).toBe('COMPLETED');
+      expect((Queue as any).instances['notification-queue'].jobs).toHaveLength(1);
+    });
+
+    it('recovers a stale PROCESSING claim whose lease expired', async () => {
+      await db.insert(outboxEvents).values({
+        id: 'evt-stale',
+        type: 'notification',
+        payload: JSON.stringify({ userId: 'u', title: 'T', message: 'M', type: 'info' }),
+        status: 'PROCESSING',
+        attempts: 0,
+        claimedAt: new Date(Date.now() - 120_000), // older than CLAIM_LEASE_MS
+        createdAt: new Date(Date.now() - 120_000),
+      });
+
+      await processOutbox();
+
+      const [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-stale'));
+      expect(event.status).toBe('COMPLETED');
+      expect((Queue as any).instances['notification-queue'].jobs).toHaveLength(1);
+    });
+
+    it('recovers PROCESSING events without a claim timestamp (legacy rows)', async () => {
+      await db.insert(outboxEvents).values({
+        id: 'evt-legacy',
+        type: 'notification',
+        payload: JSON.stringify({ userId: 'u', title: 'T', message: 'M', type: 'info' }),
+        status: 'PROCESSING',
+        attempts: 0,
+        claimedAt: null,
+        createdAt: new Date(Date.now() - 120_000),
+      });
+
+      await processOutbox();
+
+      const [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-legacy'));
+      expect(event.status).toBe('COMPLETED');
+    });
+
+    it('does not re-claim PROCESSING events with a fresh lease', async () => {
+      await db.insert(outboxEvents).values({
+        id: 'evt-fresh',
+        type: 'notification',
+        payload: JSON.stringify({ userId: 'u', title: 'T', message: 'M', type: 'info' }),
+        status: 'PROCESSING',
+        attempts: 0,
+        claimedAt: new Date(),
+        createdAt: new Date(),
+      });
+
+      await processOutbox();
+
+      const [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-fresh'));
+      expect(event.status).toBe('PROCESSING'); // lease not expired: left alone
+      expect((Queue as any).instances['notification-queue'].jobs).toHaveLength(0);
+    });
+
+    it('stops retrying an event after MAX_ATTEMPTS (bounded retries)', async () => {
+      const notifQueue = (Queue as any).instances['notification-queue'];
+      const originalAdd = notifQueue.add;
+      notifQueue.add = async () => {
+        throw new Error('redis down');
+      };
+
+      // attempts already at max - 1: one more failure exhausts the budget
+      await db.insert(outboxEvents).values({
+        id: 'evt-exhausted',
+        type: 'notification',
+        payload: JSON.stringify({ userId: 'u', title: 'T', message: 'M', type: 'info' }),
+        status: 'FAILED',
+        attempts: MAX_ATTEMPTS - 1,
+        createdAt: new Date(),
+      });
+
+      await processOutbox();
+
+      let [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-exhausted'));
+      expect(event.status).toBe('FAILED');
+      expect(event.attempts).toBe(MAX_ATTEMPTS);
+
+      // A further run must not pick it up again
+      await processOutbox();
+      [event] = await db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.id, 'evt-exhausted'));
+      expect(event.attempts).toBe(MAX_ATTEMPTS);
+
+      notifQueue.add = originalAdd;
+    });
+
+    it('rejects invalid jobs at the notification consumer boundary', async () => {
+      const notifWorker = (Worker as any).instances['notification-queue'];
+      await expect(
+        notifWorker.handler({
+          id: 'evt-consumer-bad',
+          data: { userId: '', title: '', message: '', type: 'info' },
+        })
+      ).rejects.toThrow('Invalid notification job payload');
+    });
+
+    it('rejects invalid jobs at the audit consumer boundary', async () => {
+      const auditWorker = (Worker as any).instances['audit-queue'];
+      await expect(
+        auditWorker.handler({
+          id: 'evt-audit-bad',
+          data: { userId: 42, action: '', details: {}, timestamp: 'not-a-date' },
+        })
+      ).rejects.toThrow('Invalid audit job payload');
+    });
   });
 });

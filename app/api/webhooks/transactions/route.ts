@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import {
   verifyWebhookSignature,
   validateTimestamp,
@@ -9,6 +10,35 @@ import type { WebhookPayload } from "@/lib/webhooks/types";
 import { updateTransactionStatus, getTransaction } from "@/lib/transactions/store";
 import { enqueueNotificationInBackground } from "@/lib/notifications/repository";
 import { webhookDataSchema } from "@/lib/validation/schemas/webhooks";
+import { validateMemo, resolveAccountByMemo, isStrictModeEnabled } from "@/lib/stellar/memo";
+
+/**
+ * Runtime schema for the externally-supplied `data` object of a
+ * `transaction.status_updated` webhook. Webhook payloads arrive from an
+ * external service, so we validate the shape at the boundary instead of
+ * trusting compile-time casts.
+ */
+const memoTypeSchema = z.enum([
+  "MEMO_TEXT",
+  "MEMO_ID",
+  "MEMO_HASH",
+  "MEMO_RETURN",
+]);
+
+const transactionStatusSchema = z.enum([
+  "Pending",
+  "Completed",
+  "Failed",
+]);
+
+const webhookDataSchema = z.object({
+  transaction_id: z.string().min(1),
+  status: transactionStatusSchema,
+  memo: z.string().optional(),
+  memo_type: memoTypeSchema.optional(),
+});
+
+type WebhookData = z.infer<typeof webhookDataSchema>;
 
 export const runtime = "nodejs";
 
@@ -108,7 +138,7 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const data = dataParse.data;
+  const data: WebhookData = dataParse.data;
 
   // ── 5. Validate timestamp ───────────────────────────────────────────────
   if (!validateTimestamp(payload.timestamp)) {
@@ -135,7 +165,7 @@ export async function POST(req: NextRequest) {
   const { memo, memo_type: memoType } = data;
 
   if (memo || memoType) {
-    const type = memoType ?? 'MEMO_TEXT';
+    const type: z.infer<typeof memoTypeSchema> = memoType ?? "MEMO_TEXT";
     const value = memo ?? '';
 
     // Validate format

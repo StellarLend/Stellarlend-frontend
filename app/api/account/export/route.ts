@@ -1,6 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { processAccountExport, exportThrottleStore } from '@/lib/account/export-bundle'; 
+import { processAccountExport, exportThrottleStore, resetThrottleRegistry } from '@/lib/account/export-bundle';
 import { withCsrfProtection } from '@/lib/api/handler';
+
+export { resetThrottleRegistry };
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
@@ -28,7 +30,7 @@ const postHandler = async (request: NextRequest) => {
     // In production, this would fetch real user data from the database
     const mockUserPayload = {
       userId,
-      profile: { email: user.email || "user@example.com", joinedAt: "2025-01-15" },
+      profile: { email: "user@example.com", joinedAt: "2025-01-15" },
       preferences: { darkMode: true, emailNotifications: true },
       transactions: [{ id: "tx_01", asset: "XLM", amount: 500 }],
       notifications: [{ id: "notif_01", message: "Deposit confirmed" }],

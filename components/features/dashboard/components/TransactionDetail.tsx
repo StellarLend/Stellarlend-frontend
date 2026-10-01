@@ -18,6 +18,27 @@ interface TransactionDetailProps {
   onClose: () => void;
 }
 
+/**
+ * TransactionDetail renders a modal with a transaction's core fields (always
+ * sourced from the `transaction` prop, so they render immediately) plus
+ * optional detail fields (memo, explorer link) fetched from
+ * `/api/transactions/:id`.
+ *
+ * Contract:
+ * - `transaction={null}` renders nothing.
+ * - While the detail fetch for the current `transaction.id` is in flight,
+ *   a "Loading additional details..." placeholder replaces the optional
+ *   fields; core fields remain visible throughout.
+ * - If the detail fetch fails, the error is logged and the modal keeps
+ *   showing the core fields with no optional fields (no crash, no retry).
+ * - Changing `transaction` while `isOpen` is true starts a new fetch for
+ *   the new id; the previous transaction's optional details are hidden
+ *   behind the loading placeholder for the duration of that fetch so they
+ *   never leak into the new transaction's view.
+ * - "Print Receipt" swaps the modal body for `TransactionReceipt`; "Back"
+ *   returns to this view. Closing and reopening the modal always resets
+ *   back to the detail view.
+ */
 export default function TransactionDetail({ transaction, isOpen, onClose }: TransactionDetailProps) {
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -70,7 +91,7 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
   };
 
   const formatDateTime = (dateStr: string, timeStr: string) => {
-    let fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
+    const fixedTime = timeStr.replace(/(AM|PM)$/i, " $1");
     const d = new Date(dateStr + " " + fixedTime);
     const options: Intl.DateTimeFormatOptions = {
       month: "short",
@@ -78,10 +99,9 @@ export default function TransactionDetail({ transaction, isOpen, onClose }: Tran
       year: "numeric",
     };
     const datePart = d.toLocaleDateString("en-US", options);
-    let [h, m] = [d.getHours(), d.getMinutes()];
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12;
-    h = h ? h : 12;
+    const [rawHours, m] = [d.getHours(), d.getMinutes()];
+    const ampm = rawHours >= 12 ? "PM" : "AM";
+    const h = rawHours % 12 || 12;
     const timePart = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}${ampm}`;
     return `${datePart} ${timePart}`;
   };

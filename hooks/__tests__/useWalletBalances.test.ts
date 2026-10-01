@@ -6,6 +6,15 @@ import { createElement, type ReactNode } from "react";
 import { WalletProvider } from "@/context/WalletContext";
 
 const fetchWalletBalancesMock = vi.hoisted(() => vi.fn());
+const TEST_WALLET = "GAUFVBMULU2CJRE5IGVPEOXRYZGU5YDAOSQ3UQTBM3Y7ARUPFSXZUHN5";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
 
 vi.mock("@/lib/wallet/balances", () => ({
   fetchWalletBalances: fetchWalletBalancesMock,
@@ -13,6 +22,17 @@ vi.mock("@/lib/wallet/balances", () => ({
 
 function wrapper({ children }: { children: ReactNode }) {
   return createElement(WalletProvider, null, children);
+}
+
+function sessionBody(walletAddress = TEST_WALLET) {
+  return {
+    session: {
+      active: true,
+      network: "TESTNET",
+      user: { walletAddress },
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    },
+  };
 }
 
 beforeEach(() => {
@@ -41,18 +61,17 @@ describe("useWalletBalances", () => {
     ];
     fetchWalletBalancesMock.mockResolvedValue(mockBalances);
 
-    window.sessionStorage.setItem("walletAddress", "GABCDEF1234567890");
+    window.sessionStorage.setItem("walletAddress", TEST_WALLET);
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({
-        session: { user: { walletAddress: "GABCDEF1234567890" } },
-      }),
+      json: async () => sessionBody(),
     } as Response);
 
     const { result } = renderHook(() => useWalletBalances(), { wrapper });
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      const xlmAsset = result.current.assetsWithBalances.find((a) => a.symbol === "XLM");
+      expect(xlmAsset?.balance).toBe(100);
     });
 
     const xlmAsset = result.current.assetsWithBalances.find((a) => a.symbol === "XLM");
@@ -62,17 +81,15 @@ describe("useWalletBalances", () => {
     expect(xlmAsset?.balance).toBe(100);
     expect(usdcAsset?.balance).toBe(500);
     expect(btcAsset?.balance).toBe(0);
-    expect(fetchWalletBalancesMock).toHaveBeenCalledWith("GABCDEF1234567890");
+    expect(fetchWalletBalancesMock).toHaveBeenCalledWith(TEST_WALLET);
   });
 
-  it("falls back to ASSETS when wallet disconnects", async () => {
-    window.sessionStorage.setItem("walletAddress", "GABCDEF1234567890");
+  it("falls back to ASSETS when the server rejects stale storage", async () => {
+    window.sessionStorage.setItem("walletAddress", TEST_WALLET);
     vi.mocked(fetch)
       .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          session: { user: { walletAddress: "GABCDEF1234567890" } },
-        }),
+        ok: false,
+        json: async () => ({}),
       } as Response);
 
     const { result } = renderHook(() => useWalletBalances(), { wrapper });
@@ -87,12 +104,10 @@ describe("useWalletBalances", () => {
   it("sets error when fetchWalletBalances fails", async () => {
     fetchWalletBalancesMock.mockRejectedValue(new Error("Horizon unreachable"));
 
-    window.sessionStorage.setItem("walletAddress", "GABCDEF1234567890");
+    window.sessionStorage.setItem("walletAddress", TEST_WALLET);
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({
-        session: { user: { walletAddress: "GABCDEF1234567890" } },
-      }),
+      json: async () => sessionBody(),
     } as Response);
 
     const { result } = renderHook(() => useWalletBalances(), { wrapper });
@@ -105,18 +120,16 @@ describe("useWalletBalances", () => {
   it("sets assets to zero for connected wallet with no on-chain balances", async () => {
     fetchWalletBalancesMock.mockResolvedValue([]);
 
-    window.sessionStorage.setItem("walletAddress", "GABCDEF1234567890");
+    window.sessionStorage.setItem("walletAddress", TEST_WALLET);
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: async () => ({
-        session: { user: { walletAddress: "GABCDEF1234567890" } },
-      }),
+      json: async () => sessionBody(),
     } as Response);
 
     const { result } = renderHook(() => useWalletBalances(), { wrapper });
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      expect(fetchWalletBalancesMock).toHaveBeenCalledWith(TEST_WALLET);
     });
 
     for (const asset of result.current.assetsWithBalances) {

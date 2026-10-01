@@ -3,9 +3,23 @@ import { useRouter } from 'next/navigation';
 import config from '@/lib/config';
 import { safeRedirectPath } from '@/lib/security/safe-redirect';
 import { connectWallet, type StellarNetwork } from '@/lib/wallet/connectHandshake';
+import {
+  assertWalletMatchesSession,
+  validateClientSessionResponse,
+} from '@/lib/auth/session-boundary';
 
 export type WalletStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 export type { StellarNetwork };
+
+/**
+ * Validate a Stellar public key format. Stellar addresses are
+ * 56-character base32 strings starting with 'G'. This is the same
+ * validation that was previously only present in WalletContext.connect().
+ */
+export const isValidPublicKey = (publicKey: unknown): publicKey is string =>
+  typeof publicKey === 'string' &&
+  publicKey.length === 56 &&
+  publicKey.startsWith('G');
 
 export const useWalletConnection = () => {
   const [address, setAddress] = useState<string | null>(null);
@@ -20,47 +34,51 @@ export const useWalletConnection = () => {
       ? 'PUBLIC'
       : 'TESTNET';
 
+  const clearWalletIdentity = useCallback(() => {
+    setAddress(null);
+    sessionStorage.removeItem('walletAddress');
+  }, []);
+
+  const clearWalletState = useCallback(() => {
+    clearWalletIdentity();
+    setStatus('disconnected');
+  }, [clearWalletIdentity]);
+
   // Rehydrate state on mount
   useEffect(() => {
     const rehydrate = async () => {
-      // 1. Read from sessionStorage first for immediate hydration
+      // Treat storage as a candidate only. The server session must confirm it
+      // before sensitive UI/actions are considered connected.
       const storedAddress = sessionStorage.getItem('walletAddress');
-      if (storedAddress) {
-        setAddress(storedAddress);
-        setStatus('connected');
-      }
 
-      // 2. Fetch session from server to verify/sync
+      // Fetch session from server to verify/sync.
       try {
         const response = await fetch('/api/auth/session');
         if (response.ok) {
           const data = await response.json();
-          const sessionAddress = data?.session?.user?.walletAddress;
-          if (sessionAddress) {
-            setAddress(sessionAddress);
-            setStatus('connected');
-            sessionStorage.setItem('walletAddress', sessionAddress);
-          } else {
-            // Server has no session, clear client state
-            setAddress(null);
-            setStatus('disconnected');
-            sessionStorage.removeItem('walletAddress');
+          const session = validateClientSessionResponse(data, network);
+          assertWalletMatchesSession(storedAddress, session.walletAddress);
+
+          if (!isValidPublicKey(session.walletAddress)) {
+            throw new Error('Invalid wallet address format');
           }
+
+          setAddress(session.walletAddress);
+          setStatus('connected');
+          sessionStorage.setItem('walletAddress', session.walletAddress);
         } else {
-          // If session request fails (e.g., unauthorized), clear state
-          setAddress(null);
-          setStatus('disconnected');
-          sessionStorage.removeItem('walletAddress');
+          clearWalletState();
         }
       } catch (err) {
         console.error('Failed to fetch session during rehydration:', err);
+        clearWalletState();
       } finally {
         setIsInitializing(false);
       }
     };
 
     rehydrate();
-  }, []);
+  }, [clearWalletState, network]);
 
   const connect = useCallback(async () => {
     if (status === 'connecting') return;
@@ -69,6 +87,11 @@ export const useWalletConnection = () => {
 
     try {
       const verifiedAddress = await connectWallet(network);
+
+      if (!isValidPublicKey(verifiedAddress)) {
+        throw new Error('Invalid wallet address format');
+      }
+
       setAddress(verifiedAddress);
       setStatus('connected');
       sessionStorage.setItem('walletAddress', verifiedAddress);
@@ -81,10 +104,9 @@ export const useWalletConnection = () => {
       console.error('Wallet connection failed:', err);
       setError(err.message || 'Wallet connection failed');
       setStatus('error');
-      setAddress(null);
-      sessionStorage.removeItem('walletAddress');
+      clearWalletIdentity();
     }
-  }, [status, network, router]);
+  }, [status, network, router, clearWalletIdentity]);
 
   const disconnect = useCallback(async () => {
     setError(null);
@@ -96,16 +118,14 @@ export const useWalletConnection = () => {
       console.error('Logout failed during disconnect:', err);
     } finally {
       // Always clear local state on disconnect to ensure the user is logged out locally
-      setAddress(null);
-      setStatus('disconnected');
-      sessionStorage.removeItem('walletAddress');
+      clearWalletState();
     }
 
     const returnUrl = new URL(window.location.href).searchParams.get('returnUrl');
     if (returnUrl) {
       router.push(safeRedirectPath(returnUrl));
     }
-  }, [router]);
+  }, [clearWalletState, router]);
 
   return {
     address,

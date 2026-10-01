@@ -1,9 +1,12 @@
 "use client"
-import { DisplayProfileForm, DataExportButton, PreferencesForm, AccountDeletion } from "@/components/features/account/components";
+import { usePathname } from "next/navigation";
+import { DisplayProfileForm, DataExportButton, PreferencesForm, AccountDeletion, AccountDeletionPanel } from "@/components/features/account/components";
 import Sidebar from "@/components/shared/layout/Sidebar";
 import { PageHeader } from "@/components/shared/common";
 
 export default function Account() {
+  const pathname = usePathname();
+
   return (
     <div className="bg-gray-50 min-h-screen p-4 md:p-6 lg:p-8">
       <div className="flex flex-col md:flex-row gap-6 max-w-6xl mx-auto">
@@ -28,6 +31,9 @@ export default function Account() {
               </div>
               <div className="mt-8 pt-6 border-t border-red-100">
                 <AccountDeletion />
+              </div>
+              <div className="mt-8 pt-6 border-t border-red-100">
+                <AccountDeletionPanel />
               </div>
             </>
           )}

@@ -105,7 +105,7 @@ describe('Transaction lifecycle integration (build → sign → submit)', () => 
       // 1st call: build RPC → returns unsigned XDR
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ result: { transaction: UNSIGNED_XDR_FIXTURE } }),
+          JSON.stringify({ jsonrpc: '2.0', id: 'build-request', result: { transaction: UNSIGNED_XDR_FIXTURE } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
@@ -301,7 +301,7 @@ describe('Transaction lifecycle integration (build → sign → submit)', () => 
   it('propagates a build RPC error correctly (no submit should occur)', async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({ error: { code: 400, message: 'bad sequence' } }),
+        JSON.stringify({ jsonrpc: '2.0', id: 'build-request', error: { code: 400, message: 'bad sequence' } }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     );
@@ -333,7 +333,7 @@ describe('Transaction lifecycle integration (build → sign → submit)', () => 
       // build RPC succeeds
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ result: { transaction: UNSIGNED_XDR_FIXTURE } }),
+          JSON.stringify({ jsonrpc: '2.0', id: 'build-request', result: { transaction: UNSIGNED_XDR_FIXTURE } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
@@ -393,7 +393,7 @@ describe('Transaction lifecycle integration (build → sign → submit)', () => 
       // build RPC
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ result: { transaction: UNSIGNED_XDR_FIXTURE } }),
+          JSON.stringify({ jsonrpc: '2.0', id: 'build-request', result: { transaction: UNSIGNED_XDR_FIXTURE } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )

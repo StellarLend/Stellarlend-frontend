@@ -12,65 +12,92 @@ export interface ProfileRecord {
 }
 
 export interface ProfileRepository {
-    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null>;
+    getByUserId(userId: string, tx?: any): Promise<ProfileRecord | null>;
 
     upsert(
         userId: string,
         data: Omit<ProfileRecord, "userId" | "updatedAt">,
         tx?: any
-    ): ProfileRecord | Promise<ProfileRecord>;
+    ): Promise<ProfileRecord>;
 }
 
 const ANONYMIZED_MARKER = '[deleted]';
 
 class DrizzleProfileRepository implements ProfileRepository {
-    getByUserId(userId: string, tx?: any): ProfileRecord | null | Promise<ProfileRecord | null> {
+    async getByUserId(userId: string, tx?: any): Promise<ProfileRecord | null> {
         const client = tx || db;
-        const query = client
+        const [result] = await client
             .select()
             .from(profiles)
             .where(eq(profiles.userId, userId))
             .limit(1);
-
-        if (tx) {
-            const results = query.all();
-            return results[0] ?? null;
-        } else {
-            return query.then((results: any[]) => results[0] ?? null);
-        }
+        return result ?? null;
     }
 
     upsert(
         userId: string,
         data: Omit<ProfileRecord, "userId" | "updatedAt">,
         tx?: any
-    ): ProfileRecord | Promise<ProfileRecord> {
-        const client = tx || db;
-        const query = client
-            .insert(profiles)
-            .values({
+    ): Promise<ProfileRecord> | ProfileRecord {
+        if (tx) {
+            const existing = tx.select().from(profiles).where(eq(profiles.userId, userId)).limit(1).get?.() ?? null;
+            const updatedAt = new Date();
+
+            if (existing) {
+                tx
+                    .update(profiles)
+                    .set({
+                        displayName: data.displayName,
+                        bio: data.bio,
+                        website: data.website,
+                        timezone: data.timezone,
+                        updatedAt,
+                    })
+                    .where(eq(profiles.userId, userId))
+                    .run();
+
+                return {
+                    userId,
+                    ...data,
+                    updatedAt,
+                } as ProfileRecord;
+            }
+
+            tx.insert(profiles).values({
                 userId,
                 ...data,
-                updatedAt: new Date(),
-            })
-            .onConflictDoUpdate({
-                target: profiles.userId,
-                set: {
-                    displayName: data.displayName,
-                    bio: data.bio,
-                    website: data.website,
-                    timezone: data.timezone,
-                    updatedAt: new Date(),
-                },
-            })
-            .returning();
+                updatedAt,
+            }).run();
 
-        if (tx) {
-            const results = query.all();
-            return results[0];
-        } else {
-            return query.then((results: any[]) => results[0]);
+            return {
+                userId,
+                ...data,
+                updatedAt,
+            } as ProfileRecord;
         }
+
+        return (async () => {
+            const client = db;
+            const [result] = await client
+                .insert(profiles)
+                .values({
+                    userId,
+                    ...data,
+                    updatedAt: new Date(),
+                })
+                .onConflictDoUpdate({
+                    target: profiles.userId,
+                    set: {
+                        displayName: data.displayName,
+                        bio: data.bio,
+                        website: data.website,
+                        timezone: data.timezone,
+                        updatedAt: new Date(),
+                    },
+                })
+                .returning();
+            return result;
+        })();
     }
 
     async anonymizeByUserId(userId: string): Promise<boolean> {

@@ -27,6 +27,7 @@ import {
   SnapshotHistoryResponse,
 } from '@/lib/positions/snapshot';
 import { getWalletSnapshots } from '@/src/jobs/snapshot.worker';
+import { isAccountId } from '@/lib/validation/stellar';
 
 export const runtime = 'nodejs';
 
@@ -49,6 +50,19 @@ async function handlePositionHistory(request: NextRequest): Promise<NextResponse
   const user = await getUser();
   if (!user || !user.walletAddress) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Ownership/invariant check: the wallet identity comes from the server
+  // session, never from client state. Reject a malformed session wallet
+  // instead of trusting it.
+  if (!isAccountId(user.walletAddress)) {
+    logger.error('authenticated user has invalid wallet address', '/api/positions/history', {
+      userId: user.id,
+    });
+    return NextResponse.json(
+      { error: 'Bad Request', message: 'Invalid wallet address' },
+      { status: 400 }
+    );
   }
 
   try {

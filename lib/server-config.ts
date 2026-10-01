@@ -28,8 +28,8 @@ interface ServerConfig {
   db: {
     url: string;
   };
-  sentry?: {
-    dsn?: string;
+  sentry: {
+    dsn: string;
   };
 }
 
@@ -37,7 +37,7 @@ function normalizeUrl(url: string): string {
   return url.trim().replace(/\/+$/, '');
 }
 
-function parseHorizonUrls(rawValue?: string): string[] {
+export function parseHorizonUrls(rawValue?: string): string[] {
   const rawList = rawValue?.trim() || "";
   const urls = rawList
     .split(",")
