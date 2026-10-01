@@ -347,7 +347,7 @@ describe('Session Store: Integration scenarios', () => {
     expect(getRevocationStoreSize()).toBe(1);
 
     // Stats reflect the revocation
-    let stats = getRevocationStats();
+    const stats = getRevocationStats();
     expect(stats.totalRevocations).toBeGreaterThan(0);
 
     // Can check the same token again

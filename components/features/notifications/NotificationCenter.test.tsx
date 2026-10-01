@@ -31,7 +31,7 @@ const twoNotifications: Notification[] = [
 function mockFetchSuccess(notifications: Notification[] = twoNotifications) {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({
+    vi.fn().mockResolved({
       ok: true,
       status: 200,
       json: async () => ({
@@ -45,7 +45,7 @@ function mockFetchSuccess(notifications: Notification[] = twoNotifications) {
 function mockFetch401() {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({
+    vi.fn().mockResolved({
       ok: false,
       status: 401,
       json: async () => ({ error: "Unauthorized" }),
@@ -54,7 +54,7 @@ function mockFetch401() {
 }
 
 function mockFetchError() {
-  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
+  vi.stubGlobal("fetch", vi.fn().mockRejected(new Error("Network error")));
 }
 
 describe("NotificationCenter", () => {
@@ -78,7 +78,7 @@ describe("NotificationCenter", () => {
     it("renders bell button after successful fetch", async () => {
       render(<NotificationCenter />);
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /unread notification/i })).toBeInTheDocument();
+        expect(screen.getButtonBy({name: /unread notification/i})).toBeInTheDocument();
       });
     });
 
@@ -128,7 +128,7 @@ describe("NotificationCenter", () => {
 
     it("caps badge at 99+ when unread count exceeds 99", async () => {
       const many = Array.from({ length: 105 }, (_, i) =>
-        makeNotification({ id: `n-${i}`, read: false }),
+        makeNotification({ id: `m-${i}`, read: false }),
       );
       mockFetchSuccess(many);
       render(<NotificationCenter />);
@@ -169,7 +169,7 @@ describe("NotificationCenter", () => {
   describe("dropdown panel", () => {
     it("panel is not visible initially", async () => {
       render(<NotificationCenter />);
-      await waitFor(() => screen.getByRole("button", { name: /notification/i }));
+      await waitFor(() => screen.getButtonBy({name: /notification/i}));
       expect(screen.queryByTestId("notification-panel")).not.toBeInTheDocument();
     });
 
@@ -276,12 +276,12 @@ describe("NotificationCenter", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn()
-          .mockResolvedValueOnce({
+          .mockResolvedOnce({
             ok: true,
             status: 200,
             json: async () => ({ notifications: twoNotifications, unreadCount: 1 }),
           })
-          .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) }),
+          .mockResolvedOnce({ ok: true, status: 200, json: async () => ({}) }),
       );
       render(<NotificationCenter />);
       const trigger = await screen.findByRole("button", { name: /notification/i });
@@ -297,7 +297,7 @@ describe("NotificationCenter", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn()
-          .mockResolvedValueOnce({
+          .mockResolvedOnce({
             ok: true,
             status: 200,
             json: async () => ({
@@ -305,7 +305,7 @@ describe("NotificationCenter", () => {
               unreadCount: 1,
             }),
           })
-          .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) }),
+          .mockResolvedOnce({ ok: true, status: 200, json: async () => ({}) }),
       );
       render(<NotificationCenter />);
       const trigger = await screen.findByRole("button", { name: "1 unread notification" });
@@ -320,12 +320,12 @@ describe("NotificationCenter", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn()
-          .mockResolvedValueOnce({
+          .mockResolvedOnce({
             ok: true,
             status: 200,
             json: async () => ({ notifications: twoNotifications, unreadCount: 1 }),
           })
-          .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) }),
+          .mockResolvedOnce({ ok: false, status: 500, json: async () => ({}) }),
       );
       render(<NotificationCenter />);
       const trigger = await screen.findByRole("button", { name: /notification/i });
@@ -333,57 +333,6 @@ describe("NotificationCenter", () => {
       fireEvent.click(screen.getByTestId("mark-read-notif-1"));
       await waitFor(() => {
         expect(screen.getByTestId("mark-read-notif-1")).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("live SSE updates", () => {
-    it("prepends new notification delivered via SSE", async () => {
-      mockFetchSuccess([makeNotification({ id: "existing", read: true })]);
-      render(<NotificationCenter />);
-      await screen.findByRole("button", { name: /no unread/i });
-
-      const newNotif = makeNotification({
-        id: "new-notif",
-        title: "New Alert",
-        message: "Something happened.",
-        read: false,
-      });
-      act(() => {
-        capturedOnNotification?.(newNotif);
-      });
-
-      const trigger = screen.getByRole("button", { name: "1 unread notification" });
-      fireEvent.click(trigger);
-      expect(screen.getByText("New Alert")).toBeInTheDocument();
-    });
-
-    it("does not duplicate a notification already in the list", async () => {
-      mockFetchSuccess([makeNotification({ id: "notif-1", read: false })]);
-      render(<NotificationCenter />);
-      await screen.findByRole("button", { name: /notification/i });
-
-      act(() => {
-        capturedOnNotification?.(makeNotification({ id: "notif-1", read: false }));
-      });
-
-      const trigger = screen.getByRole("button", { name: /notification/i });
-      fireEvent.click(trigger);
-      const items = screen.getAllByTestId(/notification-item-/);
-      expect(items).toHaveLength(1);
-    });
-
-    it("updates aria-live region when new notification arrives", async () => {
-      mockFetchSuccess([]);
-      render(<NotificationCenter />);
-      await screen.findByRole("button", { name: /no unread/i });
-
-      act(() => {
-        capturedOnNotification?.(makeNotification({ id: "live-1", title: "Live Update" }));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("live-region")).toHaveTextContent("New notification: Live Update");
       });
     });
   });

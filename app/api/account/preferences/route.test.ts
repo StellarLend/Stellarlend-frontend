@@ -5,6 +5,7 @@ import { NextRequest } from "next/server";
 import { GET, PUT } from "@/app/api/account/preferences/route";
 import { preferencesRepository } from "@/lib/account/preferences-repository";
 import { signToken, getAuthUser } from "@/lib/auth";
+import jwt from "jsonwebtoken";
 import { validatePreferences } from "@/lib/account/preferences-validation";
 
 const USER = { id: "user-1", email: "alice@example.com" };
@@ -52,7 +53,6 @@ describe("lib/auth – getAuthUser (preferences)", () => {
   });
 
   test("returns null when JWT payload lacks sub or email fields", () => {
-    const jwt = require("jsonwebtoken");
     const badToken = jwt.sign(
       { foo: "bar" },
       process.env.JWT_SECRET ?? "dev-secret-change-in-production"
