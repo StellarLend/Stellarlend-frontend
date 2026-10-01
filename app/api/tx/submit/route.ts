@@ -157,6 +157,15 @@ export async function POST(request: NextRequest) {
       return rpcFailure();
     }
 
+    await appendAuditEvent({
+      actorWallet: walletAddress || null,
+      action: 'tx.submit',
+      resource: 'soroban.transaction',
+      status: 'success',
+      requestId,
+      ipHash,
+    });
+
     return NextResponse.json(
       { status: 'submitted', hash: submission.hash },
       { status: 200 },
