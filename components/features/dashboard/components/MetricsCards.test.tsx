@@ -47,31 +47,28 @@ describe("MetricsCards", () => {
   });
 
   describe("error state", () => {
-    it("renders fallback '—' cards on network error", async () => {
+    it("shows a retryable error on network failure", async () => {
       global.fetch = vi.fn(() => Promise.reject(new Error("Network error")));
       render(<MetricsCards />);
-      const cards = await screen.findAllByRole("heading", { level: 3 });
-      expect(cards).toHaveLength(3);
-      cards.forEach((card) => expect(card.textContent).toBe("—"));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load metrics.");
+      expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy();
     });
 
-    it("renders fallback '—' cards on non-ok response", async () => {
+    it("shows a retryable error on non-ok response without exposing server details", async () => {
       mockFetch({}, false);
       render(<MetricsCards />);
-      const cards = await screen.findAllByRole("heading", { level: 3 });
-      cards.forEach((card) => expect(card.textContent).toBe("—"));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load metrics.");
+      expect(screen.queryByText(/Internal Server Error/)).toBeNull();
     });
-  });
 
-  describe("zero / empty positions", () => {
-    it("falls back to '$0.00' placeholders when fields are missing", async () => {
-      mockFetch({});
+    it("rejects malformed JSON and permits a successful retry", async () => {
+      global.fetch = vi.fn()
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ healthFactor: Infinity }) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(MOCK_DATA) }) as any;
       render(<MetricsCards />);
-      const cards = await screen.findAllByRole("heading", { level: 3 });
-      expect(cards).toHaveLength(3);
-      expect(cards[0].textContent).toBe("$0.00");
-      expect(cards[1].textContent).toBe("$0.00");
-      expect(cards[2].textContent).toBe("$0.00");
+      const retry = await screen.findByRole("button", { name: /try again/i });
+      fireEvent.click(retry);
+      expect(await screen.findByText("$3,750.00 XLM")).toBeTruthy();
     });
   });
 
