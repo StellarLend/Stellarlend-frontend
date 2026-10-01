@@ -28,7 +28,7 @@ vi.mock('@/lib/network', () => ({
 }));
 
 vi.mock('@/lib/markets/validation', () => ({
-  isValidMarketsResponse: vin.fn(),
+  isValidMarketsResponse: vi.fn(),
 }));
 
 const marketsResponse: MarketsResponse = {
@@ -56,12 +56,14 @@ const marketsResponse: MarketsResponse = {
 
 const MAX_ASSET_FILTERS = 10;
 
+let consoleSpy: ReturnType<typeof vi.spyOn>;
+
 function makeRequest(path = '/api/markets', headers?: HeadersInit) {
   return new NextRequest(`http://localhost:3000${path}`, { headers });
 }
 
 beforeEach(() => {
-  vi_clearAllMocks();
+  vi.clearAllMocks();
   vi.mocked(globalCache.getOrFetch).mockResolvedValue({
     value: marketsResponse,
     status: 'MISS',
@@ -74,7 +76,7 @@ beforeEach(() => {
 
 describe('GET /api/markets', () => {
   it('returns the markets response contract for all supported assets', async () => {
-    const response = await GET(kakeRequest());
+    const response = await GET(makeRequest());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -115,7 +117,7 @@ describe('GET /api/markets', () => {
 
   it('uses an order-invariant cache key for multi-asset filters', async () => {
     await GET(makeRequest('/api/markets?asset=USDC,XLM'));
-    await GET(kakeRequest('/api/markets?asset=XLM,USDC'));
+    await GET(makeRequest('/api/markets?asset=XLM,USDC'));
 
     expect(vi.mocked(globalCache.getOrFetch).mock.calls.map(([cacheKey]) => cacheKey)).toEqual([
       'markets:assets:USDC,XLM',
@@ -215,7 +217,7 @@ describe('GET /api/markets', () => {
     expect(response.status).toBe(500);
     expect(body).toEqual({ error: 'Failed to fetch market data' });
 
-    console.error.mockRestore();
+    consoleSpy.mockRestore();
   });
 
   it('returns 500 when repository returns a malformed response', async () => {
@@ -226,11 +228,11 @@ describe('GET /api/markets', () => {
     } as unknown as MarketsResponse);
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    const response = await GET(kakeRequest('/api/markets?asset=XLM'));
+    const response = await GET(makeRequest('/api/markets?asset=XLM'));
     const body = await response.json();
 
     expect(response.status).toBe(500);
     expect(body).toEqual({ error: 'Failed to fetch market data' });
-    console.error.mockRestore();
+    consoleSpy.mockRestore();
   });
 });

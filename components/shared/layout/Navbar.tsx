@@ -180,12 +180,14 @@ const Header = ({
 
           <div className="hidden md:flex text-white space-x-4">
             <button
+              type="button"
               onClick={() => handleNavigate(targetLendingPath)}
               className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             >
               Launch app
             </button>
             <button
+              type="button"
               onClick={() => handleNavigate(targetLendingPath)}
               className="bg-[#15A350] text-white px-3 py-2 rounded-sm hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             >
@@ -195,6 +197,7 @@ const Header = ({
 
           {/* Mobile Menu Button */}
           <button
+            type="button"
             className="md:hidden p-2 ml-auto rounded-md hover:bg-gray-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             onClick={toggleMenu}
             aria-label={isMenuOpen ? "Close menu" : "Open menu"}
@@ -226,12 +229,14 @@ const Header = ({
             </div>
             <div className="flex flex-col w-fit text-white space-y-4">
               <button
+                type="button"
                 onClick={() => handleMobileNavigate(targetLendingPath)}
                 className="px-3 py-2 rounded-sm hover:border hover:border-[#15A350] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               >
                 Launch app
               </button>
               <button
+                type="button"
                 onClick={() => handleMobileNavigate(targetLendingPath)}
                 className="bg-[#15A350] text-white px-3 py-2 rounded-sm hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#15A350] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               >

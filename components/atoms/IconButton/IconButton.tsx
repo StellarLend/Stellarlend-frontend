@@ -106,6 +106,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                 type="button"
                 disabled={isDisabled}
                 aria-disabled={isDisabled}
+                aria-busy={loading || undefined}
                 aria-label={ariaLabel}
                 aria-describedby={describedBy}
                 onClick={onClick}

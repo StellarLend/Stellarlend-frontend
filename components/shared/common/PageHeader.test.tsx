@@ -4,6 +4,8 @@ import { describe, it, expect } from "vitest";
 import { PageHeader } from "./PageHeader";
 
 describe("PageHeader", () => {
+  // ─── Happy-path (existing coverage) ─────────────────────────────────────────
+
   it("renders the title as a level 1 heading by default", () => {
     render(<PageHeader title="Dashboard" />);
 
@@ -85,5 +87,112 @@ describe("PageHeader", () => {
   it("merges the consumer-provided className onto the root", () => {
     render(<PageHeader title="Page" className="custom-class" />);
     expect(screen.getByRole("banner").className).toContain("custom-class");
+  });
+
+  // ─── Failure-path & boundary coverage ────────────────────────────────────────
+
+  it("omits aria-describedby on banner when description is absent", () => {
+    render(<PageHeader title="No Desc" />);
+    const banner = screen.getByRole("banner");
+    // aria-describedby must not be present (or must be undefined) when no description
+    expect(banner).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("derives id correctly from a title with multiple consecutive spaces", () => {
+    render(<PageHeader title="  Spaced   Title  " />);
+    const heading = screen.getByRole("heading", { name: /spaced/i });
+    // multiple whitespace sequences replaced by single dash each
+    expect(heading.getAttribute("id")).toMatch(/^page-header-/);
+    expect(heading.getAttribute("id")).not.toContain(" ");
+  });
+
+  it("derives id correctly from a title with uppercase characters", () => {
+    render(<PageHeader title="My DASHBOARD" />);
+    const heading = screen.getByRole("heading", { name: "My DASHBOARD" });
+    expect(heading).toHaveAttribute("id", "page-header-my-dashboard");
+  });
+
+  it("renders with an empty className prop without breaking layout classes", () => {
+    render(<PageHeader title="Clean" className="" />);
+    const banner = screen.getByRole("banner");
+    expect(banner.className).toContain("mb-8");
+  });
+
+  it("renders actions wrapper only when actions prop is provided", () => {
+    const { rerender, container } = render(<PageHeader title="No Actions" />);
+    // No actions → no extra wrapper div
+    expect(container.querySelectorAll("div").length).toBeGreaterThanOrEqual(1);
+    const withoutActions = container.querySelectorAll("div").length;
+
+    rerender(<PageHeader title="With Actions" actions={<button>Act</button>} />);
+    const withActions = container.querySelectorAll("div").length;
+    expect(withActions).toBeGreaterThan(withoutActions);
+  });
+
+  it("renders multiple actions in the slot without error", () => {
+    render(
+      <PageHeader
+        title="Multi"
+        actions={
+          <>
+            <button type="button">Action A</button>
+            <button type="button">Action B</button>
+          </>
+        }
+      />
+    );
+    expect(screen.getByRole("button", { name: "Action A" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Action B" })).toBeInTheDocument();
+  });
+
+  it("explicit id override propagates correctly to description id", () => {
+    render(<PageHeader title="Override" id="my-override" description="some desc" />);
+    const descEl = screen.getByText("some desc");
+    expect(descEl).toHaveAttribute("id", "my-override-description");
+    expect(screen.getByRole("banner")).toHaveAttribute("aria-describedby", "my-override-description");
+  });
+
+  it("re-renders with different props without stale ids or content", () => {
+    const { rerender } = render(<PageHeader title="First" description="First desc" />);
+    rerender(<PageHeader title="Second" description="Second desc" />);
+    expect(screen.getByRole("heading", { name: "Second" })).toHaveAttribute(
+      "id",
+      "page-header-second"
+    );
+    expect(screen.getByText("Second desc")).toBeInTheDocument();
+    expect(screen.queryByText("First desc")).toBeNull();
+  });
+
+  it("switching from description to no description removes the paragraph", () => {
+    const { rerender, container } = render(<PageHeader title="Toggle" description="Visible" />);
+    expect(container.querySelector("p")).not.toBeNull();
+    rerender(<PageHeader title="Toggle" />);
+    expect(container.querySelector("p")).toBeNull();
+  });
+
+  it("root element has role=banner for landmark accessibility", () => {
+    render(<PageHeader title="Landmark" />);
+    expect(screen.getByRole("banner")).toBeInTheDocument();
+  });
+
+  it("heading is always connected to banner via aria-labelledby", () => {
+    render(<PageHeader title="Connected" />);
+    const banner = screen.getByRole("banner");
+    const heading = screen.getByRole("heading", { name: "Connected" });
+    expect(banner).toHaveAttribute("aria-labelledby", heading.getAttribute("id"));
+  });
+
+  it("applies both default and additional className without duplicating base classes", () => {
+    render(<PageHeader title="Class Test" className="extra-a extra-b" />);
+    const cls = screen.getByRole("banner").className;
+    expect(cls).toContain("extra-a");
+    expect(cls).toContain("extra-b");
+    expect(cls).toContain("mb-8");
+  });
+
+  it("renders h1 by default when as prop is omitted", () => {
+    render(<PageHeader title="Default Tag" />);
+    const heading = screen.getByRole("heading", { name: "Default Tag" });
+    expect(heading.tagName).toBe("H1");
   });
 });

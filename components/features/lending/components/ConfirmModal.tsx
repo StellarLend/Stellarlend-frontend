@@ -34,9 +34,15 @@ export default function ConfirmModal({
   const [submitMessage, setSubmitMessage] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useFocusTrap(dialogRef, { isActive: isOpen, onEscape: onClose });
+  const handleClose = () => {
+    if (isConfirming) return;
+    onClose();
+  };
+
+  useFocusTrap(dialogRef, { isActive: isOpen, onEscape: handleClose });
 
   useEffect(() => {
     if (isOpen) {
@@ -44,6 +50,7 @@ export default function ConfirmModal({
       setSubmitMessage("");
       setHasAgreed(false);
       setIsTermsOpen(false);
+      setIsConfirming(false);
     }
   }, [isOpen]);
 
@@ -80,6 +87,7 @@ export default function ConfirmModal({
 
   const handleConfirm = async () => {
     if (!hasAgreed) return;
+    if (isConfirming) return;
 
     setIsConfirming(true);
     setSubmitStatus("idle");
@@ -88,7 +96,11 @@ export default function ConfirmModal({
       await onConfirm();
       setSubmitStatus("success");
       setSubmitMessage("Transaction confirmed successfully!");
-      timeoutRef.current = setTimeout(onClose, 2000);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        timeoutRef.current = null;
+        onClose();
+      }, 2000);
     } catch (err) {
       setSubmitStatus("error");
       setSubmitMessage("Transaction failed. Please try again.");
@@ -111,7 +123,7 @@ export default function ConfirmModal({
           {/* Background overlay */}
           <div
             className="fixed inset-0 transition-opacity motion-reduce:transition-none bg-gray-500 bg-opacity-75"
-            onClick={onClose}
+            onClick={handleClose}
           />
 
           {/* Modal */}
@@ -133,7 +145,7 @@ export default function ConfirmModal({
               </h3>
               <button
                 ref={closeButtonRef}
-                onClick={onClose}
+                onClick={handleClose}
                 className="text-gray-400 hover:text-gray-600 transition-colors motion-reduce:transition-none p-1 rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
                 aria-label="Close modal"
               >
@@ -451,6 +463,7 @@ export default function ConfirmModal({
                 />
                 <span className="text-sm text-gray-700">
                   I understand and agree to the{" "}
+                  {/* terms and conditions link fixed */}
                   <button
                     type="button"
                     onClick={() => setIsTermsOpen(true)}
@@ -473,13 +486,14 @@ export default function ConfirmModal({
             {/* Action Buttons */}
             <div className="flex space-x-3">
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
                 disabled={isConfirming}
               >
                 Cancel
               </button>
               <button
+                ref={confirmButtonRef}
                 onClick={handleConfirm}
                 disabled={!hasAgreed || isConfirming}
                 className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition-all duration-200 ${
