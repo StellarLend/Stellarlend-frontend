@@ -267,6 +267,53 @@ describe("BorrowingForm Component", () => {
     );
   });
 
+  it("handles submission failure safely", async () => {
+    const errorSubmit = vi.fn().mockRejectedValue(new Error("Network Error"));
+    render(
+      <BorrowingForm initialData={mockInitialData} onSubmit={errorSubmit} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Amount to Borrow/i), {
+      target: { value: "10" },
+    });
+
+    const submitButton = screen.getByText(/Review Loan Request/i);
+    fireEvent.click(submitButton);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByText(/Network Error/i),
+    ).toBeInTheDocument();
+  });
+
+  it("prevents double submission while submitting", async () => {
+    let resolveSubmit: (value: void | PromiseLike<void>) => void;
+    const slowSubmit = vi.fn(() => new Promise<void>((resolve) => {
+      resolveSubmit = resolve;
+    }));
+    render(
+      <BorrowingForm initialData={mockInitialData} onSubmit={slowSubmit} />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Amount to Borrow/i), {
+      target: { value: "10" },
+    });
+
+    const submitButton = screen.getByText(/Review Loan Request/i);
+    fireEvent.click(submitButton);
+    fireEvent.click(submitButton);
+
+    expect(slowSubmit).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSubmit!();
+      await Promise.resolve();
+    });
+  });
+
   describe("cross-asset collateral", () => {
     it("uses AssetSelector for a distinct collateral asset", () => {
       render(
