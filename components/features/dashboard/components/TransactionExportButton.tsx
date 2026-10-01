@@ -4,14 +4,31 @@ import React, { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { useToast } from "@/components/shared/common/Toast";
 import { serializeTransactionFilters } from "@/lib/transactions/filters";
-import type { TransactionFilters } from "@/lib/transactions/types";
+import type { TransactionStatus } from "@/lib/transactions/types";
+
+/**
+ * Export filter view-model.
+ *
+ * All fields are optional so existing callers keep working unchanged. The
+ * serializer consumes `dateFrom`/`dateTo`, which mirror the URL's
+ * `fromDate`/`toDate` query params; `type` and `asset` are forwarded so the
+ * CSV honours exactly the filters the table is showing.
+ */
+export interface TransactionExportFilters {
+  status?: TransactionStatus | "All";
+  type?: string;
+  asset?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
 
 interface TransactionExportButtonProps {
-  filters: TransactionFilters;
+  filters: TransactionExportFilters;
   className?: string;
 }
 
-function buildExportUrl(filters: TransactionFilters): string {
+function buildExportUrl(filters: TransactionExportFilters): string {
   const params = serializeTransactionFilters({
     asset: filters.asset,
     type: filters.type,

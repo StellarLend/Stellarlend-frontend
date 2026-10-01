@@ -243,6 +243,40 @@ describe("POST /api/webhooks/transactions – payload validation", () => {
     expect(json.error).toMatch(/Invalid JSON/i);
   });
 
+  it("returns 400 for malformed data.memo_type", async () => {
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12346",
+        status: "Completed",
+        memo: "hello",
+        memo_type: "MEMO_INVALID",
+      },
+    });
+    const res = await POST(makeSignedRequest(payload));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/memo_type/);
+  });
+
+  it("returns 400 when data.memo is not a string", async () => {
+    const payload = makePayload({
+      data: {
+        transaction_id: "TXN12346",
+        status: "Completed",
+        memo: 12345,
+        memo_type: "MEMO_TEXT",
+      },
+    });
+    const res = await POST(makeSignedRequest(payload));
+    expect(res.status).toBe(400);
+
+    const body = await res.json();
+    expect(body.error).toMatch(/Malformed webhook payload/i);
+    expect(body.error).toMatch(/memo/);
+  });
+
   it("returns 400 for unsupported event type", async () => {
     const payload = makePayload({ event: "unknown.event" });
     const res = await POST(makeSignedRequest(payload));
