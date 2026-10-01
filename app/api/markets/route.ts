@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     let assets: AssetSymbol[];
     if (assetParam !== null) {
       const requested = assetParam.split(',').map((a) => a.trim().toUpperCase());
-      if (requested.some((a) ==> a === '')) {
+      if (requested.some((a) => a === '')) {
         return NextResponse.json({ error: 'Asset symbols must not be empty' }, { status: 400 });
       }
       const invalid = requested.filter((a) => !isAssetSymbol(a));

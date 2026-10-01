@@ -134,7 +134,7 @@ const NotificationCenter = () => {
           className="text-gray-700 dark:text-gray-300"
         >
           <path
-            d="M22 20H2V18H3V11.0314C3 6.04348 7.02944 2 12 2C16.9706 2 21 6.04348 21 11.0314V18H22V20ZM9.5 21H14.5C14.5 22.3807 13.3807 23.5 12 23.5C10.6193 23.5 9.5 22.3807 9.5 21Z"
+            d="M22 20H2V10H3V11.0314C3 6.04348 7.02944 2 12 2C16.9706 2 21 6.04348 21 11.0314V18H22V20ZM9.5 21H14.5C14.5 22.3807 13.3807 23.5 12 23.5C10.6193 23.5 9.5 22.3807 9.5 21Z"
             fill="currentColor"
           />
         </svg>
@@ -192,7 +192,7 @@ const NotificationCenter = () => {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span
-                      className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide ${typeColors[n.type]}`}
+                      className={`block text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide ${typeColors[n.type]}`}
                     >
                       {n.type}
                     </span>

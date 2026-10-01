@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils/cn";
 import ConfirmModal from "./ConfirmModal";
 import StatusAnnouncer from "@/components/shared/common/StatusAnnouncer";
 
-export interface SupplyPosition extends HookSupplyPosition {}
+export type SupplyPosition = HookSupplyPosition;
 
 interface WithdrawFormProps {
   onSubmit: (data: LendingData) => void;

@@ -334,8 +334,10 @@ export default function MetricsCards() {
     );
   }, [uniqueAssets, filterQuery]);
 
-  if (isLoading) {
-    return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
+  if (isLoading || !data) {
+    return (
+      <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>
+    );
   }
 
   if (error || !data) {

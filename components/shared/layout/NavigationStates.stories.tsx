@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, within } from "storybook/test";
 import NavLink from "./NavLink";
 import { NavigationMenu } from "./NavigationMenu";
 
@@ -16,13 +17,39 @@ export const NavLinkStates: StoryObj = {
       {/* Active — forced via isActive prop so story works outside Next.js router */}
       <NavLink href="/dashboard" isActive>Active link</NavLink>
       {/* Inactive */}
-      <NavLink href="/settings">Inactive link</NavLink>
+      <NavLink href="/settings" isActive={false}>Inactive link</NavLink>
       {/* Focus-visible — use :focus-visible pseudo in browser devtools or Tab key */}
       <NavLink href="/focus-demo" className="[&:focus-visible]:ring-2 [&:focus-visible]:ring-[#15A350]">
         Focus-visible (Tab to me)
       </NavLink>
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const activeLink = canvas.getByRole("link", { name: "Active link" });
+    const inactiveLink = canvas.getByRole("link", { name: "Inactive link" });
+    const focusLink = canvas.getByRole("link", { name: "Focus-visible (Tab to me)" });
+
+    expect(activeLink).toHaveAttribute("aria-current", "page");
+    expect(inactiveLink).not.toHaveAttribute("aria-current");
+    expect(focusLink.className).toContain("focus-visible:ring-2");
+  },
+};
+
+/** Invalid destinations are rejected instead of rendering an unsafe link. */
+export const NavLinkInvalidHref: StoryObj = {
+  render: () => (
+    <div>
+      <p>Invalid destinations are omitted.</p>
+      <NavLink href="">Invalid link</NavLink>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    expect(canvas.getByText("Invalid destinations are omitted.")).toBeInTheDocument();
+    expect(canvas.queryAllByRole("link")).toHaveLength(0);
+  },
 };
 
 /** NavigationMenu with a pre-selected active path */
@@ -33,6 +60,39 @@ export const NavigationMenuStates: StoryObj = {
       <NavigationMenu visibleLinks={["Dashboard", "Loan", "Transactions", "Settings"]} />
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const navigation = canvas.getByRole("navigation", { name: "Main navigation" });
+
+    expect(within(navigation).getAllByRole("link")).toHaveLength(4);
+    expect(within(navigation).getByRole("link", { name: "Transactions" })).toBeInTheDocument();
+  },
+};
+
+/** An empty filter produces a valid, empty navigation list. */
+export const NavigationMenuEmpty: StoryObj = {
+  render: () => <NavigationMenu visibleLinks={[]} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const navigation = canvas.getByRole("navigation", { name: "Main navigation" });
+
+    expect(within(navigation).queryAllByRole("listitem")).toHaveLength(0);
+  },
+};
+
+/** Duplicate and unknown names cannot create duplicate or unintended links. */
+export const NavigationMenuDuplicateAndUnknown: StoryObj = {
+  render: () => (
+    <NavigationMenu visibleLinks={["Dashboard", "Dashboard", "Unknown destination"]} />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const navigation = canvas.getByRole("navigation", { name: "Main navigation" });
+
+    expect(within(navigation).getAllByRole("link")).toHaveLength(1);
+    expect(within(navigation).getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
+    expect(within(navigation).queryByRole("link", { name: "Unknown destination" })).toBeNull();
+  },
 };
 
 /** Token reference card */
@@ -59,4 +119,10 @@ export const TokenReference: StoryObj = {
       <div className="text-gray-500 mt-1">minTouchTarget: 44 px (py-3.5)</div>
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    expect(canvas.getByText(/focusRing \/ activeText \/ indicatorBar/)).toBeInTheDocument();
+    expect(canvas.getByText(/minTouchTarget: 44 px/)).toBeInTheDocument();
+  },
 };
