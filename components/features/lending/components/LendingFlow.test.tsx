@@ -64,8 +64,15 @@ describe('LendingFlow - success paths', () => {
 
   it('renders InterestCalculator with valid data', () => {
     const onCalculate = vi.fn();
-    render(<InterestCalculator data={mockData} type="lend" onCalculate={onCalculate} />);
-    expect(screen.getByText(/8.5/)).toBeDefined();
+    const { container } = render(<InterestCalculator data={mockData} type="lend" onCalculate={onCalculate} />);
+    // #1530: assert a real invariant — a valid quote renders the summary and
+    // publishes a result (the old /8.5/ text assertion matched nothing the
+    // component ever renders).
+    expect(screen.getByText(/earnings summary/i)).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/NaN|Infinity/);
+    expect(onCalculate).toHaveBeenCalledWith(
+      expect.objectContaining({ dailyEarnings: expect.any(Number) }),
+    );
   });
 
   it('renders TransactionSummary with valid calculation', () => {
@@ -93,8 +100,14 @@ describe('LendingFlow - boundary cases', () => {
 
   it('renders InterestCalculator with boundary max values', () => {
     const onCalculate = vi.fn();
-    render(<InterestCalculator data={boundaryData} type="lend" onCalculate={onCalculate} />);
-    expect(screen.getByText(/100/)).toBeDefined();
+    const { container } = render(<InterestCalculator data={boundaryData} type="lend" onCalculate={onCalculate} />);
+    // #1530: boundary input must settle into a display-safe state — no crash,
+    // no non-finite numbers in the output (the old /100/ assertion matched
+    // nothing the component ever renders).
+    expect(
+      screen.queryByRole('alert') ?? screen.queryByText(/earnings summary/i),
+    ).not.toBeNull();
+    expect(container.textContent).not.toMatch(/NaN|Infinity/);
   });
 });
 

@@ -33,6 +33,10 @@ export default defineConfig({
       NEXT_PUBLIC_STELLAR_NETWORK: 'testnet',
       NEXT_PUBLIC_STELLAR_HORIZON_URL: 'https://horizon-testnet.stellar.org',
       NEXT_PUBLIC_SOROBAN_RPC_URL: 'https://soroban-testnet.stellar.org',
+      // Required by lib/configValidation.ts (min 1 char, no default). Without
+      // it every suite that imports lib/config dies at import time with a
+      // ZodError instead of running the tests (#1530).
+      NEXT_PUBLIC_SOROBAN_CONTRACT_ID: 'CATESTCONTRACT00000000000000000000000000000000000000000000',
       API_RATE_LIMIT_MAX: '100',
       API_RATE_LIMIT_WINDOW_MS: '60000',
       TX_ACCOUNT_RATE_LIMIT_MAX: '30',

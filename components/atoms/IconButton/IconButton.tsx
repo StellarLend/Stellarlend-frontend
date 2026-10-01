@@ -51,6 +51,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         {
             className,
             children,
+            // Destructure aria-label so it is always present in the rendered
+            // element even when the consumer provides it via spread.
             "aria-label": ariaLabel,
             "aria-describedby": ariaDescribedBy,
             tooltip,
@@ -59,10 +61,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
             loading = false,
             disabled,
             onClick,
-            tooltip,
-            // Destructure aria-label so it is always present in the rendered
-            // element even when the consumer provides it via spread.
-            "aria-label": ariaLabel,
             onKeyDown: callerOnKeyDown,
             ...props
         },
@@ -100,6 +98,11 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                     "icon-only controls are otherwise unusable with assistive technology.",
             );
         }
+
+        const handleKeyDown = (
+            e: React.KeyboardEvent<HTMLButtonElement>,
+        ) => {
+            if (isDisabled) return;
 
             if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
@@ -150,7 +153,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
-                        aria-hidden="true"
                         focusable="false"
                     >
                         <circle

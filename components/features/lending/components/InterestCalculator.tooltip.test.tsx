@@ -44,8 +44,10 @@ test("renders help icons with tooltips", async () => {
   const helpIcon = await screen.findAllByLabelText("Help");
   expect(helpIcon.length).toBeGreaterThan(0);
 
-  // Hover over first help icon to show tooltip
-  fireEvent.mouseOver(helpIcon[0]);
+  // Hover the Daily Earnings help icon (index 1 — index 0 is the card header
+  // "Earnings Summary" tooltip) and expect its tooltip copy. (#1530: the
+  // header tooltip was added later, shifting icon order.)
+  fireEvent.mouseOver(helpIcon[1]);
   const tooltip = await screen.findByText(
     "Estimated earnings per day based on APR and amount.",
   );
