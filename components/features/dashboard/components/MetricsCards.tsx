@@ -227,7 +227,7 @@ function AssetCard({ asset }: { asset: AssetMetadata }) {
   );
 }
 
-// ── Positions data types and hook ─────────────────────────────────────────────
+// ── Positions data types and helper ─────────────────────────────────────────────
 
 interface PositionsData {
   availableBalance: string;
@@ -261,12 +261,9 @@ function isPositionsData(value: unknown): value is PositionsData {
   );
 }
 
-function usePositionsData(): {
-  data: PositionsData | null;
-  isLoading: boolean;
-  error: Error | null;
-  refetch: () => Promise<void>;
-} {
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function MetricsCards() {
   const [data, setData] = useState<PositionsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -298,13 +295,8 @@ function usePositionsData(): {
     };
   }, [fetchData]);
 
-  return { data, isLoading, error, refetch: fetchData };
-}
+  const refetch = fetchData;
 
-// ── Main component ─────────────────────────────────────────────────────────────
-
-export default function MetricsCards() {
-  const { data, isLoading, error, refetch } = usePositionsData();
   const [filterQuery, setFilterQuery] = useState("");
 
   const allAssets = useMemo(() => {
