@@ -16,6 +16,7 @@ import type { OutboxPayload } from '@/lib/validation/outbox';
 const ROUTE = 'jobs/outbox-dispatcher';
 
 const MAX_OUTBOX_RETRY_ATTEMPTS = 3;
+const VALID_OUTBOX_TYPES = new Set(['notification', 'audit']);
 
 // Redis connection options (pulled from environment)
 const connection = {
