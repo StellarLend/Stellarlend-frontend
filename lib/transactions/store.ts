@@ -1,5 +1,5 @@
 import type { Transaction } from "@/types/Transaction";
-import type { TransactionStatus } from "@/types/enums";
+import { isAssetSymbol, isTransactionStatus, type TransactionStatus } from "@/types/enums";
 import { db } from "@/lib/db";
 import { transactions as transactionsTable } from "@/lib/db/schema/transactions";
 import { eq } from "drizzle-orm";
@@ -19,6 +19,25 @@ const inMemoryStore = new Map<string, Transaction>(
 
 const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
 
+export function mapTransactionRow(row: any): Transaction {
+  if (!isAssetSymbol(row.asset)) {
+    throw new Error(`Invalid transaction asset: ${String(row.asset)}`);
+  }
+  if (!isTransactionStatus(row.status)) {
+    throw new Error(`Invalid transaction status: ${String(row.status)}`);
+  }
+  
+  return {
+    id: row.id,
+    type: row.type,
+    amount: row.amount,
+    asset: row.asset,
+    date: row.date,
+    time: row.time,
+    status: row.status,
+  };
+}
+
 /** Retrieve a single transaction by ID. */
 export async function getTransaction(
   id: string,
@@ -35,15 +54,7 @@ export async function getTransaction(
 
     if (!row) return inMemoryStore.get(id);
 
-    return {
-      id: row.id,
-      type: row.type,
-      amount: row.amount,
-      asset: row.asset,
-      date: row.date,
-      time: row.time,
-      status: row.status,
-    };
+    return mapTransactionRow(row);
   } catch {
     return inMemoryStore.get(id);
   }
@@ -78,15 +89,7 @@ export async function updateTransactionStatus(
       return mem;
     }
 
-    return {
-      id: row.id,
-      type: row.type,
-      amount: row.amount,
-      asset: row.asset,
-      date: row.date,
-      time: row.time,
-      status: row.status,
-    };
+    return mapTransactionRow(row);
   } catch {
     const mem = inMemoryStore.get(id);
     if (!mem) return null;
