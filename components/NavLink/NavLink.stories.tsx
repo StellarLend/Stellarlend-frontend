@@ -34,6 +34,11 @@ export const Active: Story = {
   args: {
     href: "/dashboard",
     children: "Dashboard",
+    isActive: true,
+  },
+  play: async ({ canvasElement }) => {
+    const link = canvasElement.querySelector("a");
+    expect(link).toHaveAttribute("aria-current", "page");
   },
   parameters: { docs: { storyDescription: "Current route indicator" } },
 };
@@ -61,35 +66,49 @@ export const Focus: Story = {
   parameters: { pseudo: { focus: true } },
 };
 
-export const Disabled: Story = {
+export const InactiveOverride: Story = {
   args: {
-    href: "/admin",
-    children: "Admin",
+    href: "/markets",
+    children: "Markets",
+    isActive: false,
   },
   play: async ({ canvasElement }) => {
     const link = canvasElement.querySelector("a");
-    expect(link).toHaveAttribute("aria-disabled", "true");
+    expect(link).not.toHaveAttribute("aria-current");
   },
 };
 
-export const Loading: Story = {
+export const InvalidHref: Story = {
   args: {
-    href: "/data",
-    children: "Analytics",
+    href: "",
+    children: "Unavailable",
   },
   play: async ({ canvasElement }) => {
-    const spinner = canvasElement.querySelector('[role="status"]');
-    expect(spinner).toBeInTheDocument();
+    expect(canvasElement.querySelector("a")).toBeNull();
   },
 };
 
-export const Error: Story = {
+export const HashLink: Story = {
   args: {
-    href: "/broken",
-    children: "Broken Link",
+    href: "#features",
+    children: "Features",
   },
-  parameters: {
-    docs: { storyDescription: "Route failed to load or is unreachable" },
+  play: async ({ canvasElement }) => {
+    const link = canvasElement.querySelector("a");
+    expect(link).toHaveAttribute("href", "#features");
+  },
+};
+
+export const DuplicateHref: Story = {
+  render: () => (
+    <div className="flex flex-col gap-1">
+      <NavLink href="/markets">Markets</NavLink>
+      <NavLink href="/markets">Markets overview</NavLink>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const links = canvasElement.querySelectorAll('a[href="/markets"]');
+    expect(links).toHaveLength(2);
   },
 };
 
@@ -114,11 +133,13 @@ export const SidebarGroup: Story = {
 export const StateMatrix: Story = {
   render: () => (
     <div className="flex flex-col gap-2 w-48">
-      <NavLink href="/a">Default</NavLink>
-      <NavLink href="/b">Active</NavLink>
-      <NavLink href="/c">Disabled</NavLink>
-      <NavLink href="/d">Loading</NavLink>
-      <NavLink href="/e">Error</NavLink>
+      <NavLink href="/markets" isActive={false}>
+        Inactive
+      </NavLink>
+      <NavLink href="/markets" isActive>
+        Active
+      </NavLink>
+      <NavLink href="#features">Hash link</NavLink>
     </div>
   ),
 };

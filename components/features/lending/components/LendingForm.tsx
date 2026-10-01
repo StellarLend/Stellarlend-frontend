@@ -8,6 +8,8 @@ import Button from "@/components/shared/ui/Button";
 import { cn } from "@/lib/utils/cn";
 import { useWalletBalances } from "@/hooks/useWalletBalances";
 import AssetSelector from "@/components/shared/ui/AssetSelector";
+// WalletGate is imported once here and wraps the submit button further down, so
+// the "Review Lending Offer" action stays gated behind a connected wallet.
 import { WalletGate } from "@/components/shared/ui/WalletGate";
 import { AmountInput } from "@/components/shared/ui/AmountInput";
 import { Tooltip } from "@/components/atoms/Tooltip/Tooltip";

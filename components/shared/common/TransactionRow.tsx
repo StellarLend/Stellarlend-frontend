@@ -18,7 +18,7 @@ export const rowRenderCounts = new Map<string, number>();
 export const mobileRowRenderCounts = new Map<string, number>();
 
 export const formatDateTime = (date: string, time: string) => {
-  let fixedTime = time.replace(/(AM|PM)$/i, " $1");
+  const fixedTime = time.replace(/(AM|PM)$/i, " $1");
   const d = new Date(date + " " + fixedTime);
 
   // date for month
@@ -30,10 +30,9 @@ export const formatDateTime = (date: string, time: string) => {
 
   // date for hours and minites
   const dateStr = d.toLocaleDateString("en-US", options);
-  let [h, m] = [d.getHours(), d.getMinutes()];
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12;
-  h = h ? h : 12;
+  const [rawHours, m] = [d.getHours(), d.getMinutes()];
+  const ampm = rawHours >= 12 ? "PM" : "AM";
+  const h = rawHours % 12 || 12;
 
   // time
   const timeStr = `${h.toString().padStart(2, "0")}:${m

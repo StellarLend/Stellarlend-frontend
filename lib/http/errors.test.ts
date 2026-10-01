@@ -5,6 +5,7 @@ import {
   NetworkError,
   RetryExhaustedError,
   TimeoutError,
+  UpstreamError,
   UpstreamHttpError,
 } from "./errors";
 
@@ -18,6 +19,7 @@ describe("HttpError hierarchy", () => {
       cause,
     );
 
+    expect(error).toBeInstanceOf(HttpError);
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("HttpError");
     expect(error.message).toBe("Failed to parse response");
@@ -26,10 +28,21 @@ describe("HttpError hierarchy", () => {
     expect(error.cause).toBe(cause);
   });
 
+  it("defaults status and cause to undefined when omitted", () => {
+    const error = new HttpError("NETWORK_ERROR", "Something went wrong");
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error.message).toBe("Something went wrong");
+    expect(error.code).toBe("NETWORK_ERROR");
+    expect(error.status).toBeUndefined();
+    expect(error.cause).toBeUndefined();
+  });
+
   it("constructs TimeoutError with timeout details and the HttpError prototype chain", () => {
     const error = new TimeoutError("https://rpc.example.com", 5_000);
 
     expect(error).toBeInstanceOf(HttpError);
+    expect(error).toBeInstanceOf(TimeoutError);
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("TimeoutError");
     expect(error.message).toBe(
@@ -45,6 +58,7 @@ describe("HttpError hierarchy", () => {
     const error = new NetworkError("https://rpc.example.com", cause);
 
     expect(error).toBeInstanceOf(HttpError);
+    expect(error).toBeInstanceOf(NetworkError);
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("NetworkError");
     expect(error.message).toBe(
@@ -55,10 +69,20 @@ describe("HttpError hierarchy", () => {
     expect(error.cause).toBe(cause);
   });
 
+  it("preserves an HttpError cause on NetworkError", () => {
+    const cause = new HttpError("HTTP_ERROR", "upstream exploded", 500);
+    const error = new NetworkError("https://rpc.example.com", cause);
+
+    expect(error.cause).toBe(cause);
+    expect(error.status).toBeUndefined();
+    expect((error.cause as HttpError).status).toBe(500);
+  });
+
   it("constructs UpstreamHttpError with its status and the HttpError prototype chain", () => {
     const error = new UpstreamHttpError("https://rpc.example.com", 503);
 
     expect(error).toBeInstanceOf(HttpError);
+    expect(error).toBeInstanceOf(UpstreamHttpError);
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("UpstreamHttpError");
     expect(error.message).toBe("Upstream https://rpc.example.com returned 503");
@@ -76,6 +100,7 @@ describe("HttpError hierarchy", () => {
     );
 
     expect(error).toBeInstanceOf(HttpError);
+    expect(error).toBeInstanceOf(RetryExhaustedError);
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("RetryExhaustedError");
     expect(error.message).toBe(
@@ -84,5 +109,49 @@ describe("HttpError hierarchy", () => {
     expect(error.code).toBe("RETRY_EXHAUSTED");
     expect(error.status).toBe(503);
     expect(error.cause).toBe(lastError);
+  });
+
+  it("propagates an undefined status when the last error has none", () => {
+    const lastError = new NetworkError(
+      "https://rpc.example.com",
+      new Error("connect ECONNREFUSED"),
+    );
+    const error = new RetryExhaustedError(
+      "https://rpc.example.com",
+      2,
+      lastError,
+    );
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error.status).toBeUndefined();
+    expect(error.cause).toBe(lastError);
+    expect(error.message).toBe(
+      "All 2 attempts failed for https://rpc.example.com: Network error fetching https://rpc.example.com",
+    );
+  });
+
+  it("keeps subclasses distinct from one another", () => {
+    const timeout = new TimeoutError("https://rpc.example.com", 1_000);
+    const network = new NetworkError(
+      "https://rpc.example.com",
+      new Error("boom"),
+    );
+    const upstream = new UpstreamHttpError("https://rpc.example.com", 500);
+
+    expect(timeout).not.toBeInstanceOf(NetworkError);
+    expect(timeout).not.toBeInstanceOf(UpstreamHttpError);
+    expect(network).not.toBeInstanceOf(TimeoutError);
+    expect(network).not.toBeInstanceOf(UpstreamHttpError);
+    expect(upstream).not.toBeInstanceOf(TimeoutError);
+    expect(upstream).not.toBeInstanceOf(NetworkError);
+  });
+
+  it("re-exports HttpError as UpstreamError", () => {
+    expect(UpstreamError).toBe(HttpError);
+
+    const error = new UpstreamError("TIMEOUT", "timed out");
+    expect(error).toBeInstanceOf(HttpError);
+    expect(error).toBeInstanceOf(UpstreamError);
+    expect(error.name).toBe("HttpError");
   });
 });
