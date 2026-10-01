@@ -301,4 +301,49 @@ describe('src/jobs/notifications.worker', () => {
       expect(addNotificationMock).not.toHaveBeenCalled();
     });
   });
+
+  // --- #1466 additions ---
+
+  it('throws after all retry attempts are exhausted', async () => {
+    // Verifies the retry loop gives up and rethrows after maxAttempts consecutive
+    // non-duplicate failures — essential for BullMQ to mark the job as failed.
+    const payload = {
+      userId: 'user-4',
+      title: 'Final Notice',
+      message: 'All retries failed.',
+      type: 'error' as const,
+      id: 'notif-4',
+    };
+
+    const persistentError = new Error('storage unavailable');
+    addNotificationMock.mockRejectedValue(persistentError);
+
+    const { handleNotificationJob } = await import('./notifications.worker');
+
+    await expect(
+      handleNotificationJob(payload, { maxAttempts: 3, backoffMs: 0 }),
+    ).rejects.toThrow('storage unavailable');
+
+    // All three attempts must have been tried before giving up.
+    expect(addNotificationMock).toHaveBeenCalledTimes(3);
+    // The retry-warn path fires for attempts 1 and 2 (not the final throw).
+    expect(loggerWarnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns validationError and skips delivery when required fields are missing', async () => {
+    // Guards the invariant that the validation guard runs before any I/O.
+    // Since the worker now uses validateJobPayload, invalid payloads return
+    // { delivered: false, validationError } instead of throwing.
+    const { handleNotificationJob } = await import('./notifications.worker');
+
+    const result = await handleNotificationJob(
+      // Deliberately omit title, message, and type to trigger the guard.
+      { userId: 'user-5' } as Parameters<typeof handleNotificationJob>[0],
+      { maxAttempts: 3, backoffMs: 0 },
+    );
+
+    expect(result.delivered).toBe(false);
+    expect(result.validationError).toBeDefined();
+    expect(addNotificationMock).not.toHaveBeenCalled();
+  });
 });

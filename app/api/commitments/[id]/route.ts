@@ -158,7 +158,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (field in draft) {
         const value = (draft as Record<string, unknown>)[field];
         if (field === "amount" || field === "collateralAmount" || field === "interestRate" || field === "duration") {
-          if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return NextResponse.json({ error: { message: `Froperty ${field} must be a positive number` } }, { status: 400 });
+          if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return NextResponse.json({ error: { message: `Property ${field} must be a positive number` } }, { status: 400 });
         }
         if (field === "collateralAsset") {
           if (typeof value !== "string" || value.trim() === "") return NextResponse.json({ error: { message: "collateralAsset must be a non-empty string" } }, { status: 400 });
@@ -169,7 +169,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (Object.keys(updates).length === 0) return NextResponse.json({ error: { message: "No valid fields to update" } }, { status: 400 });
     const updated: Commitment = { ...commitment, ...updates, updatedAt: new Date().toISOString() };
     commitments.set(id, updated);
-    return NextResponse.json({ commitment: updated, canFormActions: buildAuth(updated) }, { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } });
+    return NextResponse.json({ commitment: updated, canPerformActions: buildAuth(updated) }, { headers: { "Cache-Control": "no-cache, no-store, must-revalidate" } });
   } catch (error) {
     console.error("Error updating commitment:", error);
     return NextResponse.json({ error: { message: "Failed to update commitment" } }, { status: 500 });
