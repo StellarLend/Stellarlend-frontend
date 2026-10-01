@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Copy, Search, X } from "lucide-react";
 import ScrollCues from "@/components/atoms/ScrollCues/ScrollCues";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
@@ -239,42 +239,72 @@ interface PositionsData {
   healthFactor: number | string;
 }
 
+// Keep untrusted API data out of the render tree; healthFactor is the only
+// field that may be numeric, and copyAddress is optional for read-only cards.
+function isPositionsData(value: unknown): value is PositionsData {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  const textFields = [
+    "availableBalance",
+    "borrowedAmount",
+    "nextDue",
+    "suppliedFunds",
+    "earnings",
+  ];
+
+  return (
+    textFields.every((field) => typeof data[field] === "string") &&
+    (data.copyAddress === undefined || typeof data.copyAddress === "string") &&
+    ((typeof data.healthFactor === "number" && Number.isFinite(data.healthFactor)) ||
+      (typeof data.healthFactor === "string" && data.healthFactor.trim() !== "" &&
+        Number.isFinite(Number(data.healthFactor))))
+  );
+}
+
 function usePositionsData(): {
   data: PositionsData | null;
   isLoading: boolean;
   error: Error | null;
+  refetch: () => Promise<void>;
 } {
   const [data, setData] = useState<PositionsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const requestId = useRef(0);
 
   const fetchData = useCallback(async () => {
+    const id = ++requestId.current;
     setIsLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/positions");
-      if (!res.ok)
-        throw new Error(`Failed to fetch positions: ${res.statusText}`);
+      if (!res.ok) throw new Error("Request failed");
       const json = await res.json();
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
+      if (!isPositionsData(json)) throw new Error("Invalid response");
+      if (requestId.current === id) setData(json);
+    } catch {
+      // Avoid rendering server details that may contain private information.
+      if (requestId.current === id) setError(new Error("Unable to load metrics."));
     } finally {
-      setIsLoading(false);
+      if (requestId.current === id) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchData();
+    return () => {
+      // Ignore late results after unmount; retry requests also supersede older ones.
+      requestId.current += 1;
+    };
   }, [fetchData]);
 
-  return { data, isLoading, error };
+  return { data, isLoading, error, refetch: fetchData };
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function MetricsCards() {
-  const { data, isLoading, error } = usePositionsData();
+  const { data, isLoading, error, refetch } = usePositionsData();
   const [filterQuery, setFilterQuery] = useState("");
 
   const allAssets = useMemo(() => {
@@ -285,23 +315,36 @@ export default function MetricsCards() {
     }
   }, []);
 
+  const uniqueAssets = useMemo(() => {
+    const seen = new Set<string>();
+    return allAssets.filter((asset) => {
+      if (!asset || typeof asset.symbol !== "string" || typeof asset.name !== "string") return false;
+      const key = asset.symbol.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [allAssets]);
+
   const filteredAssets = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
-    if (!q) return allAssets;
-    return allAssets.filter(
+    if (!q) return uniqueAssets;
+    return uniqueAssets.filter(
       (a) =>
         a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q),
     );
-  }, [allAssets, filterQuery]);
+  }, [uniqueAssets, filterQuery]);
 
-  if (isLoading || !data) {
-    return <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>;
+  if (isLoading) {
+    return (
+      <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>
+    );
   }
 
-  if (error) {
+  if (error || !data) {
     return (
-      <div className="text-red-400 p-4 text-sm font-medium">
-        Failed to load metrics: {error.message}
+      <div className="text-red-400 p-4 text-sm font-medium" role="alert">
+        Failed to load metrics. <button className="underline" onClick={refetch}>Try again</button>
       </div>
     );
   }
@@ -362,7 +405,7 @@ export default function MetricsCards() {
           query={filterQuery}
           onChange={setFilterQuery}
           showing={filteredAssets.length}
-          total={allAssets.length}
+          total={uniqueAssets.length}
         />
 
         {filteredAssets.length === 0 ? (

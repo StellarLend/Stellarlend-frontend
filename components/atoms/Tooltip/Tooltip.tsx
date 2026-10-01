@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useId } from "react";
 import { cn } from "@/lib/utils/cn";
 
 export interface TooltipProps {
@@ -34,64 +34,100 @@ export const Tooltip: React.FC<TooltipProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const triggerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const isHoveredRef = useRef(false);
+  const isFocusedRef = useRef(false);
+  const isDismissedRef = useRef(false);
+  const tooltipId = useId();
+  const normalizedDelay = Number.isFinite(delay) && delay >= 0 ? delay : 0;
 
-  const showTooltip = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => setIsVisible(true), delay);
-  };
-
-  const hideTooltip = () => {
-    if (timeoutRef.current) {
+  const clearShowTimeout = () => {
+    if (timeoutRef.current !== null) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    setIsVisible(false);
+  };
+
+  const scheduleShow = () => {
+    clearShowTimeout();
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setIsVisible(true);
+    }, normalizedDelay);
+  };
+
+  const activate = (interaction: "hover" | "focus") => {
+    const wasActive = isHoveredRef.current || isFocusedRef.current;
+    if (interaction === "hover") isHoveredRef.current = true;
+    else isFocusedRef.current = true;
+
+    if (!wasActive && !isDismissedRef.current) scheduleShow();
+  };
+
+  const deactivate = (interaction: "hover" | "focus") => {
+    if (interaction === "hover") isHoveredRef.current = false;
+    else isFocusedRef.current = false;
+
+    if (!isHoveredRef.current && !isFocusedRef.current) {
+      clearShowTimeout();
+      setIsVisible(false);
+      isDismissedRef.current = false;
+    }
   };
 
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        hideTooltip();
+    const handleEscape = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        (!isHoveredRef.current && !isFocusedRef.current && timeoutRef.current === null)
+      ) {
+        return;
       }
+
+      clearShowTimeout();
+      setIsVisible(false);
+      isDismissedRef.current = true;
     };
 
-    if (isVisible) {
-      document.addEventListener("keydown", handleEscape);
-    }
-
+    document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isVisible]);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      clearShowTimeout();
     };
   }, []);
 
+  const childProps = children.props as React.HTMLAttributes<HTMLElement>;
+  const describedBy = (childProps["aria-describedby"] ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (isVisible && !describedBy.includes(tooltipId)) describedBy.push(tooltipId);
+
   const triggerElement = React.cloneElement(children, {
-    onMouseEnter: showTooltip,
-    onMouseLeave: hideTooltip,
-    onFocus: showTooltip,
-    onBlur: hideTooltip,
-    "aria-describedby": isVisible ? "tooltip-content" : undefined,
+    onMouseEnter: (event: React.MouseEvent<HTMLElement>) => {
+      childProps.onMouseEnter?.(event);
+      activate("hover");
+    },
+    onMouseLeave: (event: React.MouseEvent<HTMLElement>) => {
+      childProps.onMouseLeave?.(event);
+      deactivate("hover");
+    },
+    onFocus: (event: React.FocusEvent<HTMLElement>) => {
+      childProps.onFocus?.(event);
+      activate("focus");
+    },
+    onBlur: (event: React.FocusEvent<HTMLElement>) => {
+      childProps.onBlur?.(event);
+      deactivate("focus");
+    },
+    "aria-describedby": describedBy.length > 0 ? describedBy.join(" ") : undefined,
   } as React.HTMLAttributes<HTMLElement>);
 
   return (
-    <div ref={triggerRef} className={cn("relative", wrapperClassName ?? "inline-block")}>
+    <div className={cn("relative", wrapperClassName ?? "inline-block")}>
       {triggerElement}
 
       {isVisible && (
         <div
-          ref={tooltipRef}
-          id="tooltip-content"
+          id={tooltipId}
           role="tooltip"
           className={cn(
             // Base styles
