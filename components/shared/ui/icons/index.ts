@@ -13,7 +13,7 @@ export { Dollar } from "./Dollar";
 export { Dropdown } from "./Dropdown";
 export { File } from "./File";
 export { Global } from "./Global";
-export { FastSecure } from "./FastSecure";
+export { FastSecureIcon as FastSecure } from "./FastSecure";
 export { IconPlaceholder } from "./IconPlaceholder";
 export { CoinIcon } from "./CoinIcon";
 export { TransactionIcon } from "./TransactionIcon";

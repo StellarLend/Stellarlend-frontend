@@ -14,6 +14,21 @@ vi.mock("@/hooks/useWalletConnection", () => ({
   }),
 }));
 
+// `BorrowingForm` reads collateral balances from `useWalletBalances()` (wired up
+// in #1057). These unit tests exercise the form in isolation, so the hook is
+// mocked to return the canonical asset list they assert against (e.g. the XLM
+// balance of 3750) rather than requiring a live `WalletProvider` mount.
+vi.mock("@/hooks/useWalletBalances", async () => {
+  const { ASSETS } = await import("@/lib/assets");
+  return {
+    useWalletBalances: () => ({
+      assetsWithBalances: ASSETS,
+      loading: false,
+      error: null,
+    }),
+  };
+});
+
 describe("BorrowingForm Component", () => {
   const mockInitialData = {
     asset: "USDC",

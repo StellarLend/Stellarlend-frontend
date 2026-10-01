@@ -18,13 +18,11 @@ vi.mock("next/image", () => ({
 }));
 
 // ── Feature-component stubs ──────────────────────────────────────────────────
-vi.mock("@/components/features/account/components/ProfileForm", () => ({
-  default: () => <div data-testid="profile-form" />,
-}));
-
 vi.mock("@/components/features/account/components", () => ({
+  DisplayProfileForm: () => <div data-testid="display-profile-form" />,
   DataExportButton: () => <div data-testid="data-export-button" />,
   AccountDeletion: () => <div data-testid="account-deletion" />,
+  AccountDeletionPanel: () => <div data-testid="account-deletion-panel" />,
 }));
 
 // ── Layout / shared stubs ────────────────────────────────────────────────────
@@ -38,9 +36,9 @@ vi.mock("@/components/shared/common", () => ({
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 describe("Account profile page", () => {
-  it("always renders ProfileForm", () => {
+  it("always renders DisplayProfileForm", () => {
     render(<Account />);
-    expect(screen.getByTestId("profile-form")).toBeInTheDocument();
+    expect(screen.getByTestId("display-profile-form")).toBeInTheDocument();
   });
 
   it("always renders DataExportButton", () => {
@@ -55,7 +53,7 @@ describe("Account profile page", () => {
 
   it("renders all three sub-components in a single pass", () => {
     render(<Account />);
-    expect(screen.getByTestId("profile-form")).toBeInTheDocument();
+    expect(screen.getByTestId("display-profile-form")).toBeInTheDocument();
     expect(screen.getByTestId("data-export-button")).toBeInTheDocument();
     expect(screen.getByTestId("account-deletion")).toBeInTheDocument();
   });

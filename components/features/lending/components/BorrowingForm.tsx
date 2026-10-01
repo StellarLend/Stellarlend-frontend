@@ -103,7 +103,10 @@ export default function BorrowingForm({
   );
   const [targetHealthFactor, setTargetHealthFactor] = useState<number>(2);
   const [customTargetHealth, setCustomTargetHealth] = useState<string>("");
-  const [durationMode, setDurationMode] = useState<"fixed" | "custom">("fixed");
+  // "preset" = one of the LOAN_DURATIONS chips is active
+  // "custom" = the Custom chip is active and the numeric input is visible
+  const [durationMode, setDurationMode] = useState<"preset" | "custom">("preset");
+  // Raw string so the input can be empty / partially typed without coercion
   const [customDays, setCustomDays] = useState<string>("");
   const [customDaysError, setCustomDaysError] = useState<string>("");
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -277,44 +280,40 @@ export default function BorrowingForm({
     onValid?: (days: number) => void,
   ): string => {
     const trimmed = value.trim();
-    if (!trimmed) {
-      return "Please enter a custom duration";
+    if (!trimmed || Number.isNaN(Number(trimmed))) {
+      return "Please enter a number of days";
     }
     const parsed = Number(trimmed);
     if (!Number.isInteger(parsed)) {
       return "Duration must be a whole number of days";
     }
     if (parsed < CUSTOM_DURATION_MIN_DAYS) {
-      return `Duration must be at least ${CUSTOM_DURATION_MIN_DAYS} day`;
+      return `Minimum duration is ${CUSTOM_DURATION_MIN_DAYS} day`;
     }
     if (parsed > CUSTOM_DURATION_MAX_DAYS) {
-      return `Duration must be at most ${CUSTOM_DURATION_MAX_DAYS} days`;
+      return `Maximum duration is ${CUSTOM_DURATION_MAX_DAYS} days`;
     }
     onValid?.(parsed);
     return "";
   };
 
-  /**
-   * Handles changes to the custom-days input. Keeps `formData.duration` in
-   * sync only when the value is valid, and always surfaces the validation
-   * error so the user gets immediate feedback.
-   */
-  const handleCustomDaysChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     setCustomDays(raw);
+
     const errorMsg = validateCustomDays(raw, (days) => {
       setFormData((prev) => ({ ...prev, duration: days }));
+      // Clear the duration field error if the user fixes it
+      if (errors.duration) {
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next.duration;
+          return next;
+        });
+      }
     });
+
     setCustomDaysError(errorMsg);
-    if (!errorMsg && errors.duration) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.duration;
-        return next;
-      });
-    }
   };
 
   const formatCollateralUnits = (amount: number): string =>

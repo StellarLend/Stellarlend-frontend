@@ -1,5 +1,6 @@
 import React, { ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { validateButtonProps } from './Button.types';
 
 export type ButtonVariant =
   | 'primary'
@@ -60,6 +61,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
+    // Coerce legacy array className to string for compatibility
+    const normalizedClassName = Array.isArray(className) ? className.join(' ') : className;
+
+    // Validate props deterministically
+    validateButtonProps({
+      variant,
+      size,
+      className: normalizedClassName,
+      onClick: props.onClick,
+      isLoading,
+      children: children ?? text,
+    });
+
     const variantClass = variantStyles[variant] ?? variantStyles.primary;
     const sizeClass = sizeStyles[size] ?? sizeStyles.md;
 
@@ -73,7 +87,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           variantClass,
           sizeClass,
           fullWidth && 'w-full',
-          className
+          normalizedClassName
         )}
         {...props}
       >
