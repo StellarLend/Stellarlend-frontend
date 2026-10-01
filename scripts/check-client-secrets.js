@@ -18,6 +18,21 @@ const FORBIDDEN_IMPORTS = [
   '../../lib/server-config',
 ];
 
+// Directories that are always server-side or generated — never scan them for
+// client-side secret leakage (server code is allowed to use server-config and
+// process.env secrets by design).
+const SKIP_DIRS = new Set([
+  'app/api',
+  'src/jobs',
+  'node_modules',
+  '.next',
+  '.git',
+  'dist',
+  'build',
+  'coverage',
+  'storybook-static',
+]);
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
