@@ -143,7 +143,7 @@ export function computeEtag(checks: HealthChecks): string {
     version: config.app?.version ?? '1.0.0',
     checks,
   });
-  return `${crypto.createHash('md5').update(etagBase).toString('hex')}`;
+  return `"${crypto.createHash('md5').update(etagBase).digest('hex')}"`;
 }
 
 export function buildHealthResponse(checks: HealthChecks): HealthResponse {
