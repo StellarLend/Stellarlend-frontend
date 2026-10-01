@@ -265,6 +265,7 @@ function usePositionsData(): {
   data: PositionsData | null;
   isLoading: boolean;
   error: Error | null;
+  refetch: () => Promise<void>;
 } {
   const [data, setData] = useState<PositionsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -297,13 +298,13 @@ function usePositionsData(): {
     };
   }, [fetchData]);
 
-  return { data, isLoading, error };
+  return { data, isLoading, error, refetch: fetchData };
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function MetricsCards() {
-  const { data, isLoading, error } = usePositionsData();
+  const { data, isLoading, error, refetch } = usePositionsData();
   const [filterQuery, setFilterQuery] = useState("");
 
   const allAssets = useMemo(() => {
@@ -334,7 +335,7 @@ export default function MetricsCards() {
     );
   }, [uniqueAssets, filterQuery]);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="text-white p-4 text-sm font-medium">Loading metrics…</div>
     );
@@ -343,7 +344,7 @@ export default function MetricsCards() {
   if (error || !data) {
     return (
       <div className="text-red-400 p-4 text-sm font-medium" role="alert">
-        Failed to load metrics. <button className="underline" onClick={fetchData}>Try again</button>
+        Failed to load metrics. <button className="underline" onClick={refetch}>Try again</button>
       </div>
     );
   }
