@@ -27,7 +27,7 @@ import { useMarketRates } from "@/hooks/useMarketRates";
 import { LeverageSlider } from "./LeverageSlider";
 
 interface BorrowingFormProps {
-  onSubmit: (data: LendingData) => void;
+  onSubmit: (data: LendingData) => void | Promise<void>;
   initialData: LendingData;
 }
 
@@ -426,6 +426,7 @@ export default function BorrowingForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setStatus("idle");
     setSubmitMessage("");
     if (isSubmitting) {
@@ -434,10 +435,9 @@ export default function BorrowingForm({
     if (validateForm()) {
       setIsSubmitting(true);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await onSubmit(formData);
         setStatus("success");
         setSubmitMessage("Details validated successfully.");
-        onSubmit(formData);
       } catch (err) {
         setStatus("error");
         setSubmitMessage("An error occurred during validation.");

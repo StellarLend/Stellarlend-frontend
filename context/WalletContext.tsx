@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, FC,ReactNode } from "react";
-import { useWalletConnection, type WalletStatus, type StellarNetwork } from "@hooks/useWalletConnection";
+import { useWalletConnection, type WalletStatus, type StellarNetwork } from "@/hooks/useWalletConnection";
 
 export type { WalletStatus };
 export type { StellarNetwork };
