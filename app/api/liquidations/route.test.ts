@@ -6,7 +6,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/api/handler', () => ({
-  withRequestLogging: (_route: string, handler: Function) => handler,
+  withRequestLogging: <T>(_route: string, handler: T) => handler,
 }));
 
 vi.mock('@/lib/positions/liquidation', () => ({
