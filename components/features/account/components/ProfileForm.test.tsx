@@ -50,10 +50,10 @@ describe("ProfileForm Component", () => {
   it("renders all form fields", () => {
     render(<ProfileForm />);
 
-    expect(screen.getByLabelText(/First Name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Last Name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Address/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/First Name/i)).toBeInDocument();
+    expect(screen.getByLabelText(/Last Name/i)).toBeInDocument();
+    expect(screen.getByLabelText(/Email/i)).toBeInDocument();
+    expect(screen.getByLabelText(/Address/i)).toBeInDocument();
   });
 
   it("shows validation errors on empty submit", async () => {
@@ -63,9 +63,9 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/First name is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/Email is required/i)).toBeInTheDocument();
-      expect(screen.getByText(/Gender is required/i)).toBeInTheDocument();
+      expect(screen.getByText(/First name is required/i)).toBeInDocument();
+      expect(screen.getByText(/Email is required/i)).toBeInDocument();
+      expect(screen.getByText(/Gender is required/i)).toBeInDocument();
     });
   });
 
@@ -80,7 +80,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Please enter a valid email address/i)).toBeInTheDocument();
+      expect(screen.getByText(/Please enter a valid email address/i)).toBeInDocument();
     });
   });
 
@@ -132,7 +132,7 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Profile saved/i)).toBeInTheDocument();
+      expect(screen.getByText(/Profile saved/i)).toBeInDocument();
     });
   });
 
@@ -147,7 +147,342 @@ describe("ProfileForm Component", () => {
     await act(async () => { fireEvent.submit(form); });
 
     await waitFor(() => {
-      expect(screen.getByText(/Save failed/i)).toBeInTheDocument();
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+    });
+  });
+
+  it("shows error toast when the API returns 401 unauthorized", async () => {
+    const fetchMock = makeFetchMock({ 
+      ok: false, 
+      status: 401, 
+      body: { error: "Unauthorized" } 
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+    });
+  });
+
+  it("shows error toast when the API returns 400 validation error", async () => {
+    const fetchMock = makeFetchMock({ 
+      ok: false, 
+      status: 400, 
+      body: { error: "Invalid input" } 
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+    });
+  });
+
+  it("handles network failure gracefully", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/account/preferences") {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ currency: "USD" }),
+        } as Response);
+      }
+      return Promise.reject(new TypeError("Failed to fetch"));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+    });
+  });
+
+  it("prevents concurrent submissions", async () => {
+    let resolveProfile: () => void 0;
+    const profilePromise = new Promise<Response>((resolve) => {
+      resolveProfile = () => resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ profile: {} }),
+      } as Response);
+    });
+
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/account/preferences") {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ currency: "USD" }),
+        } as Response);
+      }
+      return profilePromise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    const submitButton = screen.getByRole("button", { name: /Save Changes/i });
+
+    // First submit
+    await act(async () => { fireEvent.submit(form); });
+    
+    // Second submit while first is in flight
+    await act(async () => { fireEvent.submit(form); });
+
+    // Resolve the first submit
+    await act(async () => {
+      resolveProfile();
+    });
+
+    await waitFor(() => {
+      const profileCalls = fetchMock.mock.calls.filter(
+        ([url]) => url === "/api/account/profile"
+      );
+      // Only one call should be made due to concurrency guard
+      expect(profileCalls).toHaveLength(1);
+    });
+  });
+
+  it("disables submit button during submission", async () => {
+    let resolveProfile: () => void 0;
+    const profilePromise = new Promise<Response>((resolve) => {
+      resolveProfile = () => resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ profile: {} }),
+      } as Response);
+    });
+
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/account/preferences") {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ currency: "USD" }),
+        } as Response);
+      }
+      return profilePromise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    const submitButton = screen.getByRole("button", { name: /Save Changes/i });
+
+    await act(async () => { fireEvent.submit(form); });
+
+    // Button should be disabled during submission
+    expect(submitButton).toBeDisabled();
+
+    await act(async () => {
+      resolveProfile();
+    });
+
+    await waitFor(() ==> {
+      expect(submitButton).not.toBeDisabled();
+    });
+  });
+
+  it("validates boundary cases for email length", async () => {
+    render(<ProfileForm />);
+
+    // Test email with excessive length
+    const longEmail = "a".repeat(250) + "@example.com";
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: longEmail } });
+    });
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    // Should show validation error for too long email
+    await waitFor(() => {
+      expect(screen.getByText(/Please enter a valid email address/i)).toBeInDocument();
+    });
+  });
+
+  it("validates boundary cases for name length", async () => {
+    render(<ProfileForm />);
+
+    // Test name with excessive length
+    const longName = "A".repeat(200);
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/First Name/i), { target: { value: longName } });
+    });
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    // Should show validation error for too long name
+    await waitFor(() => {
+      expect(screen.getByText(/First name is required/i)).toBeInDocument();
+    });
+  });
+
+  it("retains form data after failed submission", async () => {
+    const fetchMock = makeFetchMock({ 
+      ok: false, 
+      status: 500, 
+      body: { error: "Server error" } 
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+    });
+
+    // Form data should still be present
+    expect(screen.getLabelText(/First Name/i)).toHaveValue("John");
+    expect(screen.getLabelText(/Last Name/i)).toHaveValue("Doe");
+    expect(screen.getLabelText(/Email/i)).toHaveValue("john@example.com");
+  });
+
+  it("allows retry after failed submission", async () => {
+    // First call fails, second succeeds
+    let callCount = 0;
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/account/preferences") {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ currency: "USD" }),
+        } as Response);
+      }
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "Server error" }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ profile: {} }),
+      } as Response);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    
+    // First submit fails
+    await act(async () => { fireEvent.submit(form); });
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+    });
+
+    // Second submit succeeds
+    await act(async () => { fireEvent.submit(form); });
+    await waitFor(() => {
+      expect(screen.getByText(/Profile saved/i)).toBeInDocument();
+    });
+
+    // Verify two profile calls were made
+    const profileCalls = fetchMock.mock.calls.filter(
+      ([url]) => url === "/api/account/profile"
+    );
+    expect(profileCalls).toHaveLength(2);
+  });
+
+  it("validates tax ID format", async () => {
+    render(<ProfileForm />);
+
+    // Invalid tax ID format
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/Tax Verification Number/i), { target: { value: "invalid-tax-id" } });
+    });
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    // Should show validation error for invalid tax ID
+    await waitFor(() => {
+      expect(screen.getByText(/Tax Verification Number is required/i)).toBeInDocument();
+    });
+  });
+
+  it("validates phone number format", async () => {
+    render(<ProfileForm />);
+
+    // Invalid phone number format
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/Phone Number/i), { target: { value: "abcdef" } });
+    });
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    // Should show validation error for invalid phone
+    await waitFor(() => {
+      expect(screen.getByText(/Phone Number is required/i)).toBeInDocument();
+    });
+  });
+
+  it("shows error toast when the API returns 409 conflict", async () => {
+    const fetchMock = makeFetchMock({ 
+      ok: false, 
+      status: 409, 
+      body: { error: "Conflict" } 
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
+    });
+  });
+
+  it("shows error toast when the API returns 429 too\ many requests", async () => {
+    const fetchMock = makeFetchMock({ 
+      ok: false, 
+      status: 429, 
+      body: { error: "Too Many Requests" } 
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ProfileForm />);
+    await fillValidForm();
+
+    const form = screen.getByRole("button", { name: /Save Changes/i }).closest("form")!;
+    await act(async () => { fireEvent.submit(form); });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Save failed/i)).toBeInDocument();
     });
   });
 });

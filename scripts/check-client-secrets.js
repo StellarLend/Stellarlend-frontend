@@ -10,6 +10,26 @@ const SECRETS = [
   'DATABASE_URL',
 ];
 
+// Directories that must never be scanned for client-side secret leakage.
+// Matched against both the bare directory name and its project-relative path.
+// `api` and `jobs` are server-only trees (route handlers and background
+// workers); they legitimately read server-config and secrets and are never
+// shipped to the browser, so scanning them produces false positives.
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.next',
+  '.git',
+  'coverage',
+  'dist',
+  'build',
+  'out',
+  '.turbo',
+  'playwright-report',
+  'test-results',
+  'api',
+  'jobs',
+]);
+
 const FORBIDDEN_IMPORTS = [
   'lib/server-config',
   '@/lib/server-config',

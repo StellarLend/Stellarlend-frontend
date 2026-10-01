@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface SessionExpiryDialogProps {
   isOpen: boolean;
@@ -15,51 +16,14 @@ export default function SessionExpiryDialog({
 }: SessionExpiryDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const stayButtonRef = useRef<HTMLButtonElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useFocusTrap(dialogRef, { isActive: isOpen, onEscape: onLogOut });
 
   useEffect(() => {
     if (!isOpen) return;
 
-    previouslyFocusedRef.current = document.activeElement as HTMLElement;
     stayButtonRef.current?.focus();
-
-    const focusableSelector = [
-      "button:not([disabled])",
-      "a[href]",
-      "[tabindex]:not([tabindex='-1'])",
-    ].join(", ");
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onLogOut();
-        return;
-      }
-      if (e.key !== "Tab") return;
-
-      const focusable = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []
-      );
-      if (!focusable.length) { e.preventDefault(); return; }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      previouslyFocusedRef.current?.focus();
-    };
-  }, [isOpen, onLogOut]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -73,7 +37,10 @@ export default function SessionExpiryDialog({
         aria-labelledby="session-expiry-title"
         className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
       >
-        <h2 id="session-expiry-title" className="text-lg font-semibold text-gray-900">
+        <h2
+          id="session-expiry-title"
+          className="text-lg font-semibold text-gray-900"
+        >
           Session Expiring Soon
         </h2>
         <p className="mt-2 text-sm text-gray-600">

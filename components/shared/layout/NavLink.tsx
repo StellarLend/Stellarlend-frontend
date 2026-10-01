@@ -31,6 +31,7 @@ const NavLink = ({
 }: NavLinkProps) => {
   const pathname = usePathname();
 
+  // Prevent rendering and log a warning if href is invalid or missing
   if (!href) {
     clientLog.warn("NavLink requires a valid href prop.");
     return null;
