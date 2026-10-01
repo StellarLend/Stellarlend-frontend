@@ -53,8 +53,15 @@ export const NavigationMenu = ({
   const [activeLink, setActiveLink] = useState("dashboard");
 
   useEffect(() => {
-    const savedLink = localStorage.getItem("activeLink");
-    if (savedLink) setActiveLink(savedLink);
+    // localStorage may be unavailable in private-browsing modes, sandboxed
+    // iframes, or when storage is blocked by browser policy. Fail silently so
+    // the menu still renders with its default active state.
+    try {
+      const savedLink = localStorage.getItem("activeLink");
+      if (savedLink) setActiveLink(savedLink);
+    } catch {
+      // Storage unavailable — proceed with default active state.
+    }
   }, []);
 
   const links = [
@@ -108,7 +115,14 @@ export const NavigationMenu = ({
 
   const handleClick = (linkName: string) => {
     setActiveLink(linkName);
-    localStorage.setItem("activeLink", linkName);
+    // Persist active state for non-routed links across page refreshes.
+    // Wrapped in try/catch: localStorage may be unavailable in restricted
+    // environments (private browsing, sandboxed iframes, storage quota exceeded).
+    try {
+      localStorage.setItem("activeLink", linkName);
+    } catch {
+      // Storage unavailable — state is still updated in memory for this session.
+    }
     onLinkClick?.();
   };
 
