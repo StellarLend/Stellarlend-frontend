@@ -118,6 +118,7 @@ export default defineConfig({
             "types/enums.test.ts",
             "types/Transaction.test.ts",
             ".storybook/main.test.ts",
+            ".storybook/preview.test.ts",
             "app/api/markets/route.test.ts",
             "app/api/transactions/route.test.ts",
             "app/api/liquidations/route.test.ts",
