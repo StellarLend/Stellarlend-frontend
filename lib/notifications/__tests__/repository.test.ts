@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('server-only', () => ({}));
+
 import {
   getNotifications,
   addNotification,
   markNotificationRead,
+  deleteNotification,
   clearStore,
 } from '../repository';
 import { db } from '../../db';
@@ -86,6 +90,77 @@ describe('Drizzle Notifications Repository', () => {
     const list = await getNotifications('user-1');
     expect(list.length).toBe(1);
     expect(list[0].id).toBe('notif-123'); // Unmapped prefix
+  });
+
+  it('coerces an invalid stored type to "info" when fetching', async () => {
+    const mockRow = {
+      id: 'user-1-notif-bad',
+      userId: 'user-1',
+      title: 'Legacy',
+      message: 'Persisted before the enum existed',
+      read: false,
+      createdAt: new Date(),
+      type: 'legacy-bogus-value', // stray value outside the Notification['type'] union
+    };
+
+    const mockSelect = vi.mocked(db.select);
+    mockSelect.mockReturnValueOnce({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          orderBy: vi.fn(async () => [mockRow]),
+        })),
+      })),
+    } as any);
+
+    const list = await getNotifications('user-1');
+    expect(list).toHaveLength(1);
+    expect(list[0].type).toBe('info');
+  });
+
+  it('coerces an invalid stored type to "info" when marking read', async () => {
+    const mockRow = {
+      id: 'user-1-notif-1',
+      userId: 'user-1',
+      title: 'Confirmed',
+      message: 'Msg',
+      read: true,
+      createdAt: new Date(),
+      type: 'legacy-bogus-value',
+    };
+
+    const mockUpdate = vi.mocked(db.update);
+    mockUpdate.mockReturnValueOnce({
+      set: vi.fn(() => ({
+        where: vi.fn(() => ({
+          returning: vi.fn(async () => [mockRow]),
+        })),
+      })),
+    } as any);
+
+    const result = await markNotificationRead('user-1', 'notif-1');
+    expect(result?.type).toBe('info');
+  });
+
+  it('coerces an invalid stored type to "info" when deleting', async () => {
+    const mockRow = {
+      id: 'user-1-notif-1',
+      userId: 'user-1',
+      title: 'Confirmed',
+      message: 'Msg',
+      read: true,
+      createdAt: new Date(),
+      type: 'legacy-bogus-value',
+    };
+
+    const mockDelete = vi.mocked(db.delete);
+    mockDelete.mockReturnValueOnce({
+      where: vi.fn(() => ({
+        returning: vi.fn(async () => [mockRow]),
+      })),
+    } as any);
+
+    const result = await deleteNotification('user-1', 'notif-1');
+    expect(result?.type).toBe('info');
   });
 
   it('adds a notification successfully', async () => {
