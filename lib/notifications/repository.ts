@@ -1,4 +1,4 @@
-import type { Notification } from "./types";
+import { parseNotificationType, type Notification } from "./types";
 import { enqueue, type NotificationsJobPayload } from "@/lib/queue";
 import { logger } from "@/lib/logger";
 import { db } from "@/lib/db";
@@ -61,7 +61,7 @@ async function seedUser(userId: string): Promise<Notification[]> {
     message: x.message,
     read: x.read,
     createdAt: x.createdAt.toISOString(),
-    type: x.type,
+    type: parseNotificationType(x.type),
   }));
 }
 
@@ -86,7 +86,7 @@ export async function getNotifications(
     message: r.message,
     read: r.read,
     createdAt: r.createdAt.toISOString(),
-    type: r.type,
+    type: parseNotificationType(r.type),
   }));
 }
 
@@ -183,7 +183,7 @@ export async function markNotificationRead(
     message: row.message,
     read: row.read,
     createdAt: row.createdAt.toISOString(),
-    type: row.type,
+    type: parseNotificationType(row.type),
   };
 }
 
@@ -233,7 +233,7 @@ export async function deleteNotification(
     message: row.message,
     read: row.read,
     createdAt: row.createdAt.toISOString(),
-    type: row.type,
+    type: parseNotificationType(row.type),
   };
 }
 
