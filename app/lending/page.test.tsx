@@ -116,8 +116,8 @@ describe("LendingPage", () => {
     );
     expect(description).toHaveClass("text-slate-500");
 
-    expect(getContrastRatio("#0f172a", "#ffffff")).toBeGreaterOrEqual(7);
-    expect(getContrastRatio("#64748b", "#ffffff")).toBeGreaterOrEqual(4.5);
+    expect(getContrastRatio("#0f172a", "#ffffff")).toBeGreaterThanOrEqual(7);
+    expect(getContrastRatio("#64748b", "#ffffff")).toBeGreaterThanOrEqual(4.5);
   });
 
   it("passes axe checks on the lending route shell", async () => {
@@ -146,15 +146,15 @@ describe("LendingPage", () => {
   it("shows a loading state while the request is pending", () => {
     fetchMock.mockReturnValue(new Promise(() => {}));
     render(<LendingPage />);
-    expect(screen.getByText(/loading/i)).toBeInDocument();
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
   it("shows an error message with a retry button when the request fails", async () => {
     fetchMock.mockRejectedValue(new Error("Network error"));
     render(<LendingPage />);
 
-    expect(await screen.findByRole("alert")).toBeInDocument();
-    expect(screen.getByRole("button", { name: /retry/i })).toBeInDocument();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
 
   it("retries the request when the retry button is clicked", async () => {
@@ -173,7 +173,7 @@ describe("LendingPage", () => {
     fireEvent.click(retryButton);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText("XLM")).toBeInDocument();
+    expect(await screen.findByText("XLM")).toBeInTheDocument();
   });
 
   it("shows an empty state when no markets are returned", async () => {
@@ -184,7 +184,7 @@ describe("LendingPage", () => {
     });
 
     render(<LendingPage />);
-    expect(await screen.findByText(/no markets/i)).toBeInDocument();
+    expect(await screen.findByText(/no markets/i)).toBeInTheDocument();
   });
 
   it("shows a permission message when the API returns 403", async () => {
@@ -195,7 +195,7 @@ describe("LendingPage", () => {
     });
 
     render(<LendingPage />);
-    expect(await screen.findByText(/permission/i)).toBeInDocument();
+    expect(await screen.findByText(/permission/i)).toBeInTheDocument();
   });
 
   it("keeps the retry button focusable via keyboard", async () => {

@@ -1,3 +1,7 @@
+/**
+ * Primary SQLite schema file for user profiles, subscribers, and outbox events.
+ * Note: For Postgres-based features like notifications, refer to lib/db/schema/notifications.ts.
+ */
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 export const subscribers = sqliteTable('subscribers', {

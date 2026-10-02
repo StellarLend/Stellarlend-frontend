@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useCallback, useRef, type KeyboardEvent } from "react";
 import type { LendingActionType } from "@/lib/lending/types";
 
 interface TabSelectorProps {
@@ -6,6 +6,11 @@ interface TabSelectorProps {
   onTabChange: (tab: LendingActionType) => void;
 }
 
+// Invariants:
+// 1. TABS is the single source of truth for tab order and labels.
+// 2. Keyboard navigation is cyclic and clamped to [0, TABS.length - 1]; it never throws.
+// 3. onTabChange is only invoked with a valid tab value from TABS.
+// 4. Focus moves at most once per user interaction and is cancelled on unmount.
 const TABS: Array<{ value: LendingActionType; label: string }> = [
   { value: "lend", label: "Lend Assets" },
   { value: "borrow", label: "Borrow Assets" },
@@ -13,34 +18,56 @@ const TABS: Array<{ value: LendingActionType; label: string }> = [
   { value: "withdraw", label: "Withdraw" },
 ];
 
+const TAB_VALUES: ReadonlySet<string> = new Set(TABS.map((tab) => tab.value));
+
+export function isValidLendingActionType(
+  value: unknown,
+): value is LendingActionType {
+  return typeof value === "string" && TAB_VALUES.has(value);
+}
+
 export default function TabSelector({
   activeTab,
   onTabChange,
 }: TabSelectorProps) {
-  const focusTab = (value: LendingActionType) => {
-    requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLButtonElement>(`[data-tab-value="${value}"]`)
-        ?.focus();
-    });
-  };
+  const frameRef = useRef<number | null>(null);
 
-  const selectTab = (value: LendingActionType) => {
-    onTabChange(value);
-    focusTab(value);
-  };
+  const focusTab = useCallback((value: LendingActionType) => {
+    if (typeof window === "undefined") return;
+    if (frameRef.current !== null) {
+      window.cancelAnimationFrame(frameRef.current);
+    }
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      const node = document.querySelector<HTMLButtonElement>(
+        `button[data-tab-value="${value}"]`,
+      );
+      node?.focus();
+    });
+  }, []);
+
+  const selectTab = useCallback(
+    (value: LendingActionType) => {
+      if (!isValidLendingActionType(value)) return;
+      onTabChange(value);
+      focusTab(value);
+    },
+    [onTabChange, focusTab],
+  );
 
   const handleKeyDown = (
     event: KeyboardEvent<HTMLButtonElement>,
     index: number,
   ) => {
     const lastIndex = TABS.length - 1;
-    let nextIndex = index;
+    if (lastIndex < 0) return;
+    const safeIndex = Math.min(Math.max(index, 0), lastIndex);
+    let nextIndex = safeIndex;
 
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = index === lastIndex ? 0 : index + 1;
+      nextIndex = safeIndex === lastIndex ? 0 : safeIndex + 1;
     } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = index === 0 ? lastIndex : index - 1;
+      nextIndex = safeIndex === 0 ? lastIndex : safeIndex - 1;
     } else if (event.key === "Home") {
       nextIndex = 0;
     } else if (event.key === "End") {
@@ -49,8 +76,11 @@ export default function TabSelector({
       return;
     }
 
+    const nextTab = TABS[nextIndex];
+    if (!nextTab) return;
+
     event.preventDefault();
-    selectTab(TABS[nextIndex].value);
+    selectTab(nextTab.value);
   };
 
   return (
@@ -72,7 +102,7 @@ export default function TabSelector({
             aria-controls={`lending-panel-${tab.value}`}
             tabIndex={selected ? 0 : -1}
             data-tab-value={tab.value}
-            onClick={() => onTabChange(tab.value)}
+            onClick={() => selectTab(tab.value)}
             onKeyDown={(event) => handleKeyDown(event, index)}
             className={`flex-1 px-4 py-3 rounded-md text-sm font-medium transition-all duration-200 ${
               selected

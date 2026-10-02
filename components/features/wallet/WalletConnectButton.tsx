@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useWalletContext } from "@/context/WalletContext";
+import { useWalletConnection } from "@/hooks/useWalletConnection";
 import { copyToClipboard, type CopyFailureReason } from "@/lib/utils/clipboard";
 import { navClasses } from "@/constants/design-tokens";
 import { Toast, type ToastVariant } from "@/components/shared/common";
@@ -17,7 +17,7 @@ const truncateAddress = (addr: string) => `${addr.slice(0, 5)}…${addr.slice(-4
  * copying to clipboard, and showing any connection errors.
  */
 export const WalletConnectButton: React.FC = () => {
-  const { address, status, error, connect, disconnect } = useWalletContext();
+  const { address, status, error, connect, disconnect } = useWalletConnection();
   const [isCopied, setIsCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [toast, setToast] = useState<{
@@ -31,14 +31,17 @@ export const WalletConnectButton: React.FC = () => {
   const handleCopy = async () => {
     if (!address) return;
 
+    // The clipboard helper reports failure instead of throwing, so always branch on its result.
     const result = await copyToClipboard(address);
 
     if (result.success) {
+      // Only show copied feedback after the write (or fallback) actually succeeds.
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
       return;
     }
 
+    // Keep the feedback specific to the failure reason, with a useful default for unknown failures.
     const messages: Record<CopyFailureReason, { title: string; description: string }> = {
       invalid_address: {
         title: "Invalid Address",
@@ -52,6 +55,7 @@ export const WalletConnectButton: React.FC = () => {
 
     const failureReason = result.reason || "clipboard_error";
 
+    // A failed copy must remain visible to the user rather than silently looking like a no-op.
     setToast({
       variant: "error",
       ...messages[failureReason],
@@ -108,7 +112,7 @@ export const WalletConnectButton: React.FC = () => {
         <button
           type="button"
           aria-label="Connect wallet"
-          onClick={connect}
+          onClick={() => connect()}
           disabled={loading}
           className={`flex items-center justify-center text-white bg-[#15A350] hover:bg-[#128F43] py-2 px-5 rounded-full text-sm font-medium transition-colors disabled:opacity-70 ${focusClasses}`}
         >

@@ -1,3 +1,16 @@
+/**
+ * Stories for the shared `Input` component.
+ *
+ * Invariants (enforced by `./Input.stories.test.tsx`):
+ *
+ * 1. `meta.component` must be the shipped `./Input` — never a stale copy — and
+ *    `title` is a stable story id, because docs deep links and Chromatic
+ *    baselines are keyed off `title` + export name.
+ * 2. Every named export is a story, and every story stays args-driven (no
+ *    custom `render`) so autodocs controls remain truthful.
+ * 3. `argTypes.type.options` must stay a subset of the input types the
+ *    component actually forwards.
+ */
 import type { Meta, StoryObj } from '@storybook/react';
 import { Input } from './Input';
 
