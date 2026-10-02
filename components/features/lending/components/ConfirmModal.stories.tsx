@@ -662,6 +662,50 @@ export const ConfirmError: Story = {
 };
 
 /**
+ * ConfirmRetryAfterFailure
+ *
+ * A failed submission must leave the modal open and make the confirm action
+ * available again so a transient network failure can be retried safely.
+ */
+export const ConfirmRetryAfterFailure: Story = {
+  name: "Play: Failed confirmation can be retried",
+  render: () => {
+    const onConfirm = fn()
+      .mockRejectedValueOnce(new Error("Temporary network error"))
+      .mockResolvedValueOnce(undefined);
+    return (
+      <ConfirmModalHarness
+        type="lend"
+        data={lendData}
+        calculation={lendCalculation}
+        onConfirm={onConfirm}
+      />
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: /open modal/i }));
+
+    const dialog = await canvas.findByRole("dialog");
+    const dialogScope = within(dialog);
+    const confirmButton = dialogScope.getByRole("button", { name: /confirm lending/i });
+
+    await userEvent.click(dialogScope.getByRole("checkbox"));
+    await userEvent.click(confirmButton);
+    await waitFor(() =>
+      expect(dialogScope.getByRole("alert")).toHaveTextContent(/transaction failed/i),
+    );
+
+    expect(canvas.getByRole("dialog")).toBeInTheDocument();
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    await userEvent.click(confirmButton);
+    await waitFor(() =>
+      expect(dialogScope.getByRole("alert")).toHaveTextContent(/transaction confirmed successfully/i),
+    );
+  },
+};
+
+/**
  * BorrowFocusTrap
  *
  * Runs the same focus-trap assertions for the borrow variant (different title,

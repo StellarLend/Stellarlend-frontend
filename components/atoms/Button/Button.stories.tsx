@@ -396,6 +396,7 @@ const meta: Meta<typeof Button> = {
 };
 
 export default meta;
+type Story = StoryObj<typeof Button>;
 
 type Story = StoryObj<typeof Button>;
 
@@ -408,6 +409,15 @@ export const Primary: Story = {
   args: {
     children: "Click me",
     variant: "primary",
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: /click me/i });
+    await expect(button).toBeInTheDocument();
+    await expect(button).not.toBeDisabled();
+    
+    await userEvent.click(button);
+    await expect(args.onClick).toHaveBeenCalledOnce();
   },
 };
 
