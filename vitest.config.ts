@@ -71,6 +71,7 @@ export default defineConfig({
 
           include: [
             "app/page.test.tsx",
+            "app/layout.test.tsx",
             "app/lending/**/*.test.tsx",
             "app/account/sessions/**/*.test.tsx",
             "app/account/profile/**/*.test.tsx",

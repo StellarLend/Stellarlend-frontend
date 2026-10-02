@@ -27,6 +27,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: [
+      'app/layout.test.tsx',
       'lib/**/*.test.ts',
       'app/api/**/*.test.ts',
       'src/jobs/**/*.test.ts',
