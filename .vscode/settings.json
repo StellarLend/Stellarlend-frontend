@@ -1,7 +1,0 @@
-{
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true,
-  "githubPullRequests.ignoredPullRequestBranches": [
-    "main"
-  ]
-}

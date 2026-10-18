@@ -1,67 +1,34 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { SidebarProvider } from "@/context/SidebarContext";
-import { WalletProvider } from "@/context/WalletContext";
-import NextTopLoader from "nextjs-toploader";
-import { headers } from "next/headers";
-import { ToastProvider } from "@/components/shared/common/Toast";
-import NotificationToastBridge from "@/components/shared/common/NotificationToastBridge";
+import Link from "next/link";
+import { WalletProvider, ConnectButton } from "@/components/wallet";
 
 export const metadata: Metadata = {
-  title: "StellarLend",
-  description: "Decentralized lending and borrowing on Stellar",
+  title: "StellarLend - Lending on Stellar",
+  description: "Supply and borrow assets on Stellar with StellarLend, a Soroban-powered lending protocol (testnet).",
 };
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // Retrieve CSP nonce from middleware header
-  const nonce = (await headers()).get("x-csp-nonce") ?? undefined;
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning={true}>
-      <head>
-        {/*
-         * Strict referrer policy: browsers will only send the origin (no path/query)
-         * when navigating cross-origin, and the full URL for same-origin requests.
-         * This prevents sensitive URL parameters from leaking to third parties.
-         */}
-        <meta name="referrer" content="strict-origin-when-cross-origin" />
-      </head>
-      <body className="antialiased">
-        {/* Top progress bar */}
-        <NextTopLoader
-          color="#15a350"
-          initialPosition={0.08}
-          crawlSpeed={200}
-          height={3}
-          crawl={true}
-          showSpinner={false}
-          easing="ease"
-          speed={200}
-          shadow="0 0 10px #15a350, 0 0 5px #15a350"
-          zIndex={9999}
-        />
-        {/* Inline script that exposes the CSP nonce for client-side use.
-             referrerPolicy is set on this element as belt-and-suspenders even
-             though <script> elements without src do not generate HTTP requests. */}
-        {nonce && (
-          <script
-            nonce={nonce}
-            referrerPolicy="strict-origin-when-cross-origin"
-            dangerouslySetInnerHTML={{
-              __html: `window.CSP_NONCE = "${nonce}";`,
-            }}
-          />
-        )}
-        <ToastProvider>
-          <NotificationToastBridge />
-          <WalletProvider>
-            <SidebarProvider>{children}</SidebarProvider>
-          </WalletProvider>
-        </ToastProvider>
+    <html lang="en">
+      <body className="min-h-screen antialiased">
+        <WalletProvider>
+          <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--bg)]/85 backdrop-blur">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+              <Link href="/" className="text-lg font-bold"><span className="grad">Stellar</span>Lend</Link>
+              <nav className="flex items-center gap-5 text-sm mut">
+                <Link href="/markets" className="hover:text-white">Markets</Link>
+                <Link href="/docs" className="hover:text-white">Docs</Link>
+                <a href="https://github.com/StellarLend" className="hidden hover:text-white sm:inline">GitHub</a>
+              </nav>
+              <ConnectButton />
+            </div>
+          </header>
+          <main className="mx-auto max-w-6xl px-4 py-10">{children}</main>
+          <footer className="mx-auto max-w-6xl px-4 py-10 text-sm mut">
+            StellarLend runs on Stellar testnet. No real funds. Not financial advice.
+          </footer>
+        </WalletProvider>
       </body>
     </html>
   );

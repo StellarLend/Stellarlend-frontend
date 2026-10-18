@@ -1,75 +1,41 @@
-import type { Metadata } from 'next';
-import StubPageLayout from '@/components/marketing/StubPageLayout';
+import { config, explorer } from "@/lib/config";
+export const metadata = { title: "Docs - StellarLend" };
 
-export const metadata: Metadata = {
-  title: 'Documentation | Stellarlend',
-  description: 'Guides, references, and tutorials for the Stellarlend protocol.',
-};
+const S = ({ t, children }: { t: string; children: React.ReactNode }) => (
+  <section className="space-y-3"><h2 className="text-2xl font-semibold">{t}</h2><div className="mut space-y-3 text-sm leading-relaxed">{children}</div></section>
+);
 
-const sections = [
-  {
-    title: 'Getting Started',
-    links: [
-      { label: 'What is Stellarlend?', href: '#' },
-      { label: 'Connect your wallet', href: '#' },
-      { label: 'Lending your first asset', href: '#' },
-      { label: 'Borrowing against collateral', href: '#' },
-    ],
-  },
-  {
-    title: 'Protocol Mechanics',
-    links: [
-      { label: 'Interest rate model', href: '#' },
-      { label: 'Collateral factors', href: '#' },
-      { label: 'Liquidations explained', href: '#' },
-      { label: 'Health factor', href: '#' },
-    ],
-  },
-  {
-    title: 'Developers',
-    links: [
-      { label: 'Smart contract overview', href: '#' },
-      { label: 'API reference', href: '/api-docs' },
-      { label: 'Testnet deployment', href: '#' },
-    ],
-  },
-  {
-    title: 'Security & Audits',
-    links: [
-      { label: 'Security overview', href: '/security' },
-      { label: 'Audit reports', href: '/audits' },
-    ],
-  },
-];
-
-export default function DocsPage() {
+export default function Docs() {
   return (
-    <StubPageLayout
-      title="Documentation"
-      description="Everything you need to understand and build with Stellarlend."
-    >
-      <div className="space-y-8">
-        <div className="border border-yellow-500/30 bg-yellow-500/10 rounded-xl p-4 text-yellow-300 text-sm">
-          Full documentation is under construction. Links marked # are placeholders.
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {sections.map((section) => (
-            <div key={section.title} className="border border-[#1D2025] rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-white mb-3">{section.title}</h2>
-              <ul className="space-y-2">
-                {section.links.map((link) => (
-                  <li key={link.label}>
-                    <a href={link.href} className="text-[#15A350] hover:underline text-sm">
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+    <article className="mx-auto max-w-3xl space-y-10">
+      <h1 className="text-4xl font-bold">Documentation</h1>
+      <S t="Overview"><p>StellarLend is an over-collateralised lending market on Stellar. Users supply assets to earn interest and borrow other assets against their collateral. Core logic is implemented as Soroban smart contracts; this web app is the user interface.</p></S>
+      <S t="Getting started">
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>Install the <a className="underline" href="https://freighter.app" target="_blank" rel="noreferrer">Freighter</a> wallet and switch it to Testnet.</li>
+          <li>Fund your account with the Stellar testnet friendbot.</li>
+          <li>Open <a className="underline" href="/markets">Markets</a> and click Connect Freighter. Without a wallet the app runs in demo mode.</li>
+          <li>Pick an asset, then Supply, Borrow, Withdraw or Repay.</li>
+        </ol>
+      </S>
+      <S t="Risk parameters">
+        <p>Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable.</p>
+      </S>
+      <S t="Architecture">
+        <p>Next.js 15 (App Router) front end, Freighter for signing, Horizon for balances, Soroban RPC for contract calls. Position state in this build is a local demo ledger; contract invocation is configured through environment variables.</p>
+      </S>
+      <S t="Deployed contracts (testnet)">
+        <ul className="space-y-1 font-mono text-xs">
+          {([["Lending", config.lendingId], ["Oracle", config.oracleId], ["Token", config.tokenId]] as const).map(([n, id]) => (
+            <li key={n}>{n}: {id ? <a className="underline" href={explorer(id)} target="_blank" rel="noreferrer">{id}</a> : "not configured"}</li>
           ))}
-        </div>
-      </div>
-    </StubPageLayout>
+        </ul>
+      </S>
+      <S t="Environment variables">
+        <ul className="list-disc space-y-1 pl-5 font-mono text-xs">
+          {["NEXT_PUBLIC_STELLAR_NETWORK", "NEXT_PUBLIC_HORIZON_URL", "NEXT_PUBLIC_SOROBAN_RPC_URL", "NEXT_PUBLIC_LENDING_CONTRACT_ID", "NEXT_PUBLIC_ORACLE_CONTRACT_ID", "NEXT_PUBLIC_TOKEN_CONTRACT_ID"].map((v) => <li key={v}>{v}</li>)}
+        </ul>
+      </S>
+    </article>
   );
 }
