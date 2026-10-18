@@ -3,7 +3,7 @@
 [![CI](https://github.com/StellarLend/Stellarlend-frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/StellarLend/Stellarlend-frontend/actions/workflows/ci.yml)
 ![Network](https://img.shields.io/badge/network-Stellar%20testnet-5eead4)
 
-**Live demo: [https://stellarlend-frontend.vercel.app](https://stellarlend-frontend.vercel.app)**
+**Live demo: [https://stellarlend-frontend-tau.vercel.app](https://stellarlend-frontend-tau.vercel.app)**
 
 StellarLend is an over-collateralised lending market on Stellar (Soroban). This repo is the web UI: a landing page, a markets dashboard with supply / borrow / withdraw / repay flows, Freighter wallet connect, and a docs page.
 

@@ -58,7 +58,7 @@ jobs:
       - name: Run OWASP ZAP scan
         uses: zaproxy/action-full-scan@v0.8.0
         with:
-          target: 'https://stellarlend-staging.vercel.app'
+          target: 'https://stellarlend-frontend-tau.vercel.app'
         continue-on-error: true
 
       - name: Upload security scan results
