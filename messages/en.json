@@ -1,0 +1,116 @@
+{
+  "nav": {
+    "brand": "Stellar",
+    "markets": "Markets",
+    "docs": "Docs",
+    "github": "GitHub",
+    "switchLocale": "ES"
+  },
+  "home": {
+    "brand": "Stellar",
+    "eyebrow": "Live on Stellar testnet",
+    "title": "Lend and borrow on {brand}",
+    "subtitle": "StellarLend is an over-collateralised money market on Soroban. Supply assets to earn yield, or borrow against what you hold.",
+    "launchApp": "Launch app",
+    "readDocs": "Read the docs",
+    "totalSupplied": "Total supplied",
+    "totalBorrowed": "Total borrowed",
+    "markets": "Markets",
+    "note": "Market figures shown are illustrative testnet/demo data.",
+    "features": [
+      {
+        "title": "Supply and earn",
+        "description": "Deposit assets into pools and earn variable yield, accrued every ledger."
+      },
+      {
+        "title": "Borrow against collateral",
+        "description": "Borrow up to your collateral's LTV with a live health factor so you always see liquidation risk."
+      },
+      {
+        "title": "Built on Soroban",
+        "description": "Lending logic lives in audited-style Rust smart contracts on Stellar, with sub-5s finality and tiny fees."
+      },
+      {
+        "title": "Wallet-native",
+        "description": "Connect Freighter in one click. No wallet? Explore everything in demo mode."
+      }
+    ]
+  },
+  "wallet": {
+    "notDetected": "Freighter wallet not detected. Install it from freighter.app, or keep browsing in demo mode.",
+    "declined": "Wallet connection was declined.",
+    "unreachable": "Could not reach Freighter. Continue in demo mode.",
+    "unfunded": "0.00 (unfunded on testnet)"
+  },
+  "market": {
+    "title": "Markets",
+    "subtitle": "Supply to earn, borrow against collateral. Positions are simulated locally until contracts are wired.",
+    "wallet": "Wallet",
+    "demoMode": "Demo mode (no wallet connected)",
+    "collateral": "Collateral",
+    "borrowed": "Borrowed",
+    "health": "Health",
+    "nA": "n/a",
+    "asset": "Asset",
+    "price": "Price",
+    "supplyApy": "Supply APY",
+    "borrowApy": "Borrow APY",
+    "totalSupplied": "Total supplied",
+    "yourPosition": "Your position",
+    "trade": "Trade",
+    "connectFreighter": "Connect Freighter",
+    "disconnect": "Disconnect",
+    "amountIn": "Amount in {symbol}",
+    "supply": "Supply",
+    "borrow": "Borrow",
+    "withdraw": "Withdraw",
+    "repay": "Repay",
+    "confirm": "Confirm {action}",
+    "status": {
+      "positiveAmount": "Enter an amount greater than zero.",
+      "exceedsSupply": "Cannot withdraw more than supplied.",
+      "exceedsBorrowLimit": "Borrow exceeds your borrowing limit. Supply more collateral.",
+      "exceedsBorrowed": "Cannot repay more than borrowed.",
+      "underCollateralised": "Withdrawal would make your position undercollateralised.",
+      "recorded": "{action} of {amount} {symbol} recorded (demo ledger)."
+    },
+    "contract": "Lending contract",
+    "notDeployed": "not deployed",
+    "balance": "{balance} XLM"
+  },
+  "docs": {
+    "title": "Documentation",
+    "overview": {
+      "title": "Overview",
+      "body": "StellarLend is an over-collateralised lending market on Stellar. Users supply assets to earn interest and borrow other assets against their collateral. Core logic is implemented as Soroban smart contracts; this web app is the user interface."
+    },
+    "gettingStarted": {
+      "title": "Getting started",
+      "step1": "Install the Freighter wallet and switch it to Testnet.",
+      "step2": "Fund your account with the Stellar testnet friendbot.",
+      "step3": "Open Markets and click Connect Freighter. Without a wallet the app runs in demo mode.",
+      "step4": "Pick an asset, then Supply, Borrow, Withdraw or Repay."
+    },
+    "riskParameters": {
+      "title": "Risk parameters",
+      "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable."
+    },
+    "architecture": {
+      "title": "Architecture",
+      "body": "Next.js 15 (App Router) front end, Freighter for signing, Horizon for balances, Soroban RPC for contract calls. Position state in this build is a local demo ledger; contract invocation is configured through environment variables."
+    },
+    "contracts": {
+      "title": "Deployed contracts (testnet)",
+      "label": "Lending contract",
+      "notDeployed": "not deployed"
+    },
+    "env": {
+      "title": "Environment variables"
+    }
+  },
+  "footer": {
+    "notice": "StellarLend runs on Stellar testnet. No real funds. Not financial advice.",
+    "github": "GitHub repo",
+    "liveSite": "Live site"
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "nav": {
+    "brand": "Stellar",
+    "markets": "Mercados",
+    "docs": "Documentación",
+    "github": "GitHub",
+    "switchLocale": "EN"
+  },
+  "home": {
+    "brand": "Stellar",
+    "eyebrow": "En vivo en Stellar testnet",
+    "title": "Presta y toma prestado en {brand}",
+    "subtitle": "StellarLend es un mercado de crédito sobrecolateralizado en Soroban. Aporta activos para ganar rendimiento o toma prestado contra lo que tienes.",
+    "launchApp": "Abrir app",
+    "readDocs": "Leer la documentación",
+    "totalSupplied": "Total suministrado",
+    "totalBorrowed": "Total prestado",
+    "markets": "Mercados",
+    "note": "Las cifras del mercado son datos ilustrativos de testnet/demo.",
+    "features": [
+      {
+        "title": "Aporta y gana",
+        "description": "Deposita activos en pools y gana rendimiento variable, acumulado en cada ledger."
+      },
+      {
+        "title": "Pide prestado contra colateral",
+        "description": "Pide prestado hasta el LTV de tu colateral con un factor de salud en vivo para ver siempre el riesgo de liquidación."
+      },
+      {
+        "title": "Construido en Soroban",
+        "description": "La lógica de préstamo vive en contratos inteligentes Rust auditable-style en Stellar, con finalidad en menos de 5 s y tarifas mínimas."
+      },
+      {
+        "title": "Nativo para wallets",
+        "description": "Conecta Freighter en un clic. ¿Sin wallet? Explora todo en modo demo."
+      }
+    ]
+  },
+  "wallet": {
+    "notDetected": "No se detectó Freighter. Instálalo desde freighter.app o sigue navegando en modo demo.",
+    "declined": "La conexión de la cartera fue rechazada.",
+    "unreachable": "No se pudo contactar con Freighter. Continúa en modo demo.",
+    "unfunded": "0,00 (sin fondos en testnet)"
+  },
+  "market": {
+    "title": "Mercados",
+    "subtitle": "Aporta para ganar, pide prestado contra colateral. Las posiciones se simulan localmente hasta que los contratos se conecten.",
+    "wallet": "Cartera",
+    "demoMode": "Modo demo (sin cartera conectada)",
+    "collateral": "Colateral",
+    "borrowed": "Prestado",
+    "health": "Salud",
+    "nA": "n/a",
+    "asset": "Activo",
+    "price": "Precio",
+    "supplyApy": "APY de depósito",
+    "borrowApy": "APY de préstamo",
+    "totalSupplied": "Total suministrado",
+    "yourPosition": "Tu posición",
+    "trade": "Operar",
+    "connectFreighter": "Conectar Freighter",
+    "disconnect": "Desconectar",
+    "amountIn": "Cantidad en {symbol}",
+    "supply": "Depositar",
+    "borrow": "Pedir prestado",
+    "withdraw": "Retirar",
+    "repay": "Pagar",
+    "confirm": "Confirmar {action}",
+    "status": {
+      "positiveAmount": "Introduce una cantidad mayor que cero.",
+      "exceedsSupply": "No puedes retirar más de lo suministrado.",
+      "exceedsBorrowLimit": "El préstamo supera tu límite de endeudamiento. Aporta más colateral.",
+      "exceedsBorrowed": "No puedes pagar más de lo prestado.",
+      "underCollateralised": "La retirada dejaría tu posición infracolateralizada.",
+      "recorded": "{action} de {amount} {symbol} registrado (libro de demostración)."
+    },
+    "contract": "Contrato de préstamo",
+    "notDeployed": "no desplegado",
+    "balance": "{balance} XLM"
+  },
+  "docs": {
+    "title": "Documentación",
+    "overview": {
+      "title": "Resumen",
+      "body": "StellarLend es un mercado de préstamos sobrecolateralizado en Stellar. Los usuarios aportan activos para ganar interés y piden prestados otros activos frente a su colateral. La lógica principal se implementa en contratos inteligentes Soroban; esta aplicación web es la interfaz de usuario."
+    },
+    "gettingStarted": {
+      "title": "Primeros pasos",
+      "step1": "Instala la cartera Freighter y cámbiala a Testnet.",
+      "step2": "Financia tu cuenta con el friendbot de Stellar testnet.",
+      "step3": "Abre Mercados y haz clic en Conectar Freighter. Sin cartera la app funciona en modo demo.",
+      "step4": "Elige un activo y luego Depositar, Pedir prestado, Retirar o Pagar."
+    },
+    "riskParameters": {
+      "title": "Parámetros de riesgo",
+      "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable."
+    },
+    "architecture": {
+      "title": "Arquitectura",
+      "body": "Frontend en Next.js 15 (App Router), Freighter para firmas, Horizon para saldos y Soroban RPC para llamadas de contrato. El estado de las posiciones en esta versión es un libro de demostración local; la invocación del contrato se configura mediante variables de entorno."
+    },
+    "contracts": {
+      "title": "Contratos desplegados (testnet)",
+      "label": "Contrato de préstamo",
+      "notDeployed": "no desplegado"
+    },
+    "env": {
+      "title": "Variables de entorno"
+    }
+  },
+  "footer": {
+    "notice": "StellarLend funciona en Stellar testnet. No hay fondos reales. No es asesoramiento financiero.",
+    "github": "Repositorio de GitHub",
+    "liveSite": "Sitio en vivo"
+  }
+}
