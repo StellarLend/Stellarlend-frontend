@@ -119,7 +119,7 @@ export default function MarketsApp() {
       )}
 
       <p className="text-xs mut">
-        Lending contract: {config.lendingId ? <a className="underline" href={explorer(config.lendingId)} target="_blank" rel="noreferrer">{config.lendingId}</a> : "not deployed"}
+        Lending contract: {config.lendingId ? <a className="break-all underline" href={explorer(config.lendingId)} target="_blank" rel="noreferrer">{config.lendingId}</a> : "not deployed"}
       </p>
     </div>
   );

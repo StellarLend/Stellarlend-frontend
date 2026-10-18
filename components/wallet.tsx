@@ -48,5 +48,5 @@ export function ConnectButton() {
   if (address) return (
     <button className="btn-ghost text-sm" onClick={disconnect} title="Disconnect">{address.slice(0, 4)}...{address.slice(-4)}</button>
   );
-  return <button className="btn text-sm" onClick={connect}>Connect Freighter</button>;
+  return <button className="btn whitespace-nowrap text-xs sm:text-sm" onClick={connect}>Connect<span className="hidden sm:inline">&nbsp;Freighter</span></button>;
 }

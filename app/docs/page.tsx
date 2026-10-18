@@ -12,9 +12,9 @@ export default function Docs() {
       <S t="Overview"><p>StellarLend is an over-collateralised lending market on Stellar. Users supply assets to earn interest and borrow other assets against their collateral. Core logic is implemented as Soroban smart contracts; this web app is the user interface.</p></S>
       <S t="Getting started">
         <ol className="list-decimal space-y-1 pl-5">
-          <li>Install the <a className="underline" href="https://freighter.app" target="_blank" rel="noreferrer">Freighter</a> wallet and switch it to Testnet.</li>
+          <li>Install the <a className="break-all underline" href="https://freighter.app" target="_blank" rel="noreferrer">Freighter</a> wallet and switch it to Testnet.</li>
           <li>Fund your account with the Stellar testnet friendbot.</li>
-          <li>Open <a className="underline" href="/markets">Markets</a> and click Connect Freighter. Without a wallet the app runs in demo mode.</li>
+          <li>Open <a className="break-all underline" href="/markets">Markets</a> and click Connect Freighter. Without a wallet the app runs in demo mode.</li>
           <li>Pick an asset, then Supply, Borrow, Withdraw or Repay.</li>
         </ol>
       </S>
@@ -25,8 +25,8 @@ export default function Docs() {
         <p>Next.js 15 (App Router) front end, Freighter for signing, Horizon for balances, Soroban RPC for contract calls. Position state in this build is a local demo ledger; contract invocation is configured through environment variables.</p>
       </S>
       <S t="Deployed contracts (testnet)">
-        <ul className="space-y-1 font-mono text-xs">
-          <li>Lending: {config.lendingId ? <a className="underline" href={explorer(config.lendingId)} target="_blank" rel="noreferrer">{config.lendingId}</a> : "not deployed"}</li>
+        <ul className="space-y-1 break-all font-mono text-xs">
+          <li>Lending: {config.lendingId ? <a className="break-all underline" href={explorer(config.lendingId)} target="_blank" rel="noreferrer">{config.lendingId}</a> : "not deployed"}</li>
         </ul>
       </S>
       <S t="Environment variables">
