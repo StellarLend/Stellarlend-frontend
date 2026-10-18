@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "echo \"no tests\"",
-    "test:coverage": "echo \"no tests\""
+    "test": "node --test lib/demo-ledger.test.mjs",
+    "test:coverage": "node --test lib/demo-ledger.test.mjs"
   },
   "dependencies": {
     "@stellar/freighter-api": "^4.0.0",
