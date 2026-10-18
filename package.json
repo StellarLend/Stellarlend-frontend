@@ -8,8 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "echo \"no tests\"",
-    "test:coverage": "echo \"no tests\""
+    "check-lockfile": "node scripts/check-lockfile.mjs",
+    "test": "node scripts/check-lockfile.mjs && node --test scripts/check-lockfile.test.mjs",
+    "test:coverage": "node scripts/check-lockfile.mjs && node --test scripts/check-lockfile.test.mjs"
   },
   "dependencies": {
     "@stellar/freighter-api": "^4.0.0",
