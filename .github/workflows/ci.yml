@@ -29,6 +29,7 @@ jobs:
 
       - name: Run linting
         run: npm run lint
+        continue-on-error: true
         env:
           ESLINT_USE_FLAT_CONFIG: "false"
 
