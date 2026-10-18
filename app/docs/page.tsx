@@ -26,14 +26,12 @@ export default function Docs() {
       </S>
       <S t="Deployed contracts (testnet)">
         <ul className="space-y-1 font-mono text-xs">
-          {([["Lending", config.lendingId], ["Oracle", config.oracleId], ["Token", config.tokenId]] as const).map(([n, id]) => (
-            <li key={n}>{n}: {id ? <a className="underline" href={explorer(id)} target="_blank" rel="noreferrer">{id}</a> : "not configured"}</li>
-          ))}
+          <li>Lending: {config.lendingId ? <a className="underline" href={explorer(config.lendingId)} target="_blank" rel="noreferrer">{config.lendingId}</a> : "not deployed"}</li>
         </ul>
       </S>
       <S t="Environment variables">
         <ul className="list-disc space-y-1 pl-5 font-mono text-xs">
-          {["NEXT_PUBLIC_STELLAR_NETWORK", "NEXT_PUBLIC_HORIZON_URL", "NEXT_PUBLIC_SOROBAN_RPC_URL", "NEXT_PUBLIC_LENDING_CONTRACT_ID", "NEXT_PUBLIC_ORACLE_CONTRACT_ID", "NEXT_PUBLIC_TOKEN_CONTRACT_ID"].map((v) => <li key={v}>{v}</li>)}
+          {["NEXT_PUBLIC_STELLAR_NETWORK", "NEXT_PUBLIC_HORIZON_URL", "NEXT_PUBLIC_SOROBAN_RPC_URL", "NEXT_PUBLIC_LENDING_CONTRACT_ID"].map((v) => <li key={v}>{v}</li>)}
         </ul>
       </S>
     </article>

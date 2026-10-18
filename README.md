@@ -37,11 +37,11 @@ npm run build
 | `NEXT_PUBLIC_HORIZON_URL` | Horizon endpoint |
 | `NEXT_PUBLIC_SOROBAN_RPC_URL` | Soroban RPC endpoint |
 | `NEXT_PUBLIC_LENDING_CONTRACT_ID` | Deployed lending contract (testnet) |
-| `NEXT_PUBLIC_ORACLE_CONTRACT_ID` | Deployed oracle contract |
-| `NEXT_PUBLIC_TOKEN_CONTRACT_ID` | Deployed token contract |
 
 ## Deployed contracts (testnet)
-Pending: contract IDs from the testnet deployment of stellarlend-contracts will be listed here and set as `NEXT_PUBLIC_*_CONTRACT_ID` in Vercel.
+Lending contract (Stellar testnet): [`CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6`](https://stellar.expert/explorer/testnet/contract/CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6)
+
+Set as `NEXT_PUBLIC_LENDING_CONTRACT_ID` in Vercel. Oracle and token contracts are not deployed.
 
 ## Deploy
 Deployed on Vercel; set the env vars above in the project settings.
