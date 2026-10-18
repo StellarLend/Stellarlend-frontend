@@ -16,8 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--bg)]/85 backdrop-blur">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
               <Link href="/" className="text-lg font-bold"><span className="grad">Stellar</span>Lend</Link>
-              <nav className="flex items-center gap-3 text-sm mut sm:gap-5">
+              <nav className="flex items-center gap-2 text-xs mut sm:gap-5 sm:text-sm">
                 <Link href="/markets" className="hover:text-white">Markets</Link>
+                <Link href="/flash-loans" className="hover:text-white">Flash loans</Link>
                 <Link href="/docs" className="hover:text-white">Docs</Link>
                 <a href="https://github.com/StellarLend/Stellarlend-frontend" className="hidden hover:text-white sm:inline">GitHub</a>
               </nav>
