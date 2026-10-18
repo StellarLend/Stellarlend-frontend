@@ -17,6 +17,16 @@
     "totalBorrowed": "Total prestado",
     "markets": "Mercados",
     "note": "Las cifras del mercado son datos ilustrativos de testnet/demo.",
+    "solvencyTitle": "Solvencia del protocolo",
+    "solvencySubtitle": "Un protocolo sano mantiene un colchón de seguro listo para absorber pérdidas antes de afectar a los depositantes.",
+    "insuranceFund": "Fondo de seguro",
+    "insuranceShare": "Participación del seguro",
+    "badDebt": "Deuda mala",
+    "coverage": "Cobertura",
+    "fullyCovered": "Totalmente cubierto",
+    "writeOffHistory": "Historial de baja",
+    "noWriteOffHistory": "Sin historial de bajas",
+    "socialized": "Socializado",
     "features": [
       {
         "title": "Aporta y gana",

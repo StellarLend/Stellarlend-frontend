@@ -3,11 +3,31 @@
 import React from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
+import { SolvencyPanel, defaultSolvencyPanelLabels } from "@/components/solvency-panel";
 import { MARKETS, formatCompactCurrency, type Locale } from "@/lib/markets";
+import { readProtocolSolvency, type BadDebtWriteOffEvent, type SolvencyMetrics } from "@/lib/solvency";
 
 export function HomePage() {
   const locale = useLocale() as Locale;
   const t = useTranslations("home");
+  const [solvency, setSolvency] = React.useState<SolvencyMetrics | null>(null);
+  const [writeOffs, setWriteOffs] = React.useState<BadDebtWriteOffEvent[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      const result = await readProtocolSolvency();
+      if (!active) return;
+      setSolvency(result.metrics);
+      setWriteOffs(result.writeOffs);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const tvl = MARKETS.reduce((sum, market) => sum + market.totalSupply * market.price, 0);
   const borrowed = MARKETS.reduce((sum, market) => sum + market.totalBorrow * market.price, 0);
   const marketsHref = locale === "es" ? "/es/markets" : "/markets";
@@ -39,6 +59,23 @@ export function HomePage() {
           </div>
         ))}
       </section>
+
+      <SolvencyPanel
+        metrics={solvency}
+        writeOffs={writeOffs}
+        compact
+        labels={{
+          ...defaultSolvencyPanelLabels,
+          title: t("solvencyTitle"),
+          insuranceFund: t("insuranceFund"),
+          insuranceShare: t("insuranceShare"),
+          badDebt: t("badDebt"),
+          coverage: t("coverage"),
+          writeOffHistory: t("writeOffHistory"),
+          noWriteOffHistory: t("noWriteOffHistory"),
+          socialized: t("socialized"),
+        }}
+      />
 
       <section className="grid gap-4 sm:grid-cols-2">
         {t.raw("features").map((feature: { title: string; description: string }) => (
