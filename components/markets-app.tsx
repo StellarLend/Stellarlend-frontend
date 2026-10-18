@@ -13,13 +13,19 @@ export default function MarketsApp() {
   const { address, balance, error, connect } = useWallet();
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
-  const [pos, setPos] = useState<Pos>({});
+  const [pos, setPos] = useState<Pos>(() => {
+    try {
+      const s = localStorage.getItem(KEY);
+      return s ? JSON.parse(s) : {};
+    } catch {
+      return {};
+    }
+  });
   const [sel, setSel] = useState<Market | null>(null);
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
   const [msg, setMsg] = useState("");
 
-  useEffect(() => { try { const s = localStorage.getItem(KEY); if (s) setPos(JSON.parse(s)); } catch {} }, []);
   const save = (p: Pos) => { setPos(p); try { localStorage.setItem(KEY, JSON.stringify(p)); } catch {} };
 
   const { collateralUsd, borrowUsd, limitUsd } = useMemo(() => {

@@ -6,14 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@stellar/freighter-api": "^4.0.0",
-    "next": "15.2.8",
+    "next": "^16.4.2",
     "next-intl": "^4.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -22,15 +22,15 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/coverage-v8": "^2.1.9",
-    "eslint": "^9.31.0",
-    "eslint-config-next": "15.2.3",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^16.4.2",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^2.1.9"
+    "vitest": "^5.0.5"
   }
 }
