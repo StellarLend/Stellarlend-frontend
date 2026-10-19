@@ -11,6 +11,7 @@
     "check-lockfile": "node scripts/check-lockfile.mjs",
     "test": "node scripts/check-lockfile.mjs && vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs lib/csp.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
     "test:coverage": "vitest run --config vitest.config.ts --coverage && node --test lib/demo-ledger.test.mjs lib/csp.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
+    "test:e2e": "playwright test",
     "check-lending-errors": "node scripts/check-lending-errors.mjs"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
