@@ -97,7 +97,29 @@
     "contract": "Lending contract",
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
-    "resetDemo": "Reset demo data"
+    "resetDemo": "Reset demo data",
+    "oracle": {
+      "title": "On-chain oracle prices",
+      "subtitle": "Prices, freshness, and bounds recorded by the lending contract.",
+      "fresh": "Fresh",
+      "stale": "Stale",
+      "future": "Future-dated",
+      "missing": "Missing",
+      "noOnChainPrice": "No on-chain price",
+      "oracleSource": "Oracle",
+      "demoSource": "Demo price",
+      "updatedAgo": "Updated {time}",
+      "justNow": "just now",
+      "staleWarning": "Stale price (>1h old): new borrows and liquidations will fail.",
+      "futureWarning": "Future-dated timestamp: contract rejects timestamp > ledger close time.",
+      "bounds": "Bounds",
+      "min": "Min: {price}",
+      "max": "Max: {price}",
+      "noBounds": "No bounds set",
+      "timeSourceLedger": "Ledger time",
+      "timeSourceBrowser": "Browser clock",
+      "loading": "Loading oracle prices..."
+    }
   },
   "docs": {
     "title": "Documentation",
