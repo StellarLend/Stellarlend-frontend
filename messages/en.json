@@ -6,7 +6,8 @@
     "github": "GitHub",
     "switchLocale": "ES",
     "flashLoans": "Flash loans",
-    "governance": "Governance"
+    "governance": "Governance",
+    "amm": "AMM"
   },
   "home": {
     "brand": "Stellar",

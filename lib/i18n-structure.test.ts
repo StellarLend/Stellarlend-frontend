@@ -18,7 +18,7 @@ describe('i18n catalogs', () => {
     const roots = ['app', 'components'];
     // Feature areas merged before they were localized. Remove an entry once its
     // strings move into messages/*.json.
-    const pendingTranslation = [path.join('components', 'multisig')];
+    const pendingTranslation = [path.join('components', 'multisig'), path.join('components', 'amm')];
     const files: string[] = [];
 
     const walk = (dir: string) => {
