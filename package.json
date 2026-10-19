@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs",
+    "check-lockfile": "node scripts/check-lockfile.mjs",
+    "test": "node scripts/check-lockfile.mjs && vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs",
     "test:coverage": "vitest run --config vitest.config.ts && node --test lib/demo-ledger.test.mjs"
   },
   "dependencies": {
