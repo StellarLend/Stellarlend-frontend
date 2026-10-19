@@ -1,3 +1,13 @@
+// Well-known Stellar testnet asset issuers
+// Source for USDC & EURC: Circle official testnet documentation
+// https://developers.circle.com/stablecoins/docs/stellar-testnet-usdc
+export const TESTNET_ISSUERS = {
+  USDC: process.env.NEXT_PUBLIC_USDC_ISSUER || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  EURC: process.env.NEXT_PUBLIC_EURC_ISSUER || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  // Demo testnet BTC anchor issuer
+  BTC: process.env.NEXT_PUBLIC_BTC_ISSUER || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+};
+
 export const config = {
   network: process.env.NEXT_PUBLIC_STELLAR_NETWORK || "testnet",
   horizon: process.env.NEXT_PUBLIC_HORIZON_URL || "https://horizon-testnet.stellar.org",

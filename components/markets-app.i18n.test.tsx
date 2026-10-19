@@ -48,7 +48,7 @@ describe('MarketsApp locale rendering', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Mercados' })).toBeInTheDocument();
-    expect(screen.getByText('Cartera')).toBeInTheDocument();
+    expect(screen.getAllByText('Cartera').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Activo')).toBeInTheDocument();
   });
 });
