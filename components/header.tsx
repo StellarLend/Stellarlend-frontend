@@ -11,6 +11,7 @@ export function Header() {
   const t = useTranslations("nav");
   const marketsHref = locale === "es" ? "/es/markets" : "/markets";
   const flashLoansHref = locale === "es" ? "/es/flash-loans" : "/flash-loans";
+  const governanceHref = locale === "es" ? "/es/multisig" : "/multisig";
   const docsHref = locale === "es" ? "/es/docs" : "/docs";
   const homeHref = locale === "es" ? "/es" : "/";
 
@@ -23,6 +24,7 @@ export function Header() {
         <nav className="flex items-center gap-2 text-xs mut sm:gap-5 sm:text-sm">
           <Link href={marketsHref} className="hover:text-white">{t("markets")}</Link>
           <Link href={flashLoansHref} className="hover:text-white">{t("flashLoans")}</Link>
+          <Link href={governanceHref} className="hover:text-white">{t("governance")}</Link>
           <Link href={docsHref} className="hover:text-white">{t("docs")}</Link>
           <a href="https://github.com/StellarLend/Stellarlend-frontend" className="hidden hover:text-white sm:inline">
             {t("github")}
