@@ -5,11 +5,12 @@
 
 **Live demo: [https://stellarlend-frontend-tau.vercel.app](https://stellarlend-frontend-tau.vercel.app)**
 
-StellarLend is an over-collateralised lending market on Stellar (Soroban). This repo is the web UI: a landing page, a markets dashboard with supply / borrow / withdraw / repay flows, Freighter wallet connect, and a docs page.
+StellarLend is an over-collateralised lending market on Stellar (Soroban). This repo is the web UI: a landing page, a markets dashboard with supply / borrow / withdraw / repay flows, a flash-loan activity page, Freighter wallet connect, and docs.
 
 ## Features
 - Landing page with protocol stats
 - `/markets`: asset table, health factor, borrowing limit, trade panel
+- `/flash-loans`: recent on-chain flash-loan and repayment events, fee observations, utilization limit, and pause state
 - Freighter wallet connect with graceful no-wallet demo mode; testnet XLM balance via Horizon
 - `/docs`: user docs, risk parameters, deployed contract list, env vars
 

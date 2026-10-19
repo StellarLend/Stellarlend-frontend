@@ -21,6 +21,14 @@ export default function Docs() {
       <S t="Risk parameters">
         <p>Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable.</p>
       </S>
+      <S t="Flash loans">
+        <p>
+          Flash loans transfer assets to a receiver contract and invoke its <code>on_flash_loan</code> callback.
+          The receiver must repay the principal plus the fee within the same transaction. Visit{" "}
+          <a className="underline" href="/flash-loans">Flash loans</a> to inspect recent loan and repayment events,
+          the maximum flash utilization, and the current pause state.
+        </p>
+      </S>
       <S t="Architecture">
         <p>Next.js 15 (App Router) front end, Freighter for signing, Horizon for balances, Soroban RPC for contract calls. Position state in this build is a local demo ledger; contract invocation is configured through environment variables.</p>
       </S>
