@@ -97,7 +97,18 @@
     "contract": "Contrato de préstamo",
     "notDeployed": "no desplegado",
     "balance": "{balance} XLM",
-    "resetDemo": "Restablecer datos de demostración"
+    "resetDemo": "Restablecer datos de demostración",
+    "max": "Máx",
+    "preview": {
+      "title": "Impacto proyectado",
+      "borrowLimitUsed": "Límite de endeudamiento usado",
+      "healthFactor": "Factor de salud",
+      "collateral": "Colateral",
+      "debt": "Deuda",
+      "warningLiquidation": "Atención: El factor de salud proyectado está cerca de la liquidación (< 1,2).",
+      "dangerLiquidation": "La acción dejaría tu posición por debajo del factor de salud mínimo (< 1,0) con riesgo de liquidación.",
+      "balanceUnknown": "Conecta la cartera o espera a que se cargue el saldo para usar Máx"
+    }
   },
   "docs": {
     "title": "Documentación",

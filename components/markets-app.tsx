@@ -16,6 +16,8 @@ import {
   storageKey,
   type Ledger,
 } from "@/lib/demo-ledger";
+import { projectPosition, maxAmount, type ProjectedPosition } from "@/lib/projection";
+import { TradePreview } from "./trade-preview";
 
 export default function MarketsApp() {
   const { address, balance, error, connect } = useWallet();
@@ -26,6 +28,7 @@ export default function MarketsApp() {
   const [sel, setSel] = useState<Market | null>(null);
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
+  const [debouncedAmt, setDebouncedAmt] = useState("");
   const [msg, setMsg] = useState("");
 
   // Load positions from storage (per-wallet key)
@@ -65,10 +68,26 @@ export default function MarketsApp() {
     [address]
   );
 
-  const { collateralUsd, borrowUsd, health } = useMemo(
+  const { collateralUsd, borrowUsd, health, limitUsd } = useMemo(
     () => computeRisk(ledger, MARKETS),
     [ledger]
   );
+
+  // Debounce amount recomputation within 100ms
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedAmt(amt);
+    }, 100);
+    return () => clearTimeout(handler);
+  }, [amt]);
+
+  // Projected position after proposed trade
+  const projected = useMemo<ProjectedPosition | null>(() => {
+    if (!sel || !debouncedAmt.trim()) return null;
+    const normalized = normaliseAmountInput(debouncedAmt, locale);
+    const candidate = normalized ?? debouncedAmt.trim();
+    return projectPosition(ledger, MARKETS, sel, mode, candidate);
+  }, [sel, mode, debouncedAmt, ledger, locale]);
 
   function submit() {
     if (!sel) return;
@@ -218,6 +237,8 @@ export default function MarketsApp() {
                       className="btn-ghost"
                       onClick={() => {
                         setSel(m);
+                        setAmt("");
+                        setDebouncedAmt("");
                         setMsg("");
                       }}
                     >
@@ -240,6 +261,8 @@ export default function MarketsApp() {
                 key={x}
                 onClick={() => {
                   setMode(x);
+                  setAmt("");
+                  setDebouncedAmt("");
                   setMsg("");
                 }}
                 className={`rounded-lg py-2 ${mode === x ? "btn" : "btn-ghost"}`}
@@ -248,14 +271,58 @@ export default function MarketsApp() {
               </button>
             ))}
           </div>
-          <input
-            inputMode="decimal"
-            placeholder={t("amountIn", { symbol: sel.symbol })}
-            value={amt}
-            onChange={(e) => setAmt(e.target.value)}
-            aria-label={t("amountIn", { symbol: sel.symbol })}
+
+          <div className="relative flex items-center">
+            <input
+              inputMode="decimal"
+              placeholder={t("amountIn", { symbol: sel.symbol })}
+              value={amt}
+              onChange={(e) => setAmt(e.target.value)}
+              aria-label={t("amountIn", { symbol: sel.symbol })}
+              className="pr-16"
+            />
+            {(() => {
+              const maxCalculated = maxAmount({
+                mode,
+                symbol: sel.symbol,
+                ledger,
+                markets: MARKETS,
+                walletBalance: balance,
+              });
+              const isDisabled = maxCalculated === null;
+              return (
+                <button
+                  type="button"
+                  disabled={isDisabled}
+                  title={isDisabled ? t("preview.balanceUnknown") : t("max")}
+                  onClick={() => {
+                    if (maxCalculated !== null) {
+                      setAmt(maxCalculated);
+                      setDebouncedAmt(maxCalculated);
+                      setMsg("");
+                    }
+                  }}
+                  className="absolute right-2 px-2.5 py-1 text-xs font-semibold rounded bg-[var(--line)] text-mut hover:text-[var(--fg)] hover:border-[var(--acc)] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {t("max")}
+                </button>
+              );
+            })()}
+          </div>
+
+          <TradePreview
+            currentCollateralUsd={collateralUsd}
+            currentBorrowUsd={borrowUsd}
+            currentLimitUsd={limitUsd}
+            currentHealth={health}
+            projected={projected}
           />
-          <button className="btn w-full" onClick={submit}>
+
+          <button
+            className="btn w-full"
+            disabled={projected?.isUnsafe}
+            onClick={submit}
+          >
             {t("confirm", { action: t(mode) })}
           </button>
           {msg && (
