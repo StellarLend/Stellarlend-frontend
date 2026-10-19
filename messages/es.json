@@ -92,12 +92,24 @@
       "tooLarge": "La cantidad supera el máximo permitido.",
       "notFinite": "La cantidad debe ser un número finito (sin Infinity, NaN ni exponentes).",
       "storageReset": "Los datos de demostración se restablecieron porque el almacenamiento estaba dañado.",
-      "demoReset": "Datos de demostración restablecidos."
+      "demoReset": "Datos de demostración restablecidos.",
+      "pending": "Transacción pendiente…",
+      "confirmed": "Transacción confirmada.",
+      "failed": "La transacción falló.",
+      "cancelled": "Transacción cancelada en tu cartera.",
+      "timedOut": "La transacción agotó el tiempo de espera. Comprueba el explorador antes de reintentar.",
+      "positionError": "No se pudo cargar tu posición on-chain.",
+      "demoFallback": "Se muestra el libro de demostración hasta que el contrato esté configurado.",
+      "loadingPosition": "Cargando posición on-chain…"
     },
     "contract": "Contrato de préstamo",
     "notDeployed": "no desplegado",
     "balance": "{balance} XLM",
-    "resetDemo": "Restablecer datos de demostración"
+    "resetDemo": "Restablecer datos de demostración",
+    "comingSoon": "Próximamente",
+    "onchainMode": "Modo on-chain (testnet de Stellar)",
+    "xlmAmount": "{amount} XLM",
+    "viewTx": "Ver transacción"
   },
   "docs": {
     "title": "Documentación",

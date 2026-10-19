@@ -92,12 +92,24 @@
       "tooLarge": "Amount exceeds the maximum allowed.",
       "notFinite": "Amount must be a finite number (no Infinity, NaN, or exponents).",
       "storageReset": "Demo data was reset due to corrupted storage.",
-      "demoReset": "Demo data reset."
+      "demoReset": "Demo data reset.",
+      "pending": "Transaction pending…",
+      "confirmed": "Transaction confirmed.",
+      "failed": "The transaction failed.",
+      "cancelled": "Transaction cancelled in your wallet.",
+      "timedOut": "Transaction timed out. Check the explorer before retrying.",
+      "positionError": "Could not load your on-chain position.",
+      "demoFallback": "Showing the demo ledger until the contract is configured.",
+      "loadingPosition": "Loading on-chain position…"
     },
     "contract": "Lending contract",
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
-    "resetDemo": "Reset demo data"
+    "resetDemo": "Reset demo data",
+    "comingSoon": "Coming soon",
+    "onchainMode": "On-chain mode (Stellar testnet)",
+    "xlmAmount": "{amount} XLM",
+    "viewTx": "View transaction"
   },
   "docs": {
     "title": "Documentation",

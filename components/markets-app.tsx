@@ -3,12 +3,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
 import { useWallet } from "./wallet";
-import { config, explorer } from "@/lib/config";
+import { config, explorer, txExplorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
+import { toBaseUnits, DECIMALS, type AmountError } from "@/lib/amount";
+import {
+  isOnChainConfigured,
+  normaliseHealthFactor,
+  readPosition,
+  submitLendingAction,
+  type LendingPosition,
+  type LendingTx,
+} from "@/lib/lending-client";
 import {
   loadLedger,
   saveLedger,
-  parseAmount,
   toFloat,
   computeRisk,
   canWithdraw,
@@ -27,6 +35,32 @@ export default function MarketsApp() {
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
   const [msg, setMsg] = useState("");
+  const [position, setPosition] = useState<LendingPosition | null>(null);
+  const [positionError, setPositionError] = useState("");
+  const [loadingPosition, setLoadingPosition] = useState(false);
+  const [tx, setTx] = useState<LendingTx | null>(null);
+
+  const configured = isOnChainConfigured();
+  const onChainMode = Boolean(address && configured);
+  const busy = tx?.status === "pending";
+
+  const refreshPosition = useCallback(async () => {
+    if (!address || !configured) {
+      setPosition(null);
+      setPositionError("");
+      return;
+    }
+    setLoadingPosition(true);
+    setPositionError("");
+    try {
+      setPosition(await readPosition(address));
+    } catch {
+      setPosition(null);
+      setPositionError(t("status.positionError"));
+    } finally {
+      setLoadingPosition(false);
+    }
+  }, [address, configured, t]);
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -36,6 +70,11 @@ export default function MarketsApp() {
     setLedger(loaded);
     if (reset) setResetNotice(true);
   }, [address]);
+
+  // Refresh the on-chain position on connect and wallet reconnection.
+  useEffect(() => {
+    void refreshPosition();
+  }, [refreshPosition]);
 
   // Cross-tab sync via the storage event
   useEffect(() => {
@@ -65,27 +104,41 @@ export default function MarketsApp() {
     [address]
   );
 
-  const { collateralUsd, borrowUsd, health } = useMemo(
-    () => computeRisk(ledger, MARKETS),
-    [ledger]
-  );
+  const risk = useMemo(() => computeRisk(ledger, MARKETS), [ledger]);
 
-  function submit() {
-    if (!sel) return;
+  const health = onChainMode
+    ? (position ? normaliseHealthFactor(position.healthFactor) : null)
+    : risk.health;
+  const collateralText = onChainMode
+    ? position
+      ? t("xlmAmount", { amount: formatNumber(toFloat(position.collateral, DECIMALS), locale, 4) })
+      : "-"
+    : formatCurrency(risk.collateralUsd, locale);
+  const borrowedText = onChainMode
+    ? position
+      ? t("xlmAmount", { amount: formatNumber(toFloat(position.debt, DECIMALS), locale, 4) })
+      : "-"
+    : formatCurrency(risk.borrowUsd, locale);
+
+  function inputErrorText(error: AmountError, decimals: number): string {
+    const msgs: Record<string, string> = {
+      empty: t("status.positiveAmount"),
+      "invalid-format": t("status.invalidFormat"),
+      negative: t("status.negative"),
+      "too-many-decimals": t("status.tooManyDecimals", { decimals }),
+      "too-large": t("status.tooLarge"),
+    };
+    return msgs[error] ?? t("status.invalidFormat");
+  }
+
+  async function submit() {
+    if (!sel || busy) return;
     // Accept locale-formatted input (e.g. "1.234,5" in Spanish), then parse
-    // strictly into base units for the BigInt demo ledger.
+    // strictly into base units.
     const normalized = normaliseAmountInput(amt, locale);
-    const parsed = parseAmount(normalized ?? amt.trim(), sel.decimals);
+    const parsed = toBaseUnits(normalized ?? amt.trim(), sel.decimals);
     if (!parsed.ok) {
-      const msgs: Record<typeof parsed.error, string> = {
-        empty: t("status.positiveAmount"),
-        "invalid-format": t("status.invalidFormat"),
-        negative: t("status.negative"),
-        "too-many-decimals": t("status.tooManyDecimals", { decimals: sel.decimals }),
-        "too-large": t("status.tooLarge"),
-        "not-finite": t("status.notFinite"),
-      };
-      setMsg(msgs[parsed.error]);
+      setMsg(inputErrorText(parsed.error, sel.decimals));
       return;
     }
     const n = parsed.value;
@@ -93,6 +146,20 @@ export default function MarketsApp() {
       setMsg(t("status.positiveAmount"));
       return;
     }
+
+    if (onChainMode && sel.live && address) {
+      setMsg("");
+      setTx({ status: "pending", hash: null, error: null });
+      const action = mode === "supply" ? "deposit" : mode;
+      const result = await submitLendingAction(address, action, n, setTx);
+      if (result.status === "confirmed") {
+        setAmt("");
+        await refreshPosition();
+      }
+      return;
+    }
+
+    // Demo ledger path (no wallet, or contract not configured).
     const cur = ledger[sel.symbol] ?? { supplied: BigInt(0), borrowed: BigInt(0) };
     const next = { ...cur };
 
@@ -139,6 +206,21 @@ export default function MarketsApp() {
     setResetNotice(false);
   }
 
+  function transactionStatus() {
+    if (!tx || tx.status === "pending") return null;
+    if (tx.status === "confirmed") {
+      return t("status.confirmed");
+    }
+    if (tx.status === "cancelled") {
+      return t("status.cancelled");
+    }
+    if (tx.status === "timeout") {
+      return t("status.timedOut");
+    }
+    const detail = tx.error?.message ?? t("status.failed");
+    return tx.error?.hint ? `${detail} ${tx.error.hint}` : detail;
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -165,7 +247,11 @@ export default function MarketsApp() {
           ) : (
             <div>{t("demoMode")}</div>
           )}
+          {onChainMode && <div className="mut text-xs">{t("onchainMode")}</div>}
+          {address && !onChainMode && <div className="mut text-xs">{t("status.demoFallback")}</div>}
           {error && <div className="mt-1 text-amber-400">{error}</div>}
+          {positionError && <div className="mt-1 text-amber-400">{positionError}</div>}
+          {loadingPosition && <div className="mut text-xs">{t("status.loadingPosition")}</div>}
         </div>
         {!address && (
           <button className="btn" onClick={connect}>
@@ -173,12 +259,12 @@ export default function MarketsApp() {
           </button>
         )}
         <div className="grid grid-cols-3 gap-6 text-sm">
-          <Stat k={t("collateral")} v={formatCurrency(collateralUsd, locale)} />
-          <Stat k={t("borrowed")} v={formatCurrency(borrowUsd, locale)} />
+          <Stat k={t("collateral")} v={collateralText} />
+          <Stat k={t("borrowed")} v={borrowedText} />
           <Stat
             k={t("health")}
-            v={health === Infinity ? t("nA") : formatNumber(health, locale)}
-            tone={health < 1.2 ? "text-red-400" : "text-emerald-400"}
+            v={health === Infinity || health === null ? t("nA") : formatNumber(health, locale)}
+            tone={health !== null && health < 1.2 ? "text-red-400" : "text-emerald-400"}
           />
         </div>
       </div>
@@ -199,6 +285,10 @@ export default function MarketsApp() {
               const p = ledger[m.symbol];
               const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
               const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
+              const live = Boolean(m.live);
+              const onchainRow = live && onChainMode && position
+                ? `+${formatNumber(toFloat(position.collateral, DECIMALS), locale, 4)} / -${formatNumber(toFloat(position.debt, DECIMALS), locale, 4)}`
+                : null;
               return (
                 <tr key={m.symbol} className="border-b border-[var(--line)] last:border-0">
                   <td className="p-4">
@@ -209,20 +299,29 @@ export default function MarketsApp() {
                   <td className="p-4">{formatPercent(m.borrowApy, locale)}</td>
                   <td className="p-4">{formatNumber(m.totalSupply, locale, 0)}</td>
                   <td className="p-4 mut">
-                    {p
-                      ? `+${formatNumber(suppliedFloat, locale, 4)} / -${formatNumber(borrowedFloat, locale, 4)}`
+                    {live
+                      ? onChainMode
+                        ? onchainRow ?? "-"
+                        : p
+                          ? `+${formatNumber(suppliedFloat, locale, 4)} / -${formatNumber(borrowedFloat, locale, 4)}`
+                          : "-"
                       : "-"}
                   </td>
                   <td className="p-4 text-right">
-                    <button
-                      className="btn-ghost"
-                      onClick={() => {
-                        setSel(m);
-                        setMsg("");
-                      }}
-                    >
-                      {t("trade")}
-                    </button>
+                    {live ? (
+                      <button
+                        className="btn-ghost"
+                        onClick={() => {
+                          setSel(m);
+                          setMsg("");
+                          setTx(null);
+                        }}
+                      >
+                        {t("trade")}
+                      </button>
+                    ) : (
+                      <span className="mut">{t("comingSoon")}</span>
+                    )}
                   </td>
                 </tr>
               );
@@ -241,6 +340,7 @@ export default function MarketsApp() {
                 onClick={() => {
                   setMode(x);
                   setMsg("");
+                  setTx(null);
                 }}
                 className={`rounded-lg py-2 ${mode === x ? "btn" : "btn-ghost"}`}
               >
@@ -253,15 +353,33 @@ export default function MarketsApp() {
             placeholder={t("amountIn", { symbol: sel.symbol })}
             value={amt}
             onChange={(e) => setAmt(e.target.value)}
+            disabled={busy}
             aria-label={t("amountIn", { symbol: sel.symbol })}
           />
-          <button className="btn w-full" onClick={submit}>
-            {t("confirm", { action: t(mode) })}
+          <button className="btn w-full" onClick={submit} disabled={busy}>
+            {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
           </button>
           {msg && (
             <p className="mut text-sm" role="status">
               {msg}
             </p>
+          )}
+          {tx && (
+            <div className="text-sm" role="status">
+              <p className={tx.status === "failed" ? "text-red-300" : tx.status === "confirmed" ? "text-emerald-400" : "mut"}>
+                {transactionStatus()}
+              </p>
+              {tx.hash && (
+                <a
+                  className="break-all underline"
+                  href={txExplorer(tx.hash)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("viewTx")}
+                </a>
+              )}
+            </div>
           )}
         </div>
       )}
