@@ -10,6 +10,7 @@ StellarLend is an over-collateralised lending market on Stellar (Soroban). This 
 ## Features
 - Landing page with protocol stats
 - `/markets`: asset table, health factor, borrowing limit, trade panel
+- `/amm`: add/remove AMM liquidity with exact integer previews and Freighter signing
 - Freighter wallet connect with graceful no-wallet demo mode; testnet XLM balance via Horizon
 - `/docs`: user docs, risk parameters, deployed contract list, env vars
 
@@ -37,6 +38,11 @@ npm run build
 | `NEXT_PUBLIC_HORIZON_URL` | Horizon endpoint |
 | `NEXT_PUBLIC_SOROBAN_RPC_URL` | Soroban RPC endpoint |
 | `NEXT_PUBLIC_LENDING_CONTRACT_ID` | Deployed lending contract (testnet) |
+| `NEXT_PUBLIC_AMM_CONTRACT_ID` | Deployed AMM pool contract |
+| `NEXT_PUBLIC_AMM_TOKEN_A_CONTRACT_ID` | Token A Soroban contract used by the pool |
+| `NEXT_PUBLIC_AMM_TOKEN_B_CONTRACT_ID` | Token B Soroban contract used by the pool |
+| `NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET` | Optional Token A Horizon asset in `CODE:ISSUER` form |
+| `NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET` | Optional Token B Horizon asset in `CODE:ISSUER` form |
 
 ## Deployed contracts (testnet)
 Lending contract (Stellar testnet): [`CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6`](https://stellar.expert/explorer/testnet/contract/CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6)

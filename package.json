@@ -8,23 +8,29 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "echo \"no tests\"",
-    "test:coverage": "echo \"no tests\""
+    "test": "vitest run",
+    "test:coverage": "vitest run"
   },
   "dependencies": {
     "@stellar/freighter-api": "^4.0.0",
+    "@stellar/stellar-sdk": "^17.2.1",
     "next": "15.2.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.31.0",
     "eslint-config-next": "15.2.3",
+    "fast-check": "^4.10.2",
+    "jsdom": "^26.1.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

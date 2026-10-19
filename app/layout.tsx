@@ -18,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/" className="text-lg font-bold"><span className="grad">Stellar</span>Lend</Link>
               <nav className="flex items-center gap-3 text-sm mut sm:gap-5">
                 <Link href="/markets" className="hover:text-white">Markets</Link>
+                <Link href="/amm" className="hover:text-white">AMM</Link>
                 <Link href="/docs" className="hover:text-white">Docs</Link>
                 <a href="https://github.com/StellarLend/Stellarlend-frontend" className="hidden hover:text-white sm:inline">GitHub</a>
               </nav>
