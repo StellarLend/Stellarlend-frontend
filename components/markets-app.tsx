@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
+import { AmountInput, Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
 import { config, explorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
@@ -147,12 +148,12 @@ export default function MarketsApp() {
       </div>
 
       {resetNotice && (
-        <div className="card p-4 text-sm text-amber-400" role="alert">
+        <Card className="p-4 text-sm text-amber-400" role="alert">
           {t("status.storageReset")}
-        </div>
+        </Card>
       )}
 
-      <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
+      <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="text-sm">
           <div className="mut">{t("wallet")}</div>
           {address ? (
@@ -168,9 +169,9 @@ export default function MarketsApp() {
           {error && <div className="mt-1 text-amber-400">{error}</div>}
         </div>
         {!address && (
-          <button className="btn" onClick={connect}>
+          <Button variant="primary" onClick={connect}>
             {t("connectFreighter")}
-          </button>
+          </Button>
         )}
         <div className="grid grid-cols-3 gap-6 text-sm">
           <Stat k={t("collateral")} v={formatCurrency(collateralUsd, locale)} />
@@ -178,12 +179,12 @@ export default function MarketsApp() {
           <Stat
             k={t("health")}
             v={health === Infinity ? t("nA") : formatNumber(health, locale)}
-            tone={health < 1.2 ? "text-red-400" : "text-emerald-400"}
+            tone={health < 1.2 ? "danger" : "positive"}
           />
         </div>
-      </div>
+      </Card>
 
-      <div className="card overflow-x-auto">
+      <Card className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
@@ -214,56 +215,57 @@ export default function MarketsApp() {
                       : "-"}
                   </td>
                   <td className="p-4 text-right">
-                    <button
-                      className="btn-ghost"
+                    <Button
+                      variant="ghost"
                       onClick={() => {
                         setSel(m);
                         setMsg("");
                       }}
                     >
                       {t("trade")}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       {sel && (
-        <div className="card max-w-md space-y-4 p-6">
+        <Card className="max-w-md space-y-4 p-6">
           <h2 className="text-xl font-semibold">{sel.symbol}</h2>
           <div className="grid grid-cols-4 gap-1 text-sm">
             {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => (
-              <button
+              <Button
                 key={x}
+                variant={mode === x ? "primary" : "ghost"}
+                className="rounded-lg py-2"
                 onClick={() => {
                   setMode(x);
                   setMsg("");
                 }}
-                className={`rounded-lg py-2 ${mode === x ? "btn" : "btn-ghost"}`}
               >
                 {t(x)}
-              </button>
+              </Button>
             ))}
           </div>
-          <input
-            inputMode="decimal"
+          <AmountInput
+            decimals={sel.decimals}
             placeholder={t("amountIn", { symbol: sel.symbol })}
             value={amt}
             onChange={(e) => setAmt(e.target.value)}
             aria-label={t("amountIn", { symbol: sel.symbol })}
           />
-          <button className="btn w-full" onClick={submit}>
+          <Button variant="primary" className="w-full" onClick={submit}>
             {t("confirm", { action: t(mode) })}
-          </button>
+          </Button>
           {msg && (
             <p className="mut text-sm" role="status">
               {msg}
             </p>
           )}
-        </div>
+        </Card>
       )}
 
       <div className="flex items-center justify-between text-xs mut">
@@ -282,19 +284,10 @@ export default function MarketsApp() {
             t("notDeployed")
           )}
         </p>
-        <button className="btn-ghost text-xs" onClick={resetDemo}>
+        <Button variant="ghost" size="sm" className="text-xs" onClick={resetDemo}>
           {t("resetDemo")}
-        </button>
+        </Button>
       </div>
-    </div>
-  );
-}
-
-function Stat({ k, v, tone = "" }: { k: string; v: string; tone?: string }) {
-  return (
-    <div>
-      <div className="mut">{k}</div>
-      <div className={`text-lg font-semibold ${tone}`}>{v}</div>
     </div>
   );
 }
