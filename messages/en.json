@@ -53,7 +53,15 @@
     "notDetected": "Freighter wallet not detected. Install it from freighter.app, or keep browsing in demo mode.",
     "declined": "Wallet connection was declined.",
     "unreachable": "Could not reach Freighter. Continue in demo mode.",
-    "unfunded": "0.00 (unfunded on testnet)"
+    "unfunded": "0.00 (unfunded on testnet)",
+    "connectWallet": "Connect a Wallet",
+    "loadingWallets": "Loading available wallets...",
+    "recent": "Recent",
+    "available": "Available",
+    "notInstalled": "Not installed",
+    "install": "Install",
+    "connecting": "Connecting...",
+    "close": "Close"
   },
   "market": {
     "title": "Markets",

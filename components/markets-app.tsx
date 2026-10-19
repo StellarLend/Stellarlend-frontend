@@ -18,7 +18,7 @@ import {
 } from "@/lib/demo-ledger";
 
 export default function MarketsApp() {
-  const { address, balance, error, connect } = useWallet();
+  const { address, balance, error, openPicker } = useWallet();
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
   const [ledger, setLedger] = useState<Ledger>({});
@@ -168,7 +168,7 @@ export default function MarketsApp() {
           {error && <div className="mt-1 text-amber-400">{error}</div>}
         </div>
         {!address && (
-          <button className="btn" onClick={connect}>
+          <button className="btn" onClick={openPicker}>
             {t("connectFreighter")}
           </button>
         )}

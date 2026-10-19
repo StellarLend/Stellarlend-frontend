@@ -53,7 +53,15 @@
     "notDetected": "No se detectó Freighter. Instálalo desde freighter.app o sigue navegando en modo demo.",
     "declined": "La conexión de la cartera fue rechazada.",
     "unreachable": "No se pudo contactar con Freighter. Continúa en modo demo.",
-    "unfunded": "0,00 (sin fondos en testnet)"
+    "unfunded": "0,00 (sin fondos en testnet)",
+    "connectWallet": "Conectar una cartera",
+    "loadingWallets": "Cargando carteras disponibles...",
+    "recent": "Reciente",
+    "available": "Disponible",
+    "notInstalled": "No instalado",
+    "install": "Instalar",
+    "connecting": "Conectando...",
+    "close": "Cerrar"
   },
   "market": {
     "title": "Mercados",
