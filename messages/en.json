@@ -1,4 +1,4 @@
-{
+﻿{
   "nav": {
     "brand": "Stellar",
     "markets": "Markets",
@@ -53,7 +53,29 @@
     "notDetected": "Freighter wallet not detected. Install it from freighter.app, or keep browsing in demo mode.",
     "declined": "Wallet connection was declined.",
     "unreachable": "Could not reach Freighter. Continue in demo mode.",
-    "unfunded": "0.00 (unfunded on testnet)"
+    "unfunded": "0.00 (unfunded on testnet)",
+    "fundWithFriendbot": "Fund with Friendbot",
+    "funding": "Funding...",
+    "fundTooltip": "Get free testnet XLM from Stellar Friendbot",
+    "fundCooldown": "Please wait {seconds}s before requesting Friendbot funding again.",
+    "fundFailed": "Friendbot funding failed.",
+    "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments."
+  },
+  "onboarding": {
+    "title": "Testnet Quickstart Checklist",
+    "subtitle": "Complete these steps to start using StellarLend on testnet in under a minute.",
+    "dismiss": "Dismiss",
+    "stepInstalled": "Freighter wallet installed",
+    "installFreighter": "Install Freighter",
+    "stepConnected": "Wallet connected",
+    "stepNetwork": "Connected to Stellar Testnet",
+    "stepFunded": "Account funded with testnet XLM",
+    "stepSupply": "First supply position created",
+    "fundWithFriendbot": "Fund with Friendbot",
+    "funding": "Funding account...",
+    "manualLink": "Stellar Lab Faucet",
+    "retry": "Retry",
+    "manualFaucet": "Manual Faucet"
   },
   "market": {
     "title": "Markets",

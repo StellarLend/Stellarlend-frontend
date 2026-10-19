@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -26,7 +26,17 @@ export function DocsPage() {
       <S title={t("gettingStarted.title")}>
         <ol className="list-decimal space-y-1 pl-5">
           <li>{t("gettingStarted.step1")}</li>
-          <li>{t("gettingStarted.step2")}</li>
+          <li>
+            {t("gettingStarted.step2")}{" "}
+            <a
+              href="https://laboratory.stellar.org/#account-creator"
+              target="_blank"
+              rel="noreferrer"
+              className="underline text-blue-400 hover:text-blue-300"
+            >
+              (Stellar Laboratory Friendbot)
+            </a>
+          </li>
           <li>{t("gettingStarted.step3")}</li>
           <li>{t("gettingStarted.step4")}</li>
         </ol>

@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
 import { useWallet } from "./wallet";
 import { config, explorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
+import { OnboardingChecklist } from "./onboarding-checklist";
 import {
   loadLedger,
   saveLedger,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/demo-ledger";
 
 export default function MarketsApp() {
-  const { address, balance, error, connect } = useWallet();
+  const { address, balance, error, accountStatus, isFunding, fundError, fundAccount, connect } = useWallet();
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
   const [ledger, setLedger] = useState<Ledger>({});
@@ -27,6 +28,10 @@ export default function MarketsApp() {
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
   const [msg, setMsg] = useState("");
+
+  const hasSupplied = useMemo(() => {
+    return Object.values(ledger).some((entry) => entry && entry.supplied > BigInt(0));
+  }, [ledger]);
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -146,6 +151,8 @@ export default function MarketsApp() {
         <p className="mut mt-1 text-sm">{t("subtitle")}</p>
       </div>
 
+      <OnboardingChecklist hasSupplied={hasSupplied} />
+
       {resetNotice && (
         <div className="card p-4 text-sm text-amber-400" role="alert">
           {t("status.storageReset")}
@@ -166,7 +173,17 @@ export default function MarketsApp() {
             <div>{t("demoMode")}</div>
           )}
           {error && <div className="mt-1 text-amber-400">{error}</div>}
+          {fundError && <div className="mt-1 text-red-400">{fundError}</div>}
         </div>
+        {address && config.network === "testnet" && accountStatus === "unfunded" && (
+          <button
+            className="btn text-xs py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded"
+            onClick={fundAccount}
+            disabled={isFunding}
+          >
+            {isFunding ? t("funding") ?? "Funding..." : t("fundWithFriendbot") ?? "Fund with Friendbot"}
+          </button>
+        )}
         {!address && (
           <button className="btn" onClick={connect}>
             {t("connectFreighter")}
