@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Validate workflow syntax
@@ -44,8 +44,6 @@ jobs:
       - name: Run linting
         run: npm run lint
         continue-on-error: true
-        env:
-          ESLINT_USE_FLAT_CONFIG: "false"
 
       - name: Type checking
         run: npm run type-check

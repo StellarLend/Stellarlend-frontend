@@ -1,8 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import FlashLoans from "./flash-loans";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
+import FlashLoansPage from "./flash-loans";
 import type { FlashActivity } from "@/lib/flash-events";
+
+const FlashLoans = () => (
+  <NextIntlClientProvider locale="en" messages={messages}>
+    <FlashLoansPage />
+  </NextIntlClientProvider>
+);
 
 const mockEvents = vi.hoisted(() => ({
   fetchFlashEvents: vi.fn(),

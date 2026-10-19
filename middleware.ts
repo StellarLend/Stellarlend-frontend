@@ -1,7 +1,7 @@
 /**
  * middleware.ts — Next.js Edge Middleware for security headers.
  *
- * Runs on every HTML request. Injects:
+ * Runs on every HTML request. Applies next-intl locale routing, then injects:
  * - Content-Security-Policy (nonce-based, per-request)
  * - X-Content-Type-Options
  * - X-Frame-Options (belt-and-suspenders alongside CSP frame-ancestors)
@@ -11,8 +11,13 @@
  * HSTS and X-Content-Type-Options are also set in next.config.mjs headers()
  * for static asset responses; middleware handles the dynamic HTML pages.
  */
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import createIntlMiddleware from "next-intl/middleware";
 import { buildCsp } from "@/lib/csp";
+import { routing } from "./i18n/routing";
+
+// Locale detection / prefix handling from next-intl (en default, /es prefix).
+const handleI18nRouting = createIntlMiddleware(routing);
 
 // Middleware runs on the Edge runtime by default in Next.js 15; exporting
 // `runtime = "edge"` here makes `next build` fail, so it is left implicit.
@@ -51,7 +56,9 @@ export function middleware(request: NextRequest): NextResponse {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  // Let next-intl decide whether to redirect/rewrite for the locale, using the
+  // request that carries the CSP so the nonce reaches the rendered page.
+  const response = handleI18nRouting(new NextRequest(request, { headers: requestHeaders }));
 
   // Content-Security-Policy
   response.headers.set("Content-Security-Policy", csp);
@@ -78,16 +85,9 @@ export function middleware(request: NextRequest): NextResponse {
   return response;
 }
 
-// Only apply middleware to HTML pages — skip static assets, API routes, etc.
+// Only apply middleware to HTML pages — skip API routes, Next.js internals
+// (_next/static, _next/image, ...) and any path with a file extension
+// (favicon.ico, icon.svg, robots.txt, images, fonts, ...).
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths EXCEPT:
-     * - _next/static  (static files)
-     * - _next/image   (image optimisation)
-     * - favicon.ico, icon.svg, robots.txt, sitemap.xml
-     * - public asset files (images, icons, svgs)
-     */
-    "/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|otf)).*)",
-  ],
+  matcher: ["/((?!api|_next|.*\\..*).*)"],
 };

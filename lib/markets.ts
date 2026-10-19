@@ -18,5 +18,20 @@ export const MARKETS: Market[] = [
   { symbol: "BTC",  name: "Wrapped Bitcoin",   price: 67000,  supplyApy: 1.2, borrowApy: 3.5, totalSupply:        420, totalBorrow:         96, ltv: 0.75, decimals: 8 },
 ];
 
-export const fmt = (n: number, d = 2) =>
-  n.toLocaleString("en-US", { maximumFractionDigits: d });
+const DEFAULT_LOCALE = "en";
+
+export type Locale = "en" | "es";
+
+export const formatNumber = (value: number, locale: Locale = DEFAULT_LOCALE, digits = 2) =>
+  new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
+
+export const formatCurrency = (value: number, locale: Locale = DEFAULT_LOCALE, digits = 2) =>
+  new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: digits }).format(value);
+
+export const formatPercent = (value: number, locale: Locale = DEFAULT_LOCALE, digits = 2) =>
+  new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: digits }).format(value / 100);
+
+export const formatCompactCurrency = (value: number, locale: Locale = DEFAULT_LOCALE) =>
+  new Intl.NumberFormat(locale, { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
+
+export const fmt = (n: number, d = 2) => formatNumber(n, DEFAULT_LOCALE, d);
