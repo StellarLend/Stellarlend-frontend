@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import dynamic from 'next/dynamic';
+const ClientWalletProvider = dynamic(() => import('@/components/wallet').then(mod => mod.WalletProvider), { ssr: false });
 
 export const metadata: Metadata = {
   title: "StellarLend - Lending on Stellar",
@@ -12,8 +12,11 @@ export const dynamic = "force-dynamic";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen antialiased">{children}</body>
-    </html>
-  );
+  <html lang="en">
+    <body className="min-h-screen antialiased">
+      {/* Dynamically load WalletProvider only on client side */}
+      <ClientWalletProvider>{children}</ClientWalletProvider>
+    </body>
+  </html>
+);
 }
