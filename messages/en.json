@@ -18,6 +18,16 @@
     "totalBorrowed": "Total borrowed",
     "markets": "Markets",
     "note": "Market figures shown are illustrative testnet/demo data.",
+    "solvencyTitle": "Protocol solvency",
+    "solvencySubtitle": "A healthy protocol keeps an insurance buffer ready to absorb losses before depositors are hit.",
+    "insuranceFund": "Insurance fund",
+    "insuranceShare": "Insurance share",
+    "badDebt": "Bad debt",
+    "coverage": "Coverage",
+    "fullyCovered": "Fully covered",
+    "writeOffHistory": "Write-off history",
+    "noWriteOffHistory": "No write-off history",
+    "socialized": "Socialized",
     "features": [
       {
         "title": "Supply and earn",
