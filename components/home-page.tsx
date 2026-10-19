@@ -4,7 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { SolvencyPanel, defaultSolvencyPanelLabels } from "@/components/solvency-panel";
-import { MARKETS, formatCompactCurrency, type Locale } from "@/lib/markets";
+import { ProtocolStats } from "@/components/protocol-stats";
+import { type Locale } from "@/lib/markets";
 import { readProtocolSolvency, type BadDebtWriteOffEvent, type SolvencyMetrics } from "@/lib/solvency";
 
 export function HomePage() {
@@ -28,8 +29,6 @@ export function HomePage() {
     };
   }, []);
 
-  const tvl = MARKETS.reduce((sum, market) => sum + market.totalSupply * market.price, 0);
-  const borrowed = MARKETS.reduce((sum, market) => sum + market.totalBorrow * market.price, 0);
   const marketsHref = locale === "es" ? "/es/markets" : "/markets";
   const docsHref = locale === "es" ? "/es/docs" : "/docs";
 
@@ -47,18 +46,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {[
-          [t("totalSupplied"), formatCompactCurrency(tvl, locale)],
-          [t("totalBorrowed"), formatCompactCurrency(borrowed, locale)],
-          [t("markets"), String(MARKETS.length)],
-        ].map(([label, value]) => (
-          <div key={String(label)} className="card p-6 text-center">
-            <div className="text-3xl font-bold">{value}</div>
-            <div className="mut text-sm">{label}</div>
-          </div>
-        ))}
-      </section>
+      <ProtocolStats />
 
       <SolvencyPanel
         metrics={solvency}
