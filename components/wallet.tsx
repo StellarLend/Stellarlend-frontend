@@ -1,16 +1,34 @@
 "use client";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { config } from "@/lib/config";
+import { qk } from "@/lib/query-keys";
 
-type Ctx = { address: string | null; balance: string | null; error: string | null; connect: () => Promise<void>; disconnect: () => void };
-const WalletCtx = createContext<Ctx>({ address: null, balance: null, error: null, connect: async () => {}, disconnect: () => {} });
+type Ctx = {
+  address: string | null;
+  balance: string | null;
+  error: string | null;
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  invalidateBalance: () => Promise<void>;
+};
+
+const WalletCtx = createContext<Ctx>({
+  address: null,
+  balance: null,
+  error: null,
+  connect: async () => {},
+  disconnect: () => {},
+  invalidateBalance: async () => {},
+});
+
 export const useWallet = () => useContext(WalletCtx);
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const t = useTranslations("wallet");
+  const queryClient = useQueryClient();
   const [address, setAddress] = useState<string | null>(null);
-  const [balance, setBalance] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const connect = useCallback(async () => {
@@ -32,23 +50,55 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setError(t("unreachable"));
     }
   }, [t]);
-  const disconnect = () => { setAddress(null); setBalance(null); };
 
-  useEffect(() => {
+  const disconnect = useCallback(() => {
+    if (address) {
+      // Clear cached data for the disconnected address to avoid leaking data across accounts
+      queryClient.removeQueries({ queryKey: qk.account(address) });
+    }
+    setAddress(null);
+  }, [address, queryClient]);
+
+  const { data: balance = null } = useQuery({
+    queryKey: qk.accountBalance(address),
+    queryFn: async ({ signal }) => {
+      if (!address) return null;
+      const res = await fetch(`${config.horizon}/accounts/${address}`, { signal });
+      if (res.status === 404) {
+        return t("unfunded");
+      }
+      if (!res.ok) {
+        throw new Error(`Horizon error: ${res.status}`);
+      }
+      const accountData = await res.json();
+      const nativeBalance = accountData?.balances?.find(
+        (b: { asset_type: string }) => b.asset_type === "native"
+      );
+      return nativeBalance ? Number(nativeBalance.balance).toFixed(2) : t("unfunded");
+    },
+    enabled: Boolean(address),
+    staleTime: 15_000,
+  });
+
+  const invalidateBalance = useCallback(async () => {
     if (!address) return;
-    let live = true;
-    fetch(`${config.horizon}/accounts/${address}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((a) => {
-        if (!live) return;
-        const x = a?.balances?.find((b: { asset_type: string }) => b.asset_type === "native");
-        setBalance(x ? Number(x.balance).toFixed(2) : t("unfunded"));
-      })
-      .catch(() => live && setBalance(null));
-    return () => { live = false; };
-  }, [address, t]);
+    await queryClient.invalidateQueries({ queryKey: qk.accountBalance(address) });
+  }, [address, queryClient]);
 
-  return <WalletCtx.Provider value={{ address, balance, error, connect, disconnect }}>{children}</WalletCtx.Provider>;
+  return (
+    <WalletCtx.Provider
+      value={{
+        address,
+        balance,
+        error,
+        connect,
+        disconnect,
+        invalidateBalance,
+      }}
+    >
+      {children}
+    </WalletCtx.Provider>
+  );
 }
 
 export function ConnectButton() {
