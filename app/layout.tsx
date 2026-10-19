@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@/lib/config";
 
 export const metadata: Metadata = {
   title: "StellarLend - Lending on Stellar",
