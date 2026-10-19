@@ -9,8 +9,9 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "check-lockfile": "node scripts/check-lockfile.mjs",
-    "test": "node scripts/check-lockfile.mjs && vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs lib/csp.test.mjs",
-    "test:coverage": "vitest run --config vitest.config.ts --coverage && node --test lib/demo-ledger.test.mjs lib/csp.test.mjs"
+    "test": "node scripts/check-lockfile.mjs && vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs lib/csp.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage && node --test lib/demo-ledger.test.mjs lib/csp.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
+    "check-lending-errors": "node scripts/check-lending-errors.mjs"
   },
   "dependencies": {
     "@stellar/freighter-api": "^4.0.0",
