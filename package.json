@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs",
-    "test:coverage": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs",
+    "test:coverage": "vitest run --config vitest.config.ts && node --test lib/demo-ledger.test.mjs"
   },
   "dependencies": {
     "@stellar/freighter-api": "^4.0.0",
