@@ -53,7 +53,10 @@
     "notDetected": "Freighter wallet not detected. Install it from freighter.app, or keep browsing in demo mode.",
     "declined": "Wallet connection was declined.",
     "unreachable": "Could not reach Freighter. Continue in demo mode.",
-    "unfunded": "0.00 (unfunded on testnet)"
+    "unfunded": "0.00 (unfunded on testnet)",
+    "networkMismatchTitle": "Network mismatch detected",
+    "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
   },
   "market": {
     "title": "Markets",

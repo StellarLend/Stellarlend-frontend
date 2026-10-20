@@ -53,7 +53,10 @@
     "notDetected": "No se detectó Freighter. Instálalo desde freighter.app o sigue navegando en modo demo.",
     "declined": "La conexión de la cartera fue rechazada.",
     "unreachable": "No se pudo contactar con Freighter. Continúa en modo demo.",
-    "unfunded": "0,00 (sin fondos en testnet)"
+    "unfunded": "0,00 (sin fondos en testnet)",
+    "networkMismatchTitle": "Discrepancia de red detectada",
+    "networkMismatchDescription": "Freighter está conectado a una red diferente ({currentNetwork}). Cambia Freighter a {expectedNetwork} para interactuar y firmar transacciones.",
+    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}."
   },
   "market": {
     "title": "Mercados",
