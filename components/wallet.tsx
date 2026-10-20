@@ -2,6 +2,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { config } from "@/lib/config";
+import { ProtocolStatusProvider } from "@/components/protocol-status";
 
 type Ctx = { address: string | null; balance: string | null; error: string | null; connect: () => Promise<void>; disconnect: () => void };
 const WalletCtx = createContext<Ctx>({ address: null, balance: null, error: null, connect: async () => {}, disconnect: () => {} });
@@ -48,7 +49,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return () => { live = false; };
   }, [address, t]);
 
-  return <WalletCtx.Provider value={{ address, balance, error, connect, disconnect }}>{children}</WalletCtx.Provider>;
+  return (
+    <WalletCtx.Provider value={{ address, balance, error, connect, disconnect }}>
+      <ProtocolStatusProvider>{children}</ProtocolStatusProvider>
+    </WalletCtx.Provider>
+  );
 }
 
 export function ConnectButton() {

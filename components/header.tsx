@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { ConnectButton } from "@/components/wallet";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { ProtocolStatusBanner } from "@/components/protocol-status";
 
 export function Header() {
   const locale = useLocale();
@@ -37,6 +38,7 @@ export function Header() {
           <ConnectButton />
         </div>
       </div>
+      <ProtocolStatusBanner />
     </header>
   );
 }
