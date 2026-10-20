@@ -4,8 +4,11 @@ body { background: var(--bg); color: var(--fg); font-family: ui-sans-serif, syst
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
 .btn { background: linear-gradient(90deg, var(--acc), var(--acc2)); color:#04101c; font-weight:600; border-radius:10px; padding:.55rem 1rem; }
 .btn:disabled { opacity:.5; cursor:not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .btn-ghost { border:1px solid var(--line); border-radius:10px; padding:.5rem .9rem; color:var(--fg); }
 .btn-ghost:hover { border-color: var(--acc); }
+.btn-ghost:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .mut { color: var(--mut); }
 .grad { background: linear-gradient(90deg, var(--acc), var(--acc2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
 input { background:#0a1020; border:1px solid var(--line); border-radius:10px; padding:.6rem .8rem; width:100%; color:var(--fg); }
+input:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-color: var(--acc); }

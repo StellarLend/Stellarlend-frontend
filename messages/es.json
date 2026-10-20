@@ -63,7 +63,13 @@
     "collateral": "Colateral",
     "borrowed": "Prestado",
     "health": "Salud",
+    "healthStatus": {
+      "healthy": "Saludable",
+      "atRisk": "En riesgo",
+      "liquidatable": "Liquidable"
+    },
     "nA": "n/a",
+    "actions": "Acciones",
     "asset": "Activo",
     "price": "Precio",
     "supplyApy": "APY de depósito",
