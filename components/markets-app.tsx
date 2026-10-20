@@ -17,16 +17,34 @@ import {
   type Ledger,
 } from "@/lib/demo-ledger";
 
+import { useProtocolStatus } from "./protocol-status";
+
 export default function MarketsApp() {
   const { address, balance, error, connect } = useWallet();
+  const { status: protocolStatus, isActionAllowed } = useProtocolStatus();
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
+  const tStatus = useTranslations("protocolStatus");
   const [ledger, setLedger] = useState<Ledger>({});
   const [resetNotice, setResetNotice] = useState(false);
   const [sel, setSel] = useState<Market | null>(null);
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
   const [msg, setMsg] = useState("");
+
+  const isDemoMode = !address;
+
+  const getBlockedReason = (action: "supply" | "borrow" | "withdraw" | "repay") => {
+    if (!protocolStatus || protocolStatus.kind === "unknown") return null;
+    if (protocolStatus.emergency === "Shutdown") return tStatus("reasonShutdown");
+    if (protocolStatus.emergency === "Recovery" && (action === "supply" || action === "borrow")) {
+      return tStatus("reasonRecovery");
+    }
+    if (protocolStatus.paused.All) return tStatus("reasonPaused");
+    const pauseKey = action === "supply" ? "Supply" : action === "borrow" ? "Borrow" : action === "withdraw" ? "Withdraw" : "Repay";
+    if (protocolStatus.paused[pauseKey]) return tStatus("reasonPaused");
+    return null;
+  };
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -235,19 +253,47 @@ export default function MarketsApp() {
         <div className="card max-w-md space-y-4 p-6">
           <h2 className="text-xl font-semibold">{sel.symbol}</h2>
           <div className="grid grid-cols-4 gap-1 text-sm">
-            {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => (
-              <button
-                key={x}
-                onClick={() => {
-                  setMode(x);
-                  setMsg("");
-                }}
-                className={`rounded-lg py-2 ${mode === x ? "btn" : "btn-ghost"}`}
-              >
-                {t(x)}
-              </button>
-            ))}
+            {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => {
+              const blockedReason = !isDemoMode ? getBlockedReason(x) : null;
+              const isBlocked = !isDemoMode && !isActionAllowed(x);
+              const title = blockedReason
+                ? tStatus("actionBlockedTooltip", { reason: blockedReason })
+                : undefined;
+
+              return (
+                <button
+                  key={x}
+                  disabled={isBlocked}
+                  title={title}
+                  onClick={() => {
+                    if (isBlocked) return;
+                    setMode(x);
+                    setMsg("");
+                  }}
+                  className={`rounded-lg py-2 ${
+                    isBlocked
+                      ? "opacity-40 cursor-not-allowed bg-slate-800 text-slate-500 border border-slate-700"
+                      : mode === x
+                      ? "btn"
+                      : "btn-ghost"
+                  }`}
+                >
+                  {t(x)}
+                </button>
+              );
+            })}
           </div>
+          {(() => {
+            const currentBlockedReason = !isDemoMode ? getBlockedReason(mode) : null;
+            if (currentBlockedReason) {
+              return (
+                <div className="text-xs text-amber-400 bg-amber-950/40 border border-amber-900/60 p-2.5 rounded-lg">
+                  {tStatus("actionBlockedTooltip", { reason: currentBlockedReason })}
+                </div>
+              );
+            }
+            return null;
+          })()}
           <input
             inputMode="decimal"
             placeholder={t("amountIn", { symbol: sel.symbol })}
@@ -255,7 +301,16 @@ export default function MarketsApp() {
             onChange={(e) => setAmt(e.target.value)}
             aria-label={t("amountIn", { symbol: sel.symbol })}
           />
-          <button className="btn w-full" onClick={submit}>
+          <button
+            className="btn w-full"
+            disabled={!isDemoMode && !isActionAllowed(mode)}
+            title={
+              !isDemoMode && getBlockedReason(mode)
+                ? tStatus("actionBlockedTooltip", { reason: getBlockedReason(mode)! })
+                : undefined
+            }
+            onClick={submit}
+          >
             {t("confirm", { action: t(mode) })}
           </button>
           {msg && (
