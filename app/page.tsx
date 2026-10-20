@@ -1,26 +1,20 @@
-import HowItWorks from "@/components/marketing/HowItWorks";
-import Navbar from "@/components/shared/layout/Navbar";
-import Header from "@/components/shared/layout/TopNav";
-import Footer from "@/components/marketing/Footer";
-import TestimonialsSection from "@/components/marketing/testimonial";
-import ExploreFeatures from "@/components/marketing/ExploreFeatures";
-import Hero from "@/components/marketing/Hero";
-import FastSecure from "@/components/marketing/FastSecure";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import { WalletProvider } from "@/components/wallet";
+import { HomePage } from "@/components/home-page";
 
+export default async function Page() {
+  const messages = await getMessages({ locale: "en" });
 
-export default function Home() {
   return (
-    <div className="">
-        {/* <Navbar/> */}
-      <Header />
-      <main>
-        <Hero />
-        <HowItWorks />
-        <ExploreFeatures />
-        <FastSecure />
-        <TestimonialsSection />
-      </main>
-      <Footer />
-    </div>
+    <NextIntlClientProvider locale="en" messages={messages}>
+      <WalletProvider>
+        <Header />
+        <main className="mx-auto max-w-6xl px-4 py-10"><HomePage /></main>
+        <Footer />
+      </WalletProvider>
+    </NextIntlClientProvider>
   );
 }

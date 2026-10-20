@@ -1,0 +1,193 @@
+{
+  "nav": {
+    "brand": "Stellar",
+    "markets": "Mercados",
+    "docs": "Documentación",
+    "github": "GitHub",
+    "switchLocale": "EN",
+    "flashLoans": "Préstamos flash",
+    "governance": "Gobernanza",
+    "amm": "AMM"
+  },
+  "home": {
+    "brand": "Stellar",
+    "eyebrow": "En vivo en Stellar testnet",
+    "title": "Presta y toma prestado en {brand}",
+    "subtitle": "StellarLend es un mercado de crédito sobrecolateralizado en Soroban. Aporta activos para ganar rendimiento o toma prestado contra lo que tienes.",
+    "launchApp": "Abrir app",
+    "readDocs": "Leer la documentación",
+    "totalSupplied": "Total suministrado",
+    "totalBorrowed": "Total prestado",
+    "markets": "Mercados",
+    "note": "Las cifras del mercado son datos ilustrativos de testnet/demo.",
+    "solvencyTitle": "Solvencia del protocolo",
+    "solvencySubtitle": "Un protocolo sano mantiene un colchón de seguro listo para absorber pérdidas antes de afectar a los depositantes.",
+    "insuranceFund": "Fondo de seguro",
+    "insuranceShare": "Participación del seguro",
+    "badDebt": "Deuda mala",
+    "coverage": "Cobertura",
+    "fullyCovered": "Totalmente cubierto",
+    "writeOffHistory": "Historial de baja",
+    "noWriteOffHistory": "Sin historial de bajas",
+    "socialized": "Socializado",
+    "features": [
+      {
+        "title": "Aporta y gana",
+        "description": "Deposita activos en pools y gana rendimiento variable, acumulado en cada ledger."
+      },
+      {
+        "title": "Pide prestado contra colateral",
+        "description": "Pide prestado hasta el LTV de tu colateral con un factor de salud en vivo para ver siempre el riesgo de liquidación."
+      },
+      {
+        "title": "Construido en Soroban",
+        "description": "La lógica de préstamo vive en contratos inteligentes Rust auditable-style en Stellar, con finalidad en menos de 5 s y tarifas mínimas."
+      },
+      {
+        "title": "Nativo para wallets",
+        "description": "Conecta Freighter en un clic. ¿Sin wallet? Explora todo en modo demo."
+      }
+    ]
+  },
+  "wallet": {
+    "notDetected": "No se detectó Freighter. Instálalo desde freighter.app o sigue navegando en modo demo.",
+    "declined": "La conexión de la cartera fue rechazada.",
+    "unreachable": "No se pudo contactar con Freighter. Continúa en modo demo.",
+    "unfunded": "0,00 (sin fondos en testnet)"
+  },
+  "market": {
+    "title": "Mercados",
+    "subtitle": "Aporta para ganar, pide prestado contra colateral. Las posiciones se simulan localmente hasta que los contratos se conecten.",
+    "wallet": "Cartera",
+    "demoMode": "Modo demo (sin cartera conectada)",
+    "collateral": "Colateral",
+    "borrowed": "Prestado",
+    "health": "Salud",
+    "nA": "n/a",
+    "asset": "Activo",
+    "price": "Precio",
+    "supplyApy": "APY de depósito",
+    "borrowApy": "APY de préstamo",
+    "totalSupplied": "Total suministrado",
+    "yourPosition": "Tu posición",
+    "trade": "Operar",
+    "connectFreighter": "Conectar Freighter",
+    "disconnect": "Desconectar",
+    "amountIn": "Cantidad en {symbol}",
+    "supply": "Depositar",
+    "borrow": "Pedir prestado",
+    "withdraw": "Retirar",
+    "repay": "Pagar",
+    "confirm": "Confirmar {action}",
+    "status": {
+      "positiveAmount": "Introduce una cantidad mayor que cero.",
+      "exceedsSupply": "No puedes retirar más de lo suministrado.",
+      "exceedsBorrowLimit": "El préstamo supera tu límite de endeudamiento. Aporta más colateral.",
+      "exceedsBorrowed": "No puedes pagar más de lo prestado.",
+      "underCollateralised": "La retirada dejaría tu posición infracolateralizada.",
+      "recorded": "{action} de {amount} {symbol} registrado (libro de demostración).",
+      "invalidFormat": "Cantidad no válida. Usa notación decimal simple (p. ej. 1,5).",
+      "negative": "La cantidad debe ser positiva.",
+      "tooManyDecimals": "Demasiados decimales. El máximo es {decimals}.",
+      "tooLarge": "La cantidad supera el máximo permitido.",
+      "notFinite": "La cantidad debe ser un número finito (sin Infinity, NaN ni exponentes).",
+      "storageReset": "Los datos de demostración se restablecieron porque el almacenamiento estaba dañado.",
+      "demoReset": "Datos de demostración restablecidos."
+    },
+    "contract": "Contrato de préstamo",
+    "notDeployed": "no desplegado",
+    "balance": "{balance} XLM",
+    "resetDemo": "Restablecer datos de demostración"
+  },
+  "docs": {
+    "title": "Documentación",
+    "overview": {
+      "title": "Resumen",
+      "body": "StellarLend es un mercado de préstamos sobrecolateralizado en Stellar. Los usuarios aportan activos para ganar interés y piden prestados otros activos frente a su colateral. La lógica principal se implementa en contratos inteligentes Soroban; esta aplicación web es la interfaz de usuario."
+    },
+    "gettingStarted": {
+      "title": "Primeros pasos",
+      "step1": "Instala la cartera Freighter y cámbiala a Testnet.",
+      "step2": "Financia tu cuenta con el friendbot de Stellar testnet.",
+      "step3": "Abre Mercados y haz clic en Conectar Freighter. Sin cartera la app funciona en modo demo.",
+      "step4": "Elige un activo y luego Depositar, Pedir prestado, Retirar o Pagar."
+    },
+    "riskParameters": {
+      "title": "Parámetros de riesgo",
+      "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable."
+    },
+    "flashLoans": {
+      "title": "Préstamos flash",
+      "body": "Los préstamos flash transfieren activos a un contrato receptor e invocan su callback on_flash_loan. El receptor debe devolver el principal más la comisión dentro de la misma transacción. Visita la página de préstamos flash para consultar los eventos recientes de préstamo y reembolso, la utilización flash máxima y el estado de pausa actual.",
+      "link": "Abrir préstamos flash"
+    },
+    "architecture": {
+      "title": "Arquitectura",
+      "body": "Frontend en Next.js 15 (App Router), Freighter para firmas, Horizon para saldos y Soroban RPC para llamadas de contrato. El estado de las posiciones en esta versión es un libro de demostración local; la invocación del contrato se configura mediante variables de entorno."
+    },
+    "contracts": {
+      "title": "Contratos desplegados (testnet)",
+      "label": "Contrato de préstamo",
+      "notDeployed": "no desplegado"
+    },
+    "env": {
+      "title": "Variables de entorno"
+    }
+  },
+  "footer": {
+    "notice": "StellarLend funciona en Stellar testnet. No hay fondos reales. No es asesoramiento financiero.",
+    "github": "Repositorio de GitHub",
+    "liveSite": "Sitio en vivo"
+  },
+  "flashLoans": {
+    "title": "Préstamos flash",
+    "subtitle": "Préstamos con callback y reembolsos recientes registrados por el contrato de préstamos de StellarLend.",
+    "paramsLabel": "Parámetros de préstamos flash",
+    "maxUtilization": "Utilización flash máxima",
+    "maxUtilizationHint": "Préstamo máximo como fracción de la liquidez disponible en tesorería.",
+    "unavailable": "No disponible",
+    "loading": "Cargando...",
+    "paused": "En pausa",
+    "active": "Activo",
+    "pauseHint": "Estado de pausa leído del contrato de préstamos.",
+    "currentFee": "Comisión actual (última observada)",
+    "bps": "{bps} pb",
+    "nA": "n/d",
+    "noObservations": "Sin observaciones",
+    "feeHint": "{amount} tokens en el último préstamo; derivado de su evento.",
+    "feeHintEmpty": "La comisión se calcula a partir del último evento de préstamo, no de un getter del contrato.",
+    "retry": "Reintentar",
+    "activity": "Actividad",
+    "precisionHint": "Los importes usan la precisión de tokens de Stellar (7 decimales).",
+    "lendingContract": "Contrato de préstamos",
+    "loadingActivity": "Cargando actividad on-chain...",
+    "empty": {
+      "title": "No se encontró actividad de préstamos flash",
+      "body": "El RPC solo conserva una ventana limitada de eventos del contrato. Puede que no haya actividad si no hubo préstamos flash recientes o si los ledgers correspondientes ya expiraron de la retención del RPC."
+    },
+    "columns": {
+      "activity": "Actividad",
+      "actor": "Iniciador / pagador",
+      "receiver": "Receptor",
+      "asset": "Activo",
+      "amount": "Importe",
+      "fee": "Comisión",
+      "ledger": "Ledger",
+      "time": "Hora"
+    },
+    "kind": {
+      "loan": "Préstamo flash",
+      "repayment": "Reembolso"
+    },
+    "loadMore": "Cargar más eventos",
+    "callback": {
+      "title": "Callback del receptor",
+      "body": "El contrato de préstamos invoca este método en el receptor durante un préstamo flash. Implementa el reembolso del principal más la comisión en tu contrato receptor.",
+      "link": "Implementación del callback en el contrato"
+    },
+    "errors": {
+      "events": "No se pudieron cargar los eventos de préstamos flash.",
+      "params": "No se pudieron cargar los parámetros de préstamos flash."
+    }
+  }
+}

@@ -1,108 +1,93 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { rateLimit } from '@/lib/rate-limit';
-import appConfig from '@/lib/config';
-import { getOrCreateRequestId, REQUEST_ID_HEADER } from '@/lib/request-id';
+/**
+ * middleware.ts — Next.js Edge Middleware for security headers.
+ *
+ * Runs on every HTML request. Applies next-intl locale routing, then injects:
+ * - Content-Security-Policy (nonce-based, per-request)
+ * - X-Content-Type-Options
+ * - X-Frame-Options (belt-and-suspenders alongside CSP frame-ancestors)
+ * - Referrer-Policy
+ * - Permissions-Policy
+ *
+ * HSTS and X-Content-Type-Options are also set in next.config.mjs headers()
+ * for static asset responses; middleware handles the dynamic HTML pages.
+ */
+import { NextRequest, NextResponse } from "next/server";
+import createIntlMiddleware from "next-intl/middleware";
+import { buildCsp } from "@/lib/csp";
+import { routing } from "./i18n/routing";
 
-function generateNonce(): string {
-  const array = new Uint8Array(16);
-  (globalThis.crypto || crypto).getRandomValues(array);
-  return btoa(String.fromCharCode(...array));
-}
+// Locale detection / prefix handling from next-intl (en default, /es prefix).
+const handleI18nRouting = createIntlMiddleware(routing);
 
-function getRequestIdHeaders(request: NextRequest) {
-  const { requestId } = getOrCreateRequestId(request.headers);
+// Middleware runs on the Edge runtime by default in Next.js 15; exporting
+// `runtime = "edge"` here makes `next build` fail, so it is left implicit.
+
+export function middleware(request: NextRequest): NextResponse {
+  // Generate a cryptographically random nonce for this request.
+  // We use 128 bits of randomness, base64url-encoded.
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(16));
+  const nonce = btoa(String.fromCharCode(...nonceBytes));
+
+  const dev = process.env.NODE_ENV === "development";
+  const horizon =
+    process.env.NEXT_PUBLIC_HORIZON_URL || "https://horizon-testnet.stellar.org";
+  const rpc =
+    process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
+  const reportUri = process.env.NEXT_PUBLIC_CSP_REPORT_URI;
+
+  let csp: string;
+  try {
+    csp = buildCsp({ nonce, horizon, rpc, dev, reportUri });
+  } catch (err) {
+    // Misconfigured URL — fail loudly in development, use a safe fallback in prod.
+    if (dev) throw err;
+    console.error("[CSP] Config error — falling back to safe defaults:", err);
+    csp = buildCsp({
+      nonce,
+      horizon: "https://horizon-testnet.stellar.org",
+      rpc: "https://soroban-testnet.stellar.org",
+      dev: false,
+    });
+  }
+
+  // Forward the CSP and nonce on the request so Next.js stamps the nonce onto
+  // the framework <script> tags it renders (required with 'strict-dynamic').
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set(REQUEST_ID_HEADER, requestId);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
 
-  // Generate CSP nonce per request
-  const nonce = generateNonce();
-  requestHeaders.set('x-csp-nonce', nonce);
+  // Let next-intl decide whether to redirect/rewrite for the locale, using the
+  // request that carries the CSP so the nonce reaches the rendered page.
+  const response = handleI18nRouting(new NextRequest(request, { headers: requestHeaders }));
 
-  return { requestId, requestHeaders, nonce };
-}
+  // Content-Security-Policy
+  response.headers.set("Content-Security-Policy", csp);
 
-function setRequestIdHeader(response: NextResponse, requestId: string): NextResponse {
-  response.headers.set(REQUEST_ID_HEADER, requestId);
+  // Expose the nonce to the app so layout.tsx can pass it to <Script> tags.
+  // The CSP_NONCE header is read in app/layout.tsx via headers().
+  response.headers.set("x-nonce", nonce);
+
+  // Belt-and-suspenders anti-framing (complements CSP frame-ancestors)
+  response.headers.set("X-Frame-Options", "DENY");
+
+  // Prevent MIME-type sniffing
+  response.headers.set("X-Content-Type-Options", "nosniff");
+
+  // Limit referrer information sent on navigation
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+
+  // Permissions-Policy: disable sensors/camera/mic that this dapp never uses
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+  );
+
   return response;
 }
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // 1. Path Filter: Only apply to API routes
-  if (!pathname.startsWith('/api')) {
-    // For non‑API routes, still set CSP header with nonce for inline scripts
-    const nonce = generateNonce();
-    const response = NextResponse.next();
-    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-    response.headers.set('x-csp-nonce', nonce);
-    return response;
-  }
-
-  const { requestId, requestHeaders, nonce } = getRequestIdHeaders(request);
-
-  // 2. Exemption: Health checks should never be rate limited
-  if (pathname === '/api/health') {
-    const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
-    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-    return response;
-  }
-
-  // 3. Exemption: Authenticated internal calls
-  const sessionCookieName = appConfig.rateLimit ? (process.env.NEXT_PUBLIC_SESSION_COOKIE || 'session') : 'session';
-  const isAuth = request.cookies.has(sessionCookieName);
-
-  if (isAuth) {
-    const response = setRequestIdHeader(NextResponse.next({ request: { headers: requestHeaders } }), requestId);
-    response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-    return response;
-  }
-
-  // 4. Identification (IP-based for anonymous requests)
-  const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
-  const identifier = `api-ratelimit:${ip}`;
-
-  const { success, limit, remaining, reset } = rateLimit(
-    identifier,
-    appConfig.rateLimit.max,
-    appConfig.rateLimit.window
-  );
-
-  // 5. Prepare Response
-  let response: NextResponse;
-
-  if (success) {
-    response = NextResponse.next({ request: { headers: requestHeaders } });
-  } else {
-    response = new NextResponse(
-      JSON.stringify({ 
-        error: 'Too Many Requests',
-        message: 'Rate limit exceeded. Please try again later.' 
-      }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Set CSP header on every response
-  response.headers.set('Content-Security-Policy', `default-src 'self'; script-src 'self' 'nonce-${nonce}';`);
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-
-  // 6. Standard Rate Limit Headers
-  response.headers.set('X-RateLimit-Limit', limit.toString());
-  response.headers.set('X-RateLimit-Remaining', remaining.toString());
-  response.headers.set('X-RateLimit-Reset', Math.floor(reset / 1000).toString());
-
-  if (!success) {
-    const retryAfter = Math.ceil((reset - Date.now()) / 1000);
-    response.headers.set('Retry-After', Math.max(0, retryAfter).toString());
-  }
-
-  return setRequestIdHeader(response, requestId);
-}
-
+// Only apply middleware to HTML pages — skip API routes, Next.js internals
+// (_next/static, _next/image, ...) and any path with a file extension
+// (favicon.ico, icon.svg, robots.txt, images, fonts, ...).
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ["/((?!api|_next|.*\\..*).*)"],
 };
