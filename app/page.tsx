@@ -11,6 +11,8 @@ export default async function Page() {
   return (
     <NextIntlClientProvider locale="en" messages={messages}>
       <WalletProvider>
+        <HealthIndicator />
+<YourConnectButton />
         <Header />
         <main className="mx-auto max-w-6xl px-4 py-10"><HomePage /></main>
         <Footer />
