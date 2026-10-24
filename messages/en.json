@@ -85,7 +85,13 @@
     "notInstalled": "Not installed",
     "install": "Install",
     "connecting": "Connecting...",
-    "close": "Close"
+    "close": "Close",
+    "fundWithFriendbot": "Fund with Friendbot",
+    "funding": "Funding...",
+    "fundTooltip": "Get free testnet XLM from Stellar Friendbot",
+    "fundCooldown": "Please wait {seconds}s before requesting Friendbot funding again.",
+    "fundFailed": "Friendbot funding failed.",
+    "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments."
   },
   "market": {
     "title": "Markets",
@@ -360,6 +366,21 @@
     "borrow": "Borrow",
     "repay": "Repay",
     "asset": "XLM"
+  },
+  "onboarding": {
+    "title": "Testnet Quickstart Checklist",
+    "subtitle": "Complete these steps to start using StellarLend on testnet in under a minute.",
+    "dismiss": "Dismiss",
+    "stepInstalled": "Freighter wallet installed",
+    "installFreighter": "Install Freighter",
+    "stepConnected": "Wallet connected",
+    "stepNetwork": "Connected to Stellar Testnet",
+    "stepFunded": "Account funded with testnet XLM",
+    "stepSupply": "First supply position created",
+    "fundWithFriendbot": "Fund with Friendbot",
+    "funding": "Funding account...",
+    "manualLink": "Stellar Lab Faucet",
+    "retry": "Retry",
+    "manualFaucet": "Manual Faucet"
   }
 }
-

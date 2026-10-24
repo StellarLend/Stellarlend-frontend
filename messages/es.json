@@ -85,7 +85,13 @@
     "notInstalled": "No instalado",
     "install": "Instalar",
     "connecting": "Conectando...",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "fundWithFriendbot": "Financiar con Friendbot",
+    "funding": "Financiando...",
+    "fundTooltip": "Obtener XLM de prueba gratis del Friendbot de Stellar",
+    "fundCooldown": "Por favor, espera {seconds}s antes de volver a solicitar fondos a Friendbot.",
+    "fundFailed": "Falló la financiación con Friendbot.",
+    "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos."
   },
   "market": {
     "title": "Mercados",
@@ -360,6 +366,21 @@
     "borrow": "Préstamo",
     "repay": "Pago",
     "asset": "XLM"
+  },
+  "onboarding": {
+    "title": "Guía rápida de Testnet",
+    "subtitle": "Completa estos pasos para comenzar a usar StellarLend en testnet en menos de un minuto.",
+    "dismiss": "Ocultar",
+    "stepInstalled": "Cartera Freighter instalada",
+    "installFreighter": "Instalar Freighter",
+    "stepConnected": "Cartera conectada",
+    "stepNetwork": "Conectado a Stellar Testnet",
+    "stepFunded": "Cuenta financiada con XLM de testnet",
+    "stepSupply": "Primera posición de depósito creada",
+    "fundWithFriendbot": "Financiar con Friendbot",
+    "funding": "Financiando cuenta...",
+    "manualLink": "Faucet Stellar Lab",
+    "retry": "Reintentar",
+    "manualFaucet": "Faucet manual"
   }
 }
-

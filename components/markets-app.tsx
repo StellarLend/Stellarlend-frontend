@@ -6,6 +6,7 @@ import { Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
 import { config, explorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
+import { OnboardingChecklist } from "./onboarding-checklist";
 import {
   loadLedger,
   saveLedger,
@@ -30,7 +31,8 @@ import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
 
 export default function MarketsApp() {
-  const { address, balance, error, openPicker } = useWallet();
+  const { address, balance, error, openPicker, accountStatus, isFunding, fundError, fundAccount } = useWallet();
+  const tw = useTranslations("wallet");
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
   const [ledger, setLedger] = useState<Ledger>({});
@@ -91,6 +93,10 @@ export default function MarketsApp() {
       };
     });
   }, [oraclePrices]);
+
+  const hasSupplied = useMemo(() => {
+    return Object.values(ledger).some((entry) => entry && entry.supplied > BigInt(0));
+  }, [ledger]);
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -267,6 +273,8 @@ export default function MarketsApp() {
         <p className="mut mt-1 text-sm">{t("subtitle")}</p>
       </div>
 
+      <OnboardingChecklist hasSupplied={hasSupplied} />
+
       {resetNotice && (
         <Card className="p-4 text-sm text-amber-400" role="alert">
           {t("status.storageReset")}
@@ -287,7 +295,17 @@ export default function MarketsApp() {
             <div>{t("demoMode")}</div>
           )}
           {error && <div className="mt-1 text-amber-400">{error}</div>}
+          {fundError && <div className="mt-1 text-red-400">{fundError}</div>}
         </div>
+        {address && config.network === "testnet" && accountStatus === "unfunded" && (
+          <button
+            className="btn text-xs py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded"
+            onClick={fundAccount}
+            disabled={isFunding}
+          >
+            {isFunding ? tw("funding") : tw("fundWithFriendbot")}
+          </button>
+        )}
         {!address && (
           <Button variant="primary" className="w-full sm:w-auto" onClick={openPicker}>
             {t("connectFreighter")}
