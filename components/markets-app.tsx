@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
+import { Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
 import { config, explorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
@@ -16,6 +17,8 @@ import {
   storageKey,
   type Ledger,
 } from "@/lib/demo-ledger";
+import OraclePanel from "./oracle-panel";
+import { fetchOracleAssetPrices, type OracleAssetPrice } from "@/lib/oracle";
 import {
   buildDemoRateModelSnapshot,
   fetchRateModelSnapshot,
@@ -27,7 +30,7 @@ import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
 
 export default function MarketsApp() {
-  const { address, balance, error, connect } = useWallet();
+  const { address, balance, error, openPicker } = useWallet();
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
   const [ledger, setLedger] = useState<Ledger>({});
@@ -41,6 +44,52 @@ export default function MarketsApp() {
   );
 
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const [oraclePrices, setOraclePrices] = useState<Record<string, OracleAssetPrice>>({});
+  const [timeSource, setTimeSource] = useState<"ledger" | "browser">("ledger");
+  const [isLoadingOracle, setIsLoadingOracle] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setIsLoadingOracle(true);
+    fetchOracleAssetPrices()
+      .then((res) => {
+        if (!active) return;
+        setOraclePrices(res.prices);
+        setTimeSource(res.timeSource);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setIsLoadingOracle(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activeMarkets = useMemo<Market[]>(() => {
+    return MARKETS.map((m) => {
+      const matchingRecord =
+        (m.contractId && oraclePrices[m.contractId]) ||
+        (m.symbol === "USDC" && config.tokenId && oraclePrices[config.tokenId]) ||
+        Object.values(oraclePrices).find(
+          (op) => op.symbol.toLowerCase() === m.symbol.toLowerCase()
+        );
+
+      if (matchingRecord && matchingRecord.priceNumber !== null) {
+        return {
+          ...m,
+          price: matchingRecord.priceNumber,
+          priceSource: "oracle" as const,
+        };
+      }
+
+      return {
+        ...m,
+        priceSource: "demo" as const,
+      };
+    });
+  }, [oraclePrices]);
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -111,8 +160,8 @@ export default function MarketsApp() {
   }
 
   const { collateralUsd, borrowUsd, health } = useMemo(
-    () => computeRisk(ledger, MARKETS),
-    [ledger]
+    () => computeRisk(ledger, activeMarkets),
+    [ledger, activeMarkets]
   );
 
   const rateChartLabels = useMemo<Partial<RateChartLabels>>(() => {
@@ -169,14 +218,14 @@ export default function MarketsApp() {
         setMsg({ text: t("status.exceedsSupply"), isError: true });
         return;
       }
-      if (!canWithdraw(ledger, sel.symbol, n, MARKETS)) {
-        setMsg({ text: t("status.underCollateralised"), isError: true });
+      if (!canWithdraw(ledger, sel.symbol, n, activeMarkets)) {
+        setMsg(t("status.underCollateralised"));
         return;
       }
       next.supplied = cur.supplied - n;
     } else if (mode === "borrow") {
-      if (!canBorrow(ledger, sel.symbol, n, MARKETS)) {
-        setMsg({ text: t("status.exceedsBorrowLimit"), isError: true });
+      if (!canBorrow(ledger, sel.symbol, n, activeMarkets)) {
+        setMsg(t("status.exceedsBorrowLimit"));
         return;
       }
       next.borrowed = cur.borrowed + n;
@@ -219,12 +268,12 @@ export default function MarketsApp() {
       </div>
 
       {resetNotice && (
-        <div className="card p-4 text-sm text-amber-400" role="alert">
+        <Card className="p-4 text-sm text-amber-400" role="alert">
           {t("status.storageReset")}
-        </div>
+        </Card>
       )}
 
-      <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0 text-sm">
           <div className="mut">{t("wallet")}</div>
           {address ? (
@@ -240,31 +289,24 @@ export default function MarketsApp() {
           {error && <div className="mt-1 text-amber-400">{error}</div>}
         </div>
         {!address && (
-          <button className="btn w-full sm:w-auto" onClick={connect}>
+          <Button variant="primary" className="w-full sm:w-auto" onClick={openPicker}>
             {t("connectFreighter")}
-          </button>
+          </Button>
         )}
         <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:gap-6">
           <Stat k={t("collateral")} v={formatCurrency(collateralUsd, locale)} />
           <Stat k={t("borrowed")} v={formatCurrency(borrowUsd, locale)} />
-          <div>
-            <div className="mut">{t("health")}</div>
-            <div className={`text-lg font-semibold flex items-center gap-1.5 ${healthData.tone}`}>
-              <span>{healthData.label}</span>
-              {healthData.badge && (
-                <span className="text-xs font-medium inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-current">
-                  <span aria-hidden="true">{healthData.icon}</span>
-                  <span>{healthData.badge}</span>
-                </span>
-              )}
-            </div>
-          </div>
+          <Stat
+            k={t("health")}
+            v={health === Infinity ? t("nA") : formatNumber(health, locale)}
+            tone={health < 1.2 ? "danger" : "positive"}
+          />
         </div>
-      </div>
+      </Card>
 
       {/* Mobile: stacked cards */}
       <div className="space-y-3 sm:hidden">
-        {MARKETS.map((m) => {
+        {activeMarkets.map((m) => {
           const p = ledger[m.symbol];
           const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
           const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
@@ -282,7 +324,7 @@ export default function MarketsApp() {
       </div>
 
       {/* sm+: table */}
-      <div className="card hidden overflow-x-auto sm:block">
+      <Card className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
@@ -298,7 +340,7 @@ export default function MarketsApp() {
             </tr>
           </thead>
           <tbody>
-            {MARKETS.map((m) => {
+            {activeMarkets.map((m) => {
               const rawP = ledger && typeof ledger === "object" ? ledger[m.symbol] : undefined;
               const p =
                 rawP && typeof rawP === "object" && typeof rawP.supplied === "bigint" && typeof rawP.borrowed === "bigint"
@@ -306,12 +348,26 @@ export default function MarketsApp() {
                   : null;
               const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
               const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
+              const isOracle = m.priceSource === "oracle";
               return (
                 <tr key={m.symbol} className="border-b border-[var(--line)] last:border-0">
                   <td className="p-4">
                     <b>{m.symbol}</b> <span className="mut">{m.name}</span>
                   </td>
-                  <td className="p-4">{formatCurrency(m.price, locale)}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1.5">
+                      <span>{formatCurrency(m.price, locale)}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded font-medium border ${
+                          isOracle
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                            : "bg-zinc-500/10 text-zinc-400 border-zinc-500/30"
+                        }`}
+                      >
+                        {isOracle ? t("oracle.oracleSource") : t("oracle.demoSource")}
+                      </span>
+                    </div>
+                  </td>
                   <td className="p-4 text-emerald-400">{formatPercent(m.supplyApy, locale)}</td>
                   <td className="p-4">{formatPercent(m.borrowApy, locale)}</td>
                   <td className="p-4">{formatNumber(m.totalSupply, locale, 0)}</td>
@@ -321,19 +377,25 @@ export default function MarketsApp() {
                       : "-"}
                   </td>
                   <td className="p-4 text-right">
-                    <button
-                      className="btn-ghost"
+                    <Button
+                      variant="ghost"
                       onClick={() => openTrade(m)}
                     >
                       {t("trade")}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
+
+      <OraclePanel
+        prices={oraclePrices}
+        timeSource={timeSource}
+        isLoading={isLoadingOracle}
+      />
 
       <TradeSheet
         market={sel}
@@ -374,19 +436,11 @@ export default function MarketsApp() {
             t("notDeployed")
           )}
         </p>
-        <button className="btn-ghost text-xs" onClick={resetDemo}>
+        <Button variant="ghost" size="sm" className="text-xs" onClick={resetDemo}>
           {t("resetDemo")}
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
-function Stat({ k, v, tone = "" }: { k: string; v: string; tone?: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="mut">{k}</div>
-      <div className={`truncate text-base font-semibold sm:text-lg ${tone}`}>{v}</div>
-    </div>
-  );
-}
