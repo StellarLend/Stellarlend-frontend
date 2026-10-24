@@ -17,6 +17,8 @@ import {
   storageKey,
   type Ledger,
 } from "@/lib/demo-ledger";
+import OraclePanel from "./oracle-panel";
+import { fetchOracleAssetPrices, type OracleAssetPrice } from "@/lib/oracle";
 import {
   buildDemoRateModelSnapshot,
   fetchRateModelSnapshot,
@@ -42,6 +44,52 @@ export default function MarketsApp() {
   );
 
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const [oraclePrices, setOraclePrices] = useState<Record<string, OracleAssetPrice>>({});
+  const [timeSource, setTimeSource] = useState<"ledger" | "browser">("ledger");
+  const [isLoadingOracle, setIsLoadingOracle] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setIsLoadingOracle(true);
+    fetchOracleAssetPrices()
+      .then((res) => {
+        if (!active) return;
+        setOraclePrices(res.prices);
+        setTimeSource(res.timeSource);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setIsLoadingOracle(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activeMarkets = useMemo<Market[]>(() => {
+    return MARKETS.map((m) => {
+      const matchingRecord =
+        (m.contractId && oraclePrices[m.contractId]) ||
+        (m.symbol === "USDC" && config.tokenId && oraclePrices[config.tokenId]) ||
+        Object.values(oraclePrices).find(
+          (op) => op.symbol.toLowerCase() === m.symbol.toLowerCase()
+        );
+
+      if (matchingRecord && matchingRecord.priceNumber !== null) {
+        return {
+          ...m,
+          price: matchingRecord.priceNumber,
+          priceSource: "oracle" as const,
+        };
+      }
+
+      return {
+        ...m,
+        priceSource: "demo" as const,
+      };
+    });
+  }, [oraclePrices]);
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -112,8 +160,8 @@ export default function MarketsApp() {
   }
 
   const { collateralUsd, borrowUsd, health } = useMemo(
-    () => computeRisk(ledger, MARKETS),
-    [ledger]
+    () => computeRisk(ledger, activeMarkets),
+    [ledger, activeMarkets]
   );
 
   const rateChartLabels = useMemo<Partial<RateChartLabels>>(() => {
@@ -170,13 +218,13 @@ export default function MarketsApp() {
         setMsg(t("status.exceedsSupply"));
         return;
       }
-      if (!canWithdraw(ledger, sel.symbol, n, MARKETS)) {
+      if (!canWithdraw(ledger, sel.symbol, n, activeMarkets)) {
         setMsg(t("status.underCollateralised"));
         return;
       }
       next.supplied = cur.supplied - n;
     } else if (mode === "borrow") {
-      if (!canBorrow(ledger, sel.symbol, n, MARKETS)) {
+      if (!canBorrow(ledger, sel.symbol, n, activeMarkets)) {
         setMsg(t("status.exceedsBorrowLimit"));
         return;
       }
@@ -257,7 +305,7 @@ export default function MarketsApp() {
 
       {/* Mobile: stacked cards */}
       <div className="space-y-3 sm:hidden">
-        {MARKETS.map((m) => {
+        {activeMarkets.map((m) => {
           const p = ledger[m.symbol];
           const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
           const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
@@ -287,7 +335,7 @@ export default function MarketsApp() {
             </tr>
           </thead>
           <tbody>
-            {MARKETS.map((m) => {
+            {activeMarkets.map((m) => {
               const rawP = ledger && typeof ledger === "object" ? ledger[m.symbol] : undefined;
               const p =
                 rawP && typeof rawP === "object" && typeof rawP.supplied === "bigint" && typeof rawP.borrowed === "bigint"
@@ -295,12 +343,26 @@ export default function MarketsApp() {
                   : null;
               const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
               const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
+              const isOracle = m.priceSource === "oracle";
               return (
                 <tr key={m.symbol} className="border-b border-[var(--line)] last:border-0">
                   <td className="p-4">
                     <b>{m.symbol}</b> <span className="mut">{m.name}</span>
                   </td>
-                  <td className="p-4">{formatCurrency(m.price, locale)}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1.5">
+                      <span>{formatCurrency(m.price, locale)}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded font-medium border ${
+                          isOracle
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                            : "bg-zinc-500/10 text-zinc-400 border-zinc-500/30"
+                        }`}
+                      >
+                        {isOracle ? t("oracle.oracleSource") : t("oracle.demoSource")}
+                      </span>
+                    </div>
+                  </td>
                   <td className="p-4 text-emerald-400">{formatPercent(m.supplyApy, locale)}</td>
                   <td className="p-4">{formatPercent(m.borrowApy, locale)}</td>
                   <td className="p-4">{formatNumber(m.totalSupply, locale, 0)}</td>
@@ -323,6 +385,12 @@ export default function MarketsApp() {
           </tbody>
         </table>
       </Card>
+
+      <OraclePanel
+        prices={oraclePrices}
+        timeSource={timeSource}
+        isLoading={isLoadingOracle}
+      />
 
       <TradeSheet
         market={sel}
