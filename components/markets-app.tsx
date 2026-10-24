@@ -16,6 +16,15 @@ import {
   storageKey,
   type Ledger,
 } from "@/lib/demo-ledger";
+import {
+  buildDemoRateModelSnapshot,
+  fetchRateModelSnapshot,
+  type RateModelSnapshot,
+} from "@/lib/rate-model";
+import { RateChart, defaultRateChartLabels, type RateChartLabels } from "./rate-chart";
+
+import MarketCard from "./markets/market-card";
+import TradeSheet from "./markets/trade-sheet";
 
 export default function MarketsApp() {
   const { address, balance, error, connect } = useWallet();
@@ -26,25 +35,12 @@ export default function MarketsApp() {
   const [sel, setSel] = useState<Market | null>(null);
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
-  const [msg, setMsg] = useState<{ text: string; isError: boolean } | null>(null);
-
-  const headingRef = useRef<HTMLHeadingElement | null>(null);
-  const prevSelSymbolRef = useRef<string | null>(null);
-  const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
-
-  const modes = useMemo<("supply" | "borrow" | "withdraw" | "repay")[]>(
-    () => ["supply", "borrow", "withdraw", "repay"],
-    []
+  const [msg, setMsg] = useState("");
+  const [rateSnapshot, setRateSnapshot] = useState<RateModelSnapshot>(() =>
+    buildDemoRateModelSnapshot()
   );
 
-  useEffect(() => {
-    if (sel && sel.symbol !== prevSelSymbolRef.current) {
-      prevSelSymbolRef.current = sel.symbol;
-      headingRef.current?.focus();
-    } else if (!sel) {
-      prevSelSymbolRef.current = null;
-    }
-  }, [sel]);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -54,6 +50,22 @@ export default function MarketsApp() {
     setLedger(loaded);
     if (reset) setResetNotice(true);
   }, [address]);
+
+  // Load on-chain rate model params, diagnostics, and utilization history
+  useEffect(() => {
+    if (!config.lendingId) return;
+    let active = true;
+    fetchRateModelSnapshot()
+      .then((snapshot) => {
+        if (active) setRateSnapshot(snapshot);
+      })
+      .catch(() => {
+        if (active) setRateSnapshot(buildDemoRateModelSnapshot());
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Cross-tab sync via the storage event
   useEffect(() => {
@@ -83,63 +95,42 @@ export default function MarketsApp() {
     [address]
   );
 
+  // Scroll the inline (sm+) panel into view when a market is selected.
+  useEffect(() => {
+    if (!sel) return;
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(min-width: 640px)").matches) {
+      panelRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [sel]);
+
+  function closeSheet() {
+    setSel(null);
+    setAmt("");
+    setMsg("");
+  }
+
   const { collateralUsd, borrowUsd, health } = useMemo(
     () => computeRisk(ledger, MARKETS),
     [ledger]
   );
 
-  const healthData = useMemo(() => {
-    if (health === Infinity) {
-      return {
-        label: t("nA"),
-        badge: null,
-        tone: "",
-      };
+  const rateChartLabels = useMemo<Partial<RateChartLabels>>(() => {
+    const keys = Object.keys(defaultRateChartLabels) as Array<keyof RateChartLabels>;
+    const resolved: Partial<RateChartLabels> = {};
+    for (const key of keys) {
+      const messageKey = `rateModel.${key}`;
+      if (typeof t.has === "function" && t.has(messageKey)) {
+        // Do not interpolate template placeholders in RateChartLabels here;
+        // RateChart interpolates dynamic values itself via t.raw or defaults.
+        const rawVal = typeof t.raw === "function" ? t.raw(messageKey) : undefined;
+        if (typeof rawVal === "string") {
+          resolved[key] = rawVal;
+        }
+      }
     }
-    const formatted = formatNumber(health, locale);
-    if (health < 1.0) {
-      return {
-        label: formatted,
-        badge: t("healthStatus.liquidatable"),
-        tone: "text-red-400",
-        icon: "⚠️",
-      };
-    }
-    if (health < 1.2) {
-      return {
-        label: formatted,
-        badge: t("healthStatus.atRisk"),
-        tone: "text-amber-400",
-        icon: "⚡",
-      };
-    }
-    return {
-      label: formatted,
-      badge: t("healthStatus.healthy"),
-      tone: "text-emerald-400",
-      icon: "✓",
-    };
-  }, [health, locale, t]);
-
-  function handleTabKeyDown(e: React.KeyboardEvent, index: number) {
-    let nextIndex = index;
-    if (e.key === "ArrowRight") {
-      nextIndex = (index + 1) % modes.length;
-    } else if (e.key === "ArrowLeft") {
-      nextIndex = (index - 1 + modes.length) % modes.length;
-    } else if (e.key === "Home") {
-      nextIndex = 0;
-    } else if (e.key === "End") {
-      nextIndex = modes.length - 1;
-    } else {
-      return;
-    }
-    e.preventDefault();
-    const nextMode = modes[nextIndex];
-    setMode(nextMode);
-    setMsg(null);
-    tabsRef.current[nextIndex]?.focus();
-  }
+    return resolved;
+  }, [t]);
 
   function submit() {
     if (!sel) return;
@@ -164,7 +155,11 @@ export default function MarketsApp() {
       setMsg({ text: t("status.positiveAmount"), isError: true });
       return;
     }
-    const cur = ledger[sel.symbol] ?? { supplied: BigInt(0), borrowed: BigInt(0) };
+    const rawCur = ledger && typeof ledger === "object" ? ledger[sel.symbol] : undefined;
+    const cur =
+      rawCur && typeof rawCur === "object" && typeof rawCur.supplied === "bigint" && typeof rawCur.borrowed === "bigint"
+        ? rawCur
+        : { supplied: BigInt(0), borrowed: BigInt(0) };
     const next = { ...cur };
 
     if (mode === "supply") {
@@ -211,6 +206,11 @@ export default function MarketsApp() {
     setResetNotice(false);
   }
 
+  function openTrade(m: Market) {
+    setSel(m);
+    setMsg("");
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -224,12 +224,12 @@ export default function MarketsApp() {
         </div>
       )}
 
-      <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
-        <div className="text-sm">
+      <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0 text-sm">
           <div className="mut">{t("wallet")}</div>
           {address ? (
-            <div>
-              <span className="font-mono">
+            <div className="min-w-0">
+              <span className="block truncate font-mono">
                 {address.slice(0, 8)}...{address.slice(-6)}
               </span>
               <span className="mut"> - {balance ?? "..."} XLM</span>
@@ -240,11 +240,11 @@ export default function MarketsApp() {
           {error && <div className="mt-1 text-amber-400">{error}</div>}
         </div>
         {!address && (
-          <button className="btn" onClick={connect}>
+          <button className="btn w-full sm:w-auto" onClick={connect}>
             {t("connectFreighter")}
           </button>
         )}
-        <div className="grid grid-cols-3 gap-6 text-sm">
+        <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:gap-6">
           <Stat k={t("collateral")} v={formatCurrency(collateralUsd, locale)} />
           <Stat k={t("borrowed")} v={formatCurrency(borrowUsd, locale)} />
           <div>
@@ -262,7 +262,27 @@ export default function MarketsApp() {
         </div>
       </div>
 
-      <div className="card overflow-x-auto">
+      {/* Mobile: stacked cards */}
+      <div className="space-y-3 sm:hidden">
+        {MARKETS.map((m) => {
+          const p = ledger[m.symbol];
+          const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
+          const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
+          return (
+            <MarketCard
+              key={m.symbol}
+              market={m}
+              locale={locale}
+              supplied={p ? suppliedFloat : null}
+              borrowed={p ? borrowedFloat : null}
+              onTrade={() => openTrade(m)}
+            />
+          );
+        })}
+      </div>
+
+      {/* sm+: table */}
+      <div className="card hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
@@ -279,7 +299,11 @@ export default function MarketsApp() {
           </thead>
           <tbody>
             {MARKETS.map((m) => {
-              const p = ledger[m.symbol];
+              const rawP = ledger && typeof ledger === "object" ? ledger[m.symbol] : undefined;
+              const p =
+                rawP && typeof rawP === "object" && typeof rawP.supplied === "bigint" && typeof rawP.borrowed === "bigint"
+                  ? rawP
+                  : null;
               const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
               const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
               return (
@@ -299,11 +323,7 @@ export default function MarketsApp() {
                   <td className="p-4 text-right">
                     <button
                       className="btn-ghost"
-                      aria-label={`${t("trade")} ${m.symbol}`}
-                      onClick={() => {
-                        setSel(m);
-                        setMsg(null);
-                      }}
+                      onClick={() => openTrade(m)}
                     >
                       {t("trade")}
                     </button>
@@ -315,77 +335,28 @@ export default function MarketsApp() {
         </table>
       </div>
 
-      {sel && (
-        <section
-          aria-labelledby={`trade-heading-${sel.symbol}`}
-          className="card max-w-md space-y-4 p-6"
-        >
-          <h2
-            id={`trade-heading-${sel.symbol}`}
-            ref={headingRef}
-            tabIndex={-1}
-            className="text-xl font-semibold outline-none"
-          >
-            {sel.symbol}
-          </h2>
-          <div
-            role="tablist"
-            aria-label={`${sel.symbol} actions`}
-            className="grid grid-cols-4 gap-1 text-sm"
-          >
-            {modes.map((x, index) => {
-              const isSelected = mode === x;
-              return (
-                <button
-                  key={x}
-                  ref={(el) => {
-                    tabsRef.current[index] = el;
-                  }}
-                  id={`tab-${x}`}
-                  role="tab"
-                  aria-selected={isSelected}
-                  aria-controls={`panel-${x}`}
-                  tabIndex={isSelected ? 0 : -1}
-                  onKeyDown={(e) => handleTabKeyDown(e, index)}
-                  onClick={() => {
-                    setMode(x);
-                    setMsg(null);
-                  }}
-                  className={`rounded-lg py-2 ${isSelected ? "btn" : "btn-ghost"}`}
-                >
-                  {t(x)}
-                </button>
-              );
-            })}
-          </div>
-          <div
-            id={`panel-${mode}`}
-            role="tabpanel"
-            aria-labelledby={`tab-${mode}`}
-            tabIndex={0}
-            className="space-y-4 outline-none"
-          >
-            <input
-              inputMode="decimal"
-              placeholder={t("amountIn", { symbol: sel.symbol })}
-              value={amt}
-              onChange={(e) => setAmt(e.target.value)}
-              aria-label={t("amountIn", { symbol: sel.symbol })}
-            />
-            <button className="btn w-full" onClick={submit}>
-              {t("confirm", { action: t(mode) })}
-            </button>
-            {msg && (
-              <p
-                className={msg.isError ? "text-amber-400 text-sm" : "mut text-sm"}
-                role={msg.isError ? "alert" : "status"}
-              >
-                {msg.text}
-              </p>
-            )}
-          </div>
-        </section>
-      )}
+      <TradeSheet
+        market={sel}
+        mode={mode}
+        onModeChange={(x) => {
+          setMode(x);
+          setMsg("");
+        }}
+        amount={amt}
+        onAmountChange={setAmt}
+        onSubmit={submit}
+        message={msg}
+        onClose={closeSheet}
+        panelRef={panelRef}
+      />
+
+      <RateChart
+        params={rateSnapshot.params}
+        diagnostics={rateSnapshot.diagnostics}
+        history={rateSnapshot.history}
+        source={rateSnapshot.source}
+        labels={rateChartLabels}
+      />
 
       <div className="flex items-center justify-between text-xs mut">
         <p>
@@ -413,9 +384,9 @@ export default function MarketsApp() {
 
 function Stat({ k, v, tone = "" }: { k: string; v: string; tone?: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="mut">{k}</div>
-      <div className={`text-lg font-semibold ${tone}`}>{v}</div>
+      <div className={`truncate text-base font-semibold sm:text-lg ${tone}`}>{v}</div>
     </div>
   );
 }

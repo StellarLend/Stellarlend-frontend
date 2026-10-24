@@ -53,8 +53,24 @@ jobs:
         run: npm run test:coverage
         continue-on-error: true
 
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright artifacts on failure
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
       - name: Upload coverage reports
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           file: ./coverage/lcov.info
           flags: unittests
@@ -63,30 +79,3 @@ jobs:
         if: always() && env.CODECOV_TOKEN != ''
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  a11y-e2e:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Build application
-        run: npm run build
-
-      - name: Run Playwright axe a11y tests
-        run: npx playwright test e2e/a11y.spec.ts
