@@ -2,12 +2,33 @@
   "nav": {
     "brand": "Stellar",
     "markets": "Markets",
+    "history": "History",
     "docs": "Docs",
     "github": "GitHub",
     "switchLocale": "ES",
     "flashLoans": "Flash loans",
     "governance": "Governance",
     "amm": "AMM"
+  },
+  "errors": {
+    "boundary": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred while loading this page.",
+      "tryAgain": "Try again",
+      "goHome": "Go back home"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you are looking for does not exist or has been moved.",
+      "goToMarkets": "Explore Markets",
+      "goToDocs": "Read Docs",
+      "goHome": "Go back home"
+    },
+    "global": {
+      "title": "Application error",
+      "description": "A critical system error occurred.",
+      "tryAgain": "Try again"
+    }
   },
   "home": {
     "brand": "Stellar",
@@ -18,6 +39,9 @@
     "readDocs": "Read the docs",
     "totalSupplied": "Total supplied",
     "totalBorrowed": "Total borrowed",
+    "utilization": "Utilization",
+    "asOfLedger": "as of ledger {ledger}",
+    "demoDataBadge": "Demo data",
     "markets": "Markets",
     "note": "Market figures shown are illustrative testnet/demo data.",
     "solvencyTitle": "Protocol solvency",
@@ -100,7 +124,53 @@
     "contract": "Lending contract",
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
-    "resetDemo": "Reset demo data"
+    "resetDemo": "Reset demo data",
+    "rateModel": {
+      "eyebrow": "Interest-rate model",
+      "title": "Two-slope borrow rate curve",
+      "subtitle": "Live parameters from get_rate_params, current utilization and smoothed rate from get_rate_model_diagnostics, and recent utilization samples from get_utilization_history.",
+      "chartAriaLabel": "Two-slope borrow rate curve chart",
+      "sparklineAriaLabel": "Protocol utilization history sparkline",
+      "inactiveBannerTitle": "Rate model inactive — default APR applies",
+      "inactiveBannerBody": "rate_model_active is false on the contract. Borrow positions accrue at the fixed default rate of 5.00% APR (500 bps) instead of the two-slope curve.",
+      "demoBadge": "Demo curve",
+      "liveBadge": "On-chain",
+      "currentUtilization": "Current utilization",
+      "appliedRate": "Applied rate (smoothed)",
+      "targetRate": "Target rate (raw)",
+      "kink": "Kink threshold",
+      "floorCeiling": "Floor / ceiling",
+      "surchargeBand": "Surcharge band",
+      "surchargeDisabled": "Disabled",
+      "lastUpdateLedger": "Last update ledger",
+      "elapsedLedgers": "{count} ledgers ago",
+      "summaryActive": "At {utilization} utilization, the target borrow rate is {targetRate} ({targetBps} bps) and the applied smoothed rate is {appliedRate} ({appliedBps} bps). The kink is at {kink} utilization.",
+      "summaryInactive": "The dynamic rate model is currently inactive. The protocol applies the default borrow rate of {defaultRate} ({defaultBps} bps) regardless of utilization ({utilization}).",
+      "legendCurve": "Borrow rate curve",
+      "legendCurrentUtil": "Current utilization",
+      "legendAppliedRate": "Applied rate",
+      "legendTargetRate": "Target rate",
+      "axisUtilization": "Utilization (%)",
+      "axisBorrowRate": "Borrow APR (%)",
+      "historyTitle": "Utilization history",
+      "historySubtitle": "Newest-first ring buffer (up to 256 ledger samples)",
+      "historyEmptyTitle": "No utilization history recorded yet",
+      "historyEmptyBody": "The contract returns an empty ring buffer until a borrow-rate update writes the first utilization sample on-chain.",
+      "historyLedgerRange": "Ledger {oldest} to {newest}",
+      "historyLatestSample": "Latest sample: {utilization} at ledger {ledger}",
+      "tableToggle": "Accessible data tables",
+      "curveTableCaption": "Sampled borrow-rate curve points",
+      "colUtilization": "Utilization",
+      "colUtilizationBps": "Utilization (bps)",
+      "colBorrowApr": "Borrow APR",
+      "colBorrowBps": "Borrow rate (bps)",
+      "colNote": "Marker",
+      "markerKink": "Kink",
+      "markerCurrent": "Current",
+      "markerSurcharge": "Surcharge kink",
+      "historyTableCaption": "Utilization history samples",
+      "colLedger": "Ledger"
+    }
   },
   "docs": {
     "title": "Documentation",
@@ -192,5 +262,32 @@
       "events": "Could not load flash-loan events.",
       "params": "Could not load flash-loan parameters."
     }
+  },
+  "history": {
+    "title": "Transaction History",
+    "subtitle": "View your deposits, withdrawals, borrows, and repayments recorded on-chain.",
+    "retentionNotice": "Showing events from the RPC retention window (roughly the last 7 days).",
+    "notConnectedTitle": "Connect wallet to view history",
+    "notConnectedSubtitle": "Please connect your Stellar wallet to view your on-chain transaction history.",
+    "connectWallet": "Connect wallet",
+    "loading": "Loading transaction history...",
+    "loadingMore": "Loading more...",
+    "emptyTitle": "No transactions found",
+    "emptySubtitle": "No transactions found for your address within the RPC retention window (~7 days). Older transactions cannot be queried via Soroban RPC.",
+    "errorTitle": "Failed to load transaction history",
+    "retry": "Try again",
+    "type": "Type",
+    "amount": "Amount",
+    "resulting": "Resulting balance / debt",
+    "time": "Time",
+    "tx": "Transaction",
+    "viewTx": "View",
+    "loadMore": "Load more",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "borrow": "Borrow",
+    "repay": "Repay",
+    "asset": "XLM"
   }
 }
+

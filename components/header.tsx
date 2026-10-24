@@ -11,6 +11,7 @@ export function Header() {
   const locale = useLocale();
   const t = useTranslations("nav");
   const marketsHref = locale === "es" ? "/es/markets" : "/markets";
+  const historyHref = locale === "es" ? "/es/history" : "/history";
   const flashLoansHref = locale === "es" ? "/es/flash-loans" : "/flash-loans";
   const ammHref = locale === "es" ? "/es/amm" : "/amm";
   const governanceHref = locale === "es" ? "/es/multisig" : "/multisig";
@@ -28,6 +29,7 @@ export function Header() {
         </Link>
         <nav className="flex items-center gap-2 text-xs mut sm:gap-5 sm:text-sm">
           <Link href={marketsHref} className="hover:text-white">{t("markets")}</Link>
+          <Link href={historyHref} className="hover:text-white">{t("history")}</Link>
           <Link href={flashLoansHref} className="hover:text-white">{t("flashLoans")}</Link>
           <Link href={ammHref} className="hover:text-white">{t("amm")}</Link>
           <Link href={governanceHref} className="hover:text-white">{t("governance")}</Link>
