@@ -8,4 +8,23 @@ body { background: var(--bg); color: var(--fg); font-family: ui-sans-serif, syst
 .btn-ghost:hover { border-color: var(--acc); }
 .mut { color: var(--mut); }
 .grad { background: linear-gradient(90deg, var(--acc), var(--acc2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-input { background:#0a1020; border:1px solid var(--line); border-radius:10px; padding:.6rem .8rem; width:100%; color:var(--fg); }
+input { background:#0a1020; border:1px solid var(--line); border-radius:10px; padding:.6rem .8rem; width:100%; color:var(--fg); font-size: 16px; }
+
+/* Prevent iOS Safari focus zoom on form controls (font-size must be >= 16px). */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Trade sheet animation respecting user motion preferences. */
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sheet-enter { animation: sheet-in 200ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter { animation: none; }
+}
