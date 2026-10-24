@@ -40,7 +40,7 @@ describe("MarketsApp Wallet balance column", () => {
       disconnect: vi.fn(),
       refreshBalances: vi.fn(),
       addTrustline: mockAddTrustline,
-    });
+    } as unknown as ReturnType<typeof walletModule.useWallet>);
 
     renderMarketsApp();
 
@@ -61,7 +61,7 @@ describe("MarketsApp Wallet balance column", () => {
       disconnect: vi.fn(),
       refreshBalances: vi.fn(),
       addTrustline: mockAddTrustline,
-    });
+    } as unknown as ReturnType<typeof walletModule.useWallet>);
 
     renderMarketsApp();
 
@@ -97,7 +97,7 @@ describe("MarketsApp Wallet balance column", () => {
       disconnect: vi.fn(),
       refreshBalances: vi.fn(),
       addTrustline: mockAddTrustline,
-    });
+    } as unknown as ReturnType<typeof walletModule.useWallet>);
 
     renderMarketsApp();
 
@@ -127,7 +127,7 @@ describe("MarketsApp Wallet balance column", () => {
       disconnect: vi.fn(),
       refreshBalances: vi.fn(),
       addTrustline: mockAddTrustline,
-    });
+    } as unknown as ReturnType<typeof walletModule.useWallet>);
 
     renderMarketsApp();
 

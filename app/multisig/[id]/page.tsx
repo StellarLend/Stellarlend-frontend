@@ -2,8 +2,9 @@ import { ProposalDetail } from "@/components/multisig/proposal-detail";
 import { PageShell } from "@/components/page-shell";
 
 export const metadata = {
-  title: "Multisig Proposal - StellarLend",
-  description: "Review and sign multisig governance proposals via Freighter wallet.",
+  title: "Multisig Proposal Details - StellarLend",
+  description:
+    "Review decoded proposal actions, signer quorum progress, and ledger expiry for StellarLend multisig governance.",
 };
 
 export default async function Page({

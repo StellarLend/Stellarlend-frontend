@@ -20,10 +20,16 @@ export type Market = {
   decimals: number;
   asset: AssetIdentity;
   sacId?: string;
+  /** Whether this market is wired to the live on-chain lending contract */
+  live?: boolean;
+  /** Optional token contract ID for on-chain oracle lookups */
+  contractId?: string;
+  /** Source of price data (defaults to "demo") */
+  priceSource?: "oracle" | "demo";
 };
 
 export const MARKETS: Market[] = [
-  { symbol: "XLM",  name: "Stellar Lumens",   price: 0.12,   supplyApy: 3.4, borrowApy: 6.1, totalSupply: 48_200_000, totalBorrow: 21_400_000, ltv: 0.7,  decimals: 7, asset: "native" },
+  { symbol: "XLM",  name: "Stellar Lumens",   price: 0.12,   supplyApy: 3.4, borrowApy: 6.1, totalSupply: 48_200_000, totalBorrow: 21_400_000, ltv: 0.7,  decimals: 7, asset: "native", live: true },
   { symbol: "USDC", name: "USD Coin",          price: 1,      supplyApy: 5.2, borrowApy: 7.8, totalSupply: 12_600_000, totalBorrow:  8_900_000, ltv: 0.85, decimals: 7, asset: { code: "USDC", issuer: TESTNET_ISSUERS.USDC } },
   { symbol: "EURC", name: "Euro Coin",         price: 1.08,   supplyApy: 4.1, borrowApy: 6.9, totalSupply:  3_100_000, totalBorrow:  1_700_000, ltv: 0.8,  decimals: 7, asset: { code: "EURC", issuer: TESTNET_ISSUERS.EURC } },
   { symbol: "BTC",  name: "Wrapped Bitcoin",   price: 67000,  supplyApy: 1.2, borrowApy: 3.5, totalSupply:        420, totalBorrow:         96, ltv: 0.75, decimals: 8, asset: { code: "BTC", issuer: TESTNET_ISSUERS.BTC } },
