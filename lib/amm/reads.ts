@@ -36,7 +36,7 @@ export type PoolSnapshot = {
   tokenBInfo: ReadResult<TokenInfo>;
 };
 
-const NETWORK_PASSPHRASE = config.network === "public" ? Networks.PUBLIC : Networks.TESTNET;
+const NETWORK_PASSPHRASE = config.networkPassphrase;
 export const MAX_IMPACT_SENTINEL = 4294967295; // u32::MAX (guard disabled)
 
 // Validates a Stellar StrKey contract address (starts with 'C', 56 uppercase alphanumeric chars)
