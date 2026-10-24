@@ -2,7 +2,7 @@
 
 import { HealthChip } from "@/components/health-chip";
 import { useHealthMonitor } from "@/hooks/use-health-monitor";
-import { useWallet } from "@/components/wallet-provider"; // CHANGE: your wallet hook's file and name
+import { useWallet } from "@/components/wallet";
 
 function ConnectedHealthChip({ address }: { address: string }) {
   const monitor = useHealthMonitor(address);
@@ -19,7 +19,7 @@ function ConnectedHealthChip({ address }: { address: string }) {
 }
 
 export function HealthIndicator() {
-  const { address } = useWallet(); // CHANGE: your hook name and address field
+  const { address } = useWallet();
   if (!address) return null;
   return <ConnectedHealthChip key={address} address={address} />;
 }
