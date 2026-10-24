@@ -188,13 +188,37 @@ export function loadLedger(address: string | null): LoadResult {
 
   // Try v2 format
   if (raw !== null) {
-    if (isRawV2(raw)) {
-      const ledger: Ledger = {};
-      for (const [symbol, pos] of Object.entries(raw.positions)) {
-        const p = deserializePosition(pos);
-        if (p) ledger[symbol] = p;
+    if (
+      typeof raw === "object" &&
+      raw !== null &&
+      "v" in raw &&
+      (raw as Record<string, unknown>).v === 2
+    ) {
+      const rawObj = raw as Record<string, unknown>;
+      if (
+        typeof rawObj.positions === "object" &&
+        rawObj.positions !== null &&
+        !Array.isArray(rawObj.positions)
+      ) {
+        const ledger: Ledger = {};
+        for (const [symbol, pos] of Object.entries(
+          rawObj.positions as Record<string, unknown>
+        )) {
+          if (
+            typeof pos === "object" &&
+            pos !== null &&
+            !Array.isArray(pos) &&
+            typeof (pos as Record<string, unknown>).supplied === "string" &&
+            typeof (pos as Record<string, unknown>).borrowed === "string" &&
+            /^\d+$/.test((pos as Record<string, unknown>).supplied as string) &&
+            /^\d+$/.test((pos as Record<string, unknown>).borrowed as string)
+          ) {
+            const p = deserializePosition(pos as RawV2Position);
+            if (p) ledger[symbol] = p;
+          }
+        }
+        return { ledger, reset: false };
       }
-      return { ledger, reset: false };
     }
 
     // Invalid v2 — discard and reset
@@ -277,8 +301,8 @@ export function computeRisk(ledger: Ledger, markets: MarketParams[]): RiskSummar
   let limitUsd = 0;
 
   for (const m of markets) {
-    const pos = ledger[m.symbol];
-    if (!pos) continue;
+    const pos = ledger && typeof ledger === "object" ? ledger[m.symbol] : undefined;
+    if (!pos || typeof pos !== "object" || typeof pos.supplied !== "bigint" || typeof pos.borrowed !== "bigint") continue;
     const decimals = m.decimals ?? DECIMALS;
     const supplied = toFloat(pos.supplied, decimals);
     const borrowed = toFloat(pos.borrowed, decimals);
@@ -301,8 +325,8 @@ export function canWithdraw(
   amount: bigint,
   markets: MarketParams[]
 ): boolean {
-  const pos = ledger[symbol];
-  if (!pos) return false;
+  const pos = ledger && typeof ledger === "object" ? ledger[symbol] : undefined;
+  if (!pos || typeof pos !== "object" || typeof pos.supplied !== "bigint" || typeof pos.borrowed !== "bigint") return false;
   if (amount > pos.supplied) return false;
 
   // Simulate the withdrawal
