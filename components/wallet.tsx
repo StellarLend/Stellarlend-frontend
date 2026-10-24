@@ -2,6 +2,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { config } from "@/lib/config";
+import { reportError } from "@/lib/report-error";
 
 type Ctx = { address: string | null; balance: string | null; error: string | null; connect: () => Promise<void>; disconnect: () => void };
 const WalletCtx = createContext<Ctx>({ address: null, balance: null, error: null, connect: async () => {}, disconnect: () => {} });
@@ -44,7 +45,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         const x = a?.balances?.find((b: { asset_type: string }) => b.asset_type === "native");
         setBalance(x ? Number(x.balance).toFixed(2) : t("unfunded"));
       })
-      .catch(() => live && setBalance(null));
+      .catch((err) => {
+        reportError(err, { context: "wallet:fetchBalance", address });
+        if (live) setBalance(null);
+      });
     return () => { live = false; };
   }, [address, t]);
 

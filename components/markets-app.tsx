@@ -113,7 +113,11 @@ export default function MarketsApp() {
       setMsg(t("status.positiveAmount"));
       return;
     }
-    const cur = ledger[sel.symbol] ?? { supplied: BigInt(0), borrowed: BigInt(0) };
+    const rawCur = ledger && typeof ledger === "object" ? ledger[sel.symbol] : undefined;
+    const cur =
+      rawCur && typeof rawCur === "object" && typeof rawCur.supplied === "bigint" && typeof rawCur.borrowed === "bigint"
+        ? rawCur
+        : { supplied: BigInt(0), borrowed: BigInt(0) };
     const next = { ...cur };
 
     if (mode === "supply") {
@@ -241,7 +245,11 @@ export default function MarketsApp() {
           </thead>
           <tbody>
             {MARKETS.map((m) => {
-              const p = ledger[m.symbol];
+              const rawP = ledger && typeof ledger === "object" ? ledger[m.symbol] : undefined;
+              const p =
+                rawP && typeof rawP === "object" && typeof rawP.supplied === "bigint" && typeof rawP.borrowed === "bigint"
+                  ? rawP
+                  : null;
               const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
               const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
               return (

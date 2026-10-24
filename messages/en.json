@@ -9,6 +9,26 @@
     "governance": "Governance",
     "amm": "AMM"
   },
+  "errors": {
+    "boundary": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred while loading this page.",
+      "tryAgain": "Try again",
+      "goHome": "Go back home"
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you are looking for does not exist or has been moved.",
+      "goToMarkets": "Explore Markets",
+      "goToDocs": "Read Docs",
+      "goHome": "Go back home"
+    },
+    "global": {
+      "title": "Application error",
+      "description": "A critical system error occurred.",
+      "tryAgain": "Try again"
+    }
+  },
   "home": {
     "brand": "Stellar",
     "eyebrow": "Live on Stellar testnet",
