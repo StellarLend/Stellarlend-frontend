@@ -2,6 +2,7 @@
   "nav": {
     "brand": "Stellar",
     "markets": "Mercados",
+    "history": "Historial",
     "docs": "Documentación",
     "github": "GitHub",
     "switchLocale": "EN",
@@ -212,5 +213,32 @@
       "events": "No se pudieron cargar los eventos de préstamos flash.",
       "params": "No se pudieron cargar los parámetros de préstamos flash."
     }
+  },
+  "history": {
+    "title": "Historial de transacciones",
+    "subtitle": "Consulta tus depósitos, retiros, préstamos y pagos registrados en la cadena.",
+    "retentionNotice": "Mostrando eventos de la ventana de retención de RPC (aproximadamente los últimos 7 días).",
+    "notConnectedTitle": "Conecta tu billetera para ver el historial",
+    "notConnectedSubtitle": "Por favor conecta tu billetera Stellar para ver tu historial de transacciones en la cadena.",
+    "connectWallet": "Conectar billetera",
+    "loading": "Cargando historial de transacciones...",
+    "loadingMore": "Cargando más...",
+    "emptyTitle": "No se encontraron transacciones",
+    "emptySubtitle": "No se encontraron transacciones para tu dirección dentro de la ventana de retención de RPC (~7 días). Las transacciones más antiguas no se pueden consultar mediante Soroban RPC.",
+    "errorTitle": "Error al cargar el historial de transacciones",
+    "retry": "Intentar de nuevo",
+    "type": "Tipo",
+    "amount": "Cantidad",
+    "resulting": "Saldo / deuda resultante",
+    "time": "Tiempo",
+    "tx": "Transacción",
+    "viewTx": "Ver",
+    "loadMore": "Cargar más",
+    "deposit": "Depósito",
+    "withdraw": "Retiro",
+    "borrow": "Préstamo",
+    "repay": "Pago",
+    "asset": "XLM"
   }
 }
+

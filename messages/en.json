@@ -2,6 +2,7 @@
   "nav": {
     "brand": "Stellar",
     "markets": "Markets",
+    "history": "History",
     "docs": "Docs",
     "github": "GitHub",
     "switchLocale": "ES",
@@ -212,5 +213,32 @@
       "events": "Could not load flash-loan events.",
       "params": "Could not load flash-loan parameters."
     }
+  },
+  "history": {
+    "title": "Transaction History",
+    "subtitle": "View your deposits, withdrawals, borrows, and repayments recorded on-chain.",
+    "retentionNotice": "Showing events from the RPC retention window (roughly the last 7 days).",
+    "notConnectedTitle": "Connect wallet to view history",
+    "notConnectedSubtitle": "Please connect your Stellar wallet to view your on-chain transaction history.",
+    "connectWallet": "Connect wallet",
+    "loading": "Loading transaction history...",
+    "loadingMore": "Loading more...",
+    "emptyTitle": "No transactions found",
+    "emptySubtitle": "No transactions found for your address within the RPC retention window (~7 days). Older transactions cannot be queried via Soroban RPC.",
+    "errorTitle": "Failed to load transaction history",
+    "retry": "Try again",
+    "type": "Type",
+    "amount": "Amount",
+    "resulting": "Resulting balance / debt",
+    "time": "Time",
+    "tx": "Transaction",
+    "viewTx": "View",
+    "loadMore": "Load more",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "borrow": "Borrow",
+    "repay": "Repay",
+    "asset": "XLM"
   }
 }
+
