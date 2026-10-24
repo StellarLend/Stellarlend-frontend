@@ -30,7 +30,7 @@ import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
 
 export default function MarketsApp() {
-  const { address, balance, error, connect } = useWallet();
+  const { address, balance, error, openPicker } = useWallet();
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
   const [ledger, setLedger] = useState<Ledger>({});
@@ -288,7 +288,7 @@ export default function MarketsApp() {
           {error && <div className="mt-1 text-amber-400">{error}</div>}
         </div>
         {!address && (
-          <Button variant="primary" className="w-full sm:w-auto" onClick={connect}>
+          <Button variant="primary" className="w-full sm:w-auto" onClick={openPicker}>
             {t("connectFreighter")}
           </Button>
         )}
