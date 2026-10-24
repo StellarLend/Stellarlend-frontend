@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { config, explorer } from "@/lib/config";
+import { MARKETS, formatPercent, type Market } from "@/lib/markets";
+import { fetchLiveMarketParams, bpsToPercent } from "@/lib/market-params";
 
 const S = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="space-y-3">
@@ -13,7 +15,25 @@ const S = ({ title, children }: { title: string; children: React.ReactNode }) =>
 
 export function DocsPage() {
   const t = useTranslations("docs");
-  const flashLoansHref = useLocale() === "es" ? "/es/flash-loans" : "/flash-loans";
+  const locale = useLocale();
+  const flashLoansHref = locale === "es" ? "/es/flash-loans" : "/flash-loans";
+  const [markets, setMarkets] = useState<Market[]>(MARKETS);
+
+  useEffect(() => {
+    let active = true;
+    async function loadParams() {
+      try {
+        const live = await fetchLiveMarketParams(MARKETS);
+        if (active) setMarkets(live);
+      } catch {
+        // keep default
+      }
+    }
+    loadParams();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <article className="mx-auto max-w-3xl space-y-10">
@@ -34,6 +54,39 @@ export function DocsPage() {
 
       <S title={t("riskParameters.title")}>
         <p>{t("riskParameters.body")}</p>
+        <div className="overflow-x-auto rounded-lg border border-[var(--line)]">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-[var(--line)] bg-zinc-900/50 uppercase mut">
+              <tr>
+                <th className="p-3">{t("riskParameters.asset")}</th>
+                <th className="p-3">{t("riskParameters.maxLtv")}</th>
+                <th className="p-3">{t("riskParameters.liquidationThreshold")}</th>
+                <th className="p-3">{t("riskParameters.supplyCap")}</th>
+                <th className="p-3">{t("riskParameters.minBorrow")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {markets.map((m) => {
+                const ltvVal = m.ltvBps !== undefined ? bpsToPercent(m.ltvBps) : m.ltv * 100;
+                const liqVal = m.liqThresholdBps !== undefined ? bpsToPercent(m.liqThresholdBps) : 80;
+                const capStr = !m.supplyCap || m.supplyCap === BigInt(0) ? t("riskParameters.uncapped") : m.supplyCap.toString();
+                const minBorrowStr = m.minBorrow ? `${m.minBorrow.toString()} stroops` : "1.0";
+
+                return (
+                  <tr key={m.symbol} className="border-b border-[var(--line)] last:border-0">
+                    <td className="p-3 font-medium">
+                      {m.symbol} <span className="mut">({m.sources?.ltv ?? "demo"})</span>
+                    </td>
+                    <td className="p-3">{formatPercent(ltvVal, locale as any)}</td>
+                    <td className="p-3">{formatPercent(liqVal, locale as any)}</td>
+                    <td className="p-3 font-mono">{capStr}</td>
+                    <td className="p-3 font-mono">{minBorrowStr}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </S>
 
       <S title={t("flashLoans.title")}>
