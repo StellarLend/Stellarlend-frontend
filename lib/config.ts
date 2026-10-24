@@ -12,6 +12,12 @@ export const config = {
   ammTokenBId: process.env.NEXT_PUBLIC_AMM_TOKEN_B_CONTRACT_ID || "",
   ammTokenAHorizonAsset: process.env.NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET || "",
   ammTokenBHorizonAsset: process.env.NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET || "",
+  marketAssets: {
+    XLM: process.env.NEXT_PUBLIC_XLM_ASSET_ADDRESS || "",
+    USDC: process.env.NEXT_PUBLIC_USDC_ASSET_ADDRESS || "",
+    EURC: process.env.NEXT_PUBLIC_EURC_ASSET_ADDRESS || "",
+    BTC: process.env.NEXT_PUBLIC_BTC_ASSET_ADDRESS || "",
+  } as Record<string, string>,
 };
 export const explorer = (id: string) => `https://stellar.expert/explorer/testnet/contract/${id}`;
 export const txExplorer = (hash: string) => `https://stellar.expert/explorer/testnet/tx/${hash}`;

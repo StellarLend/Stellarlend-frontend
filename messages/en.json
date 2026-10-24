@@ -92,12 +92,21 @@
       "tooLarge": "Amount exceeds the maximum allowed.",
       "notFinite": "Amount must be a finite number (no Infinity, NaN, or exponents).",
       "storageReset": "Demo data was reset due to corrupted storage.",
-      "demoReset": "Demo data reset."
+      "demoReset": "Demo data reset.",
+      "depositCapExceeded": "This deposit would exceed the market deposit limit.",
+      "belowMinimumBorrow": "The requested borrow is below the minimum amount."
     },
     "contract": "Lending contract",
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
-    "resetDemo": "Reset demo data"
+    "resetDemo": "Reset demo data",
+    "ltv": "LTV",
+    "liquidationThreshold": "Liquidation threshold",
+    "capacity": "Capacity",
+    "uncapped": "Uncapped",
+    "demo": "demo",
+    "chain": "chain",
+    "remainingCapacity": "Remaining cap: {amount} {symbol}"
   },
   "docs": {
     "title": "Documentation",
@@ -114,7 +123,13 @@
     },
     "riskParameters": {
       "title": "Risk parameters",
-      "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable."
+      "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable.",
+      "asset": "Asset",
+      "maxLtv": "Max LTV",
+      "liquidationThreshold": "Liquidation threshold",
+      "supplyCap": "Supply cap",
+      "minBorrow": "Min borrow",
+      "uncapped": "Uncapped"
     },
     "flashLoans": {
       "title": "Flash loans",

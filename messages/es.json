@@ -92,12 +92,21 @@
       "tooLarge": "La cantidad supera el máximo permitido.",
       "notFinite": "La cantidad debe ser un número finito (sin Infinity, NaN ni exponentes).",
       "storageReset": "Los datos de demostración se restablecieron porque el almacenamiento estaba dañado.",
-      "demoReset": "Datos de demostración restablecidos."
+      "demoReset": "Datos de demostración restablecidos.",
+      "depositCapExceeded": "Este depósito superaría el límite de depósito del mercado.",
+      "belowMinimumBorrow": "El préstamo solicitado está por debajo del monto mínimo."
     },
     "contract": "Contrato de préstamo",
     "notDeployed": "no desplegado",
     "balance": "{balance} XLM",
-    "resetDemo": "Restablecer datos de demostración"
+    "resetDemo": "Restablecer datos de demostración",
+    "ltv": "LTV",
+    "liquidationThreshold": "Umbral de liquidación",
+    "capacity": "Capacidad",
+    "uncapped": "Sin límite",
+    "demo": "demo",
+    "chain": "en cadena",
+    "remainingCapacity": "Capacidad restante: {amount} {symbol}"
   },
   "docs": {
     "title": "Documentación",
@@ -114,7 +123,13 @@
     },
     "riskParameters": {
       "title": "Parámetros de riesgo",
-      "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable."
+      "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable.",
+      "asset": "Activo",
+      "maxLtv": "LTV máximo",
+      "liquidationThreshold": "Umbral de liquidación",
+      "supplyCap": "Límite de suministro",
+      "minBorrow": "Préstamo mínimo",
+      "uncapped": "Sin límite"
     },
     "flashLoans": {
       "title": "Préstamos flash",
