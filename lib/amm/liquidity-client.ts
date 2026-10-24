@@ -30,6 +30,11 @@ export type PoolSnapshot = {
   userShares: bigint;
   tokenA: TokenState;
   tokenB: TokenState;
+  feeBps?: bigint;
+  minSwapIn?: bigint;
+  maxImpactBps?: number;
+  ledger?: number | null;
+  fetchedAt?: number;
 };
 
 export type LiquidityAction =
@@ -92,11 +97,34 @@ export async function readPool(address: string): Promise<PoolSnapshot> {
   if (horizonResponse.ok) horizonAccount = await horizonResponse.json() as HorizonAccount;
   else if (horizonResponse.status !== 404) throw new Error(`Horizon account lookup failed (${horizonResponse.status}).`);
 
-  const [reserves, totalSupply, userShares, minimumReserve, decimalsA, decimalsB, balanceA, balanceB] = await Promise.all([
+  let latestLedger: number | null = null;
+  try {
+    const latest = await rpcServer.getLatestLedger();
+    latestLedger = latest.sequence;
+  } catch {
+    // optional ledger sequence
+  }
+
+  const [
+    reserves,
+    totalSupply,
+    userShares,
+    minimumReserve,
+    feeBpsVal,
+    minSwapInVal,
+    maxImpactBpsVal,
+    decimalsA,
+    decimalsB,
+    balanceA,
+    balanceB,
+  ] = await Promise.all([
     readContract<unknown[]>(rpcServer, address, config.ammId, "get_reserves"),
     readContract<bigint>(rpcServer, address, config.ammId, "get_total_supply"),
     readContract<bigint>(rpcServer, address, config.ammId, "get_lp_balance", [user]),
-    readContract<bigint>(rpcServer, address, config.ammId, "get_min_liquidity"),
+    readContract<bigint>(rpcServer, address, config.ammId, "get_min_liquidity").catch(() => 0n),
+    readContract<bigint | number>(rpcServer, address, config.ammId, "get_fee_bps").catch(() => 30n),
+    readContract<bigint | number>(rpcServer, address, config.ammId, "get_min_swap_in").catch(() => 0n),
+    readContract<number | bigint>(rpcServer, address, config.ammId, "get_max_impact_bps").catch(() => 0xffff_ffff),
     readContract<number | bigint>(rpcServer, address, config.ammTokenAId, "decimals"),
     readContract<number | bigint>(rpcServer, address, config.ammTokenBId, "decimals"),
     readContract<bigint>(rpcServer, address, config.ammTokenAId, "balance", [user]),
@@ -113,7 +141,10 @@ export async function readPool(address: string): Promise<PoolSnapshot> {
     reserveB: BigInt(reserves[1] as bigint),
     totalSupply: BigInt(totalSupply),
     userShares: BigInt(userShares),
-    minimumReserve: BigInt(minimumReserve),
+    minimumReserve: BigInt(minimumReserve ?? 0n),
+    feeBps: BigInt(feeBpsVal ?? 30n),
+    minSwapIn: BigInt(minSwapInVal ?? 0n),
+    maxImpactBps: Number(maxImpactBpsVal ?? 0xffff_ffff),
     tokenA: {
       decimals: tokenDecimalsA,
       balance: BigInt(balanceA),
@@ -124,6 +155,55 @@ export async function readPool(address: string): Promise<PoolSnapshot> {
       balance: BigInt(balanceB),
       trustline: readHorizonTrustline(config.ammTokenBHorizonAsset, horizonAccount),
     },
+    ledger: latestLedger,
+    fetchedAt: 1,
+  };
+}
+
+export type SimulatedSwapQuote = {
+  amountOut: bigint;
+  fee: bigint;
+  reserveAAfter: bigint;
+  reserveBAfter: bigint;
+};
+
+export async function simulateSwapQuote(
+  sourceAddress: string,
+  amountIn: bigint,
+  feeBps: bigint,
+  aForB: boolean,
+): Promise<SimulatedSwapQuote> {
+  requireConfiguration();
+  const rpcServer = server();
+  const args = [
+    nativeToScVal(amountIn, { type: "i128" }),
+    nativeToScVal(feeBps, { type: "i128" }),
+    nativeToScVal(aForB, { type: "bool" }),
+  ];
+
+  type RawQuote = {
+    amount_out?: bigint;
+    fee?: bigint;
+    reserve_a_after?: bigint;
+    reserve_b_after?: bigint;
+    amountOut?: bigint;
+    reserveAAfter?: bigint;
+    reserveBAfter?: bigint;
+  };
+
+  const raw = await readContract<RawQuote>(
+    rpcServer,
+    sourceAddress,
+    config.ammId,
+    "get_swap_quote",
+    args,
+  );
+
+  return {
+    amountOut: BigInt(raw.amount_out ?? raw.amountOut ?? 0n),
+    fee: BigInt(raw.fee ?? 0n),
+    reserveAAfter: BigInt(raw.reserve_a_after ?? raw.reserveAAfter ?? 0n),
+    reserveBAfter: BigInt(raw.reserve_b_after ?? raw.reserveBAfter ?? 0n),
   };
 }
 
