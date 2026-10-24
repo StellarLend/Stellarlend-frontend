@@ -37,6 +37,7 @@ import { RateChart, defaultRateChartLabels, type RateChartLabels } from "./rate-
 
 import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
+import { useProtocolStatus } from "./protocol-status";
 
 export default function MarketsApp() {
   const {
@@ -55,6 +56,8 @@ export default function MarketsApp() {
   const tw = useTranslations("wallet");
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
+  const tStatus = useTranslations("protocolStatus");
+  const { status: protocolStatus, isActionAllowed } = useProtocolStatus();
   const [ledger, setLedger] = useState<Ledger>({});
   const [resetNotice, setResetNotice] = useState(false);
   const [sel, setSel] = useState<Market | null>(null);
@@ -377,23 +380,57 @@ export default function MarketsApp() {
     setTx(null);
   }
 
+  const isDemoMode = !address;
+
+  const getBlockedReason = (action: "supply" | "borrow" | "withdraw" | "repay") => {
+    if (!protocolStatus || protocolStatus.kind === "unknown") return null;
+    if (protocolStatus.emergency === "Shutdown") return tStatus("reasonShutdown");
+    if (protocolStatus.emergency === "Recovery" && (action === "supply" || action === "borrow")) {
+      return tStatus("reasonRecovery");
+    }
+    if (protocolStatus.paused.All) return tStatus("reasonPaused");
+    const pauseKey = action === "supply" ? "Supply" : action === "borrow" ? "Borrow" : action === "withdraw" ? "Withdraw" : "Repay";
+    if (protocolStatus.paused[pauseKey]) return tStatus("reasonPaused");
+    return null;
+  };
+  const currentBlockedReason = !isDemoMode ? getBlockedReason(mode) : null;
+  const currentBlocked = !isDemoMode && !isActionAllowed(mode);
+
   const tradePanel = sel ? (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-1 text-sm">
-        {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => (
-          <button
-            key={x}
-            onClick={() => {
-              setMode(x);
-              setMsg("");
-              setTx(null);
-            }}
-            className={`rounded-lg py-2 ${mode === x ? "btn" : "btn-ghost"}`}
-          >
-            {t(x)}
-          </button>
-        ))}
+        {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => {
+          const blockedReason = !isDemoMode ? getBlockedReason(x) : null;
+          const isBlocked = !isDemoMode && !isActionAllowed(x);
+          return (
+            <button
+              key={x}
+              disabled={isBlocked}
+              title={blockedReason ? tStatus("actionBlockedTooltip", { reason: blockedReason }) : undefined}
+              onClick={() => {
+                if (isBlocked) return;
+                setMode(x);
+                setMsg("");
+                setTx(null);
+              }}
+              className={`rounded-lg py-2 ${
+                isBlocked
+                  ? "opacity-40 cursor-not-allowed bg-slate-800 text-slate-500 border border-slate-700"
+                  : mode === x
+                  ? "btn"
+                  : "btn-ghost"
+              }`}
+            >
+              {t(x)}
+            </button>
+          );
+        })}
       </div>
+      {currentBlockedReason && (
+        <div className="text-xs text-amber-400 bg-amber-950/40 border border-amber-900/60 p-2.5 rounded-lg">
+          {tStatus("actionBlockedTooltip", { reason: currentBlockedReason })}
+        </div>
+      )}
       <input
         inputMode="decimal"
         placeholder={t("amountIn", { symbol: sel.symbol })}
@@ -402,7 +439,12 @@ export default function MarketsApp() {
         disabled={busy}
         aria-label={t("amountIn", { symbol: sel.symbol })}
       />
-      <button className="btn w-full" onClick={submit} disabled={busy}>
+      <button
+        className="btn w-full"
+        onClick={submit}
+        disabled={busy || currentBlocked}
+        title={currentBlockedReason ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason }) : undefined}
+      >
         {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
       </button>
       {msg && (

@@ -402,5 +402,23 @@
     "manualLink": "Stellar Lab Faucet",
     "retry": "Retry",
     "manualFaucet": "Manual Faucet"
+  },
+  "protocolStatus": {
+    "unknown": "Protocol status unknown (RPC unreachable). Actions remain enabled.",
+    "shutdown": "Protocol is shut down. All operations are currently disabled.",
+    "recovery": "Protocol is in recovery mode. Only withdrawals, repayments, and liquidations are allowed.",
+    "pausedAll": "The protocol is currently paused. All operations are disabled.",
+    "pausedSpecific": "Protocol operation(s) paused: {ops}.",
+    "actionBlockedTooltip": "This operation is disabled because {reason}.",
+    "reasonShutdown": "the protocol is in emergency shutdown",
+    "reasonRecovery": "the protocol is in recovery mode",
+    "reasonPaused": "this operation is paused",
+    "ops": {
+      "supply": "Supply",
+      "borrow": "Borrow",
+      "withdraw": "Withdraw",
+      "repay": "Repay",
+      "liquidate": "Liquidate"
+    }
   }
 }

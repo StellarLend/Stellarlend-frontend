@@ -12,6 +12,7 @@ import {
   type AccountBalancesMap,
 } from "@/lib/horizon";
 import { QueryProvider } from "./query-provider";
+import { ProtocolStatusProvider } from "@/components/protocol-status";
 import { WalletAdapter, SignTransactionOptions, getWalletAdapter } from "@/lib/wallets";
 import { WalletPickerModal } from "./wallet-picker";
 
@@ -476,7 +477,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         assertCanSign,
       }}
     >
-      {children}
+      <ProtocolStatusProvider>{children}</ProtocolStatusProvider>
       <WalletPickerModal
         isOpen={isPickerOpen}
         onClose={closePicker}

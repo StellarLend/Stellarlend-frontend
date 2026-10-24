@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { ConnectButton } from "@/components/wallet";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { ProtocolStatusBanner } from "@/components/protocol-status";
 import { NetworkBanner } from "@/components/network-banner";
 
 export function Header() {
@@ -43,6 +44,7 @@ export function Header() {
           <ConnectButton />
         </div>
       </div>
+      <ProtocolStatusBanner />
     </header>
     </>
   );

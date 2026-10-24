@@ -402,5 +402,23 @@
     "manualLink": "Faucet Stellar Lab",
     "retry": "Reintentar",
     "manualFaucet": "Faucet manual"
+  },
+  "protocolStatus": {
+    "unknown": "Estado del protocolo desconocido (RPC inaccesible). Las acciones permanecen habilitadas.",
+    "shutdown": "El protocolo está cerrado por emergencia. Todas las operaciones están deshabilitadas.",
+    "recovery": "El protocolo está en modo de recuperación. Solo se permiten retiros, pagos y liquidaciones.",
+    "pausedAll": "El protocolo está pausado actualmente. Todas las operaciones están deshabilitadas.",
+    "pausedSpecific": "Operación(es) del protocolo en pausa: {ops}.",
+    "actionBlockedTooltip": "Esta operación está deshabilitada porque {reason}.",
+    "reasonShutdown": "el protocolo está en cierre de emergencia",
+    "reasonRecovery": "el protocolo está en modo de recuperación",
+    "reasonPaused": "esta operación está en pausa",
+    "ops": {
+      "supply": "Depositar",
+      "borrow": "Pedir prestado",
+      "withdraw": "Retirar",
+      "repay": "Pagar",
+      "liquidate": "Liquidar"
+    }
   }
 }
