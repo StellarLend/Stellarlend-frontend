@@ -11,22 +11,29 @@
     "check-lockfile": "node scripts/check-lockfile.mjs",
     "test": "node scripts/check-lockfile.mjs && vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs lib/csp.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
     "test:coverage": "vitest run --config vitest.config.ts --coverage && node --test lib/demo-ledger.test.mjs lib/csp.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
+    "test:e2e": "playwright test",
     "check-lending-errors": "node scripts/check-lending-errors.mjs"
   },
   "dependencies": {
-    "@stellar/freighter-api": "^4.0.0",
+    "@albedo-link/intent": "^0.13.0",
+    "@creit.tech/xbull-wallet-connect": "^0.4.0",
+    "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^17.2.1",
+    "@tanstack/react-query": "^5.69.0",
     "next": "^16.4.2",
     "next-intl": "^4.3.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.4.3",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "^24",
+    "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.1.2",

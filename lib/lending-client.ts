@@ -48,7 +48,7 @@ export type LendingPosition = {
 };
 
 export const NETWORK_PASSPHRASE =
-  config.network === "public" ? Networks.PUBLIC : Networks.TESTNET;
+  config.networkPassphrase ?? (config.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET);
 
 /** A Stellar contract ID is a 56-character strkey starting with `C`. */
 export function isValidContractId(id: string | undefined | null): id is string {

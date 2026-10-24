@@ -11,6 +11,10 @@ export type Market = {
   decimals: number;
   /** Whether this market is wired to the live on-chain lending contract */
   live?: boolean;
+  /** Optional token contract ID for on-chain oracle lookups */
+  contractId?: string;
+  /** Source of price data (defaults to "demo") */
+  priceSource?: "oracle" | "demo";
 };
 
 export const MARKETS: Market[] = [
