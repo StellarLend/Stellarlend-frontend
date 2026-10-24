@@ -16,6 +16,12 @@ import {
   storageKey,
   type Ledger,
 } from "@/lib/demo-ledger";
+import {
+  buildDemoRateModelSnapshot,
+  fetchRateModelSnapshot,
+  type RateModelSnapshot,
+} from "@/lib/rate-model";
+import { RateChart, defaultRateChartLabels, type RateChartLabels } from "./rate-chart";
 
 import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
@@ -30,6 +36,9 @@ export default function MarketsApp() {
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
   const [msg, setMsg] = useState("");
+  const [rateSnapshot, setRateSnapshot] = useState<RateModelSnapshot>(() =>
+    buildDemoRateModelSnapshot()
+  );
 
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -41,6 +50,22 @@ export default function MarketsApp() {
     setLedger(loaded);
     if (reset) setResetNotice(true);
   }, [address]);
+
+  // Load on-chain rate model params, diagnostics, and utilization history
+  useEffect(() => {
+    if (!config.lendingId) return;
+    let active = true;
+    fetchRateModelSnapshot()
+      .then((snapshot) => {
+        if (active) setRateSnapshot(snapshot);
+      })
+      .catch(() => {
+        if (active) setRateSnapshot(buildDemoRateModelSnapshot());
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Cross-tab sync via the storage event
   useEffect(() => {
@@ -89,6 +114,23 @@ export default function MarketsApp() {
     () => computeRisk(ledger, MARKETS),
     [ledger]
   );
+
+  const rateChartLabels = useMemo<Partial<RateChartLabels>>(() => {
+    const keys = Object.keys(defaultRateChartLabels) as Array<keyof RateChartLabels>;
+    const resolved: Partial<RateChartLabels> = {};
+    for (const key of keys) {
+      const messageKey = `rateModel.${key}`;
+      if (typeof t.has === "function" && t.has(messageKey)) {
+        // Do not interpolate template placeholders in RateChartLabels here;
+        // RateChart interpolates dynamic values itself via t.raw or defaults.
+        const rawVal = typeof t.raw === "function" ? t.raw(messageKey) : undefined;
+        if (typeof rawVal === "string") {
+          resolved[key] = rawVal;
+        }
+      }
+    }
+    return resolved;
+  }, [t]);
 
   function submit() {
     if (!sel) return;
@@ -294,6 +336,14 @@ export default function MarketsApp() {
         message={msg}
         onClose={closeSheet}
         panelRef={panelRef}
+      />
+
+      <RateChart
+        params={rateSnapshot.params}
+        diagnostics={rateSnapshot.diagnostics}
+        history={rateSnapshot.history}
+        source={rateSnapshot.source}
+        labels={rateChartLabels}
       />
 
       <div className="flex items-center justify-between text-xs mut">
