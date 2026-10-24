@@ -38,6 +38,7 @@ export default function MarketsApp() {
   const [sel, setSel] = useState<Market | null>(null);
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
+  const [debouncedAmt, setDebouncedAmt] = useState("");
   const [msg, setMsg] = useState("");
   const [rateSnapshot, setRateSnapshot] = useState<RateModelSnapshot>(() =>
     buildDemoRateModelSnapshot()
