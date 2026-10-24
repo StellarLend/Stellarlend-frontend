@@ -9,6 +9,10 @@ export type Market = {
   ltv: number;
   /** Number of decimal places for base-unit representation (default 7) */
   decimals: number;
+  /** Optional token contract ID for on-chain oracle lookups */
+  contractId?: string;
+  /** Source of price data (defaults to "demo") */
+  priceSource?: "oracle" | "demo";
 };
 
 export const MARKETS: Market[] = [

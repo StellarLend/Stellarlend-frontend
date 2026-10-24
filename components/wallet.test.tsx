@@ -1,256 +1,221 @@
+import { render, screen, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, screen, act, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { NextIntlClientProvider } from "next-intl";
-import { WalletProvider, useWallet, ConnectButton, AUTOCONNECT_STORAGE_KEY } from "./wallet";
-import { NetworkBanner } from "./network-banner";
-import messages from "@/messages/en.json";
+import { WalletProvider, useWallet, LAST_WALLET_STORAGE_KEY } from "./wallet";
+import { WalletAdapter } from "@/lib/wallets/types";
 
-// Mock @stellar/freighter-api
-const mocks = vi.hoisted(() => {
-  const holder = {
-    callback: null as ((params: any) => void) | null,
-  };
-  const mockWatcherStop = vi.fn();
+// Mock next-intl
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => {
+    const messages: Record<string, string> = {
+      notDetected: "Wallet not detected",
+      declined: "Connection declined",
+      unreachable: "Wallet unreachable",
+      unfunded: "Unfunded",
+      disconnect: "Disconnect",
+      connectFreighter: "Connect Wallet",
+      connectWallet: "Connect a Wallet",
+      loadingWallets: "Loading available wallets...",
+      recent: "Recent",
+      available: "Available",
+      notInstalled: "Not installed",
+      install: "Install",
+      connecting: "Connecting...",
+      close: "Close",
+    };
+    return messages[key] || key;
+  },
+}));
 
-  class MockWatchWalletChanges {
-    watch(cb: (params: any) => void) {
-      holder.callback = cb;
-      return {};
-    }
-    stop() {
-      mockWatcherStop();
-    }
-  }
+// Mock fetch
+global.fetch = vi.fn().mockImplementation(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ balances: [{ asset_type: "native", balance: "100.50" }] }),
+  })
+);
 
-  return {
-    holder,
-    mockWatcherStop,
-    MockWatchWalletChanges,
-    mockIsConnected: vi.fn(),
-    mockIsAllowed: vi.fn(),
-    mockGetAddress: vi.fn(),
-    mockRequestAccess: vi.fn(),
-    mockGetNetwork: vi.fn(),
-  };
-});
+function TestConsumer({ onSign }: { onSign?: (res: string) => void }) {
+  const { address, balance, error, connect, disconnect, signTransaction, activeWalletId } =
+    useWallet();
 
-vi.mock("@stellar/freighter-api", () => {
-  return {
-    isConnected: (...args: any[]) => mocks.mockIsConnected(...args),
-    isAllowed: (...args: any[]) => mocks.mockIsAllowed(...args),
-    getAddress: (...args: any[]) => mocks.mockGetAddress(...args),
-    requestAccess: (...args: any[]) => mocks.mockRequestAccess(...args),
-    getNetwork: (...args: any[]) => mocks.mockGetNetwork(...args),
-    WatchWalletChanges: mocks.MockWatchWalletChanges,
-  };
-});
-
-function TestConsumer() {
-  const wallet = useWallet();
   return (
     <div>
-      <div data-testid="address">{wallet.address ?? "none"}</div>
-      <div data-testid="balance">{wallet.balance ?? "none"}</div>
-      <div data-testid="network">{wallet.network ?? "none"}</div>
-      <div data-testid="networkMismatch">{wallet.networkMismatch ? "true" : "false"}</div>
-      <button data-testid="connect-btn" onClick={wallet.connect}>
-        Connect
+      <span data-testid="address">{address ?? "no-address"}</span>
+      <span data-testid="balance">{balance ?? "no-balance"}</span>
+      <span data-testid="error">{error ?? "no-error"}</span>
+      <span data-testid="activeWallet">{activeWalletId ?? "none"}</span>
+      <button data-testid="connect-btn" onClick={() => connect().catch(() => {})}>
+        {""}
       </button>
-      <button data-testid="disconnect-btn" onClick={wallet.disconnect}>
-        Disconnect
+      <button data-testid="disconnect-btn" onClick={() => disconnect()}>
+        {""}
       </button>
       <button
         data-testid="sign-btn"
-        onClick={() => {
+        onClick={async () => {
           try {
-            wallet.assertCanSign();
-          } catch (e: any) {
-            const el = document.getElementById("sign-error");
-            if (el) el.textContent = e.name;
+            const res = await signTransaction("dummy-xdr");
+            onSign?.(res);
+          } catch (e: unknown) {
+            onSign?.((e as Error).message);
           }
         }}
       >
-        Sign
+        {""}
       </button>
-      <div id="sign-error"></div>
     </div>
   );
 }
 
-function renderWithProviders() {
-  return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
-      <WalletProvider>
-        <NetworkBanner />
-        <TestConsumer />
-        <ConnectButton />
-      </WalletProvider>
-    </NextIntlClientProvider>
-  );
-}
-
-describe("WalletProvider and Freighter session management", () => {
+describe("WalletContext with Adapter", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.clearAllMocks();
-    mocks.holder.callback = null;
-    window.localStorage.clear();
+  });
 
-    mocks.mockIsConnected.mockResolvedValue({ isConnected: true });
-    mocks.mockIsAllowed.mockResolvedValue({ isAllowed: false });
-    mocks.mockGetAddress.mockResolvedValue({ address: "GCFAKEADDRESS" });
-    mocks.mockRequestAccess.mockResolvedValue({ address: "GCFAKEADDRESS" });
-    mocks.mockGetNetwork.mockResolvedValue({
-      network: "TESTNET",
-      networkPassphrase: "Test SDF Network ; September 2015",
+  it("connects successfully via fake adapter and updates context", async () => {
+    const fakeAdapter: WalletAdapter = {
+      id: "fake-wallet",
+      name: "Fake Wallet",
+      icon: "icon.svg",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      connect: vi.fn().mockResolvedValue("GBF...TEST1234"),
+      signTransaction: vi.fn().mockResolvedValue("signed-xdr-result"),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <WalletProvider initialAdapter={fakeAdapter}>
+        <TestConsumer />
+      </WalletProvider>
+    );
+
+    expect(screen.getByTestId("address").textContent).toBe("no-address");
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((url: string) => {
-        if (url.includes("/accounts/")) {
-          return Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({
-                balances: [{ asset_type: "native", balance: "123.456" }],
-              }),
-          });
-        }
-        return Promise.resolve({ ok: false });
+    expect(fakeAdapter.connect).toHaveBeenCalled();
+    expect(screen.getByTestId("address").textContent).toBe("GBF...TEST1234");
+    expect(screen.getByTestId("activeWallet").textContent).toBe("fake-wallet");
+    expect(localStorage.getItem(LAST_WALLET_STORAGE_KEY)).toBe("fake-wallet");
+  });
+
+  it("passes through signTransaction with networkPassphrase", async () => {
+    const fakeAdapter: WalletAdapter = {
+      id: "fake-wallet",
+      name: "Fake Wallet",
+      icon: "icon.svg",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      connect: vi.fn().mockResolvedValue("GBF...TEST1234"),
+      signTransaction: vi.fn().mockResolvedValue("signed-xdr-result"),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+
+    let signResult = "";
+    render(
+      <WalletProvider initialAdapter={fakeAdapter}>
+        <TestConsumer onSign={(res) => (signResult = res)} />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
+    });
+
+    await act(async () => {
+      screen.getByTestId("sign-btn").click();
+    });
+
+    expect(fakeAdapter.signTransaction).toHaveBeenCalledWith(
+      "dummy-xdr",
+      expect.objectContaining({
+        accountToSign: "GBF...TEST1234",
+        networkPassphrase: expect.any(String),
       })
     );
+    expect(signResult).toBe("signed-xdr-result");
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+  it("handles disconnect correctly", async () => {
+    const fakeAdapter: WalletAdapter = {
+      id: "fake-wallet",
+      name: "Fake Wallet",
+      icon: "icon.svg",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      connect: vi.fn().mockResolvedValue("GBF...TEST1234"),
+      signTransaction: vi.fn().mockResolvedValue("signed-xdr-result"),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
 
-  it("restores session when allowed and autoconnect flag is present", async () => {
-    window.localStorage.setItem(AUTOCONNECT_STORAGE_KEY, "true");
-    mocks.mockIsAllowed.mockResolvedValue({ isAllowed: true });
-    mocks.mockGetAddress.mockResolvedValue({ address: "GCRESTOREDADDRESS" });
-
-    renderWithProviders();
-
-    await waitFor(() => {
-      expect(screen.getByTestId("address").textContent).toBe("GCRESTOREDADDRESS");
-    });
-    expect(mocks.mockGetAddress).toHaveBeenCalled();
-  });
-
-  it("does not restore session when isAllowed returns false", async () => {
-    window.localStorage.setItem(AUTOCONNECT_STORAGE_KEY, "true");
-    mocks.mockIsAllowed.mockResolvedValue({ isAllowed: false });
-
-    renderWithProviders();
+    render(
+      <WalletProvider initialAdapter={fakeAdapter}>
+        <TestConsumer />
+      </WalletProvider>
+    );
 
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 20));
+      screen.getByTestId("connect-btn").click();
     });
-
-    expect(screen.getByTestId("address").textContent).toBe("none");
-    expect(mocks.mockGetAddress).not.toHaveBeenCalled();
-  });
-
-  it("does not restore session when autoconnect flag is absent even if allowed", async () => {
-    mocks.mockIsAllowed.mockResolvedValue({ isAllowed: true });
-
-    renderWithProviders();
+    expect(screen.getByTestId("address").textContent).toBe("GBF...TEST1234");
 
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 20));
+      screen.getByTestId("disconnect-btn").click();
     });
 
-    expect(screen.getByTestId("address").textContent).toBe("none");
-    expect(mocks.mockGetAddress).not.toHaveBeenCalled();
+    expect(fakeAdapter.disconnect).toHaveBeenCalled();
+    expect(screen.getByTestId("address").textContent).toBe("no-address");
+    expect(screen.getByTestId("balance").textContent).toBe("no-balance");
   });
 
-  it("handles account change event from WatchWalletChanges", async () => {
-    renderWithProviders();
+  it("does not set error banner when user cancels / rejects connection", async () => {
+    const fakeAdapter: WalletAdapter = {
+      id: "fake-wallet",
+      name: "Fake Wallet",
+      icon: "icon.svg",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      connect: vi.fn().mockRejectedValue(new Error("User rejected connection request")),
+      signTransaction: vi.fn().mockResolvedValue(""),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
 
-    expect(screen.getByTestId("address").textContent).toBe("none");
+    render(
+      <WalletProvider initialAdapter={fakeAdapter}>
+        <TestConsumer />
+      </WalletProvider>
+    );
 
     await act(async () => {
-      if (mocks.holder.callback) {
-        mocks.holder.callback({
-          address: "GCSWITCHEDACCOUNT",
-          network: "TESTNET",
-          networkPassphrase: "Test SDF Network ; September 2015",
-        });
-      }
+      screen.getByTestId("connect-btn").click();
     });
 
-    expect(screen.getByTestId("address").textContent).toBe("GCSWITCHEDACCOUNT");
-    await waitFor(() => {
-      expect(screen.getByTestId("balance").textContent).toBe("123.46");
-    });
+    // Cancellation should NOT result in an error banner
+    expect(screen.getByTestId("error").textContent).toBe("no-error");
   });
 
-  it("detects network change, shows mismatch banner, and assertCanSign throws", async () => {
-    renderWithProviders();
+  it("sets error banner when adapter throws non-cancellation error", async () => {
+    const fakeAdapter: WalletAdapter = {
+      id: "fake-wallet",
+      name: "Fake Wallet",
+      icon: "icon.svg",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      connect: vi.fn().mockRejectedValue(new Error("Internal adapter failure")),
+      signTransaction: vi.fn().mockResolvedValue(""),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <WalletProvider initialAdapter={fakeAdapter}>
+        <TestConsumer />
+      </WalletProvider>
+    );
 
     await act(async () => {
-      if (mocks.holder.callback) {
-        mocks.holder.callback({
-          address: "GCTESTACCOUNT",
-          network: "PUBLIC",
-          networkPassphrase: "Public Global Stellar Network ; September 2015",
-        });
-      }
+      screen.getByTestId("connect-btn").click();
     });
 
-    expect(screen.getByTestId("networkMismatch").textContent).toBe("true");
-
-    // Network banner should be rendered
-    expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.getByText(/Network mismatch detected/i)).toBeInTheDocument();
-
-    // assertCanSign should throw NetworkMismatchError
-    const signBtn = screen.getByTestId("sign-btn");
-    act(() => {
-      signBtn.click();
-    });
-    expect(document.getElementById("sign-error")?.textContent).toBe("NetworkMismatchError");
-  });
-
-  it("disconnect clears the autoconnect flag and resets state", async () => {
-    window.localStorage.setItem(AUTOCONNECT_STORAGE_KEY, "true");
-    mocks.mockIsAllowed.mockResolvedValue({ isAllowed: true });
-    mocks.mockGetAddress.mockResolvedValue({ address: "GCCONNECTED" });
-
-    renderWithProviders();
-
-    await waitFor(() => {
-      expect(screen.getByTestId("address").textContent).toBe("GCCONNECTED");
-    });
-
-    const disconnectBtn = screen.getByTestId("disconnect-btn");
-    act(() => {
-      disconnectBtn.click();
-    });
-
-    expect(screen.getByTestId("address").textContent).toBe("none");
-    expect(screen.getByTestId("balance").textContent).toBe("none");
-    expect(window.localStorage.getItem(AUTOCONNECT_STORAGE_KEY)).toBeNull();
-  });
-
-  it("cleans up WatchWalletChanges watcher on unmount", () => {
-    const { unmount } = renderWithProviders();
-    unmount();
-    expect(mocks.mockWatcherStop).toHaveBeenCalled();
-  });
-
-  it("handles Freighter not installed gracefully on connect", async () => {
-    mocks.mockIsConnected.mockResolvedValue({ isConnected: false });
-
-    renderWithProviders();
-
-    const connectBtn = screen.getByTestId("connect-btn");
-    await act(async () => {
-      connectBtn.click();
-    });
-
-    expect(screen.getByTestId("address").textContent).toBe("none");
+    expect(screen.getByTestId("error").textContent).toBe("Internal adapter failure");
   });
 });

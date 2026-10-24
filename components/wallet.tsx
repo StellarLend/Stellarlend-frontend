@@ -3,76 +3,143 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { useTranslations } from "next-intl";
 import { config } from "@/lib/config";
 import { reportError } from "@/lib/report-error";
+import { WalletAdapter, SignTransactionOptions, getWalletAdapter } from "@/lib/wallets";
+import { WalletPickerModal } from "./wallet-picker";
+
+export const LAST_WALLET_STORAGE_KEY = "stellarlend:last_wallet_id";
+
+type Ctx = {
+  address: string | null;
+  balance: string | null;
+  error: string | null;
+  activeWalletId: string | null;
+  isPickerOpen: boolean;
+  openPicker: () => void;
+  closePicker: () => void;
+  connect: (walletId?: string) => Promise<void>;
+  disconnect: () => void;
+  signTransaction: (xdr: string, options?: SignTransactionOptions) => Promise<string>;
+};
+
+const WalletCtx = createContext<Ctx>({
+  address: null,
+  balance: null,
+  error: null,
+  activeWalletId: null,
+  isPickerOpen: false,
+  openPicker: () => {},
+  closePicker: () => {},
+  connect: async () => {},
+  disconnect: () => {},
+  signTransaction: async () => "",
+});
 
 export const useWallet = () => useContext(WalletCtx);
 
-export function WalletProvider({ children }: { children: React.ReactNode }) {
+interface WalletProviderProps {
+  children: React.ReactNode;
+  initialAdapter?: WalletAdapter;
+}
+
+export function WalletProvider({ children, initialAdapter }: WalletProviderProps) {
   const t = useTranslations("wallet");
   const [address, setAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [network, setNetwork] = useState<string | null>(null);
-  const [networkPassphrase, setNetworkPassphrase] = useState<string | null>(null);
+  const [activeWalletId, setActiveWalletId] = useState<string | null>(initialAdapter?.id ?? null);
+  const [adapter, setAdapter] = useState<WalletAdapter | null>(initialAdapter ?? null);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [lastWalletId, setLastWalletId] = useState<string | null>(null);
 
-  const addressRef = useRef<string | null>(address);
-  addressRef.current = address;
-
-  const expectedPassphrase = getExpectedNetworkPassphrase();
-  const networkMismatch = isNetworkMismatch(networkPassphrase, expectedPassphrase);
-
-  const fetchBalanceForAddress = useCallback(
-    (targetAddress: string) => {
-      let live = true;
-      fetch(`${config.horizon}/accounts/${targetAddress}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((a) => {
-          if (!live) return;
-          // Guard: ensure targetAddress is still the active address
-          if (addressRef.current !== targetAddress) return;
-          const x = a?.balances?.find((b: { asset_type: string }) => b.asset_type === "native");
-          setBalance(x ? Number(x.balance).toFixed(2) : t("unfunded"));
-        })
-        .catch(() => {
-          if (live && addressRef.current === targetAddress) {
-            setBalance(null);
-          }
-        });
-      return () => {
-        live = false;
-      };
-    },
-    [t]
-  );
-
-  const connect = useCallback(async () => {
-    setError(null);
+  useEffect(() => {
     try {
-      const conn = await freighterIsConnected();
-      if (!conn.isConnected) {
-        setError(t("notDetected"));
-        return;
-      }
-      const res = await freighterRequestAccess();
-      if (res.error || !res.address) {
-        setError(t("declined"));
-        return;
-      }
-      setAddress(res.address);
-      setAutoConnectFlag(true);
-
-      try {
-        const net = await freighterGetNetwork();
-        if (net && !net.error) {
-          setNetwork(net.network ?? null);
-          setNetworkPassphrase(net.networkPassphrase ?? null);
-        }
-      } catch {
-        // Non-blocking network query failure
+      const stored = localStorage.getItem(LAST_WALLET_STORAGE_KEY);
+      if (stored) {
+        setLastWalletId(stored);
       }
     } catch {
-      setError(t("unreachable"));
+      // Ignore storage access errors
     }
-  }, [t]);
+  }, []);
+
+  const openPicker = useCallback(() => setIsPickerOpen(true), []);
+  const closePicker = useCallback(() => setIsPickerOpen(false), []);
+
+  const connect = useCallback(
+    async (walletId?: string) => {
+      setError(null);
+      let targetAdapter: WalletAdapter | null = adapter;
+
+      if (!targetAdapter || (walletId && targetAdapter.id !== walletId)) {
+        const idToLoad = walletId || lastWalletId || "freighter";
+        if (initialAdapter && initialAdapter.id === idToLoad) {
+          targetAdapter = initialAdapter;
+        } else {
+          targetAdapter = await getWalletAdapter(idToLoad);
+        }
+      }
+
+      if (!targetAdapter) {
+        setError(t("notDetected"));
+        throw new Error(t("notDetected"));
+      }
+
+      try {
+        const addr = await targetAdapter.connect();
+        if (!addr) {
+          setError(t("declined"));
+          return;
+        }
+        setAddress(addr);
+        setAdapter(targetAdapter);
+        setActiveWalletId(targetAdapter.id);
+        setLastWalletId(targetAdapter.id);
+        try {
+          localStorage.setItem(LAST_WALLET_STORAGE_KEY, targetAdapter.id);
+        } catch {
+          // Ignore storage write errors
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const lower = msg.toLowerCase();
+        // If user rejected / cancelled, do not trigger error banner
+        const isUserCancellation =
+          lower.includes("cancel") ||
+          lower.includes("reject") ||
+          lower.includes("declined") ||
+          lower.includes("closed");
+
+        if (!isUserCancellation) {
+          setError(msg || t("unreachable"));
+        }
+        throw err;
+      }
+    },
+    [adapter, initialAdapter, lastWalletId, t]
+  );
+
+  const disconnect = useCallback(() => {
+    if (adapter?.disconnect) {
+      adapter.disconnect().catch(() => {});
+    }
+    setAddress(null);
+    setBalance(null);
+    setAdapter(null);
+    setActiveWalletId(null);
+  }, [adapter]);
+
+  const signTransaction = useCallback(
+    async (xdr: string, options?: SignTransactionOptions) => {
+      if (!adapter) {
+        throw new Error("No wallet connected to sign transaction.");
+      }
+      return adapter.signTransaction(xdr, {
+        networkPassphrase: options?.networkPassphrase ?? config.networkPassphrase,
+        accountToSign: options?.accountToSign ?? address ?? undefined,
+      });
+    },
+    [adapter, address]
+  );
 
   const disconnect = useCallback(() => {
     setAutoConnectFlag(false);
@@ -107,11 +174,36 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return () => { live = false; };
   }, [address, t]);
 
-  return <WalletCtx.Provider value={{ address, balance, error, connect, disconnect }}>{children}</WalletCtx.Provider>;
+  return (
+    <WalletCtx.Provider
+      value={{
+        address,
+        balance,
+        error,
+        activeWalletId,
+        isPickerOpen,
+        openPicker,
+        closePicker,
+        connect,
+        disconnect,
+        signTransaction,
+      }}
+    >
+      {children}
+      <WalletPickerModal
+        isOpen={isPickerOpen}
+        onClose={closePicker}
+        onSelectWallet={async (id) => {
+          await connect(id);
+        }}
+        lastWalletId={lastWalletId}
+      />
+    </WalletCtx.Provider>
+  );
 }
 
 export function ConnectButton() {
-  const { address, connect, disconnect } = useWallet();
+  const { address, openPicker, disconnect } = useWallet();
   const t = useTranslations("market");
 
   if (address) {
@@ -123,7 +215,7 @@ export function ConnectButton() {
   }
 
   return (
-    <button className="btn whitespace-nowrap text-xs sm:text-sm" onClick={connect}>
+    <button className="btn whitespace-nowrap text-xs sm:text-sm" onClick={openPicker}>
       {t("connectFreighter")}
     </button>
   );
