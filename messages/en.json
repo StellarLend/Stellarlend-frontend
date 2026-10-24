@@ -101,7 +101,13 @@
     "collateral": "Collateral",
     "borrowed": "Borrowed",
     "health": "Health",
+    "healthStatus": {
+      "healthy": "Healthy",
+      "atRisk": "At risk",
+      "liquidatable": "Liquidatable"
+    },
     "nA": "n/a",
+    "actions": "Actions",
     "asset": "Asset",
     "price": "Price",
     "supplyApy": "Supply APY",

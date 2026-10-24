@@ -289,7 +289,7 @@ export default function MarketsApp() {
     }
     const n = parsed.value;
     if (n <= BigInt(0)) {
-      setMsg(t("status.positiveAmount"));
+      setMsg({ text: t("status.positiveAmount"), isError: true });
       return;
     }
 
@@ -317,7 +317,7 @@ export default function MarketsApp() {
       next.supplied = cur.supplied + n;
     } else if (mode === "withdraw") {
       if (n > cur.supplied) {
-        setMsg(t("status.exceedsSupply"));
+        setMsg({ text: t("status.exceedsSupply"), isError: true });
         return;
       }
       if (!canWithdraw(ledger, sel.symbol, n, activeMarkets)) {
@@ -333,26 +333,27 @@ export default function MarketsApp() {
       next.borrowed = cur.borrowed + n;
     } else if (mode === "repay") {
       if (n > cur.borrowed) {
-        setMsg(t("status.exceedsBorrowed"));
+        setMsg({ text: t("status.exceedsBorrowed"), isError: true });
         return;
       }
       next.borrowed = cur.borrowed - n;
     }
 
     save({ ...ledger, [sel.symbol]: next });
-    setMsg(
-      t("status.recorded", {
+    setMsg({
+      text: t("status.recorded", {
         action: t(mode),
         amount: formatNumber(toFloat(n, sel.decimals), locale, sel.decimals),
         symbol: sel.symbol,
-      })
-    );
+      }),
+      isError: false,
+    });
     setAmt("");
   }
 
   function resetDemo() {
     save({});
-    setMsg(t("status.demoReset"));
+    setMsg({ text: t("status.demoReset"), isError: false });
     setResetNotice(false);
   }
 
