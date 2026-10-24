@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { ConnectButton } from "@/components/wallet";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { NetworkBanner } from "@/components/network-banner";
 
 export function Header() {
   const locale = useLocale();
@@ -18,7 +19,10 @@ export function Header() {
   const homeHref = locale === "es" ? "/es" : "/";
 
   return (
-    <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--bg)]/85 backdrop-blur">
+    <>
+      <NetworkBanner />
+      <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--bg)]/85 backdrop-blur">
+
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href={homeHref} className="text-lg font-bold">
           <span className="grad">{t("brand")}</span>Lend
@@ -40,5 +44,6 @@ export function Header() {
         </div>
       </div>
     </header>
+    </>
   );
 }

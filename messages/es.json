@@ -91,7 +91,10 @@
     "fundTooltip": "Obtener XLM de prueba gratis del Friendbot de Stellar",
     "fundCooldown": "Por favor, espera {seconds}s antes de volver a solicitar fondos a Friendbot.",
     "fundFailed": "Falló la financiación con Friendbot.",
-    "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos."
+    "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos.",
+    "networkMismatchTitle": "Discrepancia de red detectada",
+    "networkMismatchDescription": "Freighter está conectado a una red diferente ({currentNetwork}). Cambia Freighter a {expectedNetwork} para interactuar y firmar transacciones.",
+    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}."
   },
   "market": {
     "title": "Mercados",

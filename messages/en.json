@@ -91,7 +91,10 @@
     "fundTooltip": "Get free testnet XLM from Stellar Friendbot",
     "fundCooldown": "Please wait {seconds}s before requesting Friendbot funding again.",
     "fundFailed": "Friendbot funding failed.",
-    "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments."
+    "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments.",
+    "networkMismatchTitle": "Network mismatch detected",
+    "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
   },
   "market": {
     "title": "Markets",
