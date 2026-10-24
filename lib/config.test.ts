@@ -1,54 +1,156 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { Networks } from "@stellar/stellar-sdk";
 import {
-  getExpectedNetworkPassphrase,
-  isNetworkMismatch,
-  NetworkMismatchError,
-  NETWORK_PASSPHRASES,
-  config,
+  createExplorerHelpers,
+  parseEnvFile,
+  validateConfig,
 } from "./config";
 
-describe("network config and passphrase mapping", () => {
-  it("maps known networks to their SDF passphrases", () => {
-    expect(NETWORK_PASSPHRASES.testnet).toBe("Test SDF Network ; September 2015");
-    expect(NETWORK_PASSPHRASES.public).toBe("Public Global Stellar Network ; September 2015");
-    expect(NETWORK_PASSPHRASES.mainnet).toBe("Public Global Stellar Network ; September 2015");
-    expect(NETWORK_PASSPHRASES.futurenet).toBe("Test SDF Future Network ; October 2022");
-    expect(NETWORK_PASSPHRASES.standalone).toBe("Standalone Network ; February 2017");
+describe("validateConfig", () => {
+  const validTestnetEnv = {
+    NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
+    NEXT_PUBLIC_HORIZON_URL: "https://horizon-testnet.stellar.org",
+    NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org",
+    NEXT_PUBLIC_LENDING_CONTRACT_ID: "CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6",
+  };
+
+  it("validates a standard valid testnet config", () => {
+    const config = validateConfig(validTestnetEnv, { isDev: false });
+    expect(config.network).toBe("testnet");
+    expect(config.networkPassphrase).toBe(Networks.TESTNET);
+    expect(config.horizon).toBe("https://horizon-testnet.stellar.org");
+    expect(config.rpc).toBe("https://soroban-testnet.stellar.org");
+    expect(config.lendingId).toBe("CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6");
   });
 
-  it("getExpectedNetworkPassphrase returns configured passphrase or defaults based on network", () => {
-    const defaultPassphrase = getExpectedNetworkPassphrase();
-    expect(defaultPassphrase).toBe(config.networkPassphrase || NETWORK_PASSPHRASES.testnet);
+  it("derives mainnet passphrase and explorer URLs", () => {
+    const mainnetEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_STELLAR_NETWORK: "mainnet",
+      NEXT_PUBLIC_HORIZON_URL: "https://horizon.stellar.org",
+      NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-rpc.mainnet.stellar.org",
+    };
+    const config = validateConfig(mainnetEnv, { isDev: false });
+    expect(config.network).toBe("mainnet");
+    expect(config.networkPassphrase).toBe(Networks.PUBLIC);
 
-    expect(getExpectedNetworkPassphrase("public")).toBe(NETWORK_PASSPHRASES.public);
-    expect(getExpectedNetworkPassphrase("testnet")).toBe(NETWORK_PASSPHRASES.testnet);
-    expect(getExpectedNetworkPassphrase("futurenet")).toBe(NETWORK_PASSPHRASES.futurenet);
+    const explorer = createExplorerHelpers(config.network);
+    const contractId = "CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6";
+    expect(explorer(contractId)).toBe(`https://stellar.expert/explorer/public/contract/${contractId}`);
+    expect(explorer.contract(contractId)).toBe(`https://stellar.expert/explorer/public/contract/${contractId}`);
+    expect(explorer.tx("hash123")).toBe("https://stellar.expert/explorer/public/tx/hash123");
+    expect(explorer.account("GB...ADDRESS")).toBe("https://stellar.expert/explorer/public/account/GB...ADDRESS");
   });
 
-  it("isNetworkMismatch correctly flags different passphrases", () => {
-    const expected = NETWORK_PASSPHRASES.testnet;
+  it("derives futurenet passphrase and explorer URLs", () => {
+    const futurenetEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_STELLAR_NETWORK: "futurenet",
+      NEXT_PUBLIC_HORIZON_URL: "https://horizon-futurenet.stellar.org",
+      NEXT_PUBLIC_SOROBAN_RPC_URL: "https://rpc-futurenet.stellar.org",
+    };
+    const config = validateConfig(futurenetEnv, { isDev: false });
+    expect(config.network).toBe("futurenet");
+    expect(config.networkPassphrase).toBe(Networks.FUTURENET);
 
-    // Same passphrase is not a mismatch
-    expect(isNetworkMismatch(NETWORK_PASSPHRASES.testnet, expected)).toBe(false);
-
-    // Public/mainnet on testnet configuration is a mismatch
-    expect(isNetworkMismatch(NETWORK_PASSPHRASES.public, expected)).toBe(true);
-
-    // Futurenet on testnet configuration is a mismatch
-    expect(isNetworkMismatch(NETWORK_PASSPHRASES.futurenet, expected)).toBe(true);
-
-    // Null or undefined current passphrase (e.g. not connected yet) is not treated as mismatch
-    expect(isNetworkMismatch(null, expected)).toBe(false);
-    expect(isNetworkMismatch(undefined, expected)).toBe(false);
+    const explorer = createExplorerHelpers(config.network);
+    expect(explorer.tx("hash456")).toBe("https://stellar.expert/explorer/futurenet/tx/hash456");
   });
 
-  it("NetworkMismatchError encapsulates passphrase info and prototype correctly", () => {
-    const error = new NetworkMismatchError(NETWORK_PASSPHRASES.public, NETWORK_PASSPHRASES.testnet);
-    expect(error).toBeInstanceOf(Error);
-    expect(error).toBeInstanceOf(NetworkMismatchError);
-    expect(error.name).toBe("NetworkMismatchError");
-    expect(error.currentPassphrase).toBe(NETWORK_PASSPHRASES.public);
-    expect(error.expectedPassphrase).toBe(NETWORK_PASSPHRASES.testnet);
-    expect(error.message).toContain("does not match");
+  it("rejects unknown network foo", () => {
+    const badEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_STELLAR_NETWORK: "foo",
+    };
+    expect(() => validateConfig(badEnv, { isDev: false })).toThrowError(/NEXT_PUBLIC_STELLAR_NETWORK/);
+  });
+
+  it("rejects contract ID with bad checksum", () => {
+    const badEnv = {
+      ...validTestnetEnv,
+      // Modify last character so checksum fails
+      NEXT_PUBLIC_LENDING_CONTRACT_ID: "CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF7",
+    };
+    expect(() => validateConfig(badEnv, { isDev: false })).toThrowError(
+      /NEXT_PUBLIC_LENDING_CONTRACT_ID.*must be a valid C\.\.\. Soroban contract address/
+    );
+  });
+
+  it("rejects G-address passed where contract C-address expected", () => {
+    const badEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_LENDING_CONTRACT_ID: "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7VEFBCompactSample",
+    };
+    expect(() => validateConfig(badEnv, { isDev: false })).toThrowError(
+      /NEXT_PUBLIC_LENDING_CONTRACT_ID.*must be a valid C\.\.\. Soroban contract address/
+    );
+  });
+
+  it("rejects http URLs in production", () => {
+    const httpEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_HORIZON_URL: "http://horizon-testnet.stellar.org",
+    };
+    expect(() => validateConfig(httpEnv, { isDev: false })).toThrowError(
+      /NEXT_PUBLIC_HORIZON_URL must be a valid https URL/
+    );
+  });
+
+  it("allows localhost http URLs in development mode", () => {
+    const devEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_HORIZON_URL: "http://localhost:8000",
+      NEXT_PUBLIC_SOROBAN_RPC_URL: "http://127.0.0.1:8000/soroban/rpc",
+    };
+    const config = validateConfig(devEnv, { isDev: true });
+    expect(config.horizon).toBe("http://localhost:8000");
+    expect(config.rpc).toBe("http://127.0.0.1:8000/soroban/rpc");
+  });
+
+  it("rejects non-localhost http URLs in development mode", () => {
+    const devEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_HORIZON_URL: "http://example.com:8000",
+    };
+    expect(() => validateConfig(devEnv, { isDev: true })).toThrowError(
+      /NEXT_PUBLIC_HORIZON_URL must be a valid https URL/
+    );
+  });
+
+  it("allows empty optional contract IDs", () => {
+    const emptyOptionalEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_LENDING_CONTRACT_ID: "",
+      NEXT_PUBLIC_AMM_CONTRACT_ID: "",
+    };
+    const config = validateConfig(emptyOptionalEnv, { isDev: false });
+    expect(config.lendingId).toBe("");
+    expect(config.ammId).toBe("");
+  });
+
+  it("normalises trailing slashes in URLs", () => {
+    const trailingSlashEnv = {
+      ...validTestnetEnv,
+      NEXT_PUBLIC_HORIZON_URL: "https://horizon-testnet.stellar.org///",
+      NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org/",
+    };
+    const config = validateConfig(trailingSlashEnv, { isDev: false });
+    expect(config.horizon).toBe("https://horizon-testnet.stellar.org");
+    expect(config.rpc).toBe("https://soroban-testnet.stellar.org");
+  });
+
+  it("parses and validates .env.example", () => {
+    const envPath = resolve(__dirname, "../.env.example");
+    const content = readFileSync(envPath, "utf-8");
+    const parsed = parseEnvFile(content);
+
+    const config = validateConfig(parsed, { isDev: false });
+    expect(config.network).toBe("testnet");
+    expect(config.networkPassphrase).toBe(Networks.TESTNET);
+    expect(config.lendingId).toBe("CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6");
+    expect(config.horizon).toBe("https://horizon-testnet.stellar.org");
+    expect(config.rpc).toBe("https://soroban-testnet.stellar.org");
   });
 });

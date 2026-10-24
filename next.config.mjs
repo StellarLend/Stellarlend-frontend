@@ -1,4 +1,5 @@
 import createNextIntlPlugin from 'next-intl/plugin';
+import withBundleAnalyzer from '@next/bundle-analyzer';
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -55,4 +56,10 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+// Enable bundle analyzer when ANALYZE=true
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === 'true',
+  openAnalyzer: false,
+});
+
+export default withAnalyzer(withNextIntl(nextConfig));

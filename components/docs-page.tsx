@@ -20,7 +20,17 @@ export function DocsPage() {
       <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("gettingStarted.title")}>
         <ol className="list-decimal space-y-1 pl-5">
           <li>{t("gettingStarted.step1")}</li>
-          <li>{t("gettingStarted.step2")}</li>
+          <li>
+            {t("gettingStarted.step2")}{" "}
+            <a
+              href="https://laboratory.stellar.org/#account-creator"
+              target="_blank"
+              rel="noreferrer"
+              className="underline text-blue-400 hover:text-blue-300"
+            >
+              (Stellar Laboratory Friendbot)
+            </a>
+          </li>
           <li>{t("gettingStarted.step3")}</li>
           <li>{t("gettingStarted.step4")}</li>
         </ol>

@@ -4,12 +4,21 @@ import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
 import { Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
-import { config, explorer } from "@/lib/config";
+import { config, explorer, txExplorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
+import { toBaseUnits, DECIMALS, type AmountError } from "@/lib/amount";
+import {
+  isOnChainConfigured,
+  normaliseHealthFactor,
+  readPosition,
+  submitLendingAction,
+  type LendingPosition,
+  type LendingTx,
+} from "@/lib/lending-client";
+import { OnboardingChecklist } from "./onboarding-checklist";
 import {
   loadLedger,
   saveLedger,
-  parseAmount,
   toFloat,
   computeRisk,
   canWithdraw,
@@ -30,7 +39,20 @@ import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
 
 export default function MarketsApp() {
-  const { address, balance, error, openPicker } = useWallet();
+  const {
+    address,
+    balance,
+    balances,
+    isUnfunded,
+    error,
+    openPicker,
+    addTrustline,
+    accountStatus,
+    isFunding,
+    fundError,
+    fundAccount,
+  } = useWallet();
+  const tw = useTranslations("wallet");
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
   const [ledger, setLedger] = useState<Ledger>({});
@@ -38,7 +60,34 @@ export default function MarketsApp() {
   const [sel, setSel] = useState<Market | null>(null);
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
+  const [debouncedAmt, setDebouncedAmt] = useState("");
   const [msg, setMsg] = useState("");
+  const [position, setPosition] = useState<LendingPosition | null>(null);
+  const [positionError, setPositionError] = useState("");
+  const [loadingPosition, setLoadingPosition] = useState(false);
+  const [tx, setTx] = useState<LendingTx | null>(null);
+
+  const configured = isOnChainConfigured();
+  const onChainMode = Boolean(address && configured);
+  const busy = tx?.status === "pending";
+
+  const refreshPosition = useCallback(async () => {
+    if (!address || !configured) {
+      setPosition(null);
+      setPositionError("");
+      return;
+    }
+    setLoadingPosition(true);
+    setPositionError("");
+    try {
+      setPosition(await readPosition(address));
+    } catch {
+      setPosition(null);
+      setPositionError(t("status.positionError"));
+    } finally {
+      setLoadingPosition(false);
+    }
+  }, [address, configured, t]);
   const [rateSnapshot, setRateSnapshot] = useState<RateModelSnapshot>(() =>
     buildDemoRateModelSnapshot()
   );
@@ -91,6 +140,27 @@ export default function MarketsApp() {
     });
   }, [oraclePrices]);
 
+  const hasSupplied = useMemo(() => {
+    return Object.values(ledger).some((entry) => entry && entry.supplied > BigInt(0));
+  }, [ledger]);
+  const [trustlineLoading, setTrustlineLoading] = useState<string | null>(null);
+  const [trustlineMsg, setTrustlineMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  async function handleAddTrustline(market: Market) {
+    if (market.asset === "native") return;
+    setTrustlineLoading(market.symbol);
+    setTrustlineMsg(null);
+    try {
+      await addTrustline(market.asset);
+      setTrustlineMsg({ type: "success", text: t("trustlineAdded") });
+    } catch (err: any) {
+      const errorText = err?.message || t("txCancelled");
+      setTrustlineMsg({ type: "error", text: errorText });
+    } finally {
+      setTrustlineLoading(null);
+    }
+  }
+
   // Load positions from storage (per-wallet key)
   useEffect(() => {
     const { ledger: loaded, reset } = loadLedger(address);
@@ -100,6 +170,10 @@ export default function MarketsApp() {
     if (reset) setResetNotice(true);
   }, [address]);
 
+  // Refresh the on-chain position on connect and wallet reconnection.
+  useEffect(() => {
+    void refreshPosition();
+  }, [refreshPosition]);
   // Load on-chain rate model params, diagnostics, and utilization history
   useEffect(() => {
     if (!config.lendingId) return;
@@ -159,11 +233,6 @@ export default function MarketsApp() {
     setMsg("");
   }
 
-  const { collateralUsd, borrowUsd, health } = useMemo(
-    () => computeRisk(ledger, activeMarkets),
-    [ledger, activeMarkets]
-  );
-
   const rateChartLabels = useMemo<Partial<RateChartLabels>>(() => {
     const keys = Object.keys(defaultRateChartLabels) as Array<keyof RateChartLabels>;
     const resolved: Partial<RateChartLabels> = {};
@@ -181,22 +250,41 @@ export default function MarketsApp() {
     return resolved;
   }, [t]);
 
-  function submit() {
-    if (!sel) return;
+  const risk = useMemo(() => computeRisk(ledger, activeMarkets), [ledger, activeMarkets]);
+
+  const health = onChainMode
+    ? (position ? normaliseHealthFactor(position.healthFactor) : null)
+    : risk.health;
+  const collateralText = onChainMode
+    ? position
+      ? t("xlmAmount", { amount: formatNumber(toFloat(position.collateral, DECIMALS), locale, 4) })
+      : "-"
+    : formatCurrency(risk.collateralUsd, locale);
+  const borrowedText = onChainMode
+    ? position
+      ? t("xlmAmount", { amount: formatNumber(toFloat(position.debt, DECIMALS), locale, 4) })
+      : "-"
+    : formatCurrency(risk.borrowUsd, locale);
+
+  function inputErrorText(error: AmountError, decimals: number): string {
+    const msgs: Record<string, string> = {
+      empty: t("status.positiveAmount"),
+      "invalid-format": t("status.invalidFormat"),
+      negative: t("status.negative"),
+      "too-many-decimals": t("status.tooManyDecimals", { decimals }),
+      "too-large": t("status.tooLarge"),
+    };
+    return msgs[error] ?? t("status.invalidFormat");
+  }
+
+  async function submit() {
+    if (!sel || busy) return;
     // Accept locale-formatted input (e.g. "1.234,5" in Spanish), then parse
-    // strictly into base units for the BigInt demo ledger.
+    // strictly into base units.
     const normalized = normaliseAmountInput(amt, locale);
-    const parsed = parseAmount(normalized ?? amt.trim(), sel.decimals);
+    const parsed = toBaseUnits(normalized ?? amt.trim(), sel.decimals);
     if (!parsed.ok) {
-      const msgs: Record<typeof parsed.error, string> = {
-        empty: t("status.positiveAmount"),
-        "invalid-format": t("status.invalidFormat"),
-        negative: t("status.negative"),
-        "too-many-decimals": t("status.tooManyDecimals", { decimals: sel.decimals }),
-        "too-large": t("status.tooLarge"),
-        "not-finite": t("status.notFinite"),
-      };
-      setMsg(msgs[parsed.error]);
+      setMsg(inputErrorText(parsed.error, sel.decimals));
       return;
     }
     const n = parsed.value;
@@ -204,6 +292,20 @@ export default function MarketsApp() {
       setMsg(t("status.positiveAmount"));
       return;
     }
+
+    if (onChainMode && sel.live && address) {
+      setMsg("");
+      setTx({ status: "pending", hash: null, error: null });
+      const action = mode === "supply" ? "deposit" : mode;
+      const result = await submitLendingAction(address, action, n, setTx);
+      if (result.status === "confirmed") {
+        setAmt("");
+        await refreshPosition();
+      }
+      return;
+    }
+
+    // Demo ledger path (no wallet, or contract not configured).
     const rawCur = ledger && typeof ledger === "object" ? ledger[sel.symbol] : undefined;
     const cur =
       rawCur && typeof rawCur === "object" && typeof rawCur.supplied === "bigint" && typeof rawCur.borrowed === "bigint"
@@ -254,10 +356,79 @@ export default function MarketsApp() {
     setResetNotice(false);
   }
 
+  function transactionStatus() {
+    if (!tx || tx.status === "pending") return null;
+    if (tx.status === "confirmed") {
+      return t("status.confirmed");
+    }
+    if (tx.status === "cancelled") {
+      return t("status.cancelled");
+    }
+    if (tx.status === "timeout") {
+      return t("status.timedOut");
+    }
+    const detail = tx.error?.message ?? t("status.failed");
+    return tx.error?.hint ? `${detail} ${tx.error.hint}` : detail;
+  }
+
   function openTrade(m: Market) {
     setSel(m);
     setMsg("");
+    setTx(null);
   }
+
+  const tradePanel = sel ? (
+    <div className="space-y-4">
+      <div className="grid grid-cols-4 gap-1 text-sm">
+        {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => (
+          <button
+            key={x}
+            onClick={() => {
+              setMode(x);
+              setMsg("");
+              setTx(null);
+            }}
+            className={`rounded-lg py-2 ${mode === x ? "btn" : "btn-ghost"}`}
+          >
+            {t(x)}
+          </button>
+        ))}
+      </div>
+      <input
+        inputMode="decimal"
+        placeholder={t("amountIn", { symbol: sel.symbol })}
+        value={amt}
+        onChange={(e) => setAmt(e.target.value)}
+        disabled={busy}
+        aria-label={t("amountIn", { symbol: sel.symbol })}
+      />
+      <button className="btn w-full" onClick={submit} disabled={busy}>
+        {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
+      </button>
+      {msg && (
+        <p className="mut text-sm" role="status">
+          {msg}
+        </p>
+      )}
+      {tx && (
+        <div className="text-sm" role="status">
+          <p className={tx.status === "failed" ? "text-red-300" : tx.status === "confirmed" ? "text-emerald-400" : "mut"}>
+            {transactionStatus()}
+          </p>
+          {tx.hash && (
+            <a
+              className="break-all underline"
+              href={txExplorer(tx.hash)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("viewTx")}
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-8">
@@ -265,6 +436,8 @@ export default function MarketsApp() {
         <h1 className="text-3xl font-bold">{t("title")}</h1>
         <p className="mut mt-1 text-sm">{t("subtitle")}</p>
       </div>
+
+      <OnboardingChecklist hasSupplied={hasSupplied} />
 
       {resetNotice && (
         <Card className="p-4 text-sm text-amber-400" role="alert">
@@ -285,20 +458,34 @@ export default function MarketsApp() {
           ) : (
             <div>{t("demoMode")}</div>
           )}
+          {onChainMode && <div className="mut text-xs">{t("onchainMode")}</div>}
+          {address && !onChainMode && <div className="mut text-xs">{t("status.demoFallback")}</div>}
           {error && <div className="mt-1 text-amber-400">{error}</div>}
+          {positionError && <div className="mt-1 text-amber-400">{positionError}</div>}
+          {loadingPosition && <div className="mut text-xs">{t("status.loadingPosition")}</div>}
+          {fundError && <div className="mt-1 text-red-400">{fundError}</div>}
         </div>
+        {address && config.network === "testnet" && accountStatus === "unfunded" && (
+          <button
+            className="btn text-xs py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded"
+            onClick={fundAccount}
+            disabled={isFunding}
+          >
+            {isFunding ? tw("funding") : tw("fundWithFriendbot")}
+          </button>
+        )}
         {!address && (
           <Button variant="primary" className="w-full sm:w-auto" onClick={openPicker}>
             {t("connectFreighter")}
           </Button>
         )}
         <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:gap-6">
-          <Stat k={t("collateral")} v={formatCurrency(collateralUsd, locale)} />
-          <Stat k={t("borrowed")} v={formatCurrency(borrowUsd, locale)} />
+          <Stat k={t("collateral")} v={collateralText} />
+          <Stat k={t("borrowed")} v={borrowedText} />
           <Stat
             k={t("health")}
-            v={health === Infinity ? t("nA") : formatNumber(health, locale)}
-            tone={health < 1.2 ? "danger" : "positive"}
+            v={health === Infinity || health === null ? t("nA") : formatNumber(health, locale)}
+            tone={health !== null && health < 1.2 ? "danger" : "positive"}
           />
         </div>
       </Card>
@@ -322,12 +509,21 @@ export default function MarketsApp() {
         })}
       </div>
 
+      {trustlineMsg && (
+        <Card
+          className={`p-4 text-sm ${trustlineMsg.type === "error" ? "text-red-400" : "text-emerald-400"}`}
+          role="alert"
+        >
+          {trustlineMsg.text}
+        </Card>
+      )}
+
       {/* sm+: table */}
       <Card className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
-              {[t("asset"), t("price"), t("supplyApy"), t("borrowApy"), t("totalSupplied"), t("yourPosition"), ""].map((h) => (
+              {[t("asset"), t("price"), t("supplyApy"), t("borrowApy"), t("totalSupplied"), t("yourPosition"), t("wallet"), ""].map((h) => (
                 <th key={String(h)} className="p-4 font-medium">
                   {h}
                 </th>
@@ -343,6 +539,10 @@ export default function MarketsApp() {
                   : null;
               const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
               const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
+              const live = Boolean(m.live);
+              const onchainRow = live && onChainMode && position
+                ? `+${formatNumber(toFloat(position.collateral, DECIMALS), locale, 4)} / -${formatNumber(toFloat(position.debt, DECIMALS), locale, 4)}`
+                : null;
               const isOracle = m.priceSource === "oracle";
               return (
                 <tr key={m.symbol} className="border-b border-[var(--line)] last:border-0">
@@ -367,17 +567,56 @@ export default function MarketsApp() {
                   <td className="p-4">{formatPercent(m.borrowApy, locale)}</td>
                   <td className="p-4">{formatNumber(m.totalSupply, locale, 0)}</td>
                   <td className="p-4 mut">
-                    {p
-                      ? `+${formatNumber(suppliedFloat, locale, 4)} / -${formatNumber(borrowedFloat, locale, 4)}`
+                    {live
+                      ? onChainMode
+                        ? onchainRow ?? "-"
+                        : p
+                          ? `+${formatNumber(suppliedFloat, locale, 4)} / -${formatNumber(borrowedFloat, locale, 4)}`
+                          : "-"
                       : "-"}
                   </td>
+                  <td className="p-4" data-testid={`wallet-balance-${m.symbol}`}>
+                    {!address ? (
+                      <span className="mut">-</span>
+                    ) : isUnfunded ? (
+                      <span className="mut text-xs">{t("unfunded")}</span>
+                    ) : m.asset === "native" ? (
+                      <span>
+                        {balances["native"]
+                          ? `${formatNumber(Number(balances["native"].available), locale, 2)} XLM`
+                          : "0.00 XLM"}
+                      </span>
+                    ) : (() => {
+                      const key = `${m.asset.code}:${m.asset.issuer}`;
+                      const detail = balances[key] || balances[m.asset.code];
+                      if (detail) {
+                        return (
+                          <span>
+                            {formatNumber(Number(detail.available), locale, 2)} {m.symbol}
+                          </span>
+                        );
+                      }
+                      const isLoading = trustlineLoading === m.symbol;
+                      return (
+                        <button
+                          className="btn-ghost text-xs px-2 py-1 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 rounded"
+                          onClick={() => handleAddTrustline(m)}
+                          disabled={isLoading}
+                          aria-label={t("addTrustline")}
+                        >
+                          {isLoading ? t("addingTrustline") : t("addTrustline")}
+                        </button>
+                      );
+                    })()}
+                  </td>
                   <td className="p-4 text-right">
-                    <Button
-                      variant="ghost"
-                      onClick={() => openTrade(m)}
-                    >
-                      {t("trade")}
-                    </Button>
+                    {live ? (
+                      <Button variant="ghost" onClick={() => openTrade(m)}>
+                        {t("trade")}
+                      </Button>
+                    ) : (
+                      <span className="mut">{t("comingSoon")}</span>
+                    )}
                   </td>
                 </tr>
               );
@@ -392,20 +631,19 @@ export default function MarketsApp() {
         isLoading={isLoadingOracle}
       />
 
-      <TradeSheet
-        market={sel}
-        mode={mode}
-        onModeChange={(x) => {
-          setMode(x);
-          setMsg("");
-        }}
-        amount={amt}
-        onAmountChange={setAmt}
-        onSubmit={submit}
-        message={msg}
-        onClose={closeSheet}
-        panelRef={panelRef}
-      />
+      {sel && (
+        <>
+          {/* sm+: inline trade panel */}
+          <div ref={panelRef} className="card hidden max-w-md space-y-4 p-6 sm:block">
+            <h2 className="text-xl font-semibold">{sel.symbol}</h2>
+            {tradePanel}
+          </div>
+          {/* Mobile: bottom sheet */}
+          <TradeSheet open={Boolean(sel)} onClose={closeSheet} title={sel.symbol} subtitle={sel.name}>
+            {tradePanel}
+          </TradeSheet>
+        </>
+      )}
 
       <RateChart
         params={rateSnapshot.params}
