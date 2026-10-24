@@ -6,6 +6,11 @@ import { config } from "@/lib/config";
 import { reportError } from "@/lib/report-error";
 import { qk } from "@/lib/query-keys";
 import { fundWithFriendbot, pollUntilFunded } from "@/lib/friendbot";
+import {
+  addTrustline as horizonAddTrustline,
+  parseAccountBalances,
+  type AccountBalancesMap,
+} from "@/lib/horizon";
 import { QueryProvider } from "./query-provider";
 import { WalletAdapter, SignTransactionOptions, getWalletAdapter } from "@/lib/wallets";
 import { WalletPickerModal } from "./wallet-picker";
@@ -31,6 +36,11 @@ type Ctx = {
   fundError: string | null;
   fundAccount: () => Promise<void>;
   refreshBalance: () => Promise<void>;
+  /** All Horizon balances keyed by "native" or "CODE:ISSUER" (see lib/horizon). */
+  balances: AccountBalancesMap;
+  isUnfunded: boolean;
+  refreshBalances: () => Promise<void>;
+  addTrustline: (asset: { code: string; issuer: string }) => Promise<{ hash: string }>;
 };
 
 const WalletCtx = createContext<Ctx>({
@@ -50,6 +60,10 @@ const WalletCtx = createContext<Ctx>({
   fundError: null,
   fundAccount: async () => {},
   refreshBalance: async () => {},
+  balances: {},
+  isUnfunded: false,
+  refreshBalances: async () => {},
+  addTrustline: async () => ({ hash: "" }),
 });
 
 export const useWallet = () => useContext(WalletCtx);
@@ -184,14 +198,14 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     [adapter, address]
   );
 
-  const { data: account = null, isError: balanceError } = useQuery<{ balance: string; status: AccountStatus } | null>({
+  const { data: account = null, isError: balanceError } = useQuery<{ balance: string; status: AccountStatus; balances: AccountBalancesMap } | null>({
     queryKey: qk.accountBalance(address),
     queryFn: async ({ signal }) => {
       if (!address) return null;
       try {
         const res = await fetch(`${config.horizon}/accounts/${address}`, { signal });
         if (res.status === 404) {
-          return { balance: t("unfunded"), status: "unfunded" };
+          return { balance: t("unfunded"), status: "unfunded", balances: {} };
         }
         if (!res.ok) {
           throw new Error(`Horizon error: ${res.status}`);
@@ -200,9 +214,10 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         const nativeBalance = accountData?.balances?.find(
           (b: { asset_type: string }) => b.asset_type === "native"
         );
+        const balances = parseAccountBalances(accountData);
         return nativeBalance
-          ? { balance: Number(nativeBalance.balance).toFixed(2), status: "funded" }
-          : { balance: t("unfunded"), status: "unfunded" };
+          ? { balance: Number(nativeBalance.balance).toFixed(2), status: "funded", balances }
+          : { balance: t("unfunded"), status: "unfunded", balances };
       } catch (err) {
         if (!signal?.aborted) reportError(err, { context: "wallet:fetchBalance", address });
         throw err;
@@ -210,7 +225,13 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     },
     enabled: Boolean(address),
     staleTime: 15_000,
+    // Poll at most every 30s while the document is visible
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
+
+  const balances: AccountBalancesMap = account?.balances ?? {};
+  const isUnfunded = Boolean(address) && account?.status === "unfunded";
 
   const balance = account?.balance ?? null;
   const accountStatus: AccountStatus = !address
@@ -223,6 +244,21 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     if (!address) return;
     await queryClient.invalidateQueries({ queryKey: qk.accountBalance(address) });
   }, [address, queryClient]);
+
+  const addTrustline = useCallback(
+    async (asset: { code: string; issuer: string }) => {
+      if (!address) throw new Error("No wallet connected");
+      const res = await horizonAddTrustline({
+        address,
+        asset,
+        horizonUrl: config.horizon,
+        networkPassphrase: config.networkPassphrase,
+      });
+      await invalidateBalance();
+      return res;
+    },
+    [address, invalidateBalance]
+  );
 
   const fundAccount = useCallback(async () => {
     if (!address || config.network !== "testnet" || isFunding) return;
@@ -289,6 +325,10 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         fundError,
         fundAccount,
         refreshBalance: invalidateBalance,
+        balances,
+        isUnfunded,
+        refreshBalances: invalidateBalance,
+        addTrustline,
       }}
     >
       {children}

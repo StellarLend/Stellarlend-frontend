@@ -1,6 +1,16 @@
 import { Networks, StrKey } from "@stellar/stellar-sdk";
 import { z } from "zod";
 
+// Well-known Stellar testnet asset issuers
+// Source for USDC & EURC: Circle official testnet documentation
+// https://developers.circle.com/stablecoins/docs/stellar-testnet-usdc
+export const TESTNET_ISSUERS = {
+  USDC: process.env.NEXT_PUBLIC_USDC_ISSUER || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  EURC: process.env.NEXT_PUBLIC_EURC_ISSUER || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  // Demo testnet BTC anchor issuer
+  BTC: process.env.NEXT_PUBLIC_BTC_ISSUER || "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+};
+
 /**
  * Validates whether a string is a valid StrKey-encoded Soroban Contract ID (starts with 'C', 56 chars).
  */

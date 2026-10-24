@@ -39,7 +39,19 @@ import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
 
 export default function MarketsApp() {
-  const { address, balance, error, openPicker, accountStatus, isFunding, fundError, fundAccount } = useWallet();
+  const {
+    address,
+    balance,
+    balances,
+    isUnfunded,
+    error,
+    openPicker,
+    addTrustline,
+    accountStatus,
+    isFunding,
+    fundError,
+    fundAccount,
+  } = useWallet();
   const tw = useTranslations("wallet");
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
@@ -131,6 +143,23 @@ export default function MarketsApp() {
   const hasSupplied = useMemo(() => {
     return Object.values(ledger).some((entry) => entry && entry.supplied > BigInt(0));
   }, [ledger]);
+  const [trustlineLoading, setTrustlineLoading] = useState<string | null>(null);
+  const [trustlineMsg, setTrustlineMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  async function handleAddTrustline(market: Market) {
+    if (market.asset === "native") return;
+    setTrustlineLoading(market.symbol);
+    setTrustlineMsg(null);
+    try {
+      await addTrustline(market.asset);
+      setTrustlineMsg({ type: "success", text: t("trustlineAdded") });
+    } catch (err: any) {
+      const errorText = err?.message || t("txCancelled");
+      setTrustlineMsg({ type: "error", text: errorText });
+    } finally {
+      setTrustlineLoading(null);
+    }
+  }
 
   // Load positions from storage (per-wallet key)
   useEffect(() => {
@@ -480,12 +509,21 @@ export default function MarketsApp() {
         })}
       </div>
 
+      {trustlineMsg && (
+        <Card
+          className={`p-4 text-sm ${trustlineMsg.type === "error" ? "text-red-400" : "text-emerald-400"}`}
+          role="alert"
+        >
+          {trustlineMsg.text}
+        </Card>
+      )}
+
       {/* sm+: table */}
       <Card className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
-              {[t("asset"), t("price"), t("supplyApy"), t("borrowApy"), t("totalSupplied"), t("yourPosition"), ""].map((h) => (
+              {[t("asset"), t("price"), t("supplyApy"), t("borrowApy"), t("totalSupplied"), t("yourPosition"), t("wallet"), ""].map((h) => (
                 <th key={String(h)} className="p-4 font-medium">
                   {h}
                 </th>
@@ -536,6 +574,40 @@ export default function MarketsApp() {
                           ? `+${formatNumber(suppliedFloat, locale, 4)} / -${formatNumber(borrowedFloat, locale, 4)}`
                           : "-"
                       : "-"}
+                  </td>
+                  <td className="p-4" data-testid={`wallet-balance-${m.symbol}`}>
+                    {!address ? (
+                      <span className="mut">-</span>
+                    ) : isUnfunded ? (
+                      <span className="mut text-xs">{t("unfunded")}</span>
+                    ) : m.asset === "native" ? (
+                      <span>
+                        {balances["native"]
+                          ? `${formatNumber(Number(balances["native"].available), locale, 2)} XLM`
+                          : "0.00 XLM"}
+                      </span>
+                    ) : (() => {
+                      const key = `${m.asset.code}:${m.asset.issuer}`;
+                      const detail = balances[key] || balances[m.asset.code];
+                      if (detail) {
+                        return (
+                          <span>
+                            {formatNumber(Number(detail.available), locale, 2)} {m.symbol}
+                          </span>
+                        );
+                      }
+                      const isLoading = trustlineLoading === m.symbol;
+                      return (
+                        <button
+                          className="btn-ghost text-xs px-2 py-1 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 rounded"
+                          onClick={() => handleAddTrustline(m)}
+                          disabled={isLoading}
+                          aria-label={t("addTrustline")}
+                        >
+                          {isLoading ? t("addingTrustline") : t("addTrustline")}
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td className="p-4 text-right">
                     {live ? (
