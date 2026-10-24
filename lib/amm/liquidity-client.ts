@@ -12,7 +12,7 @@ import { signTransaction } from "@stellar/freighter-api";
 import { config } from "@/lib/config";
 import { calculateBurnAmounts, calculateMintShares } from "./liquidity-math";
 
-const NETWORK_PASSPHRASE = config.network === "public" ? Networks.PUBLIC : Networks.TESTNET;
+const NETWORK_PASSPHRASE = config.networkPassphrase;
 const POLL_INTERVAL_MS = 2_000;
 const TX_TIMEOUT_MS = 120_000;
 
@@ -267,8 +267,8 @@ export function contractErrorMessage(message: string): string {
 }
 
 function ensureCorrectNetwork(network: string | undefined, passphrase: string | undefined): void {
-  const expected = config.network === "public" ? "PUBLIC" : "TESTNET";
-  const expectedPassphrase = config.network === "public" ? Networks.PUBLIC : Networks.TESTNET;
+  const expected = config.network === "mainnet" ? "PUBLIC" : config.network.toUpperCase();
+  const expectedPassphrase = config.networkPassphrase;
   if (!network || network.toUpperCase() !== expected || passphrase !== expectedPassphrase) {
     throw new Error(`Freighter is on ${network ?? "an unknown network"}. Switch to Stellar ${expected.toLowerCase()} before signing.`);
   }
