@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
+import { Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
 import { config, explorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
@@ -218,12 +219,12 @@ export default function MarketsApp() {
       </div>
 
       {resetNotice && (
-        <div className="card p-4 text-sm text-amber-400" role="alert">
+        <Card className="p-4 text-sm text-amber-400" role="alert">
           {t("status.storageReset")}
-        </div>
+        </Card>
       )}
 
-      <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0 text-sm">
           <div className="mut">{t("wallet")}</div>
           {address ? (
@@ -239,9 +240,9 @@ export default function MarketsApp() {
           {error && <div className="mt-1 text-amber-400">{error}</div>}
         </div>
         {!address && (
-          <button className="btn w-full sm:w-auto" onClick={connect}>
+          <Button variant="primary" className="w-full sm:w-auto" onClick={connect}>
             {t("connectFreighter")}
-          </button>
+          </Button>
         )}
         <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:gap-6">
           <Stat k={t("collateral")} v={formatCurrency(collateralUsd, locale)} />
@@ -249,10 +250,10 @@ export default function MarketsApp() {
           <Stat
             k={t("health")}
             v={health === Infinity ? t("nA") : formatNumber(health, locale)}
-            tone={health < 1.2 ? "text-red-400" : "text-emerald-400"}
+            tone={health < 1.2 ? "danger" : "positive"}
           />
         </div>
-      </div>
+      </Card>
 
       {/* Mobile: stacked cards */}
       <div className="space-y-3 sm:hidden">
@@ -274,7 +275,7 @@ export default function MarketsApp() {
       </div>
 
       {/* sm+: table */}
-      <div className="card hidden overflow-x-auto sm:block">
+      <Card className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
@@ -309,19 +310,19 @@ export default function MarketsApp() {
                       : "-"}
                   </td>
                   <td className="p-4 text-right">
-                    <button
-                      className="btn-ghost"
+                    <Button
+                      variant="ghost"
                       onClick={() => openTrade(m)}
                     >
                       {t("trade")}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       <TradeSheet
         market={sel}
@@ -362,19 +363,11 @@ export default function MarketsApp() {
             t("notDeployed")
           )}
         </p>
-        <button className="btn-ghost text-xs" onClick={resetDemo}>
+        <Button variant="ghost" size="sm" className="text-xs" onClick={resetDemo}>
           {t("resetDemo")}
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
-function Stat({ k, v, tone = "" }: { k: string; v: string; tone?: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="mut">{k}</div>
-      <div className={`truncate text-base font-semibold sm:text-lg ${tone}`}>{v}</div>
-    </div>
-  );
-}
