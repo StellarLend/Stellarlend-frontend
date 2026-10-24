@@ -108,6 +108,7 @@ export function createConfigSchema(isDev: boolean) {
     NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET: z.string().optional().default(""),
     NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET: z.string().optional().default(""),
     NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE: z.string().optional(),
+    NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: z.string().optional(),
   });
 }
 
@@ -115,6 +116,7 @@ export interface AppConfig {
   network: StellarNetwork;
   horizon: string;
   rpc: string;
+  rpcFallbacks: string[];
   lendingId: string;
   oracleId: string;
   tokenId: string;
@@ -197,6 +199,10 @@ export function validateConfig(
     network,
     horizon: data.NEXT_PUBLIC_HORIZON_URL,
     rpc: data.NEXT_PUBLIC_SOROBAN_RPC_URL,
+    rpcFallbacks: (data.NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS || "")
+      .split(",")
+      .map((u) => u.trim())
+      .filter(Boolean),
     lendingId: data.NEXT_PUBLIC_LENDING_CONTRACT_ID || "",
     oracleId: data.NEXT_PUBLIC_ORACLE_CONTRACT_ID || "",
     tokenId: data.NEXT_PUBLIC_TOKEN_CONTRACT_ID || "",
@@ -242,6 +248,7 @@ function getRuntimeEnv(): Record<string, string | undefined> {
     NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET: process.env.NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET,
     NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET: process.env.NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET,
     NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE: process.env.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE,
+    NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: process.env.NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS,
   };
 }
 
@@ -257,6 +264,7 @@ try {
     network: fallbackNetwork,
     horizon: "https://horizon-testnet.stellar.org",
     rpc: "https://soroban-testnet.stellar.org",
+    rpcFallbacks: [],
     lendingId: "",
     oracleId: "",
     tokenId: "",

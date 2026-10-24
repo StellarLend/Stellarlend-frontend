@@ -1,8 +1,11 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { QueryClientContext, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { config } from "@/lib/config";
 import { reportError } from "@/lib/report-error";
+import { qk } from "@/lib/query-keys";
+import { QueryProvider } from "./query-provider";
 import { WalletAdapter, SignTransactionOptions, getWalletAdapter } from "@/lib/wallets";
 import { WalletPickerModal } from "./wallet-picker";
 
@@ -19,6 +22,7 @@ type Ctx = {
   connect: (walletId?: string) => Promise<void>;
   disconnect: () => void;
   signTransaction: (xdr: string, options?: SignTransactionOptions) => Promise<string>;
+  invalidateBalance: () => Promise<void>;
 };
 
 const WalletCtx = createContext<Ctx>({
@@ -32,6 +36,7 @@ const WalletCtx = createContext<Ctx>({
   connect: async () => {},
   disconnect: () => {},
   signTransaction: async () => "",
+  invalidateBalance: async () => {},
 });
 
 export const useWallet = () => useContext(WalletCtx);
@@ -41,10 +46,25 @@ interface WalletProviderProps {
   initialAdapter?: WalletAdapter;
 }
 
-export function WalletProvider({ children, initialAdapter }: WalletProviderProps) {
+/**
+ * Provides wallet state. Balances are fetched through the shared React Query
+ * cache; if no QueryClientProvider is mounted above (e.g. isolated tests),
+ * a local one is created so the provider still works standalone.
+ */
+export function WalletProvider(props: WalletProviderProps) {
+  const existingClient = useContext(QueryClientContext);
+  if (existingClient) return <WalletProviderInner {...props} />;
+  return (
+    <QueryProvider>
+      <WalletProviderInner {...props} />
+    </QueryProvider>
+  );
+}
+
+function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) {
   const t = useTranslations("wallet");
+  const queryClient = useQueryClient();
   const [address, setAddress] = useState<string | null>(null);
-  const [balance, setBalance] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeWalletId, setActiveWalletId] = useState<string | null>(initialAdapter?.id ?? null);
   const [adapter, setAdapter] = useState<WalletAdapter | null>(initialAdapter ?? null);
@@ -122,11 +142,14 @@ export function WalletProvider({ children, initialAdapter }: WalletProviderProps
     if (adapter?.disconnect) {
       adapter.disconnect().catch(() => {});
     }
+    if (address) {
+      // Clear cached data for the disconnected address to avoid leaking data across accounts
+      queryClient.removeQueries({ queryKey: qk.account(address) });
+    }
     setAddress(null);
-    setBalance(null);
     setAdapter(null);
     setActiveWalletId(null);
-  }, [adapter]);
+  }, [adapter, address, queryClient]);
 
   const signTransaction = useCallback(
     async (xdr: string, options?: SignTransactionOptions) => {
@@ -141,22 +164,36 @@ export function WalletProvider({ children, initialAdapter }: WalletProviderProps
     [adapter, address]
   );
 
-  useEffect(() => {
+  const { data: balance = null } = useQuery({
+    queryKey: qk.accountBalance(address),
+    queryFn: async ({ signal }) => {
+      if (!address) return null;
+      try {
+        const res = await fetch(`${config.horizon}/accounts/${address}`, { signal });
+        if (res.status === 404) {
+          return t("unfunded");
+        }
+        if (!res.ok) {
+          throw new Error(`Horizon error: ${res.status}`);
+        }
+        const accountData = await res.json();
+        const nativeBalance = accountData?.balances?.find(
+          (b: { asset_type: string }) => b.asset_type === "native"
+        );
+        return nativeBalance ? Number(nativeBalance.balance).toFixed(2) : t("unfunded");
+      } catch (err) {
+        if (!signal?.aborted) reportError(err, { context: "wallet:fetchBalance", address });
+        throw err;
+      }
+    },
+    enabled: Boolean(address),
+    staleTime: 15_000,
+  });
+
+  const invalidateBalance = useCallback(async () => {
     if (!address) return;
-    let live = true;
-    fetch(`${config.horizon}/accounts/${address}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((a) => {
-        if (!live) return;
-        const x = a?.balances?.find((b: { asset_type: string }) => b.asset_type === "native");
-        setBalance(x ? Number(x.balance).toFixed(2) : t("unfunded"));
-      })
-      .catch((err) => {
-        reportError(err, { context: "wallet:fetchBalance", address });
-        if (live) setBalance(null);
-      });
-    return () => { live = false; };
-  }, [address, t]);
+    await queryClient.invalidateQueries({ queryKey: qk.accountBalance(address) });
+  }, [address, queryClient]);
 
   return (
     <WalletCtx.Provider
@@ -171,6 +208,7 @@ export function WalletProvider({ children, initialAdapter }: WalletProviderProps
         connect,
         disconnect,
         signTransaction,
+        invalidateBalance,
       }}
     >
       {children}

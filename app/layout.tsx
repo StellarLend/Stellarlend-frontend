@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "@/lib/config";
+import { QueryProvider } from "@/components/query-provider";
 
 export const metadata: Metadata = {
   title: "StellarLend - Lending on Stellar",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen antialiased">
+        <QueryProvider>
         <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl min-w-0 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:flex-now-rap">
             <a href="/" className="shrink-0 truncate text-base font-semibold tracking-tight text-white">
@@ -30,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         {children}
+        </QueryProvider>
       </body>
     </html>
   );
