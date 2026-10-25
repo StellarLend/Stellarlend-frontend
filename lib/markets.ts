@@ -1,5 +1,18 @@
 import { TESTNET_ISSUERS } from "./config";
 
+export type ParamSource = "chain" | "demo";
+
+export type MarketSources = {
+  ltv: ParamSource;
+  liqThreshold: ParamSource;
+  supplyCap: ParamSource;
+  borrowCap: ParamSource;
+  depositCapRemaining: ParamSource;
+  minBorrow: ParamSource;
+  totalSupply: ParamSource;
+  totalBorrow: ParamSource;
+};
+
 export type AssetIdentity =
   | "native"
   | {
@@ -26,6 +39,22 @@ export type Market = {
   contractId?: string;
   /** Source of price data (defaults to "demo") */
   priceSource?: "oracle" | "demo";
+  /** On-chain contract address / contract ID for the asset */
+  address?: string;
+  /** Loan-to-value ratio in basis points (e.g. 7500 = 75%) */
+  ltvBps?: number;
+  /** Liquidation threshold in basis points (e.g. 8000 = 80%) */
+  liqThresholdBps?: number;
+  /** Supply cap in base units (0 = uncapped) */
+  supplyCap?: bigint;
+  /** Borrow cap in base units (0 = uncapped) */
+  borrowCap?: bigint;
+  /** Remaining deposit capacity in base units (null = uncapped / unknown) */
+  depositCapRemaining?: bigint | null;
+  /** Minimum borrow amount in base units */
+  minBorrow?: bigint;
+  /** Provenance of individual market parameter fields */
+  sources?: MarketSources;
 };
 
 export const MARKETS: Market[] = [

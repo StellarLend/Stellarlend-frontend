@@ -6,6 +6,7 @@ import { Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
 import { config, explorer, txExplorer } from "@/lib/config";
 import { normaliseAmountInput } from "@/lib/amount-input";
+import { fetchLiveMarketParams, bpsToPercent } from "@/lib/market-params";
 import { toBaseUnits, DECIMALS, type AmountError } from "@/lib/amount";
 import {
   isOnChainConfigured,
@@ -91,6 +92,25 @@ export default function MarketsApp() {
       setLoadingPosition(false);
     }
   }, [address, configured, t]);
+  const [markets, setMarkets] = useState<Market[]>(MARKETS);
+  const [loadingParams, setLoadingParams] = useState(true);
+
+  // Concurrently fetch live market params (LTV, thresholds, caps) without blocking table rendering
+  useEffect(() => {
+    let active = true;
+    fetchLiveMarketParams(MARKETS)
+      .then((live) => {
+        if (active) setMarkets(live);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoadingParams(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const [rateSnapshot, setRateSnapshot] = useState<RateModelSnapshot>(() =>
     buildDemoRateModelSnapshot()
   );
@@ -120,7 +140,7 @@ export default function MarketsApp() {
   }, []);
 
   const activeMarkets = useMemo<Market[]>(() => {
-    return MARKETS.map((m) => {
+    return markets.map((m) => {
       const matchingRecord =
         (m.contractId && oraclePrices[m.contractId]) ||
         (m.symbol === "USDC" && config.tokenId && oraclePrices[config.tokenId]) ||
@@ -141,7 +161,14 @@ export default function MarketsApp() {
         priceSource: "demo" as const,
       };
     });
-  }, [oraclePrices]);
+  }, [oraclePrices, markets]);
+
+  // Keep the selected market in sync when live params / prices update
+  useEffect(() => {
+    if (!sel) return;
+    const updated = activeMarkets.find((m) => m.symbol === sel.symbol);
+    if (updated && updated !== sel) setSel(updated);
+  }, [activeMarkets, sel]);
 
   const hasSupplied = useMemo(() => {
     return Object.values(ledger).some((entry) => entry && entry.supplied > BigInt(0));
@@ -317,6 +344,11 @@ export default function MarketsApp() {
     const next = { ...cur };
 
     if (mode === "supply") {
+      // Validate supply against remaining deposit capacity
+      if (sel.depositCapRemaining !== null && sel.depositCapRemaining !== undefined && n > sel.depositCapRemaining) {
+        setMsg({ text: t("status.depositCapExceeded"), isError: true });
+        return;
+      }
       next.supplied = cur.supplied + n;
     } else if (mode === "withdraw") {
       if (n > cur.supplied) {
@@ -329,6 +361,11 @@ export default function MarketsApp() {
       }
       next.supplied = cur.supplied - n;
     } else if (mode === "borrow") {
+      // Validate borrow against minimum borrow limit
+      if (sel.minBorrow !== null && sel.minBorrow !== undefined && n < sel.minBorrow) {
+        setMsg({ text: t("status.belowMinimumBorrow"), isError: true });
+        return;
+      }
       if (!canBorrow(ledger, sel.symbol, n, activeMarkets)) {
         setMsg({ text: t("status.exceedsBorrowLimit"), isError: true });
         return;
@@ -571,7 +608,19 @@ export default function MarketsApp() {
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
-              {[t("asset"), t("price"), t("supplyApy"), t("borrowApy"), t("totalSupplied"), t("yourPosition"), t("wallet"), ""].map((h) => (
+              {[
+                t("asset"),
+                t("price"),
+                t("supplyApy"),
+                t("borrowApy"),
+                t("ltv"),
+                t("liquidationThreshold"),
+                t("capacity"),
+                t("totalSupplied"),
+                t("yourPosition"),
+                t("wallet"),
+                "",
+              ].map((h) => (
                 <th key={String(h)} className="p-4 font-medium">
                   {h}
                 </th>
@@ -592,6 +641,13 @@ export default function MarketsApp() {
                 ? `+${formatNumber(toFloat(position.collateral, DECIMALS), locale, 4)} / -${formatNumber(toFloat(position.debt, DECIMALS), locale, 4)}`
                 : null;
               const isOracle = m.priceSource === "oracle";
+              const ltvDisplay = m.ltvBps !== undefined ? bpsToPercent(m.ltvBps) : m.ltv * 100;
+              const liqThresholdDisplay = m.liqThresholdBps !== undefined ? bpsToPercent(m.liqThresholdBps) : 80;
+              const capBigInt = m.supplyCap ?? BigInt(0);
+              const isUncapped = capBigInt === BigInt(0);
+              const capFloat = isUncapped ? null : toFloat(capBigInt, m.decimals);
+              const capacityPercent =
+                capFloat && capFloat > 0 ? Math.min(100, Math.round((m.totalSupply / capFloat) * 100)) : 0;
               return (
                 <tr key={m.symbol} className="border-b border-[var(--line)] last:border-0">
                   <td className="p-4">
@@ -613,6 +669,49 @@ export default function MarketsApp() {
                   </td>
                   <td className="p-4 text-emerald-400">{formatPercent(m.supplyApy, locale)}</td>
                   <td className="p-4">{formatPercent(m.borrowApy, locale)}</td>
+                  <td className="p-4">
+                    {loadingParams ? (
+                      <span className="inline-block h-4 w-12 animate-pulse rounded bg-zinc-800" />
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>{formatPercent(ltvDisplay, locale)}</span>
+                        <SourceBadge source={m.sources?.ltv} t={t} />
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    {loadingParams ? (
+                      <span className="inline-block h-4 w-12 animate-pulse rounded bg-zinc-800" />
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>{formatPercent(liqThresholdDisplay, locale)}</span>
+                        <SourceBadge source={m.sources?.liqThreshold} t={t} />
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    {loadingParams ? (
+                      <span className="inline-block h-4 w-24 animate-pulse rounded bg-zinc-800" />
+                    ) : isUncapped ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="mut">{t("uncapped")}</span>
+                        <SourceBadge source={m.sources?.supplyCap} t={t} />
+                      </span>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span>{capacityPercent}%</span>
+                          <SourceBadge source={m.sources?.supplyCap} t={t} />
+                        </div>
+                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-zinc-800">
+                          <div
+                            className={`h-full rounded-full ${capacityPercent > 90 ? "bg-rose-500" : "bg-emerald-500"}`}
+                            style={{ width: `${capacityPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </td>
                   <td className="p-4">{formatNumber(m.totalSupply, locale, 0)}</td>
                   <td className="p-4 mut">
                     {live
@@ -687,7 +786,17 @@ export default function MarketsApp() {
             aria-labelledby={`trade-heading-${sel.symbol}`}
             className="card hidden max-w-md space-y-4 p-6 sm:block"
           >
-            <h2 id={`trade-heading-${sel.symbol}`} className="text-xl font-semibold">{sel.symbol}</h2>
+            <div className="flex items-center justify-between">
+              <h2 id={`trade-heading-${sel.symbol}`} className="text-xl font-semibold">{sel.symbol}</h2>
+              {sel.depositCapRemaining !== null && sel.depositCapRemaining !== undefined && (
+                <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+                  {t("remainingCapacity", {
+                    amount: formatNumber(toFloat(sel.depositCapRemaining, sel.decimals), locale, 2),
+                    symbol: sel.symbol,
+                  })}
+                </span>
+              )}
+            </div>
             {tradePanel}
           </section>
           {/* Mobile: bottom sheet */}
@@ -729,3 +838,16 @@ export default function MarketsApp() {
   );
 }
 
+function SourceBadge({ source, t }: { source?: "chain" | "demo"; t: (k: string) => string }) {
+  if (!source) return null;
+  const isChain = source === "chain";
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase ${
+        isChain ? "bg-emerald-950/70 text-emerald-400 border border-emerald-800/60" : "bg-zinc-800 text-zinc-400"
+      }`}
+    >
+      {t(source)}
+    </span>
+  );
+}

@@ -122,6 +122,10 @@ export function createConfigSchema(isDev: boolean) {
     NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET: z.string().optional().default(""),
     NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE: z.string().optional(),
     NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: z.string().optional(),
+    NEXT_PUBLIC_XLM_ASSET_ADDRESS: z.string().optional(),
+    NEXT_PUBLIC_USDC_ASSET_ADDRESS: z.string().optional(),
+    NEXT_PUBLIC_EURC_ASSET_ADDRESS: z.string().optional(),
+    NEXT_PUBLIC_BTC_ASSET_ADDRESS: z.string().optional(),
   });
 }
 
@@ -141,6 +145,8 @@ export interface AppConfig {
   ammTokenAHorizonAsset: string;
   ammTokenBHorizonAsset: string;
   networkPassphrase: string;
+  /** Per-market on-chain asset contract addresses (for get_asset_params etc.). */
+  marketAssets: Record<string, string>;
 }
 
 export interface ExplorerHelpers {
@@ -227,6 +233,12 @@ export function validateConfig(
     ammTokenAHorizonAsset: data.NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET || "",
     ammTokenBHorizonAsset: data.NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET || "",
     networkPassphrase: derivedPassphrase,
+    marketAssets: {
+      XLM: data.NEXT_PUBLIC_XLM_ASSET_ADDRESS || "",
+      USDC: data.NEXT_PUBLIC_USDC_ASSET_ADDRESS || "",
+      EURC: data.NEXT_PUBLIC_EURC_ASSET_ADDRESS || "",
+      BTC: data.NEXT_PUBLIC_BTC_ASSET_ADDRESS || "",
+    },
   };
 }
 
@@ -262,6 +274,10 @@ function getRuntimeEnv(): Record<string, string | undefined> {
     NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET: process.env.NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET,
     NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE: process.env.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE,
     NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: process.env.NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS,
+    NEXT_PUBLIC_XLM_ASSET_ADDRESS: process.env.NEXT_PUBLIC_XLM_ASSET_ADDRESS,
+    NEXT_PUBLIC_USDC_ASSET_ADDRESS: process.env.NEXT_PUBLIC_USDC_ASSET_ADDRESS,
+    NEXT_PUBLIC_EURC_ASSET_ADDRESS: process.env.NEXT_PUBLIC_EURC_ASSET_ADDRESS,
+    NEXT_PUBLIC_BTC_ASSET_ADDRESS: process.env.NEXT_PUBLIC_BTC_ASSET_ADDRESS,
   };
 }
 
@@ -289,6 +305,7 @@ try {
     ammTokenAHorizonAsset: "",
     ammTokenBHorizonAsset: "",
     networkPassphrase: Networks.TESTNET,
+    marketAssets: { XLM: "", USDC: "", EURC: "", BTC: "" },
   };
 }
 

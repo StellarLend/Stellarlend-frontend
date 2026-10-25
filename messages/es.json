@@ -146,7 +146,9 @@
       "timedOut": "La transacción agotó el tiempo de espera. Comprueba el explorador antes de reintentar.",
       "positionError": "No se pudo cargar tu posición on-chain.",
       "demoFallback": "Se muestra el libro de demostración hasta que el contrato esté configurado.",
-      "loadingPosition": "Cargando posición on-chain…"
+      "loadingPosition": "Cargando posición on-chain…",
+      "depositCapExceeded": "Este depósito superaría el límite de depósito del mercado.",
+      "belowMinimumBorrow": "El préstamo solicitado está por debajo del monto mínimo."
     },
     "contract": "Contrato de préstamo",
     "notDeployed": "no desplegado",
@@ -229,7 +231,14 @@
       "atRisk": "En riesgo",
       "liquidatable": "Liquidable"
     },
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "ltv": "LTV",
+    "liquidationThreshold": "Umbral de liquidación",
+    "capacity": "Capacidad",
+    "uncapped": "Sin límite",
+    "demo": "demo",
+    "chain": "en cadena",
+    "remainingCapacity": "Capacidad restante: {amount} {symbol}"
   },
   "docs": {
     "title": "Documentación",
@@ -246,7 +255,13 @@
     },
     "riskParameters": {
       "title": "Parámetros de riesgo",
-      "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable."
+      "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable.",
+      "asset": "Activo",
+      "maxLtv": "LTV máximo",
+      "liquidationThreshold": "Umbral de liquidación",
+      "supplyCap": "Límite de suministro",
+      "minBorrow": "Préstamo mínimo",
+      "uncapped": "Sin límite"
     },
     "flashLoans": {
       "title": "Préstamos flash",

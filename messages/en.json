@@ -146,7 +146,9 @@
       "timedOut": "Transaction timed out. Check the explorer before retrying.",
       "positionError": "Could not load your on-chain position.",
       "demoFallback": "Showing the demo ledger until the contract is configured.",
-      "loadingPosition": "Loading on-chain position…"
+      "loadingPosition": "Loading on-chain position…",
+      "depositCapExceeded": "This deposit would exceed the market deposit limit.",
+      "belowMinimumBorrow": "The requested borrow is below the minimum amount."
     },
     "contract": "Lending contract",
     "notDeployed": "not deployed",
@@ -229,7 +231,14 @@
       "atRisk": "At risk",
       "liquidatable": "Liquidatable"
     },
-    "actions": "Actions"
+    "actions": "Actions",
+    "ltv": "LTV",
+    "liquidationThreshold": "Liquidation threshold",
+    "capacity": "Capacity",
+    "uncapped": "Uncapped",
+    "demo": "demo",
+    "chain": "chain",
+    "remainingCapacity": "Remaining cap: {amount} {symbol}"
   },
   "docs": {
     "title": "Documentation",
@@ -246,7 +255,13 @@
     },
     "riskParameters": {
       "title": "Risk parameters",
-      "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable."
+      "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable.",
+      "asset": "Asset",
+      "maxLtv": "Max LTV",
+      "liquidationThreshold": "Liquidation threshold",
+      "supplyCap": "Supply cap",
+      "minBorrow": "Min borrow",
+      "uncapped": "Uncapped"
     },
     "flashLoans": {
       "title": "Flash loans",
