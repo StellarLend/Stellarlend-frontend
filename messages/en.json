@@ -91,7 +91,10 @@
     "fundTooltip": "Get free testnet XLM from Stellar Friendbot",
     "fundCooldown": "Please wait {seconds}s before requesting Friendbot funding again.",
     "fundFailed": "Friendbot funding failed.",
-    "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments."
+    "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments.",
+    "networkMismatchTitle": "Network mismatch detected",
+    "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
   },
   "market": {
     "title": "Markets",
@@ -101,13 +104,7 @@
     "collateral": "Collateral",
     "borrowed": "Borrowed",
     "health": "Health",
-    "healthStatus": {
-      "healthy": "Healthy",
-      "atRisk": "At risk",
-      "liquidatable": "Liquidatable"
-    },
     "nA": "n/a",
-    "actions": "Actions",
     "asset": "Asset",
     "price": "Price",
     "supplyApy": "Supply APY",
@@ -226,7 +223,13 @@
     "comingSoon": "Coming soon",
     "onchainMode": "On-chain mode (Stellar testnet)",
     "xlmAmount": "{amount} XLM",
-    "viewTx": "View transaction"
+    "viewTx": "View transaction",
+    "healthStatus": {
+      "healthy": "Healthy",
+      "atRisk": "At risk",
+      "liquidatable": "Liquidatable"
+    },
+    "actions": "Actions"
   },
   "docs": {
     "title": "Documentation",
@@ -405,5 +408,23 @@
     "manualLink": "Stellar Lab Faucet",
     "retry": "Retry",
     "manualFaucet": "Manual Faucet"
+  },
+  "protocolStatus": {
+    "unknown": "Protocol status unknown (RPC unreachable). Actions remain enabled.",
+    "shutdown": "Protocol is shut down. All operations are currently disabled.",
+    "recovery": "Protocol is in recovery mode. Only withdrawals, repayments, and liquidations are allowed.",
+    "pausedAll": "The protocol is currently paused. All operations are disabled.",
+    "pausedSpecific": "Protocol operation(s) paused: {ops}.",
+    "actionBlockedTooltip": "This operation is disabled because {reason}.",
+    "reasonShutdown": "the protocol is in emergency shutdown",
+    "reasonRecovery": "the protocol is in recovery mode",
+    "reasonPaused": "this operation is paused",
+    "ops": {
+      "supply": "Supply",
+      "borrow": "Borrow",
+      "withdraw": "Withdraw",
+      "repay": "Repay",
+      "liquidate": "Liquidate"
+    }
   }
 }

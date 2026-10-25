@@ -91,7 +91,10 @@
     "fundTooltip": "Obtener XLM de prueba gratis del Friendbot de Stellar",
     "fundCooldown": "Por favor, espera {seconds}s antes de volver a solicitar fondos a Friendbot.",
     "fundFailed": "Falló la financiación con Friendbot.",
-    "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos."
+    "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos.",
+    "networkMismatchTitle": "Discrepancia de red detectada",
+    "networkMismatchDescription": "Freighter está conectado a una red diferente ({currentNetwork}). Cambia Freighter a {expectedNetwork} para interactuar y firmar transacciones.",
+    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}."
   },
   "market": {
     "title": "Mercados",
@@ -101,13 +104,7 @@
     "collateral": "Colateral",
     "borrowed": "Prestado",
     "health": "Salud",
-    "healthStatus": {
-      "healthy": "Saludable",
-      "atRisk": "En riesgo",
-      "liquidatable": "Liquidable"
-    },
     "nA": "n/a",
-    "actions": "Acciones",
     "asset": "Activo",
     "price": "Precio",
     "supplyApy": "APY de depósito",
@@ -226,7 +223,13 @@
     "comingSoon": "Próximamente",
     "onchainMode": "Modo on-chain (testnet de Stellar)",
     "xlmAmount": "{amount} XLM",
-    "viewTx": "Ver transacción"
+    "viewTx": "Ver transacción",
+    "healthStatus": {
+      "healthy": "Saludable",
+      "atRisk": "En riesgo",
+      "liquidatable": "Liquidable"
+    },
+    "actions": "Acciones"
   },
   "docs": {
     "title": "Documentación",
@@ -405,5 +408,23 @@
     "manualLink": "Faucet Stellar Lab",
     "retry": "Reintentar",
     "manualFaucet": "Faucet manual"
+  },
+  "protocolStatus": {
+    "unknown": "Estado del protocolo desconocido (RPC inaccesible). Las acciones permanecen habilitadas.",
+    "shutdown": "El protocolo está cerrado por emergencia. Todas las operaciones están deshabilitadas.",
+    "recovery": "El protocolo está en modo de recuperación. Solo se permiten retiros, pagos y liquidaciones.",
+    "pausedAll": "El protocolo está pausado actualmente. Todas las operaciones están deshabilitadas.",
+    "pausedSpecific": "Operación(es) del protocolo en pausa: {ops}.",
+    "actionBlockedTooltip": "Esta operación está deshabilitada porque {reason}.",
+    "reasonShutdown": "el protocolo está en cierre de emergencia",
+    "reasonRecovery": "el protocolo está en modo de recuperación",
+    "reasonPaused": "esta operación está en pausa",
+    "ops": {
+      "supply": "Depositar",
+      "borrow": "Pedir prestado",
+      "withdraw": "Retirar",
+      "repay": "Pagar",
+      "liquidate": "Liquidar"
+    }
   }
 }

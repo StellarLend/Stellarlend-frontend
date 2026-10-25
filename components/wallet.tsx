@@ -2,7 +2,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { QueryClientContext, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { config } from "@/lib/config";
+import { config, getExpectedNetworkPassphrase, isNetworkMismatch, NetworkMismatchError } from "@/lib/config";
 import { reportError } from "@/lib/report-error";
 import { qk } from "@/lib/query-keys";
 import { fundWithFriendbot, pollUntilFunded } from "@/lib/friendbot";
@@ -12,12 +12,48 @@ import {
   type AccountBalancesMap,
 } from "@/lib/horizon";
 import { QueryProvider } from "./query-provider";
+import { ProtocolStatusProvider } from "@/components/protocol-status";
 import { WalletAdapter, SignTransactionOptions, getWalletAdapter } from "@/lib/wallets";
 import { WalletPickerModal } from "./wallet-picker";
 
 export type AccountStatus = "unknown" | "unfunded" | "funded" | "error";
 
 export const LAST_WALLET_STORAGE_KEY = "stellarlend:last_wallet_id";
+export const AUTOCONNECT_STORAGE_KEY = "stellarlend.wallet.autoconnect";
+
+export function getAutoConnectFlag(): boolean {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return false;
+    return window.localStorage.getItem(AUTOCONNECT_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setAutoConnectFlag(enabled: boolean): void {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    if (enabled) {
+      window.localStorage.setItem(AUTOCONNECT_STORAGE_KEY, "true");
+    } else {
+      window.localStorage.removeItem(AUTOCONNECT_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failure (e.g. Safari private browsing restrictions)
+  }
+}
+
+/** Reads the current Freighter network; returns null when unavailable. */
+async function readFreighterNetwork(): Promise<{ network: string | null; networkPassphrase: string | null } | null> {
+  try {
+    const api = await import("@stellar/freighter-api");
+    const net = await api.getNetwork();
+    if (!net || net.error) return null;
+    return { network: net.network ?? null, networkPassphrase: net.networkPassphrase ?? null };
+  } catch {
+    return null;
+  }
+}
 
 type Ctx = {
   address: string | null;
@@ -41,6 +77,13 @@ type Ctx = {
   isUnfunded: boolean;
   refreshBalances: () => Promise<void>;
   addTrustline: (asset: { code: string; issuer: string }) => Promise<{ hash: string }>;
+  /** Wallet network as reported by Freighter (null for other wallets / unknown). */
+  network: string | null;
+  networkPassphrase: string | null;
+  networkMismatch: boolean;
+  expectedPassphrase: string;
+  /** Throws NetworkMismatchError when the wallet is on a different network than the app. */
+  assertCanSign: () => void;
 };
 
 const WalletCtx = createContext<Ctx>({
@@ -64,6 +107,11 @@ const WalletCtx = createContext<Ctx>({
   isUnfunded: false,
   refreshBalances: async () => {},
   addTrustline: async () => ({ hash: "" }),
+  network: null,
+  networkPassphrase: null,
+  networkMismatch: false,
+  expectedPassphrase: getExpectedNetworkPassphrase(),
+  assertCanSign: () => {},
 });
 
 export const useWallet = () => useContext(WalletCtx);
@@ -95,6 +143,10 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
   const [isFunding, setIsFunding] = useState(false);
   const [fundError, setFundError] = useState<string | null>(null);
   const fundAbortRef = useRef<AbortController | null>(null);
+  const [network, setNetwork] = useState<string | null>(null);
+  const [networkPassphrase, setNetworkPassphrase] = useState<string | null>(null);
+  const expectedPassphrase = getExpectedNetworkPassphrase();
+  const networkMismatch = isNetworkMismatch(networkPassphrase, expectedPassphrase);
   const lastFundAttemptRef = useRef<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [activeWalletId, setActiveWalletId] = useState<string | null>(initialAdapter?.id ?? null);
@@ -150,6 +202,14 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         } catch {
           // Ignore storage write errors
         }
+        setAutoConnectFlag(true);
+        if (targetAdapter.id === "freighter") {
+          const net = await readFreighterNetwork();
+          if (net) {
+            setNetwork(net.network);
+            setNetworkPassphrase(net.networkPassphrase);
+          }
+        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         const lower = msg.toLowerCase();
@@ -180,22 +240,103 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     fundAbortRef.current?.abort();
     setIsFunding(false);
     setFundError(null);
+    setAutoConnectFlag(false);
+    setNetwork(null);
+    setNetworkPassphrase(null);
     setAddress(null);
     setAdapter(null);
     setActiveWalletId(null);
   }, [adapter, address, queryClient]);
+
+  const assertCanSign = useCallback(() => {
+    if (networkMismatch) {
+      throw new NetworkMismatchError(networkPassphrase ?? "unknown", expectedPassphrase);
+    }
+  }, [networkMismatch, networkPassphrase, expectedPassphrase]);
+
+  // Restore a Freighter session on mount if autoconnect is enabled and the site is still allowed.
+  useEffect(() => {
+    let active = true;
+    async function restoreSession() {
+      if (!getAutoConnectFlag()) return;
+      let lastId: string | null = null;
+      try {
+        lastId = localStorage.getItem(LAST_WALLET_STORAGE_KEY);
+      } catch {
+        // ignore storage errors
+      }
+      if (lastId && lastId !== "freighter") return;
+      try {
+        const api = await import("@stellar/freighter-api");
+        const conn = await api.isConnected();
+        if (!active || !conn.isConnected) return;
+        const allowed = await api.isAllowed();
+        if (!active || !allowed.isAllowed) return;
+        const res = await api.getAddress();
+        if (!active || res.error || !res.address) return;
+        const freighter = await getWalletAdapter("freighter");
+        if (!active) return;
+        if (freighter) {
+          setAdapter(freighter);
+          setActiveWalletId(freighter.id);
+        }
+        setAddress(res.address);
+        const net = await readFreighterNetwork();
+        if (active && net) {
+          setNetwork(net.network);
+          setNetworkPassphrase(net.networkPassphrase);
+        }
+      } catch {
+        // Freighter not available or lookup failed, ignore gracefully
+      }
+    }
+    void restoreSession();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Watch Freighter for account / network changes while it is the active wallet.
+  useEffect(() => {
+    if (activeWalletId !== "freighter") return;
+    let watcher: { stop: () => void } | null = null;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const api = await import("@stellar/freighter-api");
+        if (cancelled || typeof api.WatchWalletChanges !== "function") return;
+        const instance = new api.WatchWalletChanges();
+        watcher = instance;
+        instance.watch((params) => {
+          if (cancelled || params.error) return;
+          if (params.address !== undefined) {
+            setAddress((prev) => (prev !== params.address ? params.address || null : prev));
+          }
+          if (params.network !== undefined) setNetwork(params.network || null);
+          if (params.networkPassphrase !== undefined) setNetworkPassphrase(params.networkPassphrase || null);
+        });
+      } catch {
+        // Freighter watcher not available
+      }
+    })();
+    return () => {
+      cancelled = true;
+      watcher?.stop();
+    };
+  }, [activeWalletId]);
 
   const signTransaction = useCallback(
     async (xdr: string, options?: SignTransactionOptions) => {
       if (!adapter) {
         throw new Error("No wallet connected to sign transaction.");
       }
+      assertCanSign();
       return adapter.signTransaction(xdr, {
         networkPassphrase: options?.networkPassphrase ?? config.networkPassphrase,
         accountToSign: options?.accountToSign ?? address ?? undefined,
       });
     },
-    [adapter, address]
+    [adapter, address, assertCanSign]
   );
 
   const { data: account = null, isError: balanceError } = useQuery<{ balance: string; status: AccountStatus; balances: AccountBalancesMap } | null>({
@@ -329,9 +470,14 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         isUnfunded,
         refreshBalances: invalidateBalance,
         addTrustline,
+        network,
+        networkPassphrase,
+        networkMismatch,
+        expectedPassphrase,
+        assertCanSign,
       }}
     >
-      {children}
+      <ProtocolStatusProvider>{children}</ProtocolStatusProvider>
       <WalletPickerModal
         isOpen={isPickerOpen}
         onClose={closePicker}

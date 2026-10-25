@@ -28,11 +28,14 @@ export function isValidContractAddress(address?: string | null): boolean {
 export const STELLAR_NETWORKS = ["testnet", "futurenet", "mainnet"] as const;
 export type StellarNetwork = (typeof STELLAR_NETWORKS)[number];
 
-const NETWORK_PASSPHRASES: Record<StellarNetwork, string> = {
-  testnet: Networks.TESTNET,
-  futurenet: Networks.FUTURENET,
-  mainnet: Networks.PUBLIC,
-};
+export const NETWORK_PASSPHRASES = {
+  testnet: "Test SDF Network ; September 2015",
+  public: "Public Global Stellar Network ; September 2015",
+  mainnet: "Public Global Stellar Network ; September 2015",
+  futurenet: "Test SDF Future Network ; October 2022",
+  standalone: "Standalone Network ; February 2017",
+  sandbox: "Local Sandbox Stellar Network ; September 2022",
+} as const;
 
 const EXPLORER_NETWORK_SEGMENTS: Record<StellarNetwork, string> = {
   testnet: "testnet",
@@ -293,3 +296,36 @@ export const config = activeConfig;
 export const explorer = createExplorerHelpers(config.network);
 export const txExplorer = (hash: string) => explorer.tx(hash);
 export const accountExplorer = (id: string) => explorer.account(id);
+
+export function getExpectedNetworkPassphrase(networkName?: string): string {
+  if (networkName) {
+    const key = networkName.toLowerCase() as keyof typeof NETWORK_PASSPHRASES;
+    if (NETWORK_PASSPHRASES[key]) return NETWORK_PASSPHRASES[key];
+  }
+  if (config.networkPassphrase && config.networkPassphrase.trim() !== "") {
+    return config.networkPassphrase;
+  }
+  const key = (config.network || "testnet").toLowerCase() as keyof typeof NETWORK_PASSPHRASES;
+  return NETWORK_PASSPHRASES[key] ?? NETWORK_PASSPHRASES.testnet;
+}
+
+export function isNetworkMismatch(
+  currentPassphrase: string | null | undefined,
+  expectedPassphrase = getExpectedNetworkPassphrase()
+): boolean {
+  if (!currentPassphrase) return false;
+  return currentPassphrase !== expectedPassphrase;
+}
+
+export class NetworkMismatchError extends Error {
+  readonly currentPassphrase: string;
+  readonly expectedPassphrase: string;
+
+  constructor(currentPassphrase: string, expectedPassphrase: string) {
+    super(`Freighter network passphrase "${currentPassphrase}" does not match configured app network passphrase "${expectedPassphrase}".`);
+    this.name = "NetworkMismatchError";
+    this.currentPassphrase = currentPassphrase;
+    this.expectedPassphrase = expectedPassphrase;
+    Object.setPrototypeOf(this, NetworkMismatchError.prototype);
+  }
+}
