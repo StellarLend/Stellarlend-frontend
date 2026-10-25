@@ -3,15 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { config, explorer } from "@/lib/config";
-import { MARKETS, formatPercent, type Market } from "@/lib/markets";
+import { MARKETS, formatPercent, type Locale, type Market } from "@/lib/markets";
 import { fetchLiveMarketParams, bpsToPercent } from "@/lib/market-params";
-
-const S = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <section className="space-y-3">
-    <h2 className="text-2xl font-semibold">{title}</h2>
-    <div className="mut space-y-3 text-sm leading-relaxed">{children}</div>
-  </section>
-);
+import { Section } from "@/components/ui/section";
 
 export function DocsPage() {
   const t = useTranslations("docs");
@@ -21,15 +15,13 @@ export function DocsPage() {
 
   useEffect(() => {
     let active = true;
-    async function loadParams() {
-      try {
-        const live = await fetchLiveMarketParams(MARKETS);
+    fetchLiveMarketParams(MARKETS)
+      .then((live) => {
         if (active) setMarkets(live);
-      } catch {
-        // keep default
-      }
-    }
-    loadParams();
+      })
+      .catch(() => {
+        // keep defaults
+      });
     return () => {
       active = false;
     };
@@ -39,20 +31,30 @@ export function DocsPage() {
     <article className="mx-auto max-w-3xl space-y-10">
       <h1 className="text-4xl font-bold">{t("title")}</h1>
 
-      <S title={t("overview.title")}>
+      <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("overview.title")}>
         <p>{t("overview.body")}</p>
-      </S>
+      </Section>
 
-      <S title={t("gettingStarted.title")}>
+      <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("gettingStarted.title")}>
         <ol className="list-decimal space-y-1 pl-5">
           <li>{t("gettingStarted.step1")}</li>
-          <li>{t("gettingStarted.step2")}</li>
+          <li>
+            {t("gettingStarted.step2")}{" "}
+            <a
+              href="https://laboratory.stellar.org/#account-creator"
+              target="_blank"
+              rel="noreferrer"
+              className="underline text-blue-400 hover:text-blue-300"
+            >
+              (Stellar Laboratory Friendbot)
+            </a>
+          </li>
           <li>{t("gettingStarted.step3")}</li>
           <li>{t("gettingStarted.step4")}</li>
         </ol>
-      </S>
+      </Section>
 
-      <S title={t("riskParameters.title")}>
+      <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("riskParameters.title")}>
         <p>{t("riskParameters.body")}</p>
         <div className="overflow-x-auto rounded-lg border border-[var(--line)]">
           <table className="w-full text-left text-xs">
@@ -77,8 +79,8 @@ export function DocsPage() {
                     <td className="p-3 font-medium">
                       {m.symbol} <span className="mut">({m.sources?.ltv ?? "demo"})</span>
                     </td>
-                    <td className="p-3">{formatPercent(ltvVal, locale as any)}</td>
-                    <td className="p-3">{formatPercent(liqVal, locale as any)}</td>
+                    <td className="p-3">{formatPercent(ltvVal, locale as Locale)}</td>
+                    <td className="p-3">{formatPercent(liqVal, locale as Locale)}</td>
                     <td className="p-3 font-mono">{capStr}</td>
                     <td className="p-3 font-mono">{minBorrowStr}</td>
                   </tr>
@@ -87,20 +89,20 @@ export function DocsPage() {
             </tbody>
           </table>
         </div>
-      </S>
+      </Section>
 
-      <S title={t("flashLoans.title")}>
+      <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("flashLoans.title")}>
         <p>{t("flashLoans.body")}</p>
         <p>
           <a className="underline" href={flashLoansHref}>{t("flashLoans.link")}</a>
         </p>
-      </S>
+      </Section>
 
-      <S title={t("architecture.title")}>
+      <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("architecture.title")}>
         <p>{t("architecture.body")}</p>
-      </S>
+      </Section>
 
-      <S title={t("contracts.title")}>
+      <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("contracts.title")}>
         <ul className="space-y-1 break-all font-mono text-xs">
           <li>
             {t("contracts.label")}: {config.lendingId ? (
@@ -112,9 +114,9 @@ export function DocsPage() {
             )}
           </li>
         </ul>
-      </S>
+      </Section>
 
-      <S title={t("env.title")}>
+      <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("env.title")}>
         <ul className="list-disc space-y-1 pl-5 font-mono text-xs">
           {[
             "NEXT_PUBLIC_STELLAR_NETWORK",
@@ -125,7 +127,7 @@ export function DocsPage() {
             <li key={entry}>{entry}</li>
           ))}
         </ul>
-      </S>
+      </Section>
     </article>
   );
 }

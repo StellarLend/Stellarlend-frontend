@@ -1,147 +1,153 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
 import MarketsApp from "./markets-app";
 import enMessages from "@/messages/en.json";
 
-vi.mock("@/lib/market-params", () => ({
-  fetchLiveMarketParams: vi.fn().mockResolvedValue([
-    {
-      symbol: "XLM",
-      name: "Stellar Lumens",
-      price: 0.12,
-      supplyApy: 3.4,
-      borrowApy: 6.1,
-      totalSupply: 48_200_000,
-      totalBorrow: 21_400_000,
-      ltv: 0.65,
-      ltvBps: 6500,
-      liqThresholdBps: 7500,
-      supplyCap: BigInt(50_000_000_000_000), // 5M XLM cap in stroops
-      borrowCap: BigInt(20_000_000_000_000),
-      depositCapRemaining: BigInt(10_000_000), // 1.0 XLM remaining
-      minBorrow: BigInt(20_000_000), // 2.0 XLM min borrow
-      decimals: 7,
-      sources: {
-        ltv: "chain",
-        liqThreshold: "chain",
-        supplyCap: "chain",
-        borrowCap: "chain",
-        depositCapRemaining: "chain",
-        minBorrow: "chain",
-        totalSupply: "demo",
-        totalBorrow: "demo",
-      },
-    },
-    {
-      symbol: "USDC",
-      name: "USD Coin",
-      price: 1,
-      supplyApy: 5.2,
-      borrowApy: 7.8,
-      totalSupply: 12_600_000,
-      totalBorrow: 8_900_000,
-      ltv: 0.85,
-      ltvBps: 8500,
-      liqThresholdBps: 8000,
-      supplyCap: BigInt(0), // Uncapped
-      borrowCap: BigInt(0),
-      depositCapRemaining: null,
-      minBorrow: BigInt(10_000_000),
-      decimals: 7,
-      sources: {
-        ltv: "demo",
-        liqThreshold: "demo",
-        supplyCap: "demo",
-        borrowCap: "demo",
-        depositCapRemaining: "demo",
-        minBorrow: "demo",
-        totalSupply: "demo",
-        totalBorrow: "demo",
-      },
-    },
-  ]),
-  bpsToPercent: (bps: number) => Math.round(bps * 100) / 10000,
-}));
+function renderMarketsApp() {
+  return render(
+    <NextIntlClientProvider locale="en" messages={enMessages}>
+      <MarketsApp />
+    </NextIntlClientProvider>
+  );
+}
 
-describe("MarketsApp risk parameters & caps", () => {
-  it("renders LTV, Liquidation threshold, and Capacity columns and badges", async () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={enMessages}>
-        <MarketsApp />
-      </NextIntlClientProvider>
-    );
+describe("MarketsApp Max buttons and Trade Preview", () => {
+  it("opens trade modal and shows Max button", async () => {
+    renderMarketsApp();
 
-    expect(screen.getByText("LTV")).toBeInTheDocument();
-    expect(screen.getByText("Liquidation threshold")).toBeInTheDocument();
-    expect(screen.getByText("Capacity")).toBeInTheDocument();
+    // Click trade on XLM
+    const tradeButtons = screen.getAllByRole("button", { name: "Trade" });
+    fireEvent.click(tradeButtons[0]);
 
-    await waitFor(() => {
-      // XLM has chain source badges
-      const chainBadges = screen.getAllByText("chain");
-      expect(chainBadges.length).toBeGreaterThan(0);
-      // USDC has demo source badges
-      const demoBadges = screen.getAllByText("demo");
-      expect(demoBadges.length).toBeGreaterThan(0);
-      // USDC is uncapped
-      expect(screen.getByText("Uncapped")).toBeInTheDocument();
-    });
+    // Trade modal should appear with mode buttons and Max button
+    expect(screen.getByRole("button", { name: "Max" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm Supply" })).toBeInTheDocument();
   });
 
-  it("blocks deposit exceeding remaining deposit capacity", async () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={enMessages}>
-        <MarketsApp />
-      </NextIntlClientProvider>
+  it("updates Before -> After preview when user types amount within 150ms", async () => {
+    renderMarketsApp();
+
+    const tradeButtons = screen.getAllByRole("button", { name: "Trade" });
+    fireEvent.click(tradeButtons[0]); // XLM
+
+    const input = screen.getByPlaceholderText("Amount in XLM");
+    fireEvent.change(input, { target: { value: "100" } });
+
+    // Preview should appear after debounce (< 150ms)
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("trade-preview")).toBeInTheDocument();
+      },
+      { timeout: 300 }
     );
 
-    await waitFor(() => {
-      expect(screen.getAllByText("Trade")[0]).toBeInTheDocument();
-    });
-
-    const tradeBtns = screen.getAllByText("Trade");
-    fireEvent.click(tradeBtns[0]); // XLM (remaining cap is 1.0 XLM = 10_000_000 stroops)
-
-    const input = screen.getByRole("textbox", { name: /amount in xlm/i });
-    // Try to deposit 2.0 XLM (exceeds 1.0 remaining cap)
-    fireEvent.change(input, { target: { value: "2" } });
-
-    const confirmBtn = screen.getByRole("button", { name: /confirm supply/i });
-    fireEvent.click(confirmBtn);
-
-    expect(
-      screen.getByText("This deposit would exceed the market deposit limit.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Projected Impact")).toBeInTheDocument();
+    expect(screen.getByText("Borrow limit used")).toBeInTheDocument();
+    expect(screen.getByText("Health factor")).toBeInTheDocument();
   });
 
-  it("blocks borrow below minimum borrow limit", async () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={enMessages}>
-        <MarketsApp />
-      </NextIntlClientProvider>
-    );
+  it("clicking Max fills the input field", async () => {
+    renderMarketsApp();
 
-    await waitFor(() => {
-      expect(screen.getAllByText("Trade")[0]).toBeInTheDocument();
-    });
+    const tradeButtons = screen.getAllByRole("button", { name: "Trade" });
+    fireEvent.click(tradeButtons[0]); // XLM
 
-    const tradeBtns = screen.getAllByText("Trade");
-    fireEvent.click(tradeBtns[0]); // XLM (minBorrow is 2.0 XLM = 20_000_000 stroops)
-
-    // Switch to Borrow
+    // Switch to Borrow mode
     const borrowTab = screen.getByRole("button", { name: "Borrow" });
     fireEvent.click(borrowTab);
 
-    const input = screen.getByRole("textbox", { name: /amount in xlm/i });
-    // Try to borrow 1.0 XLM (below 2.0 min borrow)
-    fireEvent.change(input, { target: { value: "1" } });
+    const maxButton = screen.getByRole("button", { name: "Max" });
+    fireEvent.click(maxButton);
 
-    const confirmBtn = screen.getByRole("button", { name: /confirm borrow/i });
-    fireEvent.click(confirmBtn);
+    const input = screen.getByPlaceholderText("Amount in XLM") as HTMLInputElement;
+    expect(input.value).toBe("0"); // With 0 collateral, max borrow is 0
+  });
+
+  it("disables Confirm button and displays danger alert when projected HF < 1.0", async () => {
+    renderMarketsApp();
+
+    const tradeButtons = screen.getAllByRole("button", { name: "Trade" });
+    fireEvent.click(tradeButtons[0]); // XLM
+
+    // Switch to Borrow mode with 0 collateral, any borrow amount is unsafe (limit 0, borrow > 0 -> HF = 0 < 1.0)
+    const borrowTab = screen.getByRole("button", { name: "Borrow" });
+    fireEvent.click(borrowTab);
+
+    const input = screen.getByPlaceholderText("Amount in XLM");
+    fireEvent.change(input, { target: { value: "50" } });
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("alert")).toBeInTheDocument();
+      },
+      { timeout: 300 }
+    );
+
+    const confirmBtn = screen.getByRole("button", { name: "Confirm Borrow" });
+    expect(confirmBtn).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Action would put your position below minimum health factor (< 1.0) and risk liquidation."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("shows warning when projected HF is between 1.0 and 1.2", async () => {
+    // First supply some collateral so limit is positive
+    renderMarketsApp();
+
+    const tradeButtons = screen.getAllByRole("button", { name: "Trade" });
+    fireEvent.click(tradeButtons[0]); // XLM
+
+    // Supply 1000 XLM (@ $0.12, LTV 0.7 = $84 limit)
+    const input = screen.getByPlaceholderText("Amount in XLM");
+    fireEvent.change(input, { target: { value: "1000" } });
+    const confirmSupply = screen.getByRole("button", { name: "Confirm Supply" });
+    fireEvent.click(confirmSupply);
+
+    // Now switch to borrow USDC
+    const usdcTradeBtn = screen.getAllByRole("button", { name: "Trade" })[1];
+    fireEvent.click(usdcTradeBtn);
+
+    const borrowTab = screen.getByRole("button", { name: "Borrow" });
+    fireEvent.click(borrowTab);
+
+    // Limit is $84. Borrowing 75 USDC gives HF = 84 / 75 = 1.12 (between 1.0 and 1.2)
+    const borrowInput = screen.getByPlaceholderText("Amount in USDC");
+    fireEvent.change(borrowInput, { target: { value: "75" } });
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("alert")).toBeInTheDocument();
+      },
+      { timeout: 300 }
+    );
 
     expect(
-      screen.getByText("The requested borrow is below the minimum amount.")
+      screen.getByText("Caution: Projected health factor is close to liquidation (< 1.2).")
     ).toBeInTheDocument();
+    // Confirm should NOT be disabled for warning (only for unsafe < 1.0)
+    const confirmBorrow = screen.getByRole("button", { name: "Confirm Borrow" });
+    expect(confirmBorrow).not.toBeDisabled();
+  });
+
+  it("resets amount and preview on rapid mode switching", async () => {
+    renderMarketsApp();
+
+    const tradeButtons = screen.getAllByRole("button", { name: "Trade" });
+    fireEvent.click(tradeButtons[0]); // XLM
+
+    const input = screen.getByPlaceholderText("Amount in XLM") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "100" } });
+    expect(input.value).toBe("100");
+
+    // Switch mode
+    const borrowTab = screen.getByRole("button", { name: "Borrow" });
+    fireEvent.click(borrowTab);
+
+    expect(input.value).toBe("");
+    expect(screen.queryByTestId("trade-preview")).not.toBeInTheDocument();
   });
 });

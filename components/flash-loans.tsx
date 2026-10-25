@@ -9,7 +9,7 @@ import {
   type FlashActivity,
 } from "@/lib/flash-events";
 import { useTranslations } from "next-intl";
-import { config, explorer } from "@/lib/config";
+import { config, explorer, txExplorer } from "@/lib/config";
 
 const compactAddress = (value: string) => `${value.slice(0, 6)}...${value.slice(-5)}`;
 
@@ -169,7 +169,7 @@ export default function FlashLoans() {
                         <td className="p-4">
                           <a
                             className="underline"
-                            href={`https://stellar.expert/explorer/${config.network === "testnet" ? "testnet" : "public"}/tx/${event.txHash}`}
+                            href={txExplorer(event.txHash)}
                             target="_blank"
                             rel="noreferrer"
                           >

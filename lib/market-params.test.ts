@@ -84,6 +84,7 @@ describe("lib/market-params", () => {
       totalBorrow: 5_000,
       ltv: 0.7,
       decimals: 7,
+      asset: "native",
     };
 
     it("defaults to demo parameters and labels sources as 'demo' when chain params are absent", () => {
