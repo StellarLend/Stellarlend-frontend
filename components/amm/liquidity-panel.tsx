@@ -20,7 +20,7 @@ import { config, explorer } from "@/lib/config";
 type Tab = "add" | "remove";
 
 export default function LiquidityPanel() {
-  const { address, connect } = useWallet();
+  const { address, openPicker } = useWallet();
   const [snapshot, setSnapshot] = useState<PoolSnapshot | null>(null);
   const [tab, setTab] = useState<Tab>("add");
   const [amountA, setAmountA] = useState("");
@@ -137,7 +137,7 @@ export default function LiquidityPanel() {
           <div className="mut text-sm">Connected wallet</div>
           {address
             ? <div className="mt-1 break-all font-mono text-sm">{address}</div>
-            : <button className="btn mt-3" onClick={connect}>Connect Freighter</button>}
+            : <button className="btn mt-3" onClick={openPicker}>Connect Freighter</button>}
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <PoolStat label="Reserve A" value={snapshot ? formatTokenAmount(snapshot.reserveA, snapshot.tokenA.decimals) : "—"} />
