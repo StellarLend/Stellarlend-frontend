@@ -64,7 +64,7 @@ export default function MarketsApp() {
   const [mode, setMode] = useState<"supply" | "borrow" | "withdraw" | "repay">("supply");
   const [amt, setAmt] = useState("");
   const [debouncedAmt, setDebouncedAmt] = useState("");
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState<{ text: string; isError: boolean } | null>(null);
   const [position, setPosition] = useState<LendingPosition | null>(null);
   const [positionError, setPositionError] = useState("");
   const [loadingPosition, setLoadingPosition] = useState(false);
@@ -95,7 +95,7 @@ export default function MarketsApp() {
     buildDemoRateModelSnapshot()
   );
 
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
 
   const [oraclePrices, setOraclePrices] = useState<Record<string, OracleAssetPrice>>({});
   const [timeSource, setTimeSource] = useState<"ledger" | "browser">("ledger");
@@ -233,7 +233,7 @@ export default function MarketsApp() {
   function closeSheet() {
     setSel(null);
     setAmt("");
-    setMsg("");
+    setMsg(null);
   }
 
   const rateChartLabels = useMemo<Partial<RateChartLabels>>(() => {
@@ -287,17 +287,17 @@ export default function MarketsApp() {
     const normalized = normaliseAmountInput(amt, locale);
     const parsed = toBaseUnits(normalized ?? amt.trim(), sel.decimals);
     if (!parsed.ok) {
-      setMsg(inputErrorText(parsed.error, sel.decimals));
+      setMsg({ text: inputErrorText(parsed.error, sel.decimals), isError: true });
       return;
     }
     const n = parsed.value;
     if (n <= BigInt(0)) {
-      setMsg(t("status.positiveAmount"));
+      setMsg({ text: t("status.positiveAmount"), isError: true });
       return;
     }
 
     if (onChainMode && sel.live && address) {
-      setMsg("");
+      setMsg(null);
       setTx({ status: "pending", hash: null, error: null });
       const action = mode === "supply" ? "deposit" : mode;
       const result = await submitLendingAction(address, action, n, setTx);
@@ -320,42 +320,43 @@ export default function MarketsApp() {
       next.supplied = cur.supplied + n;
     } else if (mode === "withdraw") {
       if (n > cur.supplied) {
-        setMsg(t("status.exceedsSupply"));
+        setMsg({ text: t("status.exceedsSupply"), isError: true });
         return;
       }
       if (!canWithdraw(ledger, sel.symbol, n, activeMarkets)) {
-        setMsg(t("status.underCollateralised"));
+        setMsg({ text: t("status.underCollateralised"), isError: true });
         return;
       }
       next.supplied = cur.supplied - n;
     } else if (mode === "borrow") {
       if (!canBorrow(ledger, sel.symbol, n, activeMarkets)) {
-        setMsg(t("status.exceedsBorrowLimit"));
+        setMsg({ text: t("status.exceedsBorrowLimit"), isError: true });
         return;
       }
       next.borrowed = cur.borrowed + n;
     } else if (mode === "repay") {
       if (n > cur.borrowed) {
-        setMsg(t("status.exceedsBorrowed"));
+        setMsg({ text: t("status.exceedsBorrowed"), isError: true });
         return;
       }
       next.borrowed = cur.borrowed - n;
     }
 
     save({ ...ledger, [sel.symbol]: next });
-    setMsg(
-      t("status.recorded", {
+    setMsg({
+      text: t("status.recorded", {
         action: t(mode),
         amount: formatNumber(toFloat(n, sel.decimals), locale, sel.decimals),
         symbol: sel.symbol,
-      })
-    );
+      }),
+      isError: false,
+    });
     setAmt("");
   }
 
   function resetDemo() {
     save({});
-    setMsg(t("status.demoReset"));
+    setMsg({ text: t("status.demoReset"), isError: false });
     setResetNotice(false);
   }
 
@@ -376,7 +377,7 @@ export default function MarketsApp() {
 
   function openTrade(m: Market) {
     setSel(m);
-    setMsg("");
+    setMsg(null);
     setTx(null);
   }
 
@@ -398,19 +399,21 @@ export default function MarketsApp() {
 
   const tradePanel = sel ? (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-1 text-sm">
+      <div className="grid grid-cols-4 gap-1 text-sm" role="tablist" aria-label={`${sel.symbol} ${t("actions")}`}>
         {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => {
           const blockedReason = !isDemoMode ? getBlockedReason(x) : null;
           const isBlocked = !isDemoMode && !isActionAllowed(x);
           return (
             <button
               key={x}
+              role="tab"
+              aria-selected={mode === x}
               disabled={isBlocked}
               title={blockedReason ? tStatus("actionBlockedTooltip", { reason: blockedReason }) : undefined}
               onClick={() => {
                 if (isBlocked) return;
                 setMode(x);
-                setMsg("");
+                setMsg(null);
                 setTx(null);
               }}
               className={`rounded-lg py-2 ${
@@ -448,8 +451,11 @@ export default function MarketsApp() {
         {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
       </button>
       {msg && (
-        <p className="mut text-sm" role="status">
-          {msg}
+        <p
+          className={msg.isError ? "text-amber-400 text-sm" : "mut text-sm"}
+          role={msg.isError ? "alert" : "status"}
+        >
+          {msg.text}
         </p>
       )}
       {tx && (
@@ -653,7 +659,7 @@ export default function MarketsApp() {
                   </td>
                   <td className="p-4 text-right">
                     {live ? (
-                      <Button variant="ghost" onClick={() => openTrade(m)}>
+                      <Button variant="ghost" aria-label={`${t("trade")} ${m.symbol}`} onClick={() => openTrade(m)}>
                         {t("trade")}
                       </Button>
                     ) : (
@@ -676,10 +682,14 @@ export default function MarketsApp() {
       {sel && (
         <>
           {/* sm+: inline trade panel */}
-          <div ref={panelRef} className="card hidden max-w-md space-y-4 p-6 sm:block">
-            <h2 className="text-xl font-semibold">{sel.symbol}</h2>
+          <section
+            ref={panelRef}
+            aria-labelledby={`trade-heading-${sel.symbol}`}
+            className="card hidden max-w-md space-y-4 p-6 sm:block"
+          >
+            <h2 id={`trade-heading-${sel.symbol}`} className="text-xl font-semibold">{sel.symbol}</h2>
             {tradePanel}
-          </div>
+          </section>
           {/* Mobile: bottom sheet */}
           <TradeSheet open={Boolean(sel)} onClose={closeSheet} title={sel.symbol} subtitle={sel.name}>
             {tradePanel}

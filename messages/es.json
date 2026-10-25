@@ -223,7 +223,13 @@
     "comingSoon": "Próximamente",
     "onchainMode": "Modo on-chain (testnet de Stellar)",
     "xlmAmount": "{amount} XLM",
-    "viewTx": "Ver transacción"
+    "viewTx": "Ver transacción",
+    "healthStatus": {
+      "healthy": "Saludable",
+      "atRisk": "En riesgo",
+      "liquidatable": "Liquidable"
+    },
+    "actions": "Acciones"
   },
   "docs": {
     "title": "Documentación",
