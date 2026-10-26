@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout frontend repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -64,7 +64,7 @@ jobs:
 
       - name: Checkout pinned stellarlend-contracts
         if: steps.cache-wasm.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.CONTRACTS_REPO }}
           ref: ${{ env.CONTRACTS_COMMIT }}
