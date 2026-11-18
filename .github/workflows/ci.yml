@@ -55,12 +55,12 @@ jobs:
 
       # TODO(drips-wave): re-enable — Playwright E2E suite fails on main (a11y /markets, navigation, responsive overflow specs)
       - name: Install Playwright browsers
-        if: false
+        if: ${{ vars.DRIPS_WAVE_RUN_E2E == 'true' }}
         run: npx playwright install --with-deps chromium
 
       # TODO(drips-wave): re-enable — Playwright E2E suite fails on main (a11y /markets, navigation, responsive overflow specs)
       - name: Run E2E tests
-        if: false
+        if: ${{ vars.DRIPS_WAVE_RUN_E2E == 'true' }}
         run: npm run test:e2e
 
       - name: Upload Playwright artifacts on failure
