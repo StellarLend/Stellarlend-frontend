@@ -1,4 +1,7 @@
 import { config } from "@/lib/config";
+import { formatTokenAmount } from "./format";
+
+export { formatTokenAmount };
 
 export type BadDebtWriteOffEvent = {
   amount: bigint;
@@ -20,7 +23,6 @@ export type SolvencyMetrics = {
   insuranceShareDisplay: string;
 };
 
-const TOKEN_DECIMALS = 10n ** 7n;
 const BPS_SCALE = 10_000n;
 
 const toBigInt = (value: unknown): bigint => {
@@ -45,15 +47,6 @@ const toMaybeBigInt = (value: unknown): bigint | null => {
     return null;
   }
 };
-
-export function formatTokenAmount(value: bigint, decimals = 7): string {
-  const normalized = value < 0n ? -value : value;
-  const whole = normalized / TOKEN_DECIMALS;
-  const fraction = normalized % TOKEN_DECIMALS;
-  const fractionString = fraction.toString().padStart(7, "0").slice(0, decimals);
-  const sign = value < 0n ? "-" : "";
-  return `${sign}${whole}.${fractionString}`;
-}
 
 export function formatUsdAmount(value: bigint): string {
   return `$${formatTokenAmount(value)}`;

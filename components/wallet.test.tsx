@@ -1,8 +1,9 @@
 import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
-import { WalletProvider, useWallet, LAST_WALLET_STORAGE_KEY } from "./wallet";
+import { WalletProvider, ConnectButton, useWallet, LAST_WALLET_STORAGE_KEY } from "./wallet";
 import { WalletAdapter } from "@/lib/wallets/types";
+import { accountExplorer } from "@/lib/config";
 
 // Mock next-intl
 vi.mock("next-intl", () => ({
@@ -22,6 +23,10 @@ vi.mock("next-intl", () => ({
       install: "Install",
       connecting: "Connecting...",
       close: "Close",
+      copyAddress: "Copy address",
+      copied: "Address copied",
+      copyFailed: "Could not copy address",
+      viewOnExplorer: "View account on explorer",
     };
     return messages[key] || key;
   },
@@ -217,5 +222,130 @@ describe("WalletContext with Adapter", () => {
     });
 
     expect(screen.getByTestId("error").textContent).toBe("Internal adapter failure");
+  });
+});
+
+describe("ConnectButton copy address", () => {
+  const fullAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+  const originalClipboard = navigator.clipboard;
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    Object.defineProperty(navigator, "clipboard", {
+      value: originalClipboard,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  function makeConnectedAdapter(): WalletAdapter {
+    return {
+      id: "fake-wallet",
+      name: "Fake Wallet",
+      icon: "icon.svg",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      connect: vi.fn().mockResolvedValue(fullAddress),
+      signTransaction: vi.fn().mockResolvedValue(""),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it("copies the full G-address rather than the shortened text and links to explorer", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <WalletProvider initialAdapter={makeConnectedAdapter()}>
+        <TestConsumer />
+        <ConnectButton />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: "Copy address" });
+    await act(async () => {
+      copyBtn.click();
+    });
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledWith(fullAddress);
+
+    const explorerLink = screen.getByRole("link", { name: "View account on explorer" });
+    expect(explorerLink.getAttribute("href")).toBe(accountExplorer(fullAddress));
+  });
+
+  it("announces copied in the polite live region and clears it after ~2s", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <WalletProvider initialAdapter={makeConnectedAdapter()}>
+        <TestConsumer />
+        <ConnectButton />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: "Copy address" });
+    await act(async () => {
+      copyBtn.click();
+    });
+
+    const statusRegion = screen.getByRole("status");
+    expect(statusRegion.getAttribute("aria-live")).toBe("polite");
+    expect(statusRegion.textContent).toBe("Address copied");
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(statusRegion.textContent).toBe("");
+  });
+
+  it("does not throw when navigator.clipboard is undefined and shows failure message", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <WalletProvider initialAdapter={makeConnectedAdapter()}>
+        <TestConsumer />
+        <ConnectButton />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: "Copy address" });
+    await act(async () => {
+      copyBtn.click();
+    });
+
+    const statusRegion = screen.getByRole("status");
+    expect(statusRegion.textContent).toBe("Could not copy address");
   });
 });

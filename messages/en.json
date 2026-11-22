@@ -1,6 +1,7 @@
 {
   "nav": {
     "brand": "Stellar",
+    "skipToContent": "Skip to content",
     "markets": "Markets",
     "history": "History",
     "docs": "Docs",
@@ -161,6 +162,18 @@
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
     "resetDemo": "Reset demo data",
+    "controls": {
+      "searchLabel": "Search markets",
+      "searchPlaceholder": "Search by symbol or name...",
+      "sortLabel": "Sort by",
+      "sortDefault": "Default order",
+      "sortSupplyApy": "Supply APY (high to low)",
+      "sortBorrowApy": "Borrow APY (high to low)",
+      "sortUtilization": "Utilization (high to low)",
+      "myPositionsOnly": "My positions only",
+      "noResults": "No markets match your current filters.",
+      "clearFilters": "Clear filters"
+    },
     "oracle": {
       "title": "On-chain oracle prices",
       "subtitle": "Prices, freshness, and bounds recorded by the lending contract.",
@@ -181,7 +194,15 @@
       "noBounds": "No bounds set",
       "timeSourceLedger": "Ledger time",
       "timeSourceBrowser": "Browser clock",
-      "loading": "Loading oracle prices..."
+      "loading": "Loading oracle prices...",
+      "guard": {
+        "stale": "Oracle price is stale. Borrowing and withdrawing are disabled until a fresh price is posted.",
+        "future": "Oracle price timestamp is in the future. Borrowing and withdrawing are disabled until the oracle timestamp is valid.",
+        "missing": "Oracle price is missing. Borrowing and withdrawing are disabled until an on-chain price is available.",
+        "outOfBounds": "Oracle price is outside configured safety bounds. Borrowing and withdrawing are disabled.",
+        "warningPrefix": "Oracle warning:",
+        "viewOracle": "View oracle status"
+      }
     },
     "rateModel": {
       "eyebrow": "Interest-rate model",
@@ -400,6 +421,8 @@
     "loadingMore": "Loading more...",
     "emptyTitle": "No transactions found",
     "emptySubtitle": "No transactions found for your address within the RPC retention window (~7 days). Older transactions cannot be queried via Soroban RPC.",
+    "emptyFilteredTitle": "No matching transactions",
+    "emptyFilteredSubtitle": "No loaded transactions match the selected filters. Try adjusting your filters or loading the entire retention window.",
     "errorTitle": "Failed to load transaction history",
     "retry": "Try again",
     "type": "Type",
@@ -409,6 +432,15 @@
     "tx": "Transaction",
     "viewTx": "View",
     "loadMore": "Load more",
+    "loadAll": "Load entire retention window",
+    "loadingAllProgress": "Loading pages ({pages} loaded, {rows} events)...",
+    "cancelLoadAll": "Cancel",
+    "exportCsv": "Export CSV",
+    "filterKindLabel": "Type",
+    "filterAllKinds": "All types",
+    "filterFromLabel": "From date",
+    "filterToLabel": "To date",
+    "clearFilters": "Clear filters",
     "deposit": "Deposit",
     "withdraw": "Withdraw",
     "borrow": "Borrow",

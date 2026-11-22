@@ -4,20 +4,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetApiCaches } from "./cache";
 import { ContractNotConfiguredError, UpstreamRpcError } from "./errors";
 import { resetApiRateLimiter } from "./rate-limit";
-import type { PositionSummary, ProtocolMetrics } from "./lending";
+import type {
+  MarketsSnapshot,
+  PositionSummary,
+  ProtocolMetrics,
+} from "./lending";
 
 const mocks = vi.hoisted(() => ({
   fetchProtocolMetrics: vi.fn(),
   fetchPosition: vi.fn(),
+  fetchMarkets: vi.fn(),
 }));
 
 vi.mock("@/lib/api/lending", () => ({
   fetchProtocolMetrics: mocks.fetchProtocolMetrics,
   fetchPosition: mocks.fetchPosition,
+  fetchMarkets: mocks.fetchMarkets,
 }));
 
 import { GET as getProtocol } from "@/app/api/v1/protocol/route";
 import { GET as getPosition } from "@/app/api/v1/positions/[address]/route";
+import { GET as getMarkets } from "@/app/api/v1/markets/route";
 
 const VALID_ADDRESS =
   "GA5WUJ54Z23KILLCUOUNAKTPBVZWKMQVO4O6EQ5GHLAERIMLLHNCSKYH";
@@ -34,6 +41,12 @@ function positionRequest(
   ip = "203.0.113.11",
 ): Request {
   return new Request(`http://localhost/api/v1/positions/${address}`, {
+    headers: { "x-forwarded-for": ip },
+  });
+}
+
+function marketsRequest(ip = "203.0.113.20"): Request {
+  return new Request("http://localhost/api/v1/markets", {
     headers: { "x-forwarded-for": ip },
   });
 }
@@ -67,12 +80,37 @@ function positionSummary(
   };
 }
 
+function marketsSnapshot(
+  overrides: Partial<MarketsSnapshot> = {},
+): MarketsSnapshot {
+  return {
+    markets: [
+      {
+        symbol: "XLM",
+        name: "Stellar Lumens",
+        supplyApy: 3.4,
+        borrowApy: 6.1,
+        utilizationBps: 4_440n,
+        supplyCap: 2n ** 54n + 1n,
+        borrowCap: 2n ** 53n + 7n,
+        oraclePrice: 1_200_000n,
+        ltvBps: 7_000,
+        liqThresholdBps: 8_000,
+        active: true,
+      },
+    ],
+    fetchedAt: FIXED_FETCHED_AT,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetApiCaches();
   resetApiRateLimiter();
   mocks.fetchProtocolMetrics.mockResolvedValue(protocolMetrics());
   mocks.fetchPosition.mockResolvedValue(positionSummary());
+  mocks.fetchMarkets.mockResolvedValue(marketsSnapshot());
 });
 
 describe("GET /api/v1/protocol", () => {
@@ -221,6 +259,114 @@ describe("GET /api/v1/positions/[address]", () => {
     );
 
     expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "CONTRACT_NOT_CONFIGURED",
+        message: "Lending contract is not configured",
+      },
+    });
+  });
+});
+
+describe("GET /api/v1/markets", () => {
+  it("markets route returns string-encoded bigints", async () => {
+    const response = await getMarkets(marketsRequest());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toContain("s-maxage=15");
+    expect(response.headers.get("Cache-Control")).toContain(
+      "stale-while-revalidate=60",
+    );
+    await expect(response.json()).resolves.toEqual({
+      markets: [
+        {
+          symbol: "XLM",
+          name: "Stellar Lumens",
+          supplyApy: 3.4,
+          borrowApy: 6.1,
+          utilizationBps: "4440",
+          supplyCap: (2n ** 54n + 1n).toString(),
+          borrowCap: (2n ** 53n + 7n).toString(),
+          oraclePrice: "1200000",
+          ltvBps: 7_000,
+          liqThresholdBps: 8_000,
+          active: true,
+        },
+      ],
+      fetchedAt: FIXED_FETCHED_AT,
+    });
+  });
+
+  it("markets route collapses concurrent requests into one upstream read", async () => {
+    let resolveMarkets!: (value: MarketsSnapshot) => void;
+    mocks.fetchMarkets.mockReturnValueOnce(
+      new Promise<MarketsSnapshot>((resolve) => {
+        resolveMarkets = resolve;
+      }),
+    );
+
+    const requests = Array.from({ length: 50 }, (_, index) =>
+      getMarkets(marketsRequest(`10.0.1.${index + 1}`)),
+    );
+
+    await Promise.resolve();
+    expect(mocks.fetchMarkets).toHaveBeenCalledTimes(1);
+
+    resolveMarkets(marketsSnapshot());
+    const responses = await Promise.all(requests);
+
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(mocks.fetchMarkets).toHaveBeenCalledTimes(1);
+  });
+
+  it("markets route serves cached value within TTL", async () => {
+    await getMarkets(marketsRequest("203.0.113.21"));
+    await getMarkets(marketsRequest("203.0.113.22"));
+
+    expect(mocks.fetchMarkets).toHaveBeenCalledTimes(1);
+  });
+
+  it("markets route 429s after bucket exhausted", async () => {
+    const ip = "203.0.113.23";
+    for (let index = 0; index < 120; index += 1) {
+      const response = await getMarkets(marketsRequest(ip));
+      expect(response.status).toBe(200);
+    }
+
+    const blocked = await getMarkets(marketsRequest(ip));
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("Cache-Control")).toBe("no-store");
+    expect(blocked.headers.get("Retry-After")).toBe("1");
+    await expect(blocked.json()).resolves.toEqual({
+      error: { code: "RATE_LIMITED", message: "Too many requests" },
+    });
+  });
+
+  it("markets route maps upstream failure to 502", async () => {
+    mocks.fetchMarkets.mockRejectedValueOnce(
+      new UpstreamRpcError("simulation failed"),
+    );
+
+    const response = await getMarkets(marketsRequest("203.0.113.24"));
+
+    expect(response.status).toBe(502);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "UPSTREAM_RPC_ERROR",
+        message: "Failed to read from Soroban RPC",
+      },
+    });
+  });
+
+  it("markets route returns 503 when the lending contract is not configured", async () => {
+    mocks.fetchMarkets.mockRejectedValueOnce(new ContractNotConfiguredError());
+
+    const response = await getMarkets(marketsRequest("203.0.113.25"));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
     await expect(response.json()).resolves.toEqual({
       error: {
         code: "CONTRACT_NOT_CONFIGURED",
