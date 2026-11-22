@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { xdr, Address, StrKey } from "@stellar/stellar-sdk";
+import { xdr } from "@stellar/stellar-sdk";
 import {
   getMultisigOverview,
   getProposal,
   getProposalDetail,
   listProposals,
+  clearProposalIdDiscoveryCache,
   probeProposalIds,
   discoverProposalIdsViaEvents,
   isProposalNotFoundError,
@@ -18,19 +19,32 @@ describe("Multisig Reads & Discovery", () => {
   const signer2 = "GBSXPC5X665CKCIUMUHLAKVRQNYA5XCNIWV2Q3QVUNLIVL7IJIQWTSFG";
   const currentSignerSetHash = "0000000000000000000000000000000000000000000000000000000000000001";
 
+  beforeEach(() => {
+    clearProposalIdDiscoveryCache();
+  });
+
   // Helper to create a mock simulation response
   const createMockSimulationResponse = (retval: xdr.ScVal) => ({
     _parsed: true,
+    transactionData: {},
     result: {
       retval,
     },
   });
 
+  const getInvokeContractOperation = (tx: any) => {
+    const operation = tx.operations[0].func.invokeContract;
+    return {
+      function: operation.functionName.toString(),
+      args: operation.args,
+    };
+  };
+
   describe("getMultisigOverview", () => {
     it("returns overview with threshold, signers, signerSetHash, and currentLedger", async () => {
       const mockRpcServer = {
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
+          const op = getInvokeContractOperation(tx);
           const func = op.function;
 
           if (func === "get_threshold") {
@@ -40,8 +54,8 @@ describe("Multisig Reads & Discovery", () => {
             return Promise.resolve(
               createMockSimulationResponse(
                 xdr.ScVal.scvVec([
-                  new Address(signer1).toScVal(),
-                  new Address(signer2).toScVal(),
+                  xdr.ScVal.scvString(signer1),
+                  xdr.ScVal.scvString(signer2),
                 ])
               )
             );
@@ -134,12 +148,12 @@ describe("Multisig Reads & Discovery", () => {
 
       const mockRpcServer = {
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
+          const op = getInvokeContractOperation(tx);
           const func = op.function;
 
           if (func === "get_proposal") {
             const idVal = op.args[0];
-            const id = idVal.u32();
+            const id = idVal.u32;
             probedIds.push(id);
 
             // IDs 1 and 2 exist, ID 3 returns ProposalNotFound (Contract error #2)
@@ -153,7 +167,7 @@ describe("Multisig Reads & Discovery", () => {
                   }),
                   new xdr.ScMapEntry({
                     key: xdr.ScVal.scvSymbol("proposer"),
-                    val: new Address(signer1).toScVal(),
+                    val: xdr.ScVal.scvString(signer1),
                   }),
                   new xdr.ScMapEntry({
                     key: xdr.ScVal.scvSymbol("action"),
@@ -168,7 +182,7 @@ describe("Multisig Reads & Discovery", () => {
                   }),
                   new xdr.ScMapEntry({
                     key: xdr.ScVal.scvSymbol("approvals"),
-                    val: xdr.ScVal.scvVec([new Address(signer1).toScVal()]),
+                    val: xdr.ScVal.scvVec([xdr.ScVal.scvString(signer1)]),
                   }),
                   new xdr.ScMapEntry({
                     key: xdr.ScVal.scvSymbol("status"),
@@ -214,12 +228,138 @@ describe("Multisig Reads & Discovery", () => {
   });
 
   describe("listProposals integration", () => {
+    const createPagedRpcServer = (ids: number[], missingIds: number[] = []) => ({
+      getLatestLedger: vi.fn().mockResolvedValue({ sequence: 1250000 }),
+      getEvents: vi.fn().mockResolvedValue({
+        events: ids.map((id) => ({
+          topic: [xdr.ScVal.scvSymbol("ProposalCreated"), xdr.ScVal.scvU32(id)],
+          value: xdr.ScVal.scvVoid(),
+        })),
+      }),
+      simulateTransaction: vi.fn().mockImplementation((tx) => {
+        const { function: func, args } = getInvokeContractOperation(tx);
+        if (func === "get_threshold") {
+          return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU32(2)));
+        }
+        if (func === "get_signers") {
+          return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvVec([])));
+        }
+        if (func === "get_signer_set_hash" || func === "get_proposal_signer_set_hash") {
+          return Promise.resolve(
+            createMockSimulationResponse(
+              xdr.ScVal.scvBytes(Buffer.from(currentSignerSetHash, "hex"))
+            )
+          );
+        }
+        if (func === "get_proposal_nonce") {
+          return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU32(1)));
+        }
+        if (func === "get_proposal") {
+          const id = args[0].u32;
+          if (missingIds.includes(id)) {
+            return Promise.resolve({ _parsed: true, error: "HostError: Error(Contract, #2)" });
+          }
+          const statuses = ["Active", "Passed", "Executed"];
+          return Promise.resolve(
+            createMockSimulationResponse(
+              xdr.ScVal.scvMap([
+                new xdr.ScMapEntry({ key: xdr.ScVal.scvSymbol("id"), val: xdr.ScVal.scvU32(id) }),
+                new xdr.ScMapEntry({
+                  key: xdr.ScVal.scvSymbol("proposer"),
+                  val: xdr.ScVal.scvString(signer1),
+                }),
+                new xdr.ScMapEntry({
+                  key: xdr.ScVal.scvSymbol("action"),
+                  val: xdr.ScVal.scvVec([xdr.ScVal.scvSymbol("SetThreshold"), xdr.ScVal.scvU32(2)]),
+                }),
+                new xdr.ScMapEntry({
+                  key: xdr.ScVal.scvSymbol("payload_hash"),
+                  val: xdr.ScVal.scvBytes(Buffer.from("00".repeat(32), "hex")),
+                }),
+                new xdr.ScMapEntry({
+                  key: xdr.ScVal.scvSymbol("approvals"),
+                  val: xdr.ScVal.scvVec([]),
+                }),
+                new xdr.ScMapEntry({
+                  key: xdr.ScVal.scvSymbol("status"),
+                  val: xdr.ScVal.scvSymbol(statuses[(id - 1) % statuses.length]),
+                }),
+                new xdr.ScMapEntry({
+                  key: xdr.ScVal.scvSymbol("expires_at"),
+                  val: xdr.ScVal.scvU32(1300000),
+                }),
+              ])
+            )
+          );
+        }
+        return Promise.resolve({ _parsed: true, error: `Unexpected function: ${func}` });
+      }),
+    }) as any;
+
+    it("loads only the requested page and caches proposal ID discovery", async () => {
+      const mockRpcServer = createPagedRpcServer(
+        Array.from({ length: 12 }, (_, index) => index + 1)
+      );
+
+      const firstPage = await listProposals({ contractId, rpcServer: mockRpcServer });
+      expect(firstPage.proposals.map((proposal) => proposal.id)).toEqual(
+        Array.from({ length: 10 }, (_, index) => index + 1)
+      );
+      expect(firstPage.nextCursor).toBe(10);
+      expect(
+        mockRpcServer.simulateTransaction.mock.calls.filter(
+          ([tx]: any[]) => getInvokeContractOperation(tx).function === "get_proposal"
+        )
+      ).toHaveLength(10);
+
+      const secondPage = await listProposals({
+        contractId,
+        rpcServer: mockRpcServer,
+        cursor: firstPage.nextCursor!,
+        pageSize: 10,
+      });
+      expect(secondPage.proposals.map((proposal) => proposal.id)).toEqual([11, 12]);
+      expect(secondPage.nextCursor).toBeNull();
+      expect(mockRpcServer.getEvents).toHaveBeenCalledTimes(1);
+
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(Date.now() + 60_001);
+        await listProposals({
+          contractId,
+          rpcServer: mockRpcServer,
+          pageSize: 1,
+        });
+        expect(mockRpcServer.getEvents).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("filters a page by effective status", async () => {
+      const mockRpcServer = createPagedRpcServer([1, 2, 3]);
+      const result = await listProposals({
+        contractId,
+        rpcServer: mockRpcServer,
+        status: "Executed",
+      });
+
+      expect(result.proposals.map((proposal) => proposal.id)).toEqual([3]);
+    });
+
+    it("skips proposal IDs that return ProposalNotFound", async () => {
+      const mockRpcServer = createPagedRpcServer([1, 2], [2]);
+      const result = await listProposals({ contractId, rpcServer: mockRpcServer });
+
+      expect(result.proposals.map((proposal) => proposal.id)).toEqual([1]);
+    });
+
     it("falls back to probing when getEvents fails or returns empty", async () => {
       const mockRpcServer = {
         getLatestLedger: vi.fn().mockResolvedValue({ sequence: 1250000 }),
         getEvents: vi.fn().mockRejectedValue(new Error("RPC retention window expired")),
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
+          const op = getInvokeContractOperation(tx);
           const func = op.function;
 
           if (func === "get_threshold") {
@@ -228,7 +368,7 @@ describe("Multisig Reads & Discovery", () => {
           if (func === "get_signers") {
             return Promise.resolve(
               createMockSimulationResponse(
-                xdr.ScVal.scvVec([new Address(signer1).toScVal()])
+                xdr.ScVal.scvVec([xdr.ScVal.scvString(signer1)])
               )
             );
           }
@@ -240,7 +380,7 @@ describe("Multisig Reads & Discovery", () => {
             );
           }
           if (func === "get_proposal") {
-            const id = op.args[0].u32();
+            const id = op.args[0].u32;
             if (id === 1) {
               return Promise.resolve(
                 createMockSimulationResponse(
@@ -251,7 +391,7 @@ describe("Multisig Reads & Discovery", () => {
                     }),
                     new xdr.ScMapEntry({
                       key: xdr.ScVal.scvSymbol("proposer"),
-                      val: new Address(signer1).toScVal(),
+                      val: xdr.ScVal.scvString(signer1),
                     }),
                     new xdr.ScMapEntry({
                       key: xdr.ScVal.scvSymbol("action"),
@@ -266,7 +406,7 @@ describe("Multisig Reads & Discovery", () => {
                     }),
                     new xdr.ScMapEntry({
                       key: xdr.ScVal.scvSymbol("approvals"),
-                      val: xdr.ScVal.scvVec([new Address(signer1).toScVal()]),
+                      val: xdr.ScVal.scvVec([xdr.ScVal.scvString(signer1)]),
                     }),
                     new xdr.ScMapEntry({
                       key: xdr.ScVal.scvSymbol("status"),
@@ -295,7 +435,7 @@ describe("Multisig Reads & Discovery", () => {
             );
           }
           if (func === "get_proposal_nonce") {
-            return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU64(new xdr.Uint64(1))));
+            return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU32(1)));
           }
           return Promise.resolve({ _parsed: true, error: "Not found" });
         }),
@@ -330,7 +470,7 @@ describe("Multisig Reads & Discovery", () => {
           ],
         }),
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
+          const op = getInvokeContractOperation(tx);
           const func = op.function;
 
           if (func === "get_threshold") {
@@ -347,7 +487,7 @@ describe("Multisig Reads & Discovery", () => {
             );
           }
           if (func === "get_proposal") {
-            const id = op.args[0].u32();
+            const id = op.args[0].u32;
             if (id === 1) {
               return Promise.resolve(
                 createMockSimulationResponse(
@@ -358,7 +498,7 @@ describe("Multisig Reads & Discovery", () => {
                     }),
                     new xdr.ScMapEntry({
                       key: xdr.ScVal.scvSymbol("proposer"),
-                      val: new Address(signer1).toScVal(),
+                      val: xdr.ScVal.scvString(signer1),
                     }),
                     new xdr.ScMapEntry({
                       key: xdr.ScVal.scvSymbol("action"),
@@ -398,6 +538,7 @@ describe("Multisig Reads & Discovery", () => {
       // Proposal 1 succeeded, partial failure on proposal 2 did not crash the explorer
       expect(result.proposals).toHaveLength(1);
       expect(result.proposals[0].id).toBe(1);
+      expect(result.failedProposalIds).toEqual([2]);
     });
 
     it("returns empty and makes zero RPC calls when contractId is not configured", async () => {

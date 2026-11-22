@@ -53,3 +53,4 @@ sqlite.db-wal
 *storybook.log
 storybook-static
 .opencode
+branch_structure.json
