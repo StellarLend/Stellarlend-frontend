@@ -1,6 +1,7 @@
 {
   "nav": {
     "brand": "Stellar",
+    "skipToContent": "Saltar al contenido",
     "markets": "Mercados",
     "history": "Historial",
     "docs": "Documentación",
