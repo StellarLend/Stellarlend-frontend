@@ -4,6 +4,8 @@ import {
   calculateMinReserve,
   parseAccountBalances,
   getAssetKey,
+  needsTrustline,
+  classifyTrustlineError,
   fetchWithRetry,
   getAccountBalances,
   buildChangeTrustTransaction,
@@ -23,6 +25,55 @@ describe("lib/horizon", () => {
           issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
         })
       ).toBe("USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5");
+    });
+  });
+
+  describe("needsTrustline", () => {
+    const usdc = {
+      asset: {
+        code: "USDC",
+        issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+      },
+    };
+    const usdcKey = "USDC:GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+
+    it("detects missing trustline when the classic asset is absent from the balances map", () => {
+      expect(needsTrustline(usdc, {})).toBe(true);
+    });
+
+    it("returns false once the trustline is present in the balances map", () => {
+      const balances = {
+        [usdcKey]: {
+          assetType: "credit_alphanum4",
+          code: "USDC",
+          issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+          balance: "0.0000000",
+          available: "0.0000000",
+          buyingLiabilities: "0",
+          sellingLiabilities: "0",
+        },
+      };
+      expect(needsTrustline(usdc, balances)).toBe(false);
+    });
+
+    it("returns false for native markets", () => {
+      expect(needsTrustline({ asset: "native" }, {})).toBe(false);
+    });
+  });
+
+  describe("classifyTrustlineError", () => {
+    it("maps user rejection to the rejected kind", () => {
+      expect(classifyTrustlineError(new Error("Transaction was rejected or cancelled by user"))).toBe(
+        "rejected"
+      );
+    });
+
+    it("maps op_low_reserve to the lowReserve kind", () => {
+      expect(classifyTrustlineError(new Error("op_low_reserve"))).toBe("lowReserve");
+    });
+
+    it("falls back to failed for unrelated errors", () => {
+      expect(classifyTrustlineError(new Error("network connection reset"))).toBe("failed");
     });
   });
 

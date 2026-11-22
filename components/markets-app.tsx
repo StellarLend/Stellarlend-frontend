@@ -5,6 +5,12 @@ import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type
 import { Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
 import { config, explorer, txExplorer } from "@/lib/config";
+import {
+  calculateMinReserve,
+  needsTrustline,
+  classifyTrustlineError,
+  type TrustlineErrorKind,
+} from "@/lib/horizon";
 import { normaliseAmountInput } from "@/lib/amount-input";
 import { fetchLiveMarketParams, bpsToPercent } from "@/lib/market-params";
 import { toBaseUnits, DECIMALS, type AmountError } from "@/lib/amount";
@@ -38,6 +44,7 @@ import { RateChart, defaultRateChartLabels, type RateChartLabels } from "./rate-
 
 import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
+import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-prompt";
 import { useProtocolStatus } from "./protocol-status";
 
 export default function MarketsApp() {
@@ -45,6 +52,7 @@ export default function MarketsApp() {
     address,
     balance,
     balances,
+    rawAccount,
     isUnfunded,
     error,
     openPicker,
@@ -74,6 +82,23 @@ export default function MarketsApp() {
   const configured = isOnChainConfigured();
   const onChainMode = Boolean(address && configured);
   const busy = tx?.status === "pending";
+
+  // Classic assets need a trustline before they can be held, supplied or repaid.
+  // The shared pure helper matches the selected asset against the Horizon
+  // balances map via getAssetKey.
+  const missingTrustline = Boolean(address) && needsTrustline(sel, balances);
+  const nativeDetail = balances["native"];
+  const nativeBalanceXlm = nativeDetail ? Number(nativeDetail.balance) : 0;
+  const nativeSellingXlm = nativeDetail ? Number(nativeDetail.sellingLiabilities ?? "0") : 0;
+  // Prefer the exact Horizon reserve; fall back to the reserve already excluded from `available`.
+  const minReserveXlm = rawAccount
+    ? calculateMinReserve(rawAccount)
+    : Math.max(
+        0,
+        nativeBalanceXlm - nativeSellingXlm - (nativeDetail ? Number(nativeDetail.available) : 0)
+      );
+  const spendableXlm = nativeBalanceXlm - nativeSellingXlm - minReserveXlm;
+  const trustlineBlocksAction = missingTrustline && (mode === "supply" || mode === "repay");
 
   const refreshPosition = useCallback(async () => {
     if (!address || !configured) {
@@ -175,17 +200,20 @@ export default function MarketsApp() {
   }, [ledger]);
   const [trustlineLoading, setTrustlineLoading] = useState<string | null>(null);
   const [trustlineMsg, setTrustlineMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [trustlineError, setTrustlineError] = useState<{ symbol: string; kind: TrustlineErrorKind } | null>(null);
 
   async function handleAddTrustline(market: Market) {
     if (market.asset === "native") return;
     setTrustlineLoading(market.symbol);
     setTrustlineMsg(null);
+    setTrustlineError(null);
     try {
       await addTrustline(market.asset);
       setTrustlineMsg({ type: "success", text: t("trustlineAdded") });
-    } catch (err: any) {
-      const errorText = err?.message || t("txCancelled");
-      setTrustlineMsg({ type: "error", text: errorText });
+    } catch (err) {
+      const kind = classifyTrustlineError(err);
+      setTrustlineError({ symbol: market.symbol, kind });
+      setTrustlineMsg({ type: "error", text: t(TRUSTLINE_ERROR_MESSAGE_KEYS[kind]) });
     } finally {
       setTrustlineLoading(null);
     }
@@ -309,6 +337,8 @@ export default function MarketsApp() {
 
   async function submit() {
     if (!sel || busy) return;
+    // A missing classic-asset trustline makes supply/repay fail on-chain; block it.
+    if (trustlineBlocksAction) return;
     // Accept locale-formatted input (e.g. "1.234,5" in Spanish), then parse
     // strictly into base units.
     const normalized = normaliseAmountInput(amt, locale);
@@ -471,6 +501,16 @@ export default function MarketsApp() {
           {tStatus("actionBlockedTooltip", { reason: currentBlockedReason })}
         </div>
       )}
+      {missingTrustline && (
+        <TrustlinePrompt
+          symbol={sel.symbol}
+          spendableXlm={spendableXlm}
+          issuer={sel.asset !== "native" ? sel.asset.issuer : undefined}
+          isAdding={trustlineLoading === sel.symbol}
+          error={trustlineError?.symbol === sel.symbol ? trustlineError.kind : null}
+          onAdd={() => handleAddTrustline(sel)}
+        />
+      )}
       <input
         inputMode="decimal"
         placeholder={t("amountIn", { symbol: sel.symbol })}
@@ -482,7 +522,7 @@ export default function MarketsApp() {
       <button
         className="btn w-full"
         onClick={submit}
-        disabled={busy || currentBlocked}
+        disabled={busy || currentBlocked || trustlineBlocksAction}
         title={currentBlockedReason ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason }) : undefined}
       >
         {busy ? t("status.pending") : t("confirm", { action: t(mode) })}

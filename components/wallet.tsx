@@ -10,6 +10,7 @@ import {
   addTrustline as horizonAddTrustline,
   parseAccountBalances,
   type AccountBalancesMap,
+  type HorizonAccount,
 } from "@/lib/horizon";
 import { QueryProvider } from "./query-provider";
 import { ProtocolStatusProvider } from "@/components/protocol-status";
@@ -74,6 +75,8 @@ type Ctx = {
   refreshBalance: () => Promise<void>;
   /** All Horizon balances keyed by "native" or "CODE:ISSUER" (see lib/horizon). */
   balances: AccountBalancesMap;
+  /** Raw Horizon account payload, used for reserve (calculateMinReserve) checks. */
+  rawAccount: HorizonAccount | null;
   isUnfunded: boolean;
   refreshBalances: () => Promise<void>;
   addTrustline: (asset: { code: string; issuer: string }) => Promise<{ hash: string }>;
@@ -104,6 +107,7 @@ const WalletCtx = createContext<Ctx>({
   fundAccount: async () => {},
   refreshBalance: async () => {},
   balances: {},
+  rawAccount: null,
   isUnfunded: false,
   refreshBalances: async () => {},
   addTrustline: async () => ({ hash: "" }),
@@ -339,14 +343,14 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     [adapter, address, assertCanSign]
   );
 
-  const { data: account = null, isError: balanceError } = useQuery<{ balance: string; status: AccountStatus; balances: AccountBalancesMap } | null>({
+  const { data: account = null, isError: balanceError } = useQuery<{ balance: string; status: AccountStatus; balances: AccountBalancesMap; rawAccount: HorizonAccount | null } | null>({
     queryKey: qk.accountBalance(address),
     queryFn: async ({ signal }) => {
       if (!address) return null;
       try {
         const res = await fetch(`${config.horizon}/accounts/${address}`, { signal });
         if (res.status === 404) {
-          return { balance: t("unfunded"), status: "unfunded", balances: {} };
+          return { balance: t("unfunded"), status: "unfunded", balances: {}, rawAccount: null };
         }
         if (!res.ok) {
           throw new Error(`Horizon error: ${res.status}`);
@@ -357,8 +361,8 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         );
         const balances = parseAccountBalances(accountData);
         return nativeBalance
-          ? { balance: Number(nativeBalance.balance).toFixed(2), status: "funded", balances }
-          : { balance: t("unfunded"), status: "unfunded", balances };
+          ? { balance: Number(nativeBalance.balance).toFixed(2), status: "funded", balances, rawAccount: accountData }
+          : { balance: t("unfunded"), status: "unfunded", balances, rawAccount: accountData };
       } catch (err) {
         if (!signal?.aborted) reportError(err, { context: "wallet:fetchBalance", address });
         throw err;
@@ -372,6 +376,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
   });
 
   const balances: AccountBalancesMap = account?.balances ?? {};
+  const rawAccount = account?.rawAccount ?? null;
   const isUnfunded = Boolean(address) && account?.status === "unfunded";
 
   const balance = account?.balance ?? null;
@@ -467,6 +472,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         fundAccount,
         refreshBalance: invalidateBalance,
         balances,
+        rawAccount,
         isUnfunded,
         refreshBalances: invalidateBalance,
         addTrustline,
