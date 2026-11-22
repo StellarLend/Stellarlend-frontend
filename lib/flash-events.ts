@@ -8,11 +8,13 @@ import {
 } from "@stellar/stellar-sdk";
 import type { xdr } from "@stellar/stellar-sdk";
 import { config } from "@/lib/config";
+import { formatTokenAmount } from "./format";
+
+export { formatTokenAmount };
 
 const EVENT_SCHEMA_VERSION = 1;
 const EVENT_PAGE_SIZE = 100;
 const RECENT_LEDGER_WINDOW = 10_000;
-const TOKEN_SCALE = BigInt(10_000_000);
 const SIMULATION_SOURCE = "GA5WUJ54Z23KILLCUOUNAKTPBVZWKMQVO4O6EQ5GHLAERIMLLHNCSKYH";
 
 export type FlashActivity =
@@ -213,12 +215,6 @@ export async function fetchFlashLoanParams(): Promise<{ maxFlashBps: bigint; pau
     throw new Error("The lending contract returned an invalid flash-loan pause state.");
   }
   return { maxFlashBps, paused: pausedValue };
-}
-
-export function formatTokenAmount(amount: bigint): string {
-  const whole = amount / TOKEN_SCALE;
-  const fraction = (amount % TOKEN_SCALE).toString().padStart(7, "0").replace(/0+$/, "");
-  return fraction ? `${whole.toLocaleString("en-US")}.${fraction}` : whole.toLocaleString("en-US");
 }
 
 export function formatUtilization(bps: bigint): string {

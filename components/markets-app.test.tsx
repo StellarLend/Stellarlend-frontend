@@ -1,9 +1,23 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
 import MarketsApp from "./markets-app";
 import enMessages from "@/messages/en.json";
+
+const replaceMock = vi.fn();
+let currentSearchParams = new URLSearchParams();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: replaceMock }),
+  usePathname: () => "/en/markets",
+  useSearchParams: () => currentSearchParams,
+}));
+
+beforeEach(() => {
+  replaceMock.mockReset();
+  currentSearchParams = new URLSearchParams();
+});
 
 function renderMarketsApp() {
   return render(
@@ -149,5 +163,70 @@ describe("MarketsApp Max buttons and Trade Preview", () => {
 
     expect(input.value).toBe("");
     expect(screen.queryByTestId("trade-preview")).not.toBeInTheDocument();
+  });
+});
+
+describe("MarketsApp search, sort, and position filter", () => {
+  it("filters by symbol and syncs query param after 150ms debounce", async () => {
+    renderMarketsApp();
+
+    const search = screen.getByLabelText("Search markets");
+    fireEvent.change(search, { target: { value: "btc" } });
+
+    await waitFor(
+      () => {
+        expect(replaceMock).toHaveBeenCalledWith("/en/markets?q=btc", { scroll: false });
+      },
+      { timeout: 400 }
+    );
+
+    const table = screen.getByRole("table");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("BTC");
+  });
+
+  it("sorts by borrow apy desc and updates URL", () => {
+    renderMarketsApp();
+
+    const sortSelect = screen.getByLabelText("Sort by");
+    fireEvent.change(sortSelect, { target: { value: "borrowApy" } });
+
+    expect(replaceMock).toHaveBeenCalledWith("/en/markets?sort=borrowApy", { scroll: false });
+
+    const table = screen.getByRole("table");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.querySelector("b")?.textContent)).toEqual([
+      "USDC",
+      "EURC",
+      "XLM",
+      "BTC",
+    ]);
+  });
+
+  it("ignores unknown sort from URL and keeps default order", () => {
+    currentSearchParams = new URLSearchParams("sort=nonexistent");
+    renderMarketsApp();
+
+    const sortSelect = screen.getByLabelText("Sort by") as HTMLSelectElement;
+    expect(sortSelect.value).toBe("default");
+
+    const table = screen.getByRole("table");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.querySelector("b")?.textContent)).toEqual([
+      "XLM",
+      "USDC",
+      "EURC",
+      "BTC",
+    ]);
+  });
+
+  it("restores query params on reload and shows localized empty state when no markets match", () => {
+    currentSearchParams = new URLSearchParams("q=DOGE&mine=1");
+    renderMarketsApp();
+
+    expect((screen.getByLabelText("Search markets") as HTMLInputElement).value).toBe("DOGE");
+    expect((screen.getByLabelText("My positions only") as HTMLInputElement).checked).toBe(true);
+    expect(screen.getAllByText("No markets match your current filters.").length).toBeGreaterThan(0);
   });
 });

@@ -12,6 +12,7 @@ StellarLend is an over-collateralised lending market on Stellar (Soroban). This 
 - `/markets`: asset table, health factor, borrowing limit, trade panel
 - `/flash-loans`: recent on-chain flash-loan and repayment events, fee observations, utilization limit, and pause state
 - `/amm`: add/remove AMM liquidity with exact integer previews and Freighter signing
+- `/multisig`: multisig governance explorer with signer-gated proposal creation (decoded `ScVal` preview), approval, execution, and cancellation
 - Freighter wallet connect with graceful no-wallet demo mode; testnet XLM balance via Horizon
 - `/docs`: user docs, risk parameters, deployed contract list, env vars
 
@@ -22,6 +23,34 @@ Next.js 15 (App Router, React 19, Tailwind 4). Wallet signing via `@stellar/frei
 app/            routes (/, /markets, /docs)
 components/     wallet provider, markets app
 lib/            config (env), market data
+```
+
+## Public Read API
+Read-only, rate-limited JSON endpoints backed by in-memory single-flight TTL caches:
+
+- `GET /api/v1/protocol` — protocol-wide supply, borrow, utilization, and ledger
+- `GET /api/v1/positions/[address]` — per-address collateral, debt, and health factor
+- `GET /api/v1/markets` — per-market supply/borrow APY, utilization, supply/borrow caps, oracle price, LTV, liquidation threshold, and active status (`bigint` fields are encoded as decimal strings):
+
+```json
+{
+  "markets": [
+    {
+      "symbol": "XLM",
+      "name": "Stellar Lumens",
+      "supplyApy": 3.4,
+      "borrowApy": 6.1,
+      "utilizationBps": "4440",
+      "supplyCap": "0",
+      "borrowCap": "0",
+      "oraclePrice": "1200000",
+      "ltvBps": 7000,
+      "liqThresholdBps": 8000,
+      "active": true
+    }
+  ],
+  "fetchedAt": "2026-10-19T12:00:00.000Z"
+}
 ```
 
 ## Setup

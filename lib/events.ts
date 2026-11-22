@@ -6,6 +6,9 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { config } from "@/lib/config";
+import { formatTokenAmount } from "./format";
+
+export { formatTokenAmount as formatLendingAmount };
 
 export const EVENT_SCHEMA_VERSION = 1;
 export const DEFAULT_PAGE_SIZE = 50;
@@ -216,16 +219,6 @@ export function topicFilters(): string[][] {
 export function getTxExplorerUrl(txHash: string): string {
   const network = config.network || "testnet";
   return `https://stellar.expert/explorer/${network}/tx/${txHash}`;
-}
-
-export function formatLendingAmount(amount: bigint): string {
-  const isNegative = amount < BigInt(0);
-  const abs = isNegative ? -amount : amount;
-  const whole = abs / TOKEN_SCALE;
-  const fraction = (abs % TOKEN_SCALE).toString().padStart(7, "0").replace(/0+$/, "");
-  const formattedWhole = whole.toLocaleString("en-US");
-  const sign = isNegative ? "-" : "";
-  return fraction ? `${sign}${formattedWhole}.${fraction}` : `${sign}${formattedWhole}`;
 }
 
 export function formatRelativeTime(

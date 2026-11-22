@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { formatUnits, formatTokenDisplay, formatPercentFromBps } from './format';
 import { formatBps, formatDuration, formatTokenAmount, shortenAddress } from "./format";
+import { formatTokenAmount as formatSolvencyAmount } from "./solvency";
+import { formatTokenAmount as formatFlashAmount } from "./flash-events";
+import { formatLendingAmount } from "./events";
+import { formatAmount } from "./demo-ledger";
 
 describe('formatUnits', () => {
   it('formats standard 7 decimal values without trailing zeroes', () => {
@@ -68,6 +72,31 @@ describe("format helpers", () => {
     expect(formatTokenAmount(10_000_000n)).toBe("1");
     expect(formatTokenAmount(12_345_678_901n)).toBe("1,234.5678901");
     expect(formatTokenAmount(5n)).toBe("0.0000005");
+  });
+  it("keeps all token amount formatter exports consistent", () => {
+    const formatters = [
+      formatTokenAmount,
+      formatSolvencyAmount,
+      formatFlashAmount,
+      formatLendingAmount,
+      formatAmount,
+    ];
+    const cases = [
+      [0n, "0"],
+      [1n, "0.0000001"],
+      [12_345_678n, "1.2345678"],
+      [100_000_000_000_000_000_000n, "10,000,000,000,000"],
+    ] as const;
+
+    for (const [amount, expected] of cases) {
+      for (const formatter of formatters) {
+        expect(formatter(amount)).toBe(expected);
+      }
+    }
+  });
+  it("uses the requested locale for grouping and the decimal separator", () => {
+    expect(formatTokenAmount(12_345_678n, 7, "de-DE")).toBe("1,2345678");
+    expect(formatTokenAmount(100_000_000_000n, 7, "de-DE")).toBe("10.000");
   });
   it("shortens addresses", () => {
     expect(shortenAddress("GABCDEFGHIJKLMNOPQRSTUVWXYZ")).toBe("GABCDE...WXYZ");

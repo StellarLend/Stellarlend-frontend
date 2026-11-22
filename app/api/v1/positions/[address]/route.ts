@@ -1,7 +1,7 @@
 import { isValidGAddress } from "@/lib/api/address";
 import { positionCache, POSITION_TTL } from "@/lib/api/cache";
 import { fetchPosition } from "@/lib/api/lending";
-import { apiRateLimiter, getClientIp } from "@/lib/api/rate-limit";
+import { checkApiRateLimit } from "@/lib/api/rate-limit";
 import { errorResponse, jsonResponse, mapApiError } from "@/lib/api/response";
 import {
   POSITION_CACHE_CONTROL,
@@ -19,7 +19,7 @@ export async function GET(
   request: Request,
   context: RouteContext,
 ): Promise<Response> {
-  const rate = apiRateLimiter.check(getClientIp(request));
+  const rate = checkApiRateLimit(request);
   if (!rate.allowed) {
     return errorResponse("RATE_LIMITED", "Too many requests", 429, {
       "Retry-After": String(rate.retryAfterSec),
