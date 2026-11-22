@@ -2,14 +2,13 @@ import {
   Address,
   BASE_FEE,
   Contract,
-  Networks,
   rpc,
-  scValToNative,
   TransactionBuilder,
   nativeToScVal,
 } from "@stellar/stellar-sdk";
 import { signTransaction } from "@stellar/freighter-api";
 import { config } from "@/lib/config";
+import { simulateRead } from "@/lib/soroban-read";
 import { calculateBurnAmounts, calculateMintShares } from "./liquidity-math";
 
 const NETWORK_PASSPHRASE = config.networkPassphrase;
@@ -58,23 +57,19 @@ function server(): rpc.Server {
 
 async function readContract<T>(
   serverClient: rpc.Server,
-  sourceAddress: string,
+  _sourceAddress: string,
   contractId: string,
   method: string,
   args: ReturnType<typeof nativeToScVal>[] = [],
 ): Promise<T> {
-  const source = await serverClient.getAccount(sourceAddress);
-  const transaction = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(new Contract(contractId).call(method, ...args))
-    .setTimeout(30)
-    .build();
-  const result = await serverClient.simulateTransaction(transaction);
-  if (rpc.Api.isSimulationError(result)) throw new Error(result.error);
-  if (!result.result) throw new Error(`Soroban RPC did not return a value for ${method}.`);
-  return scValToNative(result.result.retval) as T;
+  const { native } = await simulateRead<T>({
+    contractId,
+    method,
+    args,
+    rpcServer: serverClient,
+    passphrase: NETWORK_PASSPHRASE,
+  });
+  return native;
 }
 
 function readHorizonTrustline(asset: string, account: HorizonAccount | null): TokenState["trustline"] {

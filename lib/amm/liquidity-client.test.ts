@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@stellar/stellar-sdk", () => {
+  class Account {
+    constructor(public readonly accountId: string, public readonly sequence: string) {}
+  }
   class Address {
     constructor(private readonly value: string) {}
     toScVal() { return { address: this.value }; }
@@ -62,6 +65,7 @@ vi.mock("@stellar/stellar-sdk", () => {
     },
   };
   return {
+    Account,
     Address,
     BASE_FEE: "100",
     Contract,

@@ -1,5 +1,6 @@
-import { Account, BASE_FEE, Contract, Keypair, Networks, rpc, scValToNative, nativeToScVal, TransactionBuilder, type xdr } from "@stellar/stellar-sdk";
+import { Networks, nativeToScVal, type xdr } from "@stellar/stellar-sdk";
 import { config } from "@/lib/config";
+import { simulateRead } from "@/lib/soroban-read";
 
 /** Result of a single read: a value or an "unavailable" marker (failed getter). */
 export type Field<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -31,17 +32,15 @@ export const AUDIT_PAGE_SIZE = 20;
  * account. Nothing is signed or submitted, and no fees are paid.
  */
 export function createContractReader(contractId: string, rpcUrl = config.rpc, passphrase = config.networkPassphrase || Networks.TESTNET): ContractReader {
-  const server = new rpc.Server(rpcUrl);
   return async (method, args = []) => {
-    const source = new Account(Keypair.random().publicKey(), "0");
-    const tx = new TransactionBuilder(source, { fee: BASE_FEE, networkPassphrase: passphrase })
-      .addOperation(new Contract(contractId).call(method, ...args))
-      .setTimeout(30)
-      .build();
-    const sim = await server.simulateTransaction(tx);
-    if (rpc.Api.isSimulationError(sim)) throw new Error(sim.error);
-    if (!sim.result) throw new Error(`No value returned for ${method}`);
-    return scValToNative(sim.result.retval);
+    const { native } = await simulateRead({
+      contractId,
+      method,
+      args,
+      rpcUrl,
+      passphrase,
+    });
+    return native;
   };
 }
 
