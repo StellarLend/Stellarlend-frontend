@@ -1,13 +1,10 @@
 import {
-  Account,
   Address,
-  Contract,
-  TransactionBuilder,
   rpc,
-  scValToNative,
 } from "@stellar/stellar-sdk";
 import type { xdr } from "@stellar/stellar-sdk";
 import { config } from "@/lib/config";
+import { simulateRead as simulateReadEntry } from "@/lib/soroban-read";
 
 /**
  * Scale factor for on-chain oracle prices.
@@ -24,6 +21,21 @@ export const ORACLE_PRICE_DECIMALS = 7;
  * by contract borrowing and liquidation functions (DEFAULT_ORACLE_MAX_AGE_SECS).
  */
 export const MAX_ORACLE_AGE_SECONDS = 3600;
+
+/**
+ * Returns the effective max oracle age in seconds, honoring the optional
+ * NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS testnet override when set to a positive integer.
+ */
+export function getMaxOracleAgeSeconds(): number {
+  const raw = process.env.NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS;
+  if (raw) {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return MAX_ORACLE_AGE_SECONDS;
+}
 
 export type PriceRecord = {
   price: bigint;
@@ -48,8 +60,6 @@ export type OracleAssetPrice = {
   bounds: PriceBounds;
   source: "oracle" | "demo";
 };
-
-const SIMULATION_SOURCE = "GA5WUJ54Z23KILLCUOUNAKTPBVZWKMQVO4O6EQ5GHLAERIMLLHNCSKYH";
 
 let cachedServer: rpc.Server | null = null;
 let cachedRpcUrl: string | null = null;
@@ -170,7 +180,7 @@ export function formatOraclePrice(
 export function classifyPriceAge(
   timestamp: bigint | null,
   referenceTimeSeconds: number,
-  maxAgeSeconds = MAX_ORACLE_AGE_SECONDS
+  maxAgeSeconds = getMaxOracleAgeSeconds()
 ): { status: StalenessStatus; ageSeconds: number | null } {
   if (timestamp === null) {
     return { status: "missing", ageSeconds: null };
@@ -214,25 +224,13 @@ export async function simulateRead(
   args: xdr.ScVal[] = [],
   rpcUrl = config.rpc
 ): Promise<unknown> {
-  const server = getServer(rpcUrl);
-  const networkPassphrase = (await server.getNetwork()).passphrase;
-  const transaction = new TransactionBuilder(new Account(SIMULATION_SOURCE, "0"), {
-    fee: "100",
-    networkPassphrase,
-  })
-    .addOperation(new Contract(contractId).call(method, ...args))
-    .setTimeout(30)
-    .build();
-
-  const result = await server.simulateTransaction(transaction);
-
-  if (rpc.Api.isSimulationError(result)) {
-    throw new Error(`RPC simulation error for ${method}: ${result.error}`);
-  }
-  if (!result.result) {
-    return null;
-  }
-  return scValToNative(result.result.retval);
+  const { native } = await simulateReadEntry({
+    contractId,
+    method,
+    args,
+    rpcUrl,
+  });
+  return native;
 }
 
 /**

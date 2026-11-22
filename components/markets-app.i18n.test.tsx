@@ -79,6 +79,20 @@ const messages = {
       timeSourceBrowser: 'Reloj del navegador',
       loading: 'Cargando precios de oráculo...',
     },
+    rateSimulator: {
+      title: 'Simulador del modelo de tasas',
+      subtitle: 'Ajusta los parámetros para explorar las tasas.',
+      utilization: 'Utilización (%)',
+      baseRate: 'Tasa base (% APR)',
+      slope1: 'Pendiente 1 (% APR)',
+      slope2: 'Pendiente 2 (% APR)',
+      kink: 'Quiebre (%)',
+      sliderLabel: 'Control deslizante de {label}',
+      reset: 'Restablecer parámetros en cadena',
+      borrowApy: 'APY estimado del préstamo',
+      supplyApy: 'APY estimado del depósito',
+      invalidInput: 'Introduce parámetros válidos.',
+    },
   },
 };
 

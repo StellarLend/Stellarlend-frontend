@@ -2,19 +2,23 @@ import {
   Address,
   BASE_FEE,
   Contract,
-  Networks,
   rpc,
-  scValToNative,
   TransactionBuilder,
   nativeToScVal,
 } from "@stellar/stellar-sdk";
 import { signTransaction } from "@stellar/freighter-api";
 import { config } from "@/lib/config";
+import { simulateRead } from "@/lib/soroban-read";
 import { calculateBurnAmounts, calculateMintShares } from "./liquidity-math";
+import { minOutFromSlippage } from "./quote";
 
 const NETWORK_PASSPHRASE = config.networkPassphrase;
 const POLL_INTERVAL_MS = 2_000;
 const TX_TIMEOUT_MS = 120_000;
+export const QUOTE_STALE_MS = 30_000;
+export const MIN_SLIPPAGE_BPS = 1n; // 0.01%
+export const MAX_SLIPPAGE_BPS = 5_000n; // 50%
+export const DEFAULT_SLIPPAGE_BPS = 50n; // 0.5%
 
 export type TokenState = {
   decimals: number;
@@ -58,23 +62,19 @@ function server(): rpc.Server {
 
 async function readContract<T>(
   serverClient: rpc.Server,
-  sourceAddress: string,
+  _sourceAddress: string,
   contractId: string,
   method: string,
   args: ReturnType<typeof nativeToScVal>[] = [],
 ): Promise<T> {
-  const source = await serverClient.getAccount(sourceAddress);
-  const transaction = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(new Contract(contractId).call(method, ...args))
-    .setTimeout(30)
-    .build();
-  const result = await serverClient.simulateTransaction(transaction);
-  if (rpc.Api.isSimulationError(result)) throw new Error(result.error);
-  if (!result.result) throw new Error(`Soroban RPC did not return a value for ${method}.`);
-  return scValToNative(result.result.retval) as T;
+  const { native } = await simulateRead<T>({
+    contractId,
+    method,
+    args,
+    rpcServer: serverClient,
+    passphrase: NETWORK_PASSPHRASE,
+  });
+  return native;
 }
 
 function readHorizonTrustline(asset: string, account: HorizonAccount | null): TokenState["trustline"] {
@@ -250,7 +250,13 @@ export function previewMovementPercent(previous: PoolSnapshot, current: PoolSnap
 }
 
 export function contractErrorMessage(message: string): string {
-  const readable: Array<[string, number, string]> = [
+  const readable: Array<[string, number | null, string]> = [
+    ["SlippageExceeded", null, "Swap output fell below your minimum received amount (slippage tolerance exceeded)."],
+    ["PriceImpactExceeded", null, "Price impact exceeds the pool's safety threshold."],
+    ["AmountBelowMinSwapIn", null, "Input amount is below the pool's minimum swap requirement."],
+    ["ZeroOutput", null, "Output amount rounds to zero; swap cannot proceed."],
+    ["EmptyPool", null, "The pool has no liquidity available for this swap."],
+    ["NonPositiveAmount", null, "Enter a positive swap amount."],
     ["InsufficientLiquidityMinted", 9, "This deposit is too small to mint any LP shares."],
     ["InsufficientLpBalance", 14, "You do not have enough LP shares for this withdrawal."],
     ["BelowMinLiquidity", 17, "This withdrawal would leave the pool below its minimum reserve floor."],
@@ -260,7 +266,9 @@ export function contractErrorMessage(message: string): string {
     ["BurnExceedsSupply", 11, "The requested LP shares exceed the pool's total supply."],
   ];
   for (const [name, code, messageText] of readable) {
-    if (message.includes(name) || new RegExp(`Error\\(Contract,\\s*#?${code}\\)`).test(message)) return messageText;
+    if (message.includes(name) || (code !== null && new RegExp(`Error\\(Contract,\\s*#?${code}\\)`).test(message))) {
+      return messageText;
+    }
   }
   if (/user rejected|rejected the request|declined|cancelled|canceled/i.test(message)) return "Transaction cancelled in Freighter.";
   return message || "The transaction failed. Please try again.";
@@ -272,6 +280,40 @@ function ensureCorrectNetwork(network: string | undefined, passphrase: string | 
   if (!network || network.toUpperCase() !== expected || passphrase !== expectedPassphrase) {
     throw new Error(`Freighter is on ${network ?? "an unknown network"}. Switch to Stellar ${expected.toLowerCase()} before signing.`);
   }
+}
+
+async function signSubmitAndPoll(
+  address: string,
+  method: string,
+  args: ReturnType<typeof nativeToScVal>[],
+): Promise<string> {
+  const freighter = await import("@stellar/freighter-api");
+  const rpcServer = server();
+  const account = await rpcServer.getAccount(address);
+  const transaction = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(new Contract(config.ammId).call(method, ...args))
+    .setTimeout(30)
+    .build();
+  const prepared = await rpcServer.prepareTransaction(transaction);
+  const signed = await freighter.signTransaction(prepared.toXDR(), { networkPassphrase: NETWORK_PASSPHRASE });
+  if (signed.error) throw new Error(signed.error.message);
+  const signedTx = TransactionBuilder.fromXDR(signed.signedTxXdr, NETWORK_PASSPHRASE);
+  const submitted = await rpcServer.sendTransaction(signedTx);
+  if (submitted.status === "ERROR") throw new Error(submitted.errorResult?.toXDR("base64") ?? "Soroban RPC rejected the transaction.");
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < TX_TIMEOUT_MS) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    const status = await rpcServer.getTransaction(submitted.hash);
+    if (status.status === rpc.Api.GetTransactionStatus.SUCCESS) return submitted.hash;
+    if (status.status === rpc.Api.GetTransactionStatus.FAILED) {
+      throw new Error(status.resultXdr?.toXDR("base64") ?? "The Soroban transaction failed.");
+    }
+  }
+  throw new Error(`Timed out waiting for transaction confirmation: ${submitted.hash}`);
 }
 
 export async function submitLiquidityAction(
@@ -300,30 +342,54 @@ export async function submitLiquidityAction(
       ]
     : [new Address(address).toScVal(), nativeToScVal(action.shares, { type: "i128" })];
   const method = action.kind === "add" ? "add_liquidity" : "remove_liquidity";
-  const rpcServer = server();
-  const account = await rpcServer.getAccount(address);
-  const transaction = new TransactionBuilder(account, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(new Contract(config.ammId).call(method, ...args))
-    .setTimeout(30)
-    .build();
-  const prepared = await rpcServer.prepareTransaction(transaction);
-  const signed = await freighter.signTransaction(prepared.toXDR(), { networkPassphrase: NETWORK_PASSPHRASE });
-  if (signed.error) throw new Error(signed.error.message);
-  const signedTx = TransactionBuilder.fromXDR(signed.signedTxXdr, NETWORK_PASSPHRASE);
-  const submitted = await rpcServer.sendTransaction(signedTx);
-  if (submitted.status === "ERROR") throw new Error(submitted.errorResult?.toXDR("base64") ?? "Soroban RPC rejected the transaction.");
+  return signSubmitAndPoll(address, method, args);
+}
 
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < TX_TIMEOUT_MS) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    const status = await rpcServer.getTransaction(submitted.hash);
-    if (status.status === rpc.Api.GetTransactionStatus.SUCCESS) return submitted.hash;
-    if (status.status === rpc.Api.GetTransactionStatus.FAILED) {
-      throw new Error(status.resultXdr?.toXDR("base64") ?? "The Soroban transaction failed.");
-    }
+export type SwapParams = {
+  amountIn: bigint;
+  aForB: boolean;
+  slippageBps?: bigint;
+  quotedAmountOut: bigint;
+  quoteTimestamp: number;
+  feeBps?: bigint;
+};
+
+export async function submitSwap(
+  address: string,
+  params: SwapParams,
+): Promise<string> {
+  requireConfiguration();
+  if (params.amountIn <= 0n) {
+    throw new Error("Enter a positive swap amount.");
   }
-  throw new Error(`Timed out waiting for transaction confirmation: ${submitted.hash}`);
+  const slippageBps = params.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
+  if (slippageBps < MIN_SLIPPAGE_BPS || slippageBps > MAX_SLIPPAGE_BPS) {
+    throw new Error("Slippage tolerance must be between 0.01% and 50%.");
+  }
+
+  const freighter = await import("@stellar/freighter-api");
+  const network = await freighter.getNetwork();
+  if (network.error) throw new Error(network.error.message);
+  ensureCorrectNetwork(network.network, network.networkPassphrase);
+
+  let effectiveAmountOut = params.quotedAmountOut;
+  if (Date.now() - params.quoteTimestamp > QUOTE_STALE_MS) {
+    const freshQuote = await simulateSwapQuote(
+      address,
+      params.amountIn,
+      params.feeBps ?? 30n,
+      params.aForB,
+    );
+    effectiveAmountOut = freshQuote.amountOut;
+  }
+
+  const minOut = minOutFromSlippage(effectiveAmountOut, slippageBps);
+  const args = [
+    new Address(address).toScVal(),
+    nativeToScVal(params.amountIn, { type: "i128" }),
+    nativeToScVal(minOut, { type: "i128" }),
+    nativeToScVal(params.aForB, { type: "bool" }),
+  ];
+
+  return signSubmitAndPoll(address, "swap", args);
 }

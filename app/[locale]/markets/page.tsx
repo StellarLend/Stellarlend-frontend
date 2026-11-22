@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { Header } from "@/components/header";
@@ -13,7 +14,11 @@ export default async function Page({ params }: { params: Promise<{ locale: strin
     <NextIntlClientProvider locale={locale} messages={messages}>
       <WalletProvider>
         <Header />
-        <main className="mx-auto max-w-6xl px-4 py-10"><MarketsApp /></main>
+        <main className="mx-auto max-w-6xl px-4 py-10">
+          <Suspense fallback={null}>
+            <MarketsApp />
+          </Suspense>
+        </main>
         <Footer />
       </WalletProvider>
     </NextIntlClientProvider>
