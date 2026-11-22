@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
 import { Button, Card, Stat } from "@/components/ui";
@@ -34,7 +35,33 @@ import {
   fetchRateModelSnapshot,
   type RateModelSnapshot,
 } from "@/lib/rate-model";
-import { RateChart, defaultRateChartLabels, type RateChartLabels } from "./rate-chart";
+import { defaultRateChartLabels, type RateChartLabels } from "./rate-chart-labels";
+
+function RateChartSkeleton() {
+  const t = useTranslations("market");
+  const label = t("rateModel.loadingChart");
+  return (
+    <section
+      className="card space-y-4 p-5 sm:p-6"
+      role="status"
+      aria-busy="true"
+      aria-label={label}
+      data-testid="rate-chart-skeleton"
+    >
+      <div className="space-y-2">
+        <div className="h-3 w-28 animate-pulse rounded bg-white/10" />
+        <div className="h-6 w-56 animate-pulse rounded bg-white/10" />
+      </div>
+      <div className="h-56 w-full animate-pulse rounded-lg bg-white/5" />
+      <span className="sr-only">{label}</span>
+    </section>
+  );
+}
+
+const RateChart = dynamic(() => import("./rate-chart").then((mod) => mod.RateChart), {
+  ssr: false,
+  loading: () => <RateChartSkeleton />,
+});
 
 import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";

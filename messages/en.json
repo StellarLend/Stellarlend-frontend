@@ -220,7 +220,8 @@
       "markerCurrent": "Current",
       "markerSurcharge": "Surcharge kink",
       "historyTableCaption": "Utilization history samples",
-      "colLedger": "Ledger"
+      "colLedger": "Ledger",
+      "loadingChart": "Loading interest-rate model chart..."
     },
     "comingSoon": "Coming soon",
     "onchainMode": "On-chain mode (Stellar testnet)",
@@ -441,5 +442,8 @@
       "repay": "Repay",
       "liquidate": "Liquidate"
     }
+  },
+  "amm": {
+    "loadingTwapChart": "Loading TWAP price chart..."
   }
 }
