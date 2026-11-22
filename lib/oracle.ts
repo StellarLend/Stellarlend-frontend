@@ -1,13 +1,10 @@
 import {
-  Account,
   Address,
-  Contract,
-  TransactionBuilder,
   rpc,
-  scValToNative,
 } from "@stellar/stellar-sdk";
 import type { xdr } from "@stellar/stellar-sdk";
 import { config } from "@/lib/config";
+import { simulateRead as simulateReadEntry } from "@/lib/soroban-read";
 
 /**
  * Scale factor for on-chain oracle prices.
@@ -48,8 +45,6 @@ export type OracleAssetPrice = {
   bounds: PriceBounds;
   source: "oracle" | "demo";
 };
-
-const SIMULATION_SOURCE = "GA5WUJ54Z23KILLCUOUNAKTPBVZWKMQVO4O6EQ5GHLAERIMLLHNCSKYH";
 
 let cachedServer: rpc.Server | null = null;
 let cachedRpcUrl: string | null = null;
@@ -214,25 +209,13 @@ export async function simulateRead(
   args: xdr.ScVal[] = [],
   rpcUrl = config.rpc
 ): Promise<unknown> {
-  const server = getServer(rpcUrl);
-  const networkPassphrase = (await server.getNetwork()).passphrase;
-  const transaction = new TransactionBuilder(new Account(SIMULATION_SOURCE, "0"), {
-    fee: "100",
-    networkPassphrase,
-  })
-    .addOperation(new Contract(contractId).call(method, ...args))
-    .setTimeout(30)
-    .build();
-
-  const result = await server.simulateTransaction(transaction);
-
-  if (rpc.Api.isSimulationError(result)) {
-    throw new Error(`RPC simulation error for ${method}: ${result.error}`);
-  }
-  if (!result.result) {
-    return null;
-  }
-  return scValToNative(result.result.retval);
+  const { native } = await simulateReadEntry({
+    contractId,
+    method,
+    args,
+    rpcUrl,
+  });
+  return native;
 }
 
 /**
