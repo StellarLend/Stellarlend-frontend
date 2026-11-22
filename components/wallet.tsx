@@ -13,7 +13,14 @@ import {
 } from "@/lib/horizon";
 import { QueryProvider } from "./query-provider";
 import { ProtocolStatusProvider } from "@/components/protocol-status";
-import { WalletAdapter, SignTransactionOptions, getWalletAdapter } from "@/lib/wallets";
+import {
+  WalletAdapter,
+  SignTransactionOptions,
+  WalletErrorCode,
+  getWalletAdapter,
+  normalizeWalletError,
+  withSigningTimeout,
+} from "@/lib/wallets";
 import { WalletPickerModal } from "./wallet-picker";
 
 export type AccountStatus = "unknown" | "unfunded" | "funded" | "error";
@@ -211,17 +218,16 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
           }
         }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        const lower = msg.toLowerCase();
+        const normalized = normalizeWalletError(err);
         // If user rejected / cancelled, do not trigger error banner
-        const isUserCancellation =
-          lower.includes("cancel") ||
-          lower.includes("reject") ||
-          lower.includes("declined") ||
-          lower.includes("closed");
-
-        if (!isUserCancellation) {
-          setError(msg || t("unreachable"));
+        if (normalized.code !== "user_rejected") {
+          const localizedMessage: Record<Exclude<WalletErrorCode, "user_rejected">, string> = {
+            not_installed: t("errors.not_installed"),
+            locked: t("errors.locked"),
+            wrong_network: t("errors.wrong_network"),
+            unknown: normalized.message || t("errors.unknown"),
+          };
+          setError(localizedMessage[normalized.code]);
         }
         throw err;
       }
@@ -331,10 +337,12 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         throw new Error("No wallet connected to sign transaction.");
       }
       assertCanSign();
-      return adapter.signTransaction(xdr, {
-        networkPassphrase: options?.networkPassphrase ?? config.networkPassphrase,
-        accountToSign: options?.accountToSign ?? address ?? undefined,
-      });
+      return withSigningTimeout(
+        adapter.signTransaction(xdr, {
+          networkPassphrase: options?.networkPassphrase ?? config.networkPassphrase,
+          accountToSign: options?.accountToSign ?? address ?? undefined,
+        })
+      );
     },
     [adapter, address, assertCanSign]
   );

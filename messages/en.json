@@ -94,7 +94,14 @@
     "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments.",
     "networkMismatchTitle": "Network mismatch detected",
     "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
-    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}.",
+    "errors": {
+      "user_rejected": "Request was rejected in your wallet.",
+      "not_installed": "Wallet extension is not installed. Please install it to continue.",
+      "locked": "Your wallet is locked. Please unlock it and try again.",
+      "wrong_network": "Your wallet is connected to the wrong network. Please switch networks and try again.",
+      "unknown": "An unexpected wallet error occurred. Please try again."
+    }
   },
   "market": {
     "title": "Markets",

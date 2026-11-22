@@ -94,7 +94,14 @@
     "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos.",
     "networkMismatchTitle": "Discrepancia de red detectada",
     "networkMismatchDescription": "Freighter está conectado a una red diferente ({currentNetwork}). Cambia Freighter a {expectedNetwork} para interactuar y firmar transacciones.",
-    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}."
+    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}.",
+    "errors": {
+      "user_rejected": "La solicitud fue rechazada en tu cartera.",
+      "not_installed": "La extensión de la cartera no está instalada. Instálala para continuar.",
+      "locked": "Tu cartera está bloqueada. Desbloquéala e inténtalo de nuevo.",
+      "wrong_network": "Tu cartera está conectada a una red incorrecta. Cambia de red e inténtalo de nuevo.",
+      "unknown": "Ocurrió un error inesperado con la cartera. Inténtalo de nuevo."
+    }
   },
   "market": {
     "title": "Mercados",
