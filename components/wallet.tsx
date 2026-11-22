@@ -15,42 +15,15 @@ import {
 } from "@/lib/horizon";
 import { QueryProvider } from "./query-provider";
 import { ProtocolStatusProvider } from "@/components/protocol-status";
-import { WalletAdapter, SignTransactionOptions, getWalletAdapter } from "@/lib/wallets";
-
-function WalletPickerSkeleton() {
-  const t = useTranslations("wallet");
-  const label = t("loadingWallets");
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      role="status"
-      aria-busy="true"
-      aria-label={label}
-      data-testid="wallet-picker-skeleton"
-    >
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111318] p-6 shadow-2xl space-y-4">
-        <div className="h-6 w-40 animate-pulse rounded bg-white/10" />
-        <div className="space-y-3">
-          <div className="h-14 w-full animate-pulse rounded-xl bg-white/5" />
-          <div className="h-14 w-full animate-pulse rounded-xl bg-white/5" />
-        </div>
-        <span className="sr-only">{label}</span>
-      </div>
-    </div>
-  );
-}
-
-const loadWalletPicker = () =>
-  import("./wallet-picker").then((mod) => mod.WalletPickerModal);
-
-export function prefetchWalletPicker(): void {
-  void loadWalletPicker();
-}
-
-const WalletPickerModal = dynamic(loadWalletPicker, {
-  ssr: false,
-  loading: () => <WalletPickerSkeleton />,
-});
+import {
+  WalletAdapter,
+  SignTransactionOptions,
+  WalletErrorCode,
+  getWalletAdapter,
+  normalizeWalletError,
+  withSigningTimeout,
+} from "@/lib/wallets";
+import { WalletPickerModal } from "./wallet-picker";
 
 export type AccountStatus = "unknown" | "unfunded" | "funded" | "error";
 
@@ -250,17 +223,16 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
           }
         }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        const lower = msg.toLowerCase();
+        const normalized = normalizeWalletError(err);
         // If user rejected / cancelled, do not trigger error banner
-        const isUserCancellation =
-          lower.includes("cancel") ||
-          lower.includes("reject") ||
-          lower.includes("declined") ||
-          lower.includes("closed");
-
-        if (!isUserCancellation) {
-          setError(msg || t("unreachable"));
+        if (normalized.code !== "user_rejected") {
+          const localizedMessage: Record<Exclude<WalletErrorCode, "user_rejected">, string> = {
+            not_installed: t("errors.not_installed"),
+            locked: t("errors.locked"),
+            wrong_network: t("errors.wrong_network"),
+            unknown: normalized.message || t("errors.unknown"),
+          };
+          setError(localizedMessage[normalized.code]);
         }
         throw err;
       }
@@ -370,10 +342,12 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         throw new Error("No wallet connected to sign transaction.");
       }
       assertCanSign();
-      return adapter.signTransaction(xdr, {
-        networkPassphrase: options?.networkPassphrase ?? config.networkPassphrase,
-        accountToSign: options?.accountToSign ?? address ?? undefined,
-      });
+      return withSigningTimeout(
+        adapter.signTransaction(xdr, {
+          networkPassphrase: options?.networkPassphrase ?? config.networkPassphrase,
+          accountToSign: options?.accountToSign ?? address ?? undefined,
+        })
+      );
     },
     [adapter, address, assertCanSign]
   );
