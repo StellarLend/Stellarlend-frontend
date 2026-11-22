@@ -3,6 +3,7 @@ import fc from "fast-check";
 import {
   calculateEffectivePrice,
   I128_MAX,
+  minOutFromSlippage,
   priceImpactBps,
   quoteExactIn,
 } from "./quote";
@@ -304,5 +305,39 @@ describe("quoteExactIn contract formula exact fixtures", () => {
       ),
       { numRuns: 200 },
     );
+  });
+
+  describe("minOutFromSlippage", () => {
+    it("rounds down using integer-only BigInt floor division", () => {
+      // 999 * (10000 - 50) / 10000 = 994.005 -> 994n
+      expect(minOutFromSlippage(999n, 50n)).toBe(994n);
+      // 100 * (10000 - 1) / 10000 = 99.99 -> 99n
+      expect(minOutFromSlippage(100n, 1n)).toBe(99n);
+      // exact division: 1000 * (10000 - 50) / 10000 = 995n
+      expect(minOutFromSlippage(1_000n, 50n)).toBe(995n);
+    });
+
+    it("accepts a SwapQuoteResult object and integer number bps", () => {
+      const res = quoteExactIn({
+        amountIn: 10_000n,
+        reserveIn: 1_000_000n,
+        reserveOut: 1_000_000n,
+        feeBps: 30n,
+      });
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        // 9871 * 9950 / 10000 = 9821.645 -> 9821n
+        expect(minOutFromSlippage(res.value, 50)).toBe(9_821n);
+      }
+    });
+
+    it("handles boundary values and rejects invalid bps", () => {
+      expect(minOutFromSlippage(1_000n, 0n)).toBe(1_000n);
+      expect(minOutFromSlippage(1_000n, 10_000n)).toBe(0n);
+      expect(minOutFromSlippage(0n, 50n)).toBe(0n);
+      expect(() => minOutFromSlippage(1_000n, -1n)).toThrow(RangeError);
+      expect(() => minOutFromSlippage(1_000n, 10_001n)).toThrow(RangeError);
+      expect(() => minOutFromSlippage(1_000n, 0.5)).toThrow(RangeError);
+    });
   });
 });

@@ -42,6 +42,12 @@ vi.mock("@stellar/stellar-sdk", () => {
           get_total_supply: 100_000n,
           get_lp_balance: 50_000n,
           get_min_liquidity: 0n,
+          get_swap_quote: {
+            amount_out: 9_500n,
+            fee: 30n,
+            reserve_a_after: 110_000n,
+            reserve_b_after: 190_500n,
+          },
           decimals: 7,
           balance: 1_000_000n,
         };
@@ -95,7 +101,7 @@ vi.mock("@/lib/config", () => ({
   },
 }));
 
-import { submitLiquidityAction } from "./liquidity-client";
+import { contractErrorMessage, submitLiquidityAction, submitSwap } from "./liquidity-client";
 
 const snapshot: PoolSnapshot = {
   reserveA: 100_000n,
@@ -179,5 +185,103 @@ describe("submitLiquidityAction", () => {
     vi.spyOn(Date, "now").mockReturnValueOnce(0).mockReturnValue(121_000);
     await expect(submitLiquidityAction("GUSER", { kind: "remove", shares: 1_000n }, snapshot, () => true))
       .rejects.toThrow("Timed out waiting for transaction confirmation");
+  });
+});
+
+describe("submitSwap", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    mocks.operations.length = 0;
+    mocks.network = "TESTNET";
+    mocks.signResult = { signedTxXdr: "signed-xdr" };
+    mocks.signTransaction.mockReset().mockImplementation(async () => mocks.signResult);
+    mocks.sendTransaction.mockReset().mockResolvedValue({ hash: "swap-hash", status: "PENDING" });
+    mocks.transactionResult = "SUCCESS";
+  });
+
+  it("passes min_out computed from slippage to the swap contract call", async () => {
+    const now = Date.now();
+    const hash = await submitSwap("GUSER", {
+      amountIn: 10_000n,
+      aForB: true,
+      slippageBps: 50n,
+      quotedAmountOut: 10_000n,
+      quoteTimestamp: now,
+    });
+
+    const op = mocks.operations.find((entry) => entry.method === "swap");
+    // min_out = 10_000 * (10_000 - 50) / 10_000 = 9_950n
+    expect(op?.args).toEqual([
+      { address: "GUSER" },
+      { value: 10_000n },
+      { value: 9_950n },
+      { value: true },
+    ]);
+    expect(mocks.signTransaction).toHaveBeenCalledTimes(1);
+    expect(mocks.sendTransaction).toHaveBeenCalledTimes(1);
+    expect(hash).toBe("swap-hash");
+  });
+
+  it("re-simulates quote before signing when quote is older than 30s", async () => {
+    const staleTimestamp = Date.now() - 31_000;
+    await submitSwap("GUSER", {
+      amountIn: 10_000n,
+      aForB: true,
+      slippageBps: 100n, // 1%
+      quotedAmountOut: 10_000n,
+      quoteTimestamp: staleTimestamp,
+      feeBps: 30n,
+    });
+
+    const simOp = mocks.operations.find((entry) => entry.method === "get_swap_quote");
+    expect(simOp).toBeDefined();
+
+    // Fresh simulated quote is 9_500n -> 1% slippage -> min_out = 9_405n
+    const swapOp = mocks.operations.find((entry) => entry.method === "swap");
+    expect(swapOp?.args).toEqual([
+      { address: "GUSER" },
+      { value: 10_000n },
+      { value: 9_405n },
+      { value: true },
+    ]);
+  });
+
+  it("rejects out-of-range slippage and non-positive amountIn", async () => {
+    const now = Date.now();
+    await expect(
+      submitSwap("GUSER", {
+        amountIn: 0n,
+        aForB: true,
+        slippageBps: 50n,
+        quotedAmountOut: 100n,
+        quoteTimestamp: now,
+      }),
+    ).rejects.toThrow("positive swap amount");
+
+    await expect(
+      submitSwap("GUSER", {
+        amountIn: 1_000n,
+        aForB: true,
+        slippageBps: 0n,
+        quotedAmountOut: 100n,
+        quoteTimestamp: now,
+      }),
+    ).rejects.toThrow("between 0.01% and 50%");
+
+    await expect(
+      submitSwap("GUSER", {
+        amountIn: 1_000n,
+        aForB: true,
+        slippageBps: 5_001n,
+        quotedAmountOut: 100n,
+        quoteTimestamp: now,
+      }),
+    ).rejects.toThrow("between 0.01% and 50%");
+  });
+
+  it("maps SlippageExceeded contract error via contractErrorMessage", () => {
+    expect(contractErrorMessage("HostError: Error(Contract, SlippageExceeded)")).toMatch(
+      /minimum received amount|slippage tolerance exceeded/i,
+    );
   });
 });
