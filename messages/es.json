@@ -248,7 +248,8 @@
       "markerCurrent": "Actual",
       "markerSurcharge": "Quiebre de recargo",
       "historyTableCaption": "Muestras del historial de utilización",
-      "colLedger": "Ledger"
+      "colLedger": "Ledger",
+      "loadingChart": "Cargando gráfico del modelo de tasas de interés..."
     },
     "comingSoon": "Próximamente",
     "onchainMode": "Modo on-chain (testnet de Stellar)",
@@ -523,5 +524,8 @@
         "ledger": "Ledger"
       }
     }
+  },
+  "amm": {
+    "loadingTwapChart": "Cargando gráfico de precios TWAP..."
   }
 }
