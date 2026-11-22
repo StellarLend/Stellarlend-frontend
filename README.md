@@ -25,6 +25,34 @@ components/     wallet provider, markets app
 lib/            config (env), market data
 ```
 
+## Public Read API
+Read-only, rate-limited JSON endpoints backed by in-memory single-flight TTL caches:
+
+- `GET /api/v1/protocol` — protocol-wide supply, borrow, utilization, and ledger
+- `GET /api/v1/positions/[address]` — per-address collateral, debt, and health factor
+- `GET /api/v1/markets` — per-market supply/borrow APY, utilization, supply/borrow caps, oracle price, LTV, liquidation threshold, and active status (`bigint` fields are encoded as decimal strings):
+
+```json
+{
+  "markets": [
+    {
+      "symbol": "XLM",
+      "name": "Stellar Lumens",
+      "supplyApy": 3.4,
+      "borrowApy": 6.1,
+      "utilizationBps": "4440",
+      "supplyCap": "0",
+      "borrowCap": "0",
+      "oraclePrice": "1200000",
+      "ltvBps": 7000,
+      "liqThresholdBps": 8000,
+      "active": true
+    }
+  ],
+  "fetchedAt": "2026-10-19T12:00:00.000Z"
+}
+```
+
 ## Setup
 ```bash
 npm install

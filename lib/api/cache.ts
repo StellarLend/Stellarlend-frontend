@@ -1,4 +1,4 @@
-import type { PositionSummary, ProtocolMetrics } from "./lending";
+import type { MarketsSnapshot, PositionSummary, ProtocolMetrics } from "./lending";
 
 interface CacheEntry<V> {
   value: V;
@@ -75,15 +75,19 @@ export class TtlSingleFlightCache<K, V> {
 
 const PROTOCOL_TTL_MS = 15_000;
 const POSITION_TTL_MS = 10_000;
+const MARKETS_TTL_MS = 15_000;
 
 export const protocolCache = new TtlSingleFlightCache<string, ProtocolMetrics>(1);
 export const positionCache = new TtlSingleFlightCache<string, PositionSummary>(500);
+export const marketsCache = new TtlSingleFlightCache<string, MarketsSnapshot>(1);
 
 export const PROTOCOL_TTL = PROTOCOL_TTL_MS;
 export const POSITION_TTL = POSITION_TTL_MS;
+export const MARKETS_TTL = MARKETS_TTL_MS;
 
 /** Test helper: drop every cached value and in-flight promise. */
 export function resetApiCaches(): void {
   protocolCache.clear();
   positionCache.clear();
+  marketsCache.clear();
 }

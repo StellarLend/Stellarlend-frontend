@@ -1,52 +1,111 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Proposal, ProposalStatus } from "@/lib/multisig/types";
-import {
-  listProposals,
-  MultisigOverview,
-} from "@/lib/multisig/reads";
+import { listProposals } from "@/lib/multisig/reads";
 import { shortenAddress } from "@/lib/multisig/decode";
 import { getStatusDisplay } from "@/lib/multisig/status";
 import { BatchProposalActions } from "./proposal-actions";
 import { CreateProposal } from "./create-proposal";
 import { config, explorer, accountExplorer } from "@/lib/config";
 
+const PROPOSALS_PAGE_SIZE = 10;
+
+const STATUS_TABS = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "executed", label: "Executed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "expired", label: "Expired" },
+] as const;
+
+type ProposalFilter = (typeof STATUS_TABS)[number]["value"];
+
+function readFilterFromUrl(): ProposalFilter {
+  const value = new URLSearchParams(window.location.search).get("filter");
+  return STATUS_TABS.find((tab) => tab.value === value)?.value ?? "all";
+}
+
+function readPageFromUrl(): number {
+  const value = Number(new URLSearchParams(window.location.search).get("page"));
+  return Number.isInteger(value) && value > 0 ? value : 1;
+}
+
 export function MultisigApp() {
   const isConfigured = Boolean(config.multisigId);
-
-  const [overview, setOverview] = useState<MultisigOverview | null>(null);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [loading, setLoading] = useState<boolean>(isConfigured);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>("All");
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<ProposalFilter>("all");
+  const [page, setPage] = useState<number>(1);
+  const [urlReady, setUrlReady] = useState(false);
   const [showAllSigners, setShowAllSigners] = useState<boolean>(false);
-
-  const loadData = useCallback(async () => {
-    if (!isConfigured) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await listProposals({ contractId: config.multisigId });
-      setOverview(res.overview);
-      setProposals(res.proposals);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load multisig governance state from RPC.");
-    } finally {
-      setLoading(false);
-    }
-  }, [isConfigured]);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const cursor = (page - 1) * PROPOSALS_PAGE_SIZE;
+  const {
+    data,
+    isLoading: queryLoading,
+    isFetching,
+    error,
+  } = useQuery({
+    queryKey: ["multisig-proposals", config.multisigId, cursor],
+    queryFn: () =>
+      listProposals({
+        contractId: config.multisigId,
+        cursor,
+        pageSize: PROPOSALS_PAGE_SIZE,
+      }),
+    enabled: isConfigured && urlReady,
+    staleTime: 30_000,
+  });
+  const loading = !urlReady || queryLoading;
+  const overview = data?.overview ?? null;
+  const proposals = data?.proposals ?? [];
+  const hasNextPage = data?.nextCursor !== null && data?.nextCursor !== undefined;
+  const refreshData = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["multisig-proposals", config.multisigId],
+    });
+  }, [queryClient]);
 
   useEffect(() => {
-    if (isConfigured) {
-      loadData();
-    }
-  }, [isConfigured, loadData]);
+    const syncUrlState = () => {
+      setFilter(readFilterFromUrl());
+      setPage(readPageFromUrl());
+    };
+    syncUrlState();
+    setUrlReady(true);
+    window.addEventListener("popstate", syncUrlState);
+    return () => window.removeEventListener("popstate", syncUrlState);
+  }, []);
+
+  const navigate = useCallback((nextFilter: ProposalFilter, nextPage: number) => {
+    setFilter(nextFilter);
+    setPage(nextPage);
+    const params = new URLSearchParams(window.location.search);
+    params.set("filter", nextFilter);
+    params.set("page", String(nextPage));
+    window.history.pushState(
+      null,
+      "",
+      `${window.location.pathname}?${params.toString()}${window.location.hash}`
+    );
+  }, []);
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const currentIndex = STATUS_TABS.findIndex((tab) => tab.value === filter);
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % STATUS_TABS.length;
+    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + STATUS_TABS.length) % STATUS_TABS.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = STATUS_TABS.length - 1;
+    else return;
+
+    event.preventDefault();
+    navigate(STATUS_TABS[nextIndex].value, 1);
+    tabRefs.current[nextIndex]?.focus();
+  };
 
   // Compute effective status for each proposal
   const enrichedProposals = useMemo(() => {
@@ -61,12 +120,37 @@ export function MultisigApp() {
     });
   }, [proposals, overview?.currentLedger]);
 
-  const filtered = useMemo(() => {
-    return enrichedProposals.filter((p) => {
-      if (filter === "All") return true;
-      return p.effectiveStatus === filter || p.status === filter;
-    });
-  }, [enrichedProposals, filter]);
+  const filtered = useMemo(
+    () =>
+      enrichedProposals.filter((proposal) => {
+        switch (filter) {
+          case "pending":
+            return proposal.effectiveStatus === "Active";
+          case "approved":
+            return proposal.effectiveStatus === "Passed";
+          case "executed":
+            return proposal.effectiveStatus === "Executed";
+          case "cancelled":
+            return proposal.effectiveStatus === "Cancelled";
+          case "expired":
+            return proposal.effectiveStatus === "Expired";
+          default:
+            return true;
+        }
+      }),
+    [enrichedProposals, filter]
+  );
+  const counts = useMemo(
+    () => ({
+      all: enrichedProposals.length,
+      pending: enrichedProposals.filter((p) => p.effectiveStatus === "Active").length,
+      approved: enrichedProposals.filter((p) => p.effectiveStatus === "Passed").length,
+      executed: enrichedProposals.filter((p) => p.effectiveStatus === "Executed").length,
+      cancelled: enrichedProposals.filter((p) => p.effectiveStatus === "Cancelled").length,
+      expired: enrichedProposals.filter((p) => p.effectiveStatus === "Expired").length,
+    }),
+    [enrichedProposals]
+  );
 
   // Status badge styling
   const statusBadgeClass = (status: ProposalStatus) => {
@@ -131,12 +215,12 @@ export function MultisigApp() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={loadData}
-            disabled={loading}
+            onClick={refreshData}
+            disabled={isFetching}
             className="btn-ghost text-xs px-3 py-1.5 rounded-lg border border-[var(--line)]"
             title="Refresh on-chain state"
           >
-            {loading ? "Refreshing..." : "↻ Refresh"}
+            {isFetching ? "Refreshing..." : "↻ Refresh"}
           </button>
           <div className="text-xs mut">
             Multisig Contract:{" "}
@@ -154,12 +238,22 @@ export function MultisigApp() {
 
       {error && (
         <div className="card p-4 border-red-500/30 bg-red-500/10 text-red-300 text-sm flex items-center justify-between">
-          <span>⚠️ {error}</span>
-          <button onClick={loadData} className="underline text-xs">
+          <span>⚠️ {error instanceof Error ? error.message : "Failed to load multisig governance state from RPC."}</span>
+          <button onClick={refreshData} className="underline text-xs">
             Retry
           </button>
         </div>
       )}
+      {data?.failedProposalIds.length ? (
+        <div
+          className="card p-4 border-amber-500/30 bg-amber-500/10 text-amber-300 text-sm"
+          role="status"
+          aria-live="polite"
+        >
+          Could not load details for proposal{data.failedProposalIds.length === 1 ? "" : "s"}{" "}
+          {data.failedProposalIds.map((id) => `#${id}`).join(", ")}.
+        </div>
+      ) : null}
 
       {/* Multisig Contract Overview Card */}
       <div className="card p-6 space-y-4">
@@ -229,40 +323,69 @@ export function MultisigApp() {
 
       {/* Proposal Filter Pills */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-2 text-xs">
-          {["All", "Active", "Passed", "Executed", "Expired", "Cancelled"].map((f) => {
-            const count =
-              f === "All"
-                ? enrichedProposals.length
-                : enrichedProposals.filter((x) => x.effectiveStatus === f || x.status === f).length;
-            return (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg border font-medium transition-colors ${
-                  filter === f
-                    ? "border-[var(--acc)] text-white bg-[var(--acc)]/10"
-                    : "border-[var(--line)] text-gray-400 hover:text-white"
-                }`}
-              >
-                {f} ({count})
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap gap-2 text-xs" role="tablist" aria-label="Filter proposals by status">
+          {STATUS_TABS.map((tab, index) => (
+            <button
+              key={tab.value}
+              ref={(element) => {
+                tabRefs.current[index] = element;
+              }}
+              id={`proposal-tab-${tab.value}`}
+              role="tab"
+              aria-selected={filter === tab.value}
+              aria-controls="multisig-proposals-panel"
+              tabIndex={filter === tab.value ? 0 : -1}
+              onClick={() => navigate(tab.value, 1)}
+              onKeyDown={handleTabKeyDown}
+              className={`px-3 py-1.5 rounded-lg border font-medium transition-colors ${
+                filter === tab.value
+                  ? "border-[var(--acc)] text-white bg-[var(--acc)]/10"
+                  : "border-[var(--line)] text-gray-400 hover:text-white"
+              }`}
+            >
+              {tab.label} ({counts[tab.value]})
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => navigate(filter, page - 1)}
+            disabled={page <= 1 || loading}
+            className="btn-ghost px-3 py-1.5 rounded-lg border border-[var(--line)] disabled:opacity-40"
+            aria-label="Previous proposal page"
+          >
+            Previous
+          </button>
+          <span className="mut" aria-live="polite">Page {page}</span>
+          <button
+            type="button"
+            onClick={() => navigate(filter, page + 1)}
+            disabled={!hasNextPage || loading}
+            className="btn-ghost px-3 py-1.5 rounded-lg border border-[var(--line)] disabled:opacity-40"
+            aria-label="Next proposal page"
+          >
+            Next
+          </button>
         </div>
       </div>
 
       {/* Proposals List Table */}
-      <div className="card overflow-x-auto">
+      <div
+        className="card overflow-x-auto"
+        id="multisig-proposals-panel"
+        role="tabpanel"
+        aria-labelledby={`proposal-tab-${filter}`}
+      >
         {loading ? (
           <div className="p-12 text-center mut">Loading multisig proposals from Soroban RPC...</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center mut space-y-2">
             <p className="text-base font-semibold">No proposals found</p>
             <p className="text-xs">
-              {filter === "All"
+              {filter === "all"
                 ? "No multisig proposals have been created yet on this contract."
-                : `No proposals found with status ${filter}.`}
+                : `No proposals found with status ${STATUS_TABS.find((tab) => tab.value === filter)?.label}.`}
             </p>
           </div>
         ) : (
@@ -363,7 +486,7 @@ export function MultisigApp() {
       {/* Batch Proposal Actions for Signers */}
       {proposals.length > 0 && (
         <div className="card p-6">
-          <BatchProposalActions proposals={proposals} onRefresh={loadData} />
+          <BatchProposalActions proposals={proposals} onRefresh={refreshData} />
         </div>
       )}
     </div>

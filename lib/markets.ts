@@ -81,3 +81,123 @@ export const formatCompactCurrency = (value: number, locale: Locale = DEFAULT_LO
   new Intl.NumberFormat(locale, { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 }).format(value);
 
 export const fmt = (n: number, d = 2) => formatNumber(n, DEFAULT_LOCALE, d);
+
+export type MarketSortKey = "default" | "supplyApy" | "borrowApy" | "utilization";
+
+export type MarketFilterParams = {
+  q?: string | null;
+  sort?: string | null;
+  mine?: boolean | string | null;
+};
+
+export type MarketPositionMap = Record<
+  string,
+  { supplied: bigint | number; borrowed: bigint | number } | undefined
+>;
+
+const VALID_SORT_KEYS = new Set<MarketSortKey>(["supplyApy", "borrowApy", "utilization"]);
+
+export function parseMarketSort(sort?: string | null): MarketSortKey {
+  if (sort && VALID_SORT_KEYS.has(sort as MarketSortKey)) {
+    return sort as MarketSortKey;
+  }
+  return "default";
+}
+
+export function parseMarketQueryParams(
+  searchParams: { get(name: string): string | null }
+): { q: string; sort: MarketSortKey; mine: boolean } {
+  return {
+    q: searchParams.get("q") ?? "",
+    sort: parseMarketSort(searchParams.get("sort")),
+    mine: searchParams.get("mine") === "1",
+  };
+}
+
+export function buildMarketQueryString(
+  params: { q: string; sort: MarketSortKey; mine: boolean },
+  currentParams?: { toString(): string } | null
+): string {
+  const next = new URLSearchParams(currentParams ? currentParams.toString() : "");
+  const trimmedQ = params.q.trim();
+  if (trimmedQ) {
+    next.set("q", trimmedQ);
+  } else {
+    next.delete("q");
+  }
+  const safeSort = parseMarketSort(params.sort);
+  if (safeSort !== "default") {
+    next.set("sort", safeSort);
+  } else {
+    next.delete("sort");
+  }
+  if (params.mine) {
+    next.set("mine", "1");
+  } else {
+    next.delete("mine");
+  }
+  return next.toString();
+}
+
+export function getMarketUtilization(market: Pick<Market, "totalSupply" | "totalBorrow">): number {
+  if (market.totalSupply <= 0) return 0;
+  return market.totalBorrow / market.totalSupply;
+}
+
+function hasOpenPosition(
+  pos: { supplied: bigint | number; borrowed: bigint | number } | undefined
+): boolean {
+  if (!pos) return false;
+  const suppliedPositive =
+    typeof pos.supplied === "bigint" ? pos.supplied > BigInt(0) : pos.supplied > 0;
+  const borrowedPositive =
+    typeof pos.borrowed === "bigint" ? pos.borrowed > BigInt(0) : pos.borrowed > 0;
+  return suppliedPositive || borrowedPositive;
+}
+
+/**
+ * Pure filter and stable sort for the markets list.
+ * - Case-insensitive substring match on symbol and name
+ * - Optional "my positions only" filter
+ * - Stable descending sort by supplyApy, borrowApy, or utilization (unknown sort ignored)
+ */
+export function filterAndSortMarkets(
+  markets: readonly Market[],
+  params: MarketFilterParams,
+  positions?: MarketPositionMap
+): Market[] {
+  const query = (params.q ?? "").trim().toLowerCase();
+  const mineOnly = params.mine === true || params.mine === "1" || params.mine === "true";
+  const sortKey = parseMarketSort(params.sort);
+
+  const filtered = markets.filter((market) => {
+    if (query) {
+      const matchesSymbol = market.symbol.toLowerCase().includes(query);
+      const matchesName = market.name.toLowerCase().includes(query);
+      if (!matchesSymbol && !matchesName) return false;
+    }
+    if (mineOnly) {
+      if (!hasOpenPosition(positions?.[market.symbol])) return false;
+    }
+    return true;
+  });
+
+  if (sortKey === "default") {
+    return filtered;
+  }
+
+  return filtered
+    .map((market, index) => ({ market, index }))
+    .sort((a, b) => {
+      let diff = 0;
+      if (sortKey === "supplyApy") {
+        diff = b.market.supplyApy - a.market.supplyApy;
+      } else if (sortKey === "borrowApy") {
+        diff = b.market.borrowApy - a.market.borrowApy;
+      } else if (sortKey === "utilization") {
+        diff = getMarketUtilization(b.market) - getMarketUtilization(a.market);
+      }
+      return diff !== 0 ? diff : a.index - b.index;
+    })
+    .map(({ market }) => market);
+}
