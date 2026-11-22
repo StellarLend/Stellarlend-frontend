@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { formatCurrency, formatNumber, formatPercent, type Locale } from "@/lib/markets";
 import type { ProjectedPosition } from "@/lib/projection";
+import type { TradeOracleGuard } from "@/hooks/use-oracle-guard";
 
 export interface TradePreviewProps {
   currentCollateralUsd: number;
@@ -10,6 +11,8 @@ export interface TradePreviewProps {
   currentLimitUsd: number;
   currentHealth: number;
   projected: ProjectedPosition | null;
+  oracleGuard?: TradeOracleGuard | null;
+  oracleGuardId?: string;
 }
 
 export function TradePreview({
@@ -18,11 +21,17 @@ export function TradePreview({
   currentLimitUsd,
   currentHealth,
   projected,
+  oracleGuard,
+  oracleGuardId,
 }: TradePreviewProps) {
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
 
-  if (!projected) {
+  const hasOracleNotice = Boolean(
+    oracleGuard?.reason && (oracleGuard.blocked || oracleGuard.warning)
+  );
+
+  if (!projected && !hasOracleNotice) {
     return null;
   }
 
@@ -54,75 +63,104 @@ export function TradePreview({
 
   return (
     <div className="space-y-3 rounded-lg border border-[var(--line)] bg-[#080d1a] p-3 text-xs" data-testid="trade-preview">
-      <div className="font-semibold text-mut">{t("preview.title")}</div>
+      {projected && (
+        <>
+          <div className="font-semibold text-mut">{t("preview.title")}</div>
 
-      <div className="space-y-2">
-        {/* Borrow limit used */}
-        <div className="flex items-center justify-between">
-          <span className="mut">{t("preview.borrowLimitUsed")}</span>
-          <div className="flex items-center gap-1.5 font-mono">
-            <span className={getLimitTone(currentLimitPercent)}>
-              {formatPercent(currentLimitPercent, locale)}
-            </span>
-            <span className="mut">→</span>
-            <span className={getLimitTone(projected.borrowLimitUsedPercent)}>
-              {formatPercent(projected.borrowLimitUsedPercent, locale)}
-            </span>
+          <div className="space-y-2">
+            {/* Borrow limit used */}
+            <div className="flex items-center justify-between">
+              <span className="mut">{t("preview.borrowLimitUsed")}</span>
+              <div className="flex items-center gap-1.5 font-mono">
+                <span className={getLimitTone(currentLimitPercent)}>
+                  {formatPercent(currentLimitPercent, locale)}
+                </span>
+                <span className="mut">→</span>
+                <span className={getLimitTone(projected.borrowLimitUsedPercent)}>
+                  {formatPercent(projected.borrowLimitUsedPercent, locale)}
+                </span>
+              </div>
+            </div>
+
+            {/* Health Factor */}
+            <div className="flex items-center justify-between">
+              <span className="mut">{t("preview.healthFactor")}</span>
+              <div className="flex items-center gap-1.5 font-mono">
+                <span className={getHfTone(currentHealth)}>
+                  {formatHf(currentHealth)}
+                </span>
+                <span className="mut">→</span>
+                <span className={getHfTone(projected.health)}>
+                  {formatHf(projected.health)}
+                </span>
+              </div>
+            </div>
+
+            {/* Collateral */}
+            <div className="flex items-center justify-between">
+              <span className="mut">{t("preview.collateral")}</span>
+              <div className="flex items-center gap-1.5 font-mono">
+                <span>{formatCurrency(currentCollateralUsd, locale)}</span>
+                <span className="mut">→</span>
+                <span>{formatCurrency(projected.collateralUsd, locale)}</span>
+              </div>
+            </div>
+
+            {/* Debt */}
+            <div className="flex items-center justify-between">
+              <span className="mut">{t("preview.debt")}</span>
+              <div className="flex items-center gap-1.5 font-mono">
+                <span>{formatCurrency(currentBorrowUsd, locale)}</span>
+                <span className="mut">→</span>
+                <span>{formatCurrency(projected.borrowUsd, locale)}</span>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Health Factor */}
-        <div className="flex items-center justify-between">
-          <span className="mut">{t("preview.healthFactor")}</span>
-          <div className="flex items-center gap-1.5 font-mono">
-            <span className={getHfTone(currentHealth)}>
-              {formatHf(currentHealth)}
-            </span>
-            <span className="mut">→</span>
-            <span className={getHfTone(projected.health)}>
-              {formatHf(projected.health)}
-            </span>
-          </div>
-        </div>
+          {/* Warning banner when HF < 1.2 and >= 1.0 */}
+          {projected.isWarning && !projected.isUnsafe && (
+            <div
+              role="alert"
+              className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-amber-300"
+            >
+              {t("preview.warningLiquidation")}
+            </div>
+          )}
 
-        {/* Collateral */}
-        <div className="flex items-center justify-between">
-          <span className="mut">{t("preview.collateral")}</span>
-          <div className="flex items-center gap-1.5 font-mono">
-            <span>{formatCurrency(currentCollateralUsd, locale)}</span>
-            <span className="mut">→</span>
-            <span>{formatCurrency(projected.collateralUsd, locale)}</span>
-          </div>
-        </div>
-
-        {/* Debt */}
-        <div className="flex items-center justify-between">
-          <span className="mut">{t("preview.debt")}</span>
-          <div className="flex items-center gap-1.5 font-mono">
-            <span>{formatCurrency(currentBorrowUsd, locale)}</span>
-            <span className="mut">→</span>
-            <span>{formatCurrency(projected.borrowUsd, locale)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Warning banner when HF < 1.2 and >= 1.0 */}
-      {projected.isWarning && !projected.isUnsafe && (
-        <div
-          role="alert"
-          className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-amber-300"
-        >
-          {t("preview.warningLiquidation")}
-        </div>
+          {/* Danger alert when HF < 1.0 */}
+          {projected.isUnsafe && (
+            <div
+              role="alert"
+              className="rounded border border-red-500/40 bg-red-500/10 p-2 text-red-300"
+            >
+              {t("preview.dangerLiquidation")}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Danger alert when HF < 1.0 */}
-      {projected.isUnsafe && (
+      {/* Oracle guard notice (blocking for borrow/withdraw, warning for supply/repay) */}
+      {hasOracleNotice && oracleGuard?.reason && (
         <div
-          role="alert"
-          className="rounded border border-red-500/40 bg-red-500/10 p-2 text-red-300"
+          id={oracleGuardId}
+          role={oracleGuard.blocked ? "alert" : "status"}
+          data-testid="oracle-guard-notice"
+          className={
+            oracleGuard.blocked
+              ? "rounded border border-red-500/40 bg-red-500/10 p-2 text-red-300 space-y-1"
+              : "rounded border border-amber-500/40 bg-amber-500/10 p-2 text-amber-300 space-y-1"
+          }
         >
-          {t("preview.dangerLiquidation")}
+          <p>
+            {oracleGuard.warning ? `${t("oracle.guard.warningPrefix")} ` : ""}
+            {t(`oracle.guard.${oracleGuard.reason}`)}
+          </p>
+          <a
+            href="#oracle-panel"
+            className="inline-block underline hover:opacity-80"
+          >
+            {t("oracle.guard.viewOracle")}
+          </a>
         </div>
       )}
     </div>

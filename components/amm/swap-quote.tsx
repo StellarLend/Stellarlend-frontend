@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/components/wallet";
+import { txExplorer } from "@/lib/config";
 import {
   calculateEffectivePrice,
+  minOutFromSlippage,
   priceImpactBps,
   quoteExactIn,
 } from "@/lib/amm/quote";
@@ -14,21 +16,57 @@ import {
 } from "@/lib/amm/validate";
 import { formatTokenAmount, parseTokenAmount } from "@/lib/amm/liquidity-math";
 import {
+  contractErrorMessage,
+  MAX_SLIPPAGE_BPS,
+  MIN_SLIPPAGE_BPS,
   readPool,
   simulateSwapQuote,
+  submitSwap,
   type PoolSnapshot,
 } from "@/lib/amm/liquidity-client";
+
+const SLIPPAGE_STORAGE_KEY = "stellarlend:amm-slippage-pct";
+const DEFAULT_SLIPPAGE_STR = "0.5";
+const SLIPPAGE_PRESETS = ["0.1", "0.5", "1"] as const;
+
+function parseSlippageBps(raw: string): { bps: bigint | null; error: string | null } {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { bps: null, error: "Slippage tolerance is required (0.01% - 50%)." };
+  }
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+    return { bps: null, error: "Enter a valid slippage percentage with up to 2 decimals (0.01% - 50%)." };
+  }
+  const [whole, frac = ""] = trimmed.split(".");
+  const bps = BigInt(whole) * 100n + BigInt(frac.padEnd(2, "0"));
+  if (bps < MIN_SLIPPAGE_BPS || bps > MAX_SLIPPAGE_BPS) {
+    return { bps: null, error: "Slippage tolerance must be between 0.01% and 50%." };
+  }
+  return { bps, error: null };
+}
+
+function readSessionSlippage(): string {
+  try {
+    const saved = window.sessionStorage.getItem(SLIPPAGE_STORAGE_KEY);
+    if (saved && parseSlippageBps(saved).bps !== null) return saved;
+  } catch {
+    // Ignore storage access errors in SSR or restricted contexts
+  }
+  return DEFAULT_SLIPPAGE_STR;
+}
 
 export type Direction = "a_to_b" | "b_to_a";
 
 export type SwapQuotePanelProps = {
   initialSnapshot?: PoolSnapshot | null;
   onSimulateQuote?: typeof simulateSwapQuote;
+  onSubmitSwap?: typeof submitSwap;
 };
 
 export default function SwapQuotePanel({
   initialSnapshot = null,
   onSimulateQuote = simulateSwapQuote,
+  onSubmitSwap = submitSwap,
 }: SwapQuotePanelProps) {
   const { address } = useWallet();
   const [snapshot, setSnapshot] = useState<PoolSnapshot | null>(initialSnapshot);
@@ -36,10 +74,15 @@ export default function SwapQuotePanel({
   const [inputStr, setInputStr] = useState<string>("");
   const [debouncedInputStr, setDebouncedInputStr] = useState<string>("");
   const [simulatedOut, setSimulatedOut] = useState<bigint | null>(null);
+  const [quoteTimestamp, setQuoteTimestamp] = useState<number | null>(null);
   const [simulating, setSimulating] = useState<boolean>(false);
   const [simulationError, setSimulationError] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
+  const [slippageStr, setSlippageStr] = useState<string>(readSessionSlippage);
+  const [swapStatus, setSwapStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [swapTxHash, setSwapTxHash] = useState<string | null>(null);
+  const [swapError, setSwapError] = useState<string | null>(null);
 
   // Debounce input by 250ms
   useEffect(() => {
@@ -160,11 +203,26 @@ export default function SwapQuotePanel({
     });
   }, [localQuote, snapshot, amountIn, impactBps]);
 
+  // Persist valid slippage per session
+  const slippageParse = useMemo(() => parseSlippageBps(slippageStr), [slippageStr]);
+  const slippageBps = slippageParse.bps;
+  const slippageError = slippageParse.error;
+
+  useEffect(() => {
+    if (slippageBps === null) return;
+    try {
+      window.sessionStorage.setItem(SLIPPAGE_STORAGE_KEY, slippageStr.trim());
+    } catch {
+      // Ignore storage access errors
+    }
+  }, [slippageBps, slippageStr]);
+
   // Simulate on-chain get_swap_quote
   useEffect(() => {
     let cancelled = false;
     if (!amountIn || !snapshot) {
       setSimulatedOut(null);
+      setQuoteTimestamp(null);
       setSimulationError(null);
       return;
     }
@@ -177,12 +235,14 @@ export default function SwapQuotePanel({
       .then((sim) => {
         if (!cancelled) {
           setSimulatedOut(sim.amountOut);
+          setQuoteTimestamp(Date.now());
           setSimulating(false);
         }
       })
       .catch((err) => {
         if (!cancelled) {
           setSimulatedOut(null);
+          setQuoteTimestamp(null);
           setSimulationError(err instanceof Error ? err.message : String(err));
           setSimulating(false);
         }
@@ -234,19 +294,62 @@ export default function SwapQuotePanel({
     return calculateEffectivePrice(amountIn, localQuote.amountOut, decimalsIn, decimalsOut, 6);
   }, [amountIn, localQuote, decimalsIn, decimalsOut]);
 
+  const minOut = useMemo(() => {
+    if (!localQuote || slippageBps === null) return null;
+    return minOutFromSlippage(localQuote, slippageBps);
+  }, [localQuote, slippageBps]);
+
+  const isPoolEmpty = reserveIn <= 0n || reserveOut <= 0n;
+
   const toggleDirection = () => {
     setDirection((prev) => (prev === "a_to_b" ? "b_to_a" : "a_to_b"));
     setInputStr("");
     setDebouncedInputStr("");
     setSimulatedOut(null);
+    setQuoteTimestamp(null);
+    setSwapStatus("idle");
+    setSwapTxHash(null);
+    setSwapError(null);
   };
 
   const isSwapDisabled =
+    !address ||
+    isPoolEmpty ||
     amountIn === null ||
+    amountIn <= 0n ||
     localQuote === null ||
+    slippageBps === null ||
     guardIssues.length > 0 ||
     hasDisagreement ||
-    Boolean(inputError);
+    Boolean(inputError) ||
+    simulating ||
+    swapStatus === "submitting";
+
+  const handleSwap = async () => {
+    if (isSwapDisabled || !address || !amountIn || !localQuote || slippageBps === null) return;
+    setSwapStatus("submitting");
+    setSwapError(null);
+    setSwapTxHash(null);
+    try {
+      const hash = await onSubmitSwap(address, {
+        amountIn,
+        aForB: isAtoB,
+        slippageBps,
+        quotedAmountOut: simulatedOut ?? localQuote.amountOut,
+        quoteTimestamp: quoteTimestamp ?? Date.now(),
+        feeBps,
+      });
+      setSwapStatus("success");
+      setSwapTxHash(hash);
+      setInputStr("");
+      setDebouncedInputStr("");
+      await refreshSnapshot();
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      setSwapStatus("error");
+      setSwapError(contractErrorMessage(raw));
+    }
+  };
 
   return (
     <div
@@ -337,6 +440,46 @@ export default function SwapQuotePanel({
         )}
       </div>
 
+      {/* Slippage Tolerance */}
+      <div className="mt-4 space-y-2">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <label htmlFor="swap-slippage">Slippage Tolerance (%)</label>
+          <div className="flex items-center space-x-1">
+            {SLIPPAGE_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setSlippageStr(preset)}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium border transition cursor-pointer ${
+                  slippageStr.trim() === preset
+                    ? "bg-indigo-600/30 border-indigo-500 text-indigo-300"
+                    : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                }`}
+              >
+                {preset}%
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="relative">
+          <input
+            id="swap-slippage"
+            type="text"
+            inputMode="decimal"
+            value={slippageStr}
+            onChange={(e) => setSlippageStr(e.target.value)}
+            placeholder="0.5"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+          <span className="absolute right-3 top-2 text-xs text-slate-400">%</span>
+        </div>
+        {slippageError && (
+          <p className="text-xs text-rose-400" role="alert">
+            {slippageError}
+          </p>
+        )}
+      </div>
+
       {/* Quote Details */}
       {localQuote && (
         <div className="mt-5 space-y-3 bg-slate-950/40 border border-slate-800 rounded-xl p-4 text-xs font-mono">
@@ -346,6 +489,15 @@ export default function SwapQuotePanel({
               {formatTokenAmount(localQuote.amountOut, decimalsOut, 6)} {tokenOutSymbol}
             </span>
           </div>
+
+          {minOut !== null && (
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Minimum Received ({slippageStr.trim()}% slippage)</span>
+              <span data-testid="min-out-value" className="text-slate-200 font-semibold">
+                {formatTokenAmount(minOut, decimalsOut, 6)} {tokenOutSymbol}
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-between items-center text-slate-400">
             <span>Fee ({Number(feeBps) / 100}%)</span>
@@ -467,28 +619,70 @@ export default function SwapQuotePanel({
         </div>
       )}
 
-      {/* Disabled Future Swap Action Button */}
+      {/* Swap Action Button */}
       <div className="mt-6">
         <button
           type="button"
+          data-testid="swap-submit-button"
           disabled={isSwapDisabled}
+          onClick={() => {
+            void handleSwap();
+          }}
           className={`w-full py-3.5 px-4 rounded-xl font-semibold text-sm transition shadow-lg ${
             isSwapDisabled
               ? "bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed"
               : "bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer active:scale-98"
           }`}
         >
-          {guardIssues.length > 0
+          {swapStatus === "submitting"
+            ? "Swapping..."
+            : !address
+            ? "Connect Wallet to Swap"
+            : isPoolEmpty
+            ? "Pool is Empty"
+            : guardIssues.length > 0
             ? GUARD_ERROR_MESSAGES[guardIssues[0]]
             : hasDisagreement
             ? "Quote Disagreement"
             : inputError
             ? "Invalid Input"
+            : slippageError
+            ? "Invalid Slippage"
             : !amountIn
             ? "Enter an Amount"
-            : "Swap (Action Out of Scope)"}
+            : "Swap"}
         </button>
       </div>
+
+      {/* Swap Status UI */}
+      {swapStatus === "success" && swapTxHash && (
+        <div
+          data-testid="swap-success"
+          className="mt-4 flex flex-col space-y-1 text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-800/80 p-3 rounded-xl"
+          role="status"
+        >
+          <span className="font-semibold text-emerald-200">Swap confirmed!</span>
+          <a
+            href={txExplorer(swapTxHash)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-emerald-400 hover:text-emerald-300 break-all"
+          >
+            View transaction: {swapTxHash}
+          </a>
+        </div>
+      )}
+
+      {swapStatus === "error" && swapError && (
+        <div
+          data-testid="swap-error"
+          className="mt-4 text-xs text-rose-300 bg-rose-950/40 border border-rose-800/80 p-3 rounded-xl"
+          role="alert"
+        >
+          <span className="font-semibold text-rose-200">Swap failed: </span>
+          <span>{swapError}</span>
+        </div>
+      )}
 
       {lastRefreshedAt && (
         <p className="text-[10px] text-slate-500 text-center mt-3">

@@ -118,4 +118,26 @@ describe("RateChart component", () => {
       "5.00% (500 bps)"
     );
   });
+
+  it("overlays a proposed curve without removing the live curve", () => {
+    render(
+      <RateChart
+        params={DEFAULT_RATE_PARAMS}
+        diagnostics={activeDiagnostics}
+        history={[]}
+        overlay={{
+          params: { ...DEFAULT_RATE_PARAMS, base_rate_bps: 500n },
+          utilizationBps: 7_000n,
+        }}
+      />
+    );
+
+    expect(screen.getByTestId("proposed-rate-curve")).toBeInTheDocument();
+    expect(screen.getByTestId("proposed-utilization-marker")).toBeInTheDocument();
+    expect(screen.getByTestId("proposed-rate-dot")).toBeInTheDocument();
+    expect(screen.getAllByText("Proposed curve")).toHaveLength(2);
+    expect(screen.getByTestId("rate-curve-fallback-table")).toHaveTextContent(
+      "Proposed curve"
+    );
+  });
 });

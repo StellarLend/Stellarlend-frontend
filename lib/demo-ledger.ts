@@ -1,3 +1,8 @@
+import { formatTokenAmount } from "./format";
+
+/** Formats base units using the shared token amount formatter. */
+export { formatTokenAmount as formatAmount };
+
 /**
  * Demo-ledger: pure storage layer for simulated positions.
  *
@@ -84,19 +89,6 @@ export function parseAmount(input: string, decimals: number = DECIMALS): ParseRe
   }
 
   return { ok: true, value: baseUnits };
-}
-
-/**
- * Convert a BigInt base unit amount to a human-readable decimal string.
- * e.g. 1_5000000n (7 decimals) -> "1.5"
- */
-export function formatAmount(baseUnits: bigint, decimals: number = DECIMALS): string {
-  const scale = BigInt(10 ** decimals);
-  const whole = baseUnits / scale;
-  const frac = baseUnits % scale;
-  if (frac === BigInt(0)) return whole.toString();
-  const fracStr = frac.toString().padStart(decimals, "0").replace(/0+$/, "");
-  return `${whole}.${fracStr}`;
 }
 
 /**

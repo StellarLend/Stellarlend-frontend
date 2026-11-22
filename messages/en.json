@@ -1,6 +1,7 @@
 {
   "nav": {
     "brand": "Stellar",
+    "skipToContent": "Skip to content",
     "markets": "Markets",
     "history": "History",
     "docs": "Docs",
@@ -94,7 +95,14 @@
     "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments.",
     "networkMismatchTitle": "Network mismatch detected",
     "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
-    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}.",
+    "errors": {
+      "user_rejected": "Request was rejected in your wallet.",
+      "not_installed": "Wallet extension is not installed. Please install it to continue.",
+      "locked": "Your wallet is locked. Please unlock it and try again.",
+      "wrong_network": "Your wallet is connected to the wrong network. Please switch networks and try again.",
+      "unknown": "An unexpected wallet error occurred. Please try again."
+    }
   },
   "market": {
     "title": "Markets",
@@ -160,6 +168,18 @@
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
     "resetDemo": "Reset demo data",
+    "controls": {
+      "searchLabel": "Search markets",
+      "searchPlaceholder": "Search by symbol or name...",
+      "sortLabel": "Sort by",
+      "sortDefault": "Default order",
+      "sortSupplyApy": "Supply APY (high to low)",
+      "sortBorrowApy": "Borrow APY (high to low)",
+      "sortUtilization": "Utilization (high to low)",
+      "myPositionsOnly": "My positions only",
+      "noResults": "No markets match your current filters.",
+      "clearFilters": "Clear filters"
+    },
     "oracle": {
       "title": "On-chain oracle prices",
       "subtitle": "Prices, freshness, and bounds recorded by the lending contract.",
@@ -180,7 +200,15 @@
       "noBounds": "No bounds set",
       "timeSourceLedger": "Ledger time",
       "timeSourceBrowser": "Browser clock",
-      "loading": "Loading oracle prices..."
+      "loading": "Loading oracle prices...",
+      "guard": {
+        "stale": "Oracle price is stale. Borrowing and withdrawing are disabled until a fresh price is posted.",
+        "future": "Oracle price timestamp is in the future. Borrowing and withdrawing are disabled until the oracle timestamp is valid.",
+        "missing": "Oracle price is missing. Borrowing and withdrawing are disabled until an on-chain price is available.",
+        "outOfBounds": "Oracle price is outside configured safety bounds. Borrowing and withdrawing are disabled.",
+        "warningPrefix": "Oracle warning:",
+        "viewOracle": "View oracle status"
+      }
     },
     "rateModel": {
       "eyebrow": "Interest-rate model",
@@ -204,6 +232,7 @@
       "summaryActive": "At {utilization} utilization, the target borrow rate is {targetRate} ({targetBps} bps) and the applied smoothed rate is {appliedRate} ({appliedBps} bps). The kink is at {kink} utilization.",
       "summaryInactive": "The dynamic rate model is currently inactive. The protocol applies the default borrow rate of {defaultRate} ({defaultBps} bps) regardless of utilization ({utilization}).",
       "legendCurve": "Borrow rate curve",
+      "legendProposedCurve": "Proposed curve",
       "legendCurrentUtil": "Current utilization",
       "legendAppliedRate": "Applied rate",
       "legendTargetRate": "Target rate",
@@ -226,7 +255,22 @@
       "markerCurrent": "Current",
       "markerSurcharge": "Surcharge kink",
       "historyTableCaption": "Utilization history samples",
-      "colLedger": "Ledger"
+      "colLedger": "Ledger",
+      "loadingChart": "Loading interest-rate model chart..."
+    },
+    "rateSimulator": {
+      "title": "Rate model simulator",
+      "subtitle": "Explore how utilization and rate parameters change estimated annual borrow and supply rates. Changes are local and do not call the contract.",
+      "utilization": "Utilization (%)",
+      "baseRate": "Base rate (% APR)",
+      "slope1": "Slope 1 (% APR)",
+      "slope2": "Slope 2 (% APR)",
+      "kink": "Kink (%)",
+      "sliderLabel": "{label} slider",
+      "reset": "Reset to on-chain parameters",
+      "borrowApy": "Estimated borrow APY",
+      "supplyApy": "Estimated supply APY",
+      "invalidInput": "Enter non-negative rates with at most two decimal places. Utilization and kink must be between 0 and 100%."
     },
     "comingSoon": "Coming soon",
     "onchainMode": "On-chain mode (Stellar testnet)",
@@ -399,6 +443,8 @@
     "loadingMore": "Loading more...",
     "emptyTitle": "No transactions found",
     "emptySubtitle": "No transactions found for your address within the RPC retention window (~7 days). Older transactions cannot be queried via Soroban RPC.",
+    "emptyFilteredTitle": "No matching transactions",
+    "emptyFilteredSubtitle": "No loaded transactions match the selected filters. Try adjusting your filters or loading the entire retention window.",
     "errorTitle": "Failed to load transaction history",
     "retry": "Try again",
     "type": "Type",
@@ -408,6 +454,15 @@
     "tx": "Transaction",
     "viewTx": "View",
     "loadMore": "Load more",
+    "loadAll": "Load entire retention window",
+    "loadingAllProgress": "Loading pages ({pages} loaded, {rows} events)...",
+    "cancelLoadAll": "Cancel",
+    "exportCsv": "Export CSV",
+    "filterKindLabel": "Type",
+    "filterAllKinds": "All types",
+    "filterFromLabel": "From date",
+    "filterToLabel": "To date",
+    "clearFilters": "Clear filters",
     "deposit": "Deposit",
     "withdraw": "Withdraw",
     "borrow": "Borrow",
@@ -447,5 +502,51 @@
       "repay": "Repay",
       "liquidate": "Liquidate"
     }
+  },
+  "governance": {
+    "metaTitle": "Governance - StellarLend",
+    "heading": "Governance & risk configuration",
+    "notConfigured": "Lending contract is not configured.",
+    "contract": "Contract:",
+    "unavailable": "unavailable",
+    "notSet": "not set",
+    "tokens": "{amount} tokens",
+    "bpsRaw": "{value} bps",
+    "cards": {
+      "roles": "Roles",
+      "limits": "Supply & borrow limits",
+      "liquidation": "Liquidation",
+      "rateModel": "Interest-rate model",
+      "flashLoans": "Flash loans",
+      "oracle": "Oracle"
+    },
+    "fields": {
+      "admin": "Admin",
+      "guardian": "Guardian",
+      "minBorrow": "Minimum borrow",
+      "depositCap": "Deposit cap",
+      "borrowCap": "Borrow cap",
+      "closeFactor": "Close factor",
+      "liquidationThreshold": "Liquidation threshold",
+      "liquidationIncentive": "Liquidation incentive",
+      "rateParameters": "Rate parameters",
+      "maxFlashLoan": "Max flash loan",
+      "oracleKey": "Oracle key"
+    },
+    "audit": {
+      "title": "Governance audit log",
+      "entryCount": "{count, plural, =0 {No entries yet.} one {# entry} other {# entries}}",
+      "empty": "No entries yet.",
+      "showMore": "Show more",
+      "columns": {
+        "sequence": "Sequence",
+        "action": "Action",
+        "actor": "Actor",
+        "ledger": "Ledger"
+      }
+    }
+  },
+  "amm": {
+    "loadingTwapChart": "Loading TWAP price chart..."
   }
 }

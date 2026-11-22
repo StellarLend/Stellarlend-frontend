@@ -12,7 +12,7 @@ export async function PageShell({ locale = "en", children }: { locale?: string; 
     <NextIntlClientProvider locale={locale} messages={messages}>
       <WalletProvider>
         <Header />
-        <main className="mx-auto max-w-6xl px-4 py-10">{children}</main>
+        <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-10">{children}</main>
         <Footer />
       </WalletProvider>
     </NextIntlClientProvider>
