@@ -97,14 +97,20 @@ export function formatDuration(totalSeconds: number | bigint): string {
   return parts.join(" ");
 }
 
-/** Formats a raw token amount (default 7 decimals) as a decimal string with grouping. */
-export function formatTokenAmount(raw: bigint, decimals = 7): string {
+/** Formats raw token units by truncating to `decimals`, trimming zeroes, and grouping with English separators by default. */
+export function formatTokenAmount(raw: bigint, decimals = 7, locale = "en"): string {
   const negative = raw < 0n;
   const abs = negative ? -raw : raw;
   const base = 10n ** BigInt(decimals);
-  const whole = (abs / base).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const whole = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+    useGrouping: true,
+  }).format(abs / base);
   const fraction = (abs % base).toString().padStart(decimals, "0").replace(/0+$/, "");
-  return `${negative ? "-" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
+  const decimalSeparator = new Intl.NumberFormat(locale)
+    .formatToParts(1.1)
+    .find((part) => part.type === "decimal")?.value ?? ".";
+  return `${negative ? "-" : ""}${whole}${fraction ? `${decimalSeparator}${fraction}` : ""}`;
 }
 
 /** Shortens an address, e.g. GABCDE...WXYZ. */
