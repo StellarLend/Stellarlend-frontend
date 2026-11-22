@@ -13,12 +13,106 @@ import {
   type UtilizationSample,
 } from "@/lib/rate-model";
 
-import {
-  defaultRateChartLabels,
-  type RateChartLabels,
-} from "./rate-chart-labels";
+export type RateChartLabels = {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  chartAriaLabel: string;
+  sparklineAriaLabel: string;
+  inactiveBannerTitle: string;
+  inactiveBannerBody: string;
+  demoBadge: string;
+  liveBadge: string;
+  currentUtilization: string;
+  appliedRate: string;
+  targetRate: string;
+  kink: string;
+  floorCeiling: string;
+  surchargeBand: string;
+  surchargeDisabled: string;
+  lastUpdateLedger: string;
+  elapsedLedgers: string;
+  summaryActive: string;
+  summaryInactive: string;
+  legendCurve: string;
+  legendProposedCurve: string;
+  legendCurrentUtil: string;
+  legendAppliedRate: string;
+  legendTargetRate: string;
+  axisUtilization: string;
+  axisBorrowRate: string;
+  historyTitle: string;
+  historySubtitle: string;
+  historyEmptyTitle: string;
+  historyEmptyBody: string;
+  historyLedgerRange: string;
+  historyLatestSample: string;
+  tableToggle: string;
+  curveTableCaption: string;
+  colUtilization: string;
+  colUtilizationBps: string;
+  colBorrowApr: string;
+  colBorrowBps: string;
+  colNote: string;
+  markerKink: string;
+  markerCurrent: string;
+  markerSurcharge: string;
+  historyTableCaption: string;
+  colLedger: string;
+};
 
-export { defaultRateChartLabels, type RateChartLabels };
+export const defaultRateChartLabels: RateChartLabels = {
+  eyebrow: "Interest-rate model",
+  title: "Two-slope borrow rate curve",
+  subtitle:
+    "Live parameters from get_rate_params, current utilization and smoothed rate from get_rate_model_diagnostics, and recent utilization samples from get_utilization_history.",
+  chartAriaLabel: "Two-slope borrow rate curve chart",
+  sparklineAriaLabel: "Protocol utilization history sparkline",
+  inactiveBannerTitle: "Rate model inactive — default APR applies",
+  inactiveBannerBody:
+    "rate_model_active is false on the contract. Borrow positions accrue at the fixed default rate of 5.00% APR (500 bps) instead of the two-slope curve.",
+  demoBadge: "Demo curve",
+  liveBadge: "On-chain",
+  currentUtilization: "Current utilization",
+  appliedRate: "Applied rate (smoothed)",
+  targetRate: "Target rate (raw)",
+  kink: "Kink threshold",
+  floorCeiling: "Floor / ceiling",
+  surchargeBand: "Surcharge band",
+  surchargeDisabled: "Disabled",
+  lastUpdateLedger: "Last update ledger",
+  elapsedLedgers: "{count} ledgers ago",
+  summaryActive:
+    "At {utilization} utilization, the target borrow rate is {targetRate} ({targetBps} bps) and the applied smoothed rate is {appliedRate} ({appliedBps} bps). The kink is at {kink} utilization.",
+  summaryInactive:
+    "The dynamic rate model is currently inactive. The protocol applies the default borrow rate of {defaultRate} ({defaultBps} bps) regardless of utilization ({utilization}).",
+  legendCurve: "Borrow rate curve",
+  legendProposedCurve: "Proposed curve",
+  legendCurrentUtil: "Current utilization",
+  legendAppliedRate: "Applied rate",
+  legendTargetRate: "Target rate",
+  axisUtilization: "Utilization (%)",
+  axisBorrowRate: "Borrow APR (%)",
+  historyTitle: "Utilization history",
+  historySubtitle: "Newest-first ring buffer (up to 256 ledger samples)",
+  historyEmptyTitle: "No utilization history recorded yet",
+  historyEmptyBody:
+    "The contract returns an empty ring buffer until a borrow-rate update writes the first utilization sample on-chain.",
+  historyLedgerRange: "Ledger {oldest} to {newest}",
+  historyLatestSample: "Latest sample: {utilization} at ledger {ledger}",
+  tableToggle: "Accessible data tables",
+  curveTableCaption: "Sampled borrow-rate curve points",
+  colUtilization: "Utilization",
+  colUtilizationBps: "Utilization (bps)",
+  colBorrowApr: "Borrow APR",
+  colBorrowBps: "Borrow rate (bps)",
+  colNote: "Marker",
+  markerKink: "Kink",
+  markerCurrent: "Current",
+  markerSurcharge: "Surcharge kink",
+  historyTableCaption: "Utilization history samples",
+  colLedger: "Ledger",
+};
 
 export type RateChartProps = {
   params?: RateParams;
@@ -26,6 +120,12 @@ export type RateChartProps = {
   history?: UtilizationSample[];
   source?: "contract" | "demo";
   labels?: Partial<RateChartLabels>;
+  overlay?: RateChartOverlay;
+};
+
+export type RateChartOverlay = {
+  params: RateParams;
+  utilizationBps: bigint;
 };
 
 const DEFAULT_DIAGNOSTICS: RateModelDiagnostics = {
@@ -58,6 +158,7 @@ export function RateChart({
   history = [],
   source = "demo",
   labels,
+  overlay,
 }: RateChartProps) {
   const copy = useMemo(
     () => ({ ...defaultRateChartLabels, ...labels }),
@@ -72,6 +173,10 @@ export function RateChart({
   const sampledCurve = useMemo(
     () => sampleBorrowRateCurve(params, 250n),
     [params]
+  );
+  const proposedCurve = useMemo(
+    () => (overlay ? sampleBorrowRateCurve(overlay.params, 250n) : []),
+    [overlay]
   );
 
   // Key milestone points for the accessible fallback table
@@ -140,17 +245,29 @@ export function RateChart({
     for (const pt of sampledCurve) {
       if (maxVal < pt.borrowRateBps) maxVal = pt.borrowRateBps;
     }
+    for (const pt of proposedCurve) {
+      if (maxVal < pt.borrowRateBps) maxVal = pt.borrowRateBps;
+    }
     if (maxVal < diagnostics.applied_rate_bps) {
       maxVal = diagnostics.applied_rate_bps;
     }
     if (maxVal < diagnostics.target_rate_bps) {
       maxVal = diagnostics.target_rate_bps;
     }
+    if (overlay) {
+      const proposedRate = borrowRateBps(
+        overlay.utilizationBps,
+        overlay.params
+      );
+      if (maxVal < proposedRate) maxVal = proposedRate;
+    }
     return maxVal;
   }, [
     sampledCurve,
+    proposedCurve,
     diagnostics.applied_rate_bps,
     diagnostics.target_rate_bps,
+    overlay,
   ]);
 
   const toX = (uBps: bigint) =>
@@ -172,6 +289,17 @@ export function RateChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sampledCurve, maxRateBps]
   );
+  const proposedPolylinePoints = useMemo(
+    () =>
+      proposedCurve
+        .map(
+          (pt) =>
+            `${toX(pt.utilizationBps).toFixed(1)},${toY(pt.borrowRateBps).toFixed(1)}`
+        )
+        .join(" "),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [proposedCurve, maxRateBps]
+  );
 
   const areaPath = useMemo(() => {
     if (sampledCurve.length === 0) return "";
@@ -185,9 +313,13 @@ export function RateChart({
   }, [sampledCurve, polylinePoints, maxRateBps]);
 
   const currentX = toX(currentUtilBps);
+  const proposedX = overlay ? toX(overlay.utilizationBps) : null;
   const kinkX = toX(kinkUtilBps);
   const targetY = toY(diagnostics.target_rate_bps);
   const appliedY = toY(diagnostics.applied_rate_bps);
+  const proposedY = overlay
+    ? toY(borrowRateBps(overlay.utilizationBps, overlay.params))
+    : null;
 
   // Chronological (oldest -> newest) ordering for the utilization sparkline
   const chronologicalHistory = useMemo(
@@ -367,6 +499,15 @@ export function RateChart({
               />
               <span>{copy.legendCurve}</span>
             </span>
+            {overlay && (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-0.5 w-4 border-t-2 border-dashed border-amber-300"
+                  aria-hidden="true"
+                />
+                <span>{copy.legendProposedCurve}</span>
+              </span>
+            )}
             <span className="inline-flex items-center gap-1.5">
               <span
                 className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"
@@ -478,6 +619,20 @@ export function RateChart({
             opacity={diagnostics.rate_model_active ? 1 : 0.35}
           />
 
+          {overlay && proposedPolylinePoints && (
+            <polyline
+              fill="none"
+              stroke="#fbbf24"
+              strokeWidth="2.5"
+              strokeDasharray="6 4"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              points={proposedPolylinePoints}
+              aria-label={copy.legendProposedCurve}
+              data-testid="proposed-rate-curve"
+            />
+          )}
+
           {/* Vertical marker at current utilization */}
           <line
             x1={currentX}
@@ -511,6 +666,29 @@ export function RateChart({
             strokeWidth="1.5"
             data-testid="applied-rate-dot"
           />
+          {overlay && proposedX !== null && proposedY !== null && (
+            <>
+              <line
+                x1={proposedX}
+                y1={padTop}
+                x2={proposedX}
+                y2={padTop + plotH}
+                stroke="#fbbf24"
+                strokeDasharray="3 3"
+                strokeWidth="1.5"
+                data-testid="proposed-utilization-marker"
+              />
+              <circle
+                cx={proposedX}
+                cy={proposedY}
+                r="5"
+                fill="#0a1020"
+                stroke="#fbbf24"
+                strokeWidth="2"
+                data-testid="proposed-rate-dot"
+              />
+            </>
+          )}
         </svg>
 
         <div className="mut mt-1 text-center text-xs">
@@ -648,6 +826,9 @@ export function RateChart({
                 <th className="py-2 pr-4">{copy.colUtilizationBps}</th>
                 <th className="py-2 pr-4">{copy.colBorrowApr}</th>
                 <th className="py-2 pr-4">{copy.colBorrowBps}</th>
+                {overlay && (
+                  <th className="py-2 pr-4">{copy.legendProposedCurve}</th>
+                )}
                 <th className="py-2">{copy.colNote}</th>
               </tr>
             </thead>
@@ -669,6 +850,13 @@ export function RateChart({
                   <td className="py-2 pr-4 font-mono">
                     {row.borrowRateBps.toString()}
                   </td>
+                  {overlay && (
+                    <td className="py-2 pr-4 text-amber-300">
+                      {formatBpsPercent(
+                        borrowRateBps(row.utilizationBps, overlay.params)
+                      )}
+                    </td>
+                  )}
                   <td className="mut py-2">{row.note}</td>
                 </tr>
               ))}

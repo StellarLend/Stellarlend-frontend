@@ -226,6 +226,7 @@
       "summaryActive": "At {utilization} utilization, the target borrow rate is {targetRate} ({targetBps} bps) and the applied smoothed rate is {appliedRate} ({appliedBps} bps). The kink is at {kink} utilization.",
       "summaryInactive": "The dynamic rate model is currently inactive. The protocol applies the default borrow rate of {defaultRate} ({defaultBps} bps) regardless of utilization ({utilization}).",
       "legendCurve": "Borrow rate curve",
+      "legendProposedCurve": "Proposed curve",
       "legendCurrentUtil": "Current utilization",
       "legendAppliedRate": "Applied rate",
       "legendTargetRate": "Target rate",
@@ -250,6 +251,20 @@
       "historyTableCaption": "Utilization history samples",
       "colLedger": "Ledger",
       "loadingChart": "Loading interest-rate model chart..."
+    },
+    "rateSimulator": {
+      "title": "Rate model simulator",
+      "subtitle": "Explore how utilization and rate parameters change estimated annual borrow and supply rates. Changes are local and do not call the contract.",
+      "utilization": "Utilization (%)",
+      "baseRate": "Base rate (% APR)",
+      "slope1": "Slope 1 (% APR)",
+      "slope2": "Slope 2 (% APR)",
+      "kink": "Kink (%)",
+      "sliderLabel": "{label} slider",
+      "reset": "Reset to on-chain parameters",
+      "borrowApy": "Estimated borrow APY",
+      "supplyApy": "Estimated supply APY",
+      "invalidInput": "Enter non-negative rates with at most two decimal places. Utilization and kink must be between 0 and 100%."
     },
     "comingSoon": "Coming soon",
     "onchainMode": "On-chain mode (Stellar testnet)",
