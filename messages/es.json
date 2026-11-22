@@ -1,6 +1,7 @@
 {
   "nav": {
     "brand": "Stellar",
+    "skipToContent": "Saltar al contenido",
     "markets": "Mercados",
     "history": "Historial",
     "docs": "Documentación",
@@ -154,6 +155,18 @@
     "notDeployed": "no desplegado",
     "balance": "{balance} XLM",
     "resetDemo": "Restablecer datos de demostración",
+    "controls": {
+      "searchLabel": "Buscar mercados",
+      "searchPlaceholder": "Buscar por símbolo o nombre...",
+      "sortLabel": "Ordenar por",
+      "sortDefault": "Orden predeterminado",
+      "sortSupplyApy": "APY de depósito (mayor a menor)",
+      "sortBorrowApy": "APY de préstamo (mayor a menor)",
+      "sortUtilization": "Utilización (mayor a menor)",
+      "myPositionsOnly": "Solo mis posiciones",
+      "noResults": "Ningún mercado coincide con tus filtros actuales.",
+      "clearFilters": "Limpiar filtros"
+    },
     "oracle": {
       "title": "Precios de oráculo en cadena",
       "subtitle": "Precios, frescura y límites registrados por el contrato de préstamo.",

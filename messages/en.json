@@ -1,6 +1,7 @@
 {
   "nav": {
     "brand": "Stellar",
+    "skipToContent": "Skip to content",
     "markets": "Markets",
     "history": "History",
     "docs": "Docs",
@@ -154,6 +155,18 @@
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
     "resetDemo": "Reset demo data",
+    "controls": {
+      "searchLabel": "Search markets",
+      "searchPlaceholder": "Search by symbol or name...",
+      "sortLabel": "Sort by",
+      "sortDefault": "Default order",
+      "sortSupplyApy": "Supply APY (high to low)",
+      "sortBorrowApy": "Borrow APY (high to low)",
+      "sortUtilization": "Utilization (high to low)",
+      "myPositionsOnly": "My positions only",
+      "noResults": "No markets match your current filters.",
+      "clearFilters": "Clear filters"
+    },
     "oracle": {
       "title": "On-chain oracle prices",
       "subtitle": "Prices, freshness, and bounds recorded by the lending contract.",
