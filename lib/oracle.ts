@@ -25,6 +25,21 @@ export const ORACLE_PRICE_DECIMALS = 7;
  */
 export const MAX_ORACLE_AGE_SECONDS = 3600;
 
+/**
+ * Returns the effective max oracle age in seconds, honoring the optional
+ * NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS testnet override when set to a positive integer.
+ */
+export function getMaxOracleAgeSeconds(): number {
+  const raw = process.env.NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS;
+  if (raw) {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return MAX_ORACLE_AGE_SECONDS;
+}
+
 export type PriceRecord = {
   price: bigint;
   timestamp: bigint;
@@ -170,7 +185,7 @@ export function formatOraclePrice(
 export function classifyPriceAge(
   timestamp: bigint | null,
   referenceTimeSeconds: number,
-  maxAgeSeconds = MAX_ORACLE_AGE_SECONDS
+  maxAgeSeconds = getMaxOracleAgeSeconds()
 ): { status: StalenessStatus; ageSeconds: number | null } {
   if (timestamp === null) {
     return { status: "missing", ageSeconds: null };

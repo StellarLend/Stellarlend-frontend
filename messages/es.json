@@ -174,7 +174,15 @@
       "noBounds": "Sin límites establecidos",
       "timeSourceLedger": "Hora del libro mayor",
       "timeSourceBrowser": "Reloj del navegador",
-      "loading": "Cargando precios de oráculo..."
+      "loading": "Cargando precios de oráculo...",
+      "guard": {
+        "stale": "El precio del oráculo está obsoleto. Pedir prestado y retirar están deshabilitados hasta que se publique un precio fresco.",
+        "future": "La marca temporal del oráculo está en el futuro. Pedir prestado y retirar están deshabilitados hasta que sea válida.",
+        "missing": "Falta el precio del oráculo. Pedir prestado y retirar están deshabilitados hasta que haya un precio en cadena.",
+        "outOfBounds": "El precio del oráculo está fuera de los límites de seguridad configurados. Pedir prestado y retirar están deshabilitados.",
+        "warningPrefix": "Aviso de oráculo:",
+        "viewOracle": "Ver estado del oráculo"
+      }
     },
     "rateModel": {
       "eyebrow": "Modelo de tasas de interés",
