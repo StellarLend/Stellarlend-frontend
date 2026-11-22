@@ -1,12 +1,13 @@
 import { test, expect, Page } from '@playwright/test';
 
 const VIEWPORTS: Array<{ width: number; height: number; label: string }> = [
+  { width: 320, height: 800, label: '320' },
   { width: 360, height: 800, label: '360' },
   { width: 390, height: 844, label: '390' },
   { width: 768, height: 1024, label: '768' },
 ];
 
-const ROUTES = ['/', '/markets', '/docs'];
+const ROUTES = ['/', '/markets', '/docs', '/es/markets'];
 
 async function getHorizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -23,22 +24,47 @@ for (const viewport of VIEWPORTS) {
 
     for (const route of ROUTES) {
       test(`no horizontal overflow on ${route}`, async ({ page }) => {
-        await page.goto(route, { waitUntil: 'networkidle' });
-        await page.waitForLoadState('networkidle');
+        await page.goto(route);
+        await expect(page.locator('main')).toBeVisible();
         const overflow = await getHorizontalOverflow(page);
-        expect(overflow, `horizontal overflow on ${route} at ${viewport.width}px`).toBeLessThanOrEqual(1);
+        expect(overflow, `horizontal overflow on ${route} at ${viewport.width}px`).toBe(0);
       });
     }
   });
 }
 
+test.describe('mobile navigation', () => {
+  test.use({ viewport: { width: 320, height: 800 } });
+
+  test('primary navigation links are reachable by keyboard', async ({ page }) => {
+    await page.goto('/');
+
+    const brandLink = page.getByRole('link', { name: /Stellar/i }).first();
+    const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+    const navigationLinks = [
+      navigation.getByRole('link', { name: /^Markets$/i }),
+      navigation.getByRole('link', { name: /^History$/i }),
+      navigation.getByRole('link', { name: /^Flash loans$/i }),
+      navigation.getByRole('link', { name: /^AMM$/i }),
+      navigation.getByRole('link', { name: /^Governance$/i }),
+      navigation.getByRole('link', { name: /^Docs$/i }),
+    ];
+
+    await brandLink.focus();
+    for (const link of navigationLinks) {
+      await page.keyboard.press('Tab');
+      await expect(link).toBeFocused();
+    }
+  });
+});
+
 test.describe('markets trade sheet', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('opens and closes the trade sheet from a market card', async ({ page }) => {
-    await page.goto('/markets', { waitUntil: 'networkidle' });
+    await page.goto('/markets');
 
-    const tradeButtons = page.getByTestId('market-card-trade');
+    const tradeButtons = page.getByRole('button', { name: /^Trade XLM$/i });
     await expect(tradeButtons.first()).toBeVisible();
 
     const scrollYbefore = await page.evaluate(() => window.scrollY);
@@ -57,7 +83,7 @@ test.describe('markets trade sheet', () => {
 
     const closeButton = page.getByTestId('trade-sheet-close');
     await closeButton.click();
-    await expect(sheet).hidden();
+    await expect(sheet).toBeHidden();
 
     const scrollYAfter = await page.evaluate(() => window.scrollY);
     expect(Math.abs(scrollYAfter - scrollYbefore)).toBeLessThanOrEqual(2);
