@@ -69,12 +69,37 @@ export class TokenBucketRateLimiter {
   }
 }
 
+export const UNKNOWN_CLIENT_IP = "unknown";
+
 /** 120-request burst, two tokens per second (about 120 requests/minute per IP). */
 export const apiRateLimiter = new TokenBucketRateLimiter(120, 2);
 
-/** Test helper: clear all per-IP buckets. */
+/** Lower-limit shared bucket for requests without a verifiable client IP. */
+export const unknownApiRateLimiter = new TokenBucketRateLimiter(30, 0.5);
+
+/** Test helper: clear all per-IP and unknown-client buckets. */
 export function resetApiRateLimiter(): void {
   apiRateLimiter.reset();
+  unknownApiRateLimiter.reset();
+}
+
+const DEFAULT_TRUSTED_PROXY_HOPS = 1;
+
+/**
+ * Parses `TRUSTED_PROXY_HOPS` as a non-negative integer.
+ * Defaults to 1 (single trusted reverse proxy, e.g. Vercel). Set to 0 to ignore `x-forwarded-for`.
+ */
+export function getTrustedProxyHops(
+  raw: string | undefined = process.env.TRUSTED_PROXY_HOPS,
+): number {
+  if (raw === undefined) return DEFAULT_TRUSTED_PROXY_HOPS;
+  const trimmed = raw.trim();
+  if (!trimmed || !/^\d+$/.test(trimmed)) return DEFAULT_TRUSTED_PROXY_HOPS;
+
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_TRUSTED_PROXY_HOPS;
 }
 
 function isPlausibleIp(value: string): boolean {
@@ -94,16 +119,47 @@ function isPlausibleIp(value: string): boolean {
   return value.includes(":") && /^[0-9a-fA-F:]+$/.test(value);
 }
 
-/** Reads the first validated `x-forwarded-for` hop, falling back to `x-real-ip`. */
-export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim() ?? "";
-    if (isPlausibleIp(first)) return first;
+/**
+ * Reads the client IP appended by the trusted proxy hop (counted from the right
+ * of `x-forwarded-for`), falling back to `x-real-ip` and then `"unknown"`.
+ * When `TRUSTED_PROXY_HOPS` is `0`, `x-forwarded-for` is ignored.
+ */
+export function getClientIp(
+  request: Request,
+  trustedProxyHops: number = getTrustedProxyHops(),
+): string {
+  if (trustedProxyHops > 0) {
+    const forwarded = request.headers.get("x-forwarded-for");
+    if (forwarded) {
+      const hops = forwarded
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const index = hops.length - trustedProxyHops;
+      if (index >= 0) {
+        const candidate = hops[index] ?? "";
+        if (isPlausibleIp(candidate)) return candidate;
+      }
+    }
   }
 
   const realIp = request.headers.get("x-real-ip")?.trim() ?? "";
   if (isPlausibleIp(realIp)) return realIp;
 
-  return "unknown";
+  return UNKNOWN_CLIENT_IP;
+}
+
+/**
+ * Applies the API rate limit for a request, routing `"unknown"` clients to a
+ * separate lower-limit bucket so they cannot evade or impact known-IP limits.
+ */
+export function checkApiRateLimit(
+  request: Request,
+  now?: number,
+): RateLimitResult {
+  const ip = getClientIp(request);
+  if (ip === UNKNOWN_CLIENT_IP) {
+    return unknownApiRateLimiter.check(UNKNOWN_CLIENT_IP, now);
+  }
+  return apiRateLimiter.check(ip, now);
 }
