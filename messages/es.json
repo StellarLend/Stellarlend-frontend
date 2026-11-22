@@ -198,6 +198,7 @@
       "summaryActive": "Con una utilización de {utilization}, la tasa objetivo es {targetRate} ({targetBps} bps) y la tasa suavizada aplicada es {appliedRate} ({appliedBps} bps). El quiebre está en {kink} de utilización.",
       "summaryInactive": "El modelo dinámico de tasas está inactivo. El protocolo aplica la tasa predeterminada de {defaultRate} ({defaultBps} bps) independientemente de la utilización ({utilization}).",
       "legendCurve": "Curva de tasa de préstamo",
+      "legendProposedCurve": "Curva propuesta",
       "legendCurrentUtil": "Utilización actual",
       "legendAppliedRate": "Tasa aplicada",
       "legendTargetRate": "Tasa objetivo",
@@ -221,6 +222,20 @@
       "markerSurcharge": "Quiebre de recargo",
       "historyTableCaption": "Muestras del historial de utilización",
       "colLedger": "Ledger"
+    },
+    "rateSimulator": {
+      "title": "Simulador del modelo de tasas",
+      "subtitle": "Explora cómo la utilización y los parámetros de tasas cambian las tasas anuales estimadas de préstamo y depósito. Los cambios son locales y no llaman al contrato.",
+      "utilization": "Utilización (%)",
+      "baseRate": "Tasa base (% APR)",
+      "slope1": "Pendiente 1 (% APR)",
+      "slope2": "Pendiente 2 (% APR)",
+      "kink": "Quiebre (%)",
+      "sliderLabel": "Control deslizante de {label}",
+      "reset": "Restablecer parámetros en cadena",
+      "borrowApy": "APY estimado del préstamo",
+      "supplyApy": "APY estimado del depósito",
+      "invalidInput": "Introduce tasas no negativas con un máximo de dos decimales. La utilización y el quiebre deben estar entre 0 y 100%."
     },
     "comingSoon": "Próximamente",
     "onchainMode": "Modo on-chain (testnet de Stellar)",

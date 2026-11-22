@@ -34,7 +34,13 @@ import {
   fetchRateModelSnapshot,
   type RateModelSnapshot,
 } from "@/lib/rate-model";
-import { RateChart, defaultRateChartLabels, type RateChartLabels } from "./rate-chart";
+import {
+  RateChart,
+  defaultRateChartLabels,
+  type RateChartLabels,
+  type RateChartOverlay,
+} from "./rate-chart";
+import { RateSimulator } from "./rate-simulator";
 
 import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
@@ -114,6 +120,10 @@ export default function MarketsApp() {
   const [rateSnapshot, setRateSnapshot] = useState<RateModelSnapshot>(() =>
     buildDemoRateModelSnapshot()
   );
+  const [rateOverlay, setRateOverlay] = useState<{
+    snapshotKey: string;
+    overlay: RateChartOverlay;
+  } | null>(null);
 
   const panelRef = useRef<HTMLElement | null>(null);
 
@@ -279,6 +289,11 @@ export default function MarketsApp() {
     }
     return resolved;
   }, [t]);
+  const rateSnapshotKey = [
+    rateSnapshot.source,
+    ...Object.values(rateSnapshot.params).map((value) => value.toString()),
+    rateSnapshot.diagnostics.utilization_bps.toString(),
+  ].join(":");
 
   const risk = useMemo(() => computeRisk(ledger, activeMarkets), [ledger, activeMarkets]);
 
@@ -812,6 +827,19 @@ export default function MarketsApp() {
         history={rateSnapshot.history}
         source={rateSnapshot.source}
         labels={rateChartLabels}
+        overlay={
+          rateOverlay?.snapshotKey === rateSnapshotKey
+            ? rateOverlay.overlay
+            : undefined
+        }
+      />
+      <RateSimulator
+        key={rateSnapshotKey}
+        params={rateSnapshot.params}
+        utilizationBps={rateSnapshot.diagnostics.utilization_bps}
+        onOverlayChange={(overlay) =>
+          setRateOverlay(overlay ? { snapshotKey: rateSnapshotKey, overlay } : null)
+        }
       />
 
       <div className="flex items-center justify-between text-xs mut">
