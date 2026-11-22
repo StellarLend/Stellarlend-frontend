@@ -16,6 +16,69 @@ export interface ListProposalsOptions {
   contractId?: string;
   rpcServer?: rpc.Server;
   forceProbing?: boolean;
+  cursor?: number;
+  pageSize?: number;
+  status?: ProposalStatus;
+}
+
+const PROPOSAL_ID_CACHE_TTL_MS = 60_000;
+const proposalIdCache = new Map<
+  string,
+  { promise: Promise<number[]>; expiresAt: number }
+>();
+
+export function clearProposalIdDiscoveryCache(contractId?: string): void {
+  if (contractId) {
+    proposalIdCache.delete(contractId);
+  } else {
+    proposalIdCache.clear();
+  }
+}
+
+async function getDiscoveredProposalIds(
+  contractId: string,
+  rpcServer: rpc.Server,
+  currentLedger: number,
+  forceProbing: boolean
+): Promise<number[]> {
+  const cached = proposalIdCache.get(contractId);
+  if (!forceProbing && cached && cached.expiresAt > Date.now()) {
+    return [...(await cached.promise)];
+  }
+
+  const discovery = (async () => {
+    let proposalIds: number[] = [];
+
+    if (!forceProbing) {
+      try {
+        proposalIds = await discoverProposalIdsViaEvents(
+          contractId,
+          rpcServer,
+          currentLedger
+        );
+      } catch {
+        // Event discovery failed or is unsupported; use the probing fallback.
+      }
+    }
+
+    if (proposalIds.length === 0) {
+      proposalIds = await probeProposalIds(contractId, rpcServer);
+    }
+
+    return proposalIds;
+  })();
+
+  if (!forceProbing) {
+    const entry = { promise: discovery, expiresAt: Date.now() + PROPOSAL_ID_CACHE_TTL_MS };
+    proposalIdCache.set(contractId, entry);
+    discovery.catch(() => {
+      if (proposalIdCache.get(contractId) === entry) {
+        proposalIdCache.delete(contractId);
+      }
+    });
+  }
+
+  return [...(await discovery)];
 }
 
 /**
@@ -402,49 +465,64 @@ export async function probeProposalIds(
  */
 export async function listProposals(
   options: ListProposalsOptions = {}
-): Promise<{ overview: MultisigOverview | null; proposals: Proposal[] }> {
+): Promise<{
+  overview: MultisigOverview | null;
+  proposals: Proposal[];
+  nextCursor: number | null;
+  failedProposalIds: number[];
+}> {
   const contractId = options.contractId || config.multisigId;
   if (!contractId) {
-    return { overview: null, proposals: [] };
+    return { overview: null, proposals: [], nextCursor: null, failedProposalIds: [] };
   }
 
   const rpcServer = options.rpcServer || getRpcServer();
   const overview = await getMultisigOverview(contractId, rpcServer);
   if (!overview) {
-    return { overview: null, proposals: [] };
+    return { overview: null, proposals: [], nextCursor: null, failedProposalIds: [] };
   }
 
-  let proposalIds: number[] = [];
-
-  if (!options.forceProbing) {
-    try {
-      proposalIds = await discoverProposalIdsViaEvents(
-        contractId,
-        rpcServer,
-        overview.currentLedger
-      );
-    } catch {
-      // Event discovery failed or unsupported, fall back to probing
-      proposalIds = [];
-    }
-  }
-
-  // If no IDs found via events (e.g. outside retention window or empty), use probing fallback
-  if (proposalIds.length === 0) {
-    proposalIds = await probeProposalIds(contractId, rpcServer);
-  }
+  const proposalIds = await getDiscoveredProposalIds(
+    contractId,
+    rpcServer,
+    overview.currentLedger,
+    Boolean(options.forceProbing)
+  );
+  const requestedCursor = options.cursor ?? 0;
+  const requestedPageSize = options.pageSize ?? 10;
+  const cursor = Number.isFinite(requestedCursor)
+    ? Math.max(0, Math.floor(requestedCursor))
+    : 0;
+  const pageSize = Number.isFinite(requestedPageSize)
+    ? Math.max(1, Math.floor(requestedPageSize))
+    : 10;
+  const pageIds = proposalIds.slice(cursor, cursor + pageSize);
 
   const proposals: Proposal[] = [];
-  for (const id of proposalIds) {
+  const failedProposalIds: number[] = [];
+  for (const id of pageIds) {
     try {
       const detail = await getProposalDetail(id, contractId, rpcServer, overview);
       if (detail) {
         proposals.push(detail);
       }
-    } catch {
-      // Gracefully continue on individual failure
+    } catch (error) {
+      if (isProposalNotFoundError(error)) {
+        continue;
+      }
+      failedProposalIds.push(id);
     }
   }
 
-  return { overview, proposals };
+  const nextCursor = cursor + pageIds.length < proposalIds.length
+    ? cursor + pageIds.length
+    : null;
+
+  const filteredProposals = options.status
+    ? proposals.filter(
+        (proposal) => (proposal.effectiveStatus ?? proposal.status) === options.status
+      )
+    : proposals;
+
+  return { overview, proposals: filteredProposals, nextCursor, failedProposalIds };
 }
