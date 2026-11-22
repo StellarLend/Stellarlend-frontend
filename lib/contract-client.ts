@@ -3,6 +3,7 @@ import {
   Address,
   Contract,
   Keypair,
+  StrKey,
   TimeoutInfinite,
   TransactionBuilder,
   nativeToScVal,
@@ -35,6 +36,12 @@ function getRpcServer(rpcUrl?: string): rpc.Server {
   });
 }
 
+function validateContractId(contractId: string): void {
+  if (!contractId || !StrKey.isValidContract(contractId)) {
+    throw new Error(`Invalid contract ID: ${contractId}`);
+  }
+}
+
 export function pauseTypeToScVal(pauseType: PauseType, asVec = false): xdr.ScVal {
   if (asVec) {
     return nativeToScVal([pauseType], { type: ["symbol"] });
@@ -49,6 +56,7 @@ export async function readContract(
   rpcUrl = config.rpc,
   networkPassphrase = config.networkPassphrase
 ): Promise<unknown> {
+  validateContractId(contractId);
   const server = getRpcServer(rpcUrl);
   const tx = new TransactionBuilder(new Account(SIMULATION_SOURCE, "0"), {
     fee: "100",
@@ -179,6 +187,7 @@ export async function set_pause(
   rpcUrl = config.rpc,
   networkPassphrase = config.networkPassphrase
 ): Promise<string> {
+  validateContractId(contractId);
   const server = getRpcServer(rpcUrl);
   const adminAccount = await server.getAccount(adminKeypair.publicKey());
 
