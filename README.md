@@ -12,6 +12,7 @@ StellarLend is an over-collateralised lending market on Stellar (Soroban). This 
 - `/markets`: asset table, health factor, borrowing limit, trade panel
 - `/flash-loans`: recent on-chain flash-loan and repayment events, fee observations, utilization limit, and pause state
 - `/amm`: add/remove AMM liquidity with exact integer previews and Freighter signing
+- `/multisig`: multisig governance explorer with signer-gated proposal creation (decoded `ScVal` preview), approval, execution, and cancellation
 - Freighter wallet connect with graceful no-wallet demo mode; testnet XLM balance via Horizon
 - `/docs`: user docs, risk parameters, deployed contract list, env vars
 
