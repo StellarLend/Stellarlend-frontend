@@ -1,14 +1,12 @@
 import {
   Address,
-  Contract,
   StrKey,
-  TransactionBuilder,
-  rpc,
   scValToNative,
   xdr,
 } from "@stellar/stellar-sdk";
 import { config } from "./config";
 import { MARKETS, type Market, type MarketSources } from "./markets";
+import { simulateRead } from "./soroban-read";
 
 export type OnChainAssetParams = {
   asset: string;
@@ -79,7 +77,7 @@ export function computeDepositCapRemaining(
 }
 
 /**
- * Simulates a read-only Soroban contract call using a throwaway keypair.
+ * Simulates a read-only Soroban contract call using the unified simulateRead helper.
  * No signing or fees required.
  */
 export async function simulateReadCall<T = unknown>(
@@ -91,26 +89,14 @@ export async function simulateReadCall<T = unknown>(
     return null;
   }
   try {
-    const server = new rpc.Server(config.rpc);
-    const contract = new Contract(contractId);
-    const throwawayPublicKey = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
-    const account = new (await import("@stellar/stellar-sdk")).Account(throwawayPublicKey, "0");
-
-    const tx = new TransactionBuilder(account, {
-      fee: "100",
-      networkPassphrase: config.networkPassphrase,
-    })
-      .addOperation(contract.call(method, ...args))
-      .setTimeout(30)
-      .build();
-
-    const sim = await server.simulateTransaction(tx);
-    if (!sim || !rpc.Api.isSimulationSuccess(sim)) {
-      return null;
-    }
-    const resultVal = sim.result?.retval;
-    if (!resultVal) return null;
-    return scValToNative(resultVal) as T;
+    const { native } = await simulateRead<T>({
+      contractId,
+      method,
+      args,
+      rpcUrl: config.rpc,
+      passphrase: config.networkPassphrase,
+    });
+    return native ?? null;
   } catch {
     return null;
   }

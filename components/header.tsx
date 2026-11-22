@@ -15,12 +15,18 @@ export function Header() {
   const historyHref = locale === "es" ? "/es/history" : "/history";
   const flashLoansHref = locale === "es" ? "/es/flash-loans" : "/flash-loans";
   const ammHref = locale === "es" ? "/es/amm" : "/amm";
-  const governanceHref = locale === "es" ? "/es/multisig" : "/multisig";
+  const governanceHref = locale === "es" ? "/es/governance" : "/governance";
   const docsHref = locale === "es" ? "/es/docs" : "/docs";
   const homeHref = locale === "es" ? "/es" : "/";
 
   return (
     <>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-[var(--bg)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--fg)] focus:outline-2 focus:outline-offset-2 focus:outline-[var(--acc)]"
+      >
+        {t("skipToContent")}
+      </a>
       <NetworkBanner />
       <header className="sticky top-0 z-10 border-b border-[var(--line)] bg-[var(--bg)]/85 backdrop-blur">
 
