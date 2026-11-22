@@ -174,7 +174,15 @@
       "noBounds": "No bounds set",
       "timeSourceLedger": "Ledger time",
       "timeSourceBrowser": "Browser clock",
-      "loading": "Loading oracle prices..."
+      "loading": "Loading oracle prices...",
+      "guard": {
+        "stale": "Oracle price is stale. Borrowing and withdrawing are disabled until a fresh price is posted.",
+        "future": "Oracle price timestamp is in the future. Borrowing and withdrawing are disabled until the oracle timestamp is valid.",
+        "missing": "Oracle price is missing. Borrowing and withdrawing are disabled until an on-chain price is available.",
+        "outOfBounds": "Oracle price is outside configured safety bounds. Borrowing and withdrawing are disabled.",
+        "warningPrefix": "Oracle warning:",
+        "viewOracle": "View oracle status"
+      }
     },
     "rateModel": {
       "eyebrow": "Interest-rate model",

@@ -28,7 +28,8 @@ import {
   type Ledger,
 } from "@/lib/demo-ledger";
 import OraclePanel from "./oracle-panel";
-import { fetchOracleAssetPrices, type OracleAssetPrice } from "@/lib/oracle";
+import { useOracleGuard } from "@/hooks/use-oracle-guard";
+import { TradePreview } from "./trade-preview";
 import {
   buildDemoRateModelSnapshot,
   fetchRateModelSnapshot,
@@ -117,27 +118,8 @@ export default function MarketsApp() {
 
   const panelRef = useRef<HTMLElement | null>(null);
 
-  const [oraclePrices, setOraclePrices] = useState<Record<string, OracleAssetPrice>>({});
-  const [timeSource, setTimeSource] = useState<"ledger" | "browser">("ledger");
-  const [isLoadingOracle, setIsLoadingOracle] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    setIsLoadingOracle(true);
-    fetchOracleAssetPrices()
-      .then((res) => {
-        if (!active) return;
-        setOraclePrices(res.prices);
-        setTimeSource(res.timeSource);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setIsLoadingOracle(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { prices: oraclePrices, timeSource, isLoading: isLoadingOracle, evaluate: evaluateOracle } = useOracleGuard();
+  // Oracle prices and staleness are managed by useOracleGuard (30s React Query refetch).
 
   const activeMarkets = useMemo<Market[]>(() => {
     return markets.map((m) => {
@@ -308,7 +290,7 @@ export default function MarketsApp() {
   }
 
   async function submit() {
-    if (!sel || busy) return;
+    if (!sel || busy || oracleGuard.blocked) return;
     // Accept locale-formatted input (e.g. "1.234,5" in Spanish), then parse
     // strictly into base units.
     const normalized = normaliseAmountInput(amt, locale);
@@ -433,6 +415,8 @@ export default function MarketsApp() {
   };
   const currentBlockedReason = !isDemoMode ? getBlockedReason(mode) : null;
   const currentBlocked = !isDemoMode && !isActionAllowed(mode);
+  const oracleGuard = useMemo(() => evaluateOracle(mode), [evaluateOracle, mode]);
+  const oracleReasonId = oracleGuard.reason ? "oracle-guard-reason" : undefined;
 
   const tradePanel = sel ? (
     <div className="space-y-4">
@@ -482,11 +466,21 @@ export default function MarketsApp() {
       <button
         className="btn w-full"
         onClick={submit}
-        disabled={busy || currentBlocked}
+        disabled={busy || currentBlocked || oracleGuard.blocked}
+        aria-describedby={oracleReasonId}
         title={currentBlockedReason ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason }) : undefined}
       >
         {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
       </button>
+      <TradePreview
+        currentCollateralUsd={risk.collateralUsd}
+        currentBorrowUsd={risk.borrowUsd}
+        currentLimitUsd={risk.limitUsd}
+        currentHealth={risk.health}
+        projected={null}
+        oracleGuard={oracleGuard}
+        oracleGuardId={oracleReasonId}
+      />
       {msg && (
         <p
           className={msg.isError ? "text-amber-400 text-sm" : "mut text-sm"}
