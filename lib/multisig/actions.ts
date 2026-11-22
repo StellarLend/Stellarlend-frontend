@@ -15,6 +15,12 @@ import { toBaseUnits } from '../amount';
 import { computeApprovalBindingHash, verifyAuthEntryBinding } from './binding';
 import { extractProposalIdFromEvent } from './reads';
 import { parseMultisigError, Proposal } from './types';
+import {
+  getRpcServer,
+  pollTransactionStatus as pollSharedTransactionStatus,
+} from '../rpc-tx';
+
+export { getRpcServer };
 
 export type ProposalActionType = 'InvokeContract' | 'SetThreshold' | 'RotateSigners';
 
@@ -216,10 +222,6 @@ export interface ActionOptions {
   knownSigners?: string[];
 }
 
-export function getRpcServer(custom?: rpc.Server, rpcUrl?: string): rpc.Server {
-  return custom || new rpc.Server(rpcUrl || config.rpc);
-}
-
 /**
  * Reads get_signers() from the multisig contract on-chain.
  */
@@ -359,22 +361,12 @@ export async function pollTransactionStatus(
   timeoutMs: number = 30000,
   pollIntervalMs: number = 2000
 ): Promise<rpc.Api.GetTransactionResponse> {
-  const start = Date.now();
-
-  while (Date.now() - start < timeoutMs) {
-    const tx = await rpcServer.getTransaction(txHash);
-    if (tx.status === rpc.Api.GetTransactionStatus.SUCCESS) {
-      return tx;
-    }
-    if (tx.status === rpc.Api.GetTransactionStatus.FAILED) {
-      throw new Error(
-        `Transaction failed on-chain: ${parseMultisigError(tx.resultXdr?.toXDR('base64') || 'Unknown execution failure')}`
-      );
-    }
-    await new Promise((r) => setTimeout(r, pollIntervalMs));
-  }
-
-  throw new Error(`Transaction timed out while waiting for confirmation: ${txHash}`);
+  return pollSharedTransactionStatus(txHash, {
+    server: rpcServer,
+    timeoutMs,
+    intervalMs: pollIntervalMs,
+    parseError: parseMultisigError,
+  });
 }
 
 /**
