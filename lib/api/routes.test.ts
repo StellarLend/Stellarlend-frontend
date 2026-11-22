@@ -4,6 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetApiCaches } from "./cache";
 import { ContractNotConfiguredError, UpstreamRpcError } from "./errors";
 import { resetApiRateLimiter } from "./rate-limit";
+import {
+  ApiErrorBodySchema,
+  PositionResponseSchema,
+  ProtocolResponseSchema,
+} from "./schema";
 import type { PositionSummary, ProtocolMetrics } from "./lending";
 
 const mocks = vi.hoisted(() => ({
@@ -84,7 +89,8 @@ describe("GET /api/v1/protocol", () => {
     expect(response.headers.get("Cache-Control")).toContain(
       "stale-while-revalidate=60",
     );
-    await expect(response.json()).resolves.toEqual({
+    const parsed = ProtocolResponseSchema.parse(await response.json());
+    expect(parsed).toEqual({
       totalSupply: "1000",
       totalBorrow: "400",
       utilizationBps: "4000",
@@ -102,9 +108,9 @@ describe("GET /api/v1/protocol", () => {
       protocolMetrics({ totalSupply, totalBorrow, utilizationBps }),
     );
 
-    const body = (await (
-      await getProtocol(protocolRequest())
-    ).json()) as Record<string, unknown>;
+    const body = ProtocolResponseSchema.parse(
+      await (await getProtocol(protocolRequest())).json(),
+    );
 
     expect(body.totalSupply).toBe(totalSupply.toString());
     expect(body.totalBorrow).toBe(totalBorrow.toString());
@@ -149,7 +155,8 @@ describe("GET /api/v1/protocol", () => {
 
     expect(response.status).toBe(502);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
-    await expect(response.json()).resolves.toEqual({
+    const body = ApiErrorBodySchema.parse(await response.json());
+    expect(body).toEqual({
       error: {
         code: "UPSTREAM_RPC_ERROR",
         message: "Failed to read from Soroban RPC",
@@ -169,7 +176,8 @@ describe("GET /api/v1/protocol", () => {
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get("Cache-Control")).toBe("no-store");
     expect(blocked.headers.get("Retry-After")).toBe("1");
-    await expect(blocked.json()).resolves.toEqual({
+    const body = ApiErrorBodySchema.parse(await blocked.json());
+    expect(body).toEqual({
       error: { code: "RATE_LIMITED", message: "Too many requests" },
     });
   });
@@ -184,7 +192,8 @@ describe("GET /api/v1/positions/[address]", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toContain("s-maxage=10");
-    await expect(response.json()).resolves.toEqual({
+    const body = PositionResponseSchema.parse(await response.json());
+    expect(body).toEqual({
       address: VALID_ADDRESS,
       collateral: "2000",
       debt: "500",
@@ -201,7 +210,8 @@ describe("GET /api/v1/positions/[address]", () => {
 
     expect(response.status).toBe(400);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
-    await expect(response.json()).resolves.toEqual({
+    const body = ApiErrorBodySchema.parse(await response.json());
+    expect(body).toEqual({
       error: {
         code: "INVALID_ADDRESS",
         message: "Invalid Stellar address",
@@ -221,7 +231,8 @@ describe("GET /api/v1/positions/[address]", () => {
     );
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
+    const body = ApiErrorBodySchema.parse(await response.json());
+    expect(body).toEqual({
       error: {
         code: "CONTRACT_NOT_CONFIGURED",
         message: "Lending contract is not configured",
