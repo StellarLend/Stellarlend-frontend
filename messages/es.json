@@ -95,7 +95,11 @@
     "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos.",
     "networkMismatchTitle": "Discrepancia de red detectada",
     "networkMismatchDescription": "Freighter está conectado a una red diferente ({currentNetwork}). Cambia Freighter a {expectedNetwork} para interactuar y firmar transacciones.",
-    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}."
+    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}.",
+    "copyAddress": "Copiar dirección",
+    "copied": "Dirección copiada",
+    "copyFailed": "No se pudo copiar la dirección",
+    "viewOnExplorer": "Ver cuenta en el explorador"
   },
   "market": {
     "title": "Mercados",

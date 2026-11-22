@@ -95,7 +95,11 @@
     "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments.",
     "networkMismatchTitle": "Network mismatch detected",
     "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
-    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}.",
+    "copyAddress": "Copy address",
+    "copied": "Address copied",
+    "copyFailed": "Could not copy address",
+    "viewOnExplorer": "View account on explorer"
   },
   "market": {
     "title": "Markets",
