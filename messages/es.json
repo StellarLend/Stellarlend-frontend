@@ -94,7 +94,14 @@
     "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos.",
     "networkMismatchTitle": "Discrepancia de red detectada",
     "networkMismatchDescription": "Freighter está conectado a una red diferente ({currentNetwork}). Cambia Freighter a {expectedNetwork} para interactuar y firmar transacciones.",
-    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}."
+    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}.",
+    "errors": {
+      "user_rejected": "La solicitud fue rechazada en tu cartera.",
+      "not_installed": "La extensión de la cartera no está instalada. Instálala para continuar.",
+      "locked": "Tu cartera está bloqueada. Desbloquéala e inténtalo de nuevo.",
+      "wrong_network": "Tu cartera está conectada a una red incorrecta. Cambia de red e inténtalo de nuevo.",
+      "unknown": "Ocurrió un error inesperado con la cartera. Inténtalo de nuevo."
+    }
   },
   "market": {
     "title": "Mercados",
@@ -440,6 +447,49 @@
       "withdraw": "Retirar",
       "repay": "Pagar",
       "liquidate": "Liquidar"
+    }
+  },
+  "governance": {
+    "metaTitle": "Gobernanza - StellarLend",
+    "heading": "Gobernanza y configuración de riesgos",
+    "notConfigured": "El contrato de préstamos no está configurado.",
+    "contract": "Contrato:",
+    "unavailable": "no disponible",
+    "notSet": "sin configurar",
+    "tokens": "{amount} tokens",
+    "bpsRaw": "{value} bps",
+    "cards": {
+      "roles": "Roles",
+      "limits": "Límites de suministro y préstamo",
+      "liquidation": "Liquidación",
+      "rateModel": "Modelo de tasa de interés",
+      "flashLoans": "Préstamos flash",
+      "oracle": "Oráculo"
+    },
+    "fields": {
+      "admin": "Administrador",
+      "guardian": "Guardián",
+      "minBorrow": "Préstamo mínimo",
+      "depositCap": "Límite de depósito",
+      "borrowCap": "Límite de préstamo",
+      "closeFactor": "Factor de cierre",
+      "liquidationThreshold": "Umbral de liquidación",
+      "liquidationIncentive": "Incentivo de liquidación",
+      "rateParameters": "Parámetros de tasa",
+      "maxFlashLoan": "Préstamo flash máximo",
+      "oracleKey": "Clave de oráculo"
+    },
+    "audit": {
+      "title": "Registro de auditoría de gobernanza",
+      "entryCount": "{count, plural, =0 {Sin entradas aún.} one {# entrada} other {# entradas}}",
+      "empty": "Sin entradas aún.",
+      "showMore": "Mostrar más",
+      "columns": {
+        "sequence": "Secuencia",
+        "action": "Acción",
+        "actor": "Actor",
+        "ledger": "Ledger"
+      }
     }
   }
 }

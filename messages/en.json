@@ -94,7 +94,14 @@
     "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments.",
     "networkMismatchTitle": "Network mismatch detected",
     "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
-    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}.",
+    "errors": {
+      "user_rejected": "Request was rejected in your wallet.",
+      "not_installed": "Wallet extension is not installed. Please install it to continue.",
+      "locked": "Your wallet is locked. Please unlock it and try again.",
+      "wrong_network": "Your wallet is connected to the wrong network. Please switch networks and try again.",
+      "unknown": "An unexpected wallet error occurred. Please try again."
+    }
   },
   "market": {
     "title": "Markets",
@@ -440,6 +447,49 @@
       "withdraw": "Withdraw",
       "repay": "Repay",
       "liquidate": "Liquidate"
+    }
+  },
+  "governance": {
+    "metaTitle": "Governance - StellarLend",
+    "heading": "Governance & risk configuration",
+    "notConfigured": "Lending contract is not configured.",
+    "contract": "Contract:",
+    "unavailable": "unavailable",
+    "notSet": "not set",
+    "tokens": "{amount} tokens",
+    "bpsRaw": "{value} bps",
+    "cards": {
+      "roles": "Roles",
+      "limits": "Supply & borrow limits",
+      "liquidation": "Liquidation",
+      "rateModel": "Interest-rate model",
+      "flashLoans": "Flash loans",
+      "oracle": "Oracle"
+    },
+    "fields": {
+      "admin": "Admin",
+      "guardian": "Guardian",
+      "minBorrow": "Minimum borrow",
+      "depositCap": "Deposit cap",
+      "borrowCap": "Borrow cap",
+      "closeFactor": "Close factor",
+      "liquidationThreshold": "Liquidation threshold",
+      "liquidationIncentive": "Liquidation incentive",
+      "rateParameters": "Rate parameters",
+      "maxFlashLoan": "Max flash loan",
+      "oracleKey": "Oracle key"
+    },
+    "audit": {
+      "title": "Governance audit log",
+      "entryCount": "{count, plural, =0 {No entries yet.} one {# entry} other {# entries}}",
+      "empty": "No entries yet.",
+      "showMore": "Show more",
+      "columns": {
+        "sequence": "Sequence",
+        "action": "Action",
+        "actor": "Actor",
+        "ledger": "Ledger"
+      }
     }
   }
 }

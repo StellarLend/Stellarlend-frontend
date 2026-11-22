@@ -15,7 +15,7 @@ export function Header() {
   const historyHref = locale === "es" ? "/es/history" : "/history";
   const flashLoansHref = locale === "es" ? "/es/flash-loans" : "/flash-loans";
   const ammHref = locale === "es" ? "/es/amm" : "/amm";
-  const governanceHref = locale === "es" ? "/es/multisig" : "/multisig";
+  const governanceHref = locale === "es" ? "/es/governance" : "/governance";
   const docsHref = locale === "es" ? "/es/docs" : "/docs";
   const homeHref = locale === "es" ? "/es" : "/";
 
