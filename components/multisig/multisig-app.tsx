@@ -10,6 +10,7 @@ import {
 import { shortenAddress } from "@/lib/multisig/decode";
 import { getStatusDisplay } from "@/lib/multisig/status";
 import { BatchProposalActions } from "./proposal-actions";
+import { CreateProposal } from "./create-proposal";
 import { config, explorer, accountExplorer } from "@/lib/config";
 
 export function MultisigApp() {
@@ -222,6 +223,9 @@ export function MultisigApp() {
           </div>
         )}
       </div>
+
+      {/* Create Proposal Form (rendered only for authorized signers) */}
+      <CreateProposal contractId={config.multisigId} onRefresh={loadData} />
 
       {/* Proposal Filter Pills */}
       <div className="flex flex-wrap items-center justify-between gap-4">

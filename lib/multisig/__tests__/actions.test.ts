@@ -1,15 +1,18 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StrKey, Address, xdr, rpc, nativeToScVal } from "@stellar/stellar-sdk";
+import { StrKey, Address, xdr, rpc, nativeToScVal, scValToNative } from "@stellar/stellar-sdk";
 import {
   approveProposal,
   executeProposal,
   batchExecuteProposals,
   cancelProposal,
+  buildProposalArgs,
+  createProposal,
   getSigners,
   isSigner,
   pollTransactionStatus,
 } from "../actions";
+import { decodeProposalAction, decodeScVal } from "../decode";
 import { computeApprovalBindingHash } from "../binding";
 import { parseMultisigError, MULTISIG_ERROR_MESSAGES } from "../types";
 
@@ -347,6 +350,167 @@ describe("Multisig Actions & Soroban Integration", () => {
       expect(parseMultisigError("HostError: Error(Contract, #18)")).toBe(
         MULTISIG_ERROR_MESSAGES.SignerSetChanged
       );
+    });
+  });
+
+  describe("buildProposalArgs", () => {
+    it("builds and decodes SetThreshold action", () => {
+      const scVal = buildProposalArgs("SetThreshold", { threshold: 2 });
+      const native = scValToNative(scVal);
+      expect(native).toEqual(["SetThreshold", 2]);
+      expect(decodeProposalAction(native)).toEqual({
+        kind: "SetThreshold",
+        threshold: 2,
+        summary: "Set threshold to 2",
+      });
+    });
+
+    it("rejects invalid threshold values", () => {
+      expect(() => buildProposalArgs("SetThreshold", { threshold: 0 })).toThrow(/Threshold/);
+      expect(() => buildProposalArgs("SetThreshold", { threshold: -1 })).toThrow(/Threshold/);
+      expect(() => buildProposalArgs("SetThreshold", { threshold: "1.5" })).toThrow(/Threshold/);
+    });
+
+    it("builds and decodes RotateSigners action", () => {
+      const scVal = buildProposalArgs("RotateSigners", {
+        signers: [signerAddress, nonSignerAddress],
+      });
+      const native = scValToNative(scVal);
+      expect(native).toEqual(["RotateSigners", [signerAddress, nonSignerAddress]]);
+      const decoded = decodeProposalAction(native);
+      expect(decoded.kind).toBe("RotateSigners");
+      if (decoded.kind === "RotateSigners") {
+        expect(decoded.signers).toEqual([signerAddress, nonSignerAddress]);
+      }
+    });
+
+    it("rejects invalid G-address or duplicate signers in RotateSigners", () => {
+      expect(() =>
+        buildProposalArgs("RotateSigners", { signers: ["NOT_A_VALID_ADDRESS"] })
+      ).toThrow(/Invalid signer G-address/);
+      expect(() =>
+        buildProposalArgs("RotateSigners", { signers: [contractId] })
+      ).toThrow(/Invalid signer G-address/);
+      expect(() =>
+        buildProposalArgs("RotateSigners", { signers: [signerAddress, signerAddress] })
+      ).toThrow(/Duplicate signer/);
+    });
+
+    it("builds and decodes InvokeContract action with address and amount args", () => {
+      const scVal = buildProposalArgs("InvokeContract", {
+        contract: contractId,
+        functionName: "transfer",
+        args: [
+          { type: "address", value: signerAddress },
+          { type: "amount", value: "12.5" },
+          { type: "bool", value: true },
+        ],
+      });
+      const native = scValToNative(scVal);
+      expect(native).toEqual([
+        "InvokeContract",
+        contractId,
+        "transfer",
+        [signerAddress, 125000000n, true],
+      ]);
+      const decoded = decodeProposalAction(native);
+      expect(decoded.kind).toBe("InvokeContract");
+      if (decoded.kind === "InvokeContract") {
+        expect(decoded.contract).toBe(contractId);
+        expect(decoded.functionName).toBe("transfer");
+        expect(decoded.args.map((a) => a.formatted)).toEqual([
+          signerAddress,
+          "125000000",
+          "true",
+        ]);
+      }
+    });
+
+    it("rejects invalid contract address, invalid arg address, and invalid amount", () => {
+      expect(() =>
+        buildProposalArgs("InvokeContract", {
+          contract: signerAddress, // G-address, not a contract address
+          functionName: "set_pause",
+          args: [],
+        })
+      ).toThrow(/Invalid contract address/);
+
+      expect(() =>
+        buildProposalArgs("InvokeContract", {
+          contract: "INVALID_CONTRACT",
+          functionName: "set_pause",
+          args: [],
+        })
+      ).toThrow(/Invalid contract address/);
+
+      expect(() =>
+        buildProposalArgs("InvokeContract", {
+          contract: contractId,
+          functionName: "transfer",
+          args: [{ type: "address", value: "BAD_ADDR" }],
+        })
+      ).toThrow(/invalid Stellar address/);
+
+      expect(() =>
+        buildProposalArgs("InvokeContract", {
+          contract: contractId,
+          functionName: "transfer",
+          args: [{ type: "amount", value: "-5" }],
+        })
+      ).toThrow(/invalid amount/);
+    });
+  });
+
+  describe("createProposal", () => {
+    it("returns proposal id extracted from ProposalCreated event", async () => {
+      const mockRpc = createMockRpc({
+        getTransaction: vi.fn().mockResolvedValue({
+          status: rpc.Api.GetTransactionStatus.SUCCESS,
+          events: [
+            {
+              topic: [xdr.ScVal.scvSymbol("ProposalCreated"), xdr.ScVal.scvU32(42)],
+              value: xdr.ScVal.scvVoid(),
+            },
+          ],
+        }),
+      });
+
+      const res = await createProposal(
+        "SetThreshold",
+        { threshold: 2 },
+        {
+          signerAddress,
+          contractId,
+          knownSigners: [signerAddress],
+          customRpcServer: mockRpc,
+          freighterSigner: mockFreighter,
+        }
+      );
+
+      expect(res.status).toBe("confirmed");
+      expect(res.txHash).toBe(dummyTxHash);
+      expect(res.proposalId).toBe(42);
+      expect(mockFreighter).toHaveBeenCalledTimes(1);
+    });
+
+    it("blocks non-signer before simulation or signing", async () => {
+      const mockRpc = createMockRpc();
+
+      await expect(
+        createProposal(
+          "SetThreshold",
+          { threshold: 2 },
+          {
+            signerAddress: nonSignerAddress,
+            contractId,
+            knownSigners: [signerAddress],
+            customRpcServer: mockRpc,
+            freighterSigner: mockFreighter,
+          }
+        )
+      ).rejects.toThrow("Action blocked: connected address is not a registered multisig signer.");
+
+      expect(mockFreighter).not.toHaveBeenCalled();
     });
   });
 });
