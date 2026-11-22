@@ -53,6 +53,17 @@ const nextConfig = {
             key: "X-DNS-Prefetch-Control",
             value: "on",
           },
+          {
+            // Isolate browsing context group while allowing popups (e.g. Albedo/xBull wallets)
+            // to communicate back via window.opener / postMessage
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin-allow-popups",
+          },
+          {
+            // Prevent cross-origin documents from loading this app's resources
+            key: "Cross-Origin-Resource-Policy",
+            value: "same-origin",
+          },
         ],
       },
     ];

@@ -1,5 +1,8 @@
 import { render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
+import en from "@/messages/en.json";
+import es from "@/messages/es.json";
 import { GovernanceView } from "./governance-view";
 import type { GovernanceSnapshot } from "@/lib/governance";
 
@@ -20,8 +23,13 @@ const snapshot: GovernanceSnapshot = {
 };
 
 describe("GovernanceView", () => {
-  it("renders labels, values, not set and unavailable", () => {
-    render(<GovernanceView snapshot={snapshot} />);
+  it("renders English labels, values, not set, unavailable, and audit entry count", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <GovernanceView snapshot={snapshot} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "Governance & risk configuration" })).toBeTruthy();
     expect(screen.getByText("Roles")).toBeTruthy();
     expect(screen.getByText("not set")).toBeTruthy();
     expect(screen.getByText("unavailable")).toBeTruthy();
@@ -29,5 +37,37 @@ describe("GovernanceView", () => {
     expect(screen.getByText("9%")).toBeTruthy();
     expect(screen.getByText("1 tokens")).toBeTruthy();
     expect(screen.getByText("<b>pause</b>")).toBeTruthy();
+    expect(screen.getByText("1 entry")).toBeTruthy();
+  });
+
+  it("renders Spanish heading and localized labels under es provider", () => {
+    render(
+      <NextIntlClientProvider locale="es" messages={es}>
+        <GovernanceView snapshot={snapshot} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "Gobernanza y configuración de riesgos" })).toBeTruthy();
+    expect(screen.getByText("Límites de suministro y préstamo")).toBeTruthy();
+    expect(screen.getByText("sin configurar")).toBeTruthy();
+    expect(screen.getByText("no disponible")).toBeTruthy();
+    expect(screen.getByText("1 entrada")).toBeTruthy();
+  });
+
+  it("renders localized not-configured message when snapshot is null", () => {
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <GovernanceView snapshot={null} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "Governance & risk configuration" })).toBeTruthy();
+    expect(screen.getByText("Lending contract is not configured.")).toBeTruthy();
+
+    rerender(
+      <NextIntlClientProvider locale="es" messages={es}>
+        <GovernanceView snapshot={null} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "Gobernanza y configuración de riesgos" })).toBeTruthy();
+    expect(screen.getByText("El contrato de préstamos no está configurado.")).toBeTruthy();
   });
 });

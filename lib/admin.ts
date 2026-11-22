@@ -1,12 +1,10 @@
 import {
   rpc,
-  TransactionBuilder,
-  Account,
-  Operation,
   xdr,
   scValToNative,
 } from "@stellar/stellar-sdk";
 import { config } from "./config";
+import { simulateRead } from "./soroban-read";
 import { executeContractCall, type TxSubmitOptions } from "./tx";
 
 export type AdminRole = "admin" | "guardian" | "none";
@@ -117,28 +115,14 @@ export async function getAdmin(
 ): Promise<string | null> {
   if (!contractId) return null;
   try {
-    const tx = new TransactionBuilder(
-      new Account("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF", "0"),
-      {
-        fee: "100",
-        networkPassphrase: config.networkPassphrase,
-      }
-    )
-      .addOperation(
-        Operation.invokeContractFunction({
-          contract: contractId,
-          function: "get_admin",
-          args: [],
-        })
-      )
-      .setTimeout(30)
-      .build();
-
-    const res = await rpcServer.simulateTransaction(tx);
-    if (rpc.Api.isSimulationSuccess(res) && res.result?.retval) {
-      const native = scValToNative(res.result.retval);
-      if (typeof native === "string") return native;
-    }
+    const { native } = await simulateRead({
+      contractId,
+      method: "get_admin",
+      args: [],
+      rpcServer,
+      passphrase: config.networkPassphrase,
+    });
+    if (typeof native === "string") return native;
     return null;
   } catch {
     return null;
@@ -154,28 +138,14 @@ export async function getGuardian(
 ): Promise<string | null> {
   if (!contractId) return null;
   try {
-    const tx = new TransactionBuilder(
-      new Account("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF", "0"),
-      {
-        fee: "100",
-        networkPassphrase: config.networkPassphrase,
-      }
-    )
-      .addOperation(
-        Operation.invokeContractFunction({
-          contract: contractId,
-          function: "get_guardian",
-          args: [],
-        })
-      )
-      .setTimeout(30)
-      .build();
-
-    const res = await rpcServer.simulateTransaction(tx);
-    if (rpc.Api.isSimulationSuccess(res) && res.result?.retval) {
-      const native = scValToNative(res.result.retval);
-      if (typeof native === "string") return native;
-    }
+    const { native } = await simulateRead({
+      contractId,
+      method: "get_guardian",
+      args: [],
+      rpcServer,
+      passphrase: config.networkPassphrase,
+    });
+    if (typeof native === "string") return native;
     return null;
   } catch {
     return null;
@@ -193,28 +163,14 @@ export async function getPauseState(
   if (!contractId) return false;
   try {
     const pauseArg = encodePauseTypeScVal(pauseType);
-    const tx = new TransactionBuilder(
-      new Account("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF", "0"),
-      {
-        fee: "100",
-        networkPassphrase: config.networkPassphrase,
-      }
-    )
-      .addOperation(
-        Operation.invokeContractFunction({
-          contract: contractId,
-          function: "get_pause_state",
-          args: [pauseArg],
-        })
-      )
-      .setTimeout(30)
-      .build();
-
-    const res = await rpcServer.simulateTransaction(tx);
-    if (rpc.Api.isSimulationSuccess(res) && res.result?.retval) {
-      return Boolean(scValToNative(res.result.retval));
-    }
-    return false;
+    const { native } = await simulateRead({
+      contractId,
+      method: "get_pause_state",
+      args: [pauseArg],
+      rpcServer,
+      passphrase: config.networkPassphrase,
+    });
+    return Boolean(native);
   } catch {
     return false;
   }
