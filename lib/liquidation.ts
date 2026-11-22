@@ -1,8 +1,11 @@
-import config from '@/lib/config';
-import { httpPost } from '@/lib/http/client';
+import { Address, scValToNative, type xdr } from "@stellar/stellar-sdk";
+import { config, isValidContractAddress } from "@/lib/config";
+import { ContractNotConfiguredError } from "@/lib/api/errors";
+import { simulateRead } from "@/lib/soroban-read";
 
 const HEALTH_FACTOR_SCALE = 10000n;
 const BPS_SCALE = 10000n;
+const LIQUIDATION_PARAMS_CACHE_TTL_MS = 30_000;
 
 export interface LiquidationParams {
   liquidationThresholdBps: bigint;
@@ -32,68 +35,237 @@ export interface LiquidationPreviewInput {
 }
 
 /**
- * Fetches liquidation parameters from the contract.
+ * ScVals returned by the lending contract's liquidation parameter getters:
+ * `get_liquidation_threshold_bps`, `get_close_factor_bps`,
+ * `get_liquidation_incentive_bps` and `get_liquidation_grace_period`.
  */
-export async function getLiquidationParams(): Promise<LiquidationParams> {
-  const contractId = config.stellar.sorobanContractId;
-  if (!contractId) {
-    throw new Error('Soroban contract ID not configured');
+export interface LiquidationParamsScVals {
+  liquidationThresholdBps: xdr.ScVal;
+  closeFactorBps: xdr.ScVal;
+  liquidationIncentiveBps: xdr.ScVal;
+  gracePeriodSeconds: xdr.ScVal;
+}
+
+interface CachedLiquidationParams {
+  value: LiquidationParams;
+  expiresAt: number;
+}
+
+let liquidationParamsCache: CachedLiquidationParams | null = null;
+
+/**
+ * Clears the module-scope liquidation params cache.
+ * Intended for tests; the cache otherwise expires after 30 seconds.
+ */
+export function resetLiquidationParamsCache(): void {
+  liquidationParamsCache = null;
+}
+
+function requireLendingContractId(): string {
+  const contractId = config.lendingId;
+  if (!contractId || !isValidContractAddress(contractId)) {
+    throw new ContractNotConfiguredError();
   }
+  return contractId;
+}
 
-  const rpcUrl = config.stellar.sorobanRpcUrl;
-  if (!rpcUrl) {
-    throw new Error('Soroban RPC URL not configured');
+async function readContractValue(
+  contractId: string,
+  method: string,
+  args: xdr.ScVal[] = [],
+): Promise<xdr.ScVal> {
+  const { scVal } = await simulateRead({
+    contractId,
+    method,
+    args,
+    rpcUrl: config.rpc,
+    passphrase: config.networkPassphrase,
+  });
+  return scVal;
+}
+
+function describeNative(value: unknown): string {
+  if (typeof value === "bigint") return `${value}n`;
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "an array";
+  return `${typeof value} ${JSON.stringify(value)}`;
+}
+
+function scValToNativeField(scVal: xdr.ScVal, field: string): unknown {
+  try {
+    return scValToNative(scVal);
+  } catch {
+    throw new Error(`Malformed ${field}: unable to decode ScVal`);
   }
+}
 
-  const responses = await Promise.all([
-    readContractMethod(rpcUrl, contractId, 'get_liquidation_threshold_bps'),
-    readContractMethod(rpcUrl, contractId, 'get_close_factor_bps'),
-    readContractMethod(rpcUrl, contractId, 'get_liquidation_incentive_bps'),
-    readContractMethod(rpcUrl, contractId, 'get_liquidation_grace_period'),
-  ]);
+function toInteger(value: unknown, field: string, context: string): bigint {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number" && Number.isInteger(value)) return BigInt(value);
+  if (typeof value === "string" && /^-?\d+$/.test(value)) return BigInt(value);
+  throw new Error(`Malformed ${context}: ${field} is not an integer (got ${describeNative(value)})`);
+}
 
+function toSeconds(value: unknown, field: string, context: string): number {
+  const seconds = toInteger(value, field, context);
+  if (seconds < 0n || seconds > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`Malformed ${context}: ${field} is outside the safe integer range (got ${seconds}n)`);
+  }
+  return Number(seconds);
+}
+
+function readField(record: Record<string, unknown>, names: string[]): unknown {
+  for (const name of names) {
+    const value = record[name];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
+function requireBigIntField(
+  record: Record<string, unknown>,
+  names: string[],
+  field: string,
+): bigint {
+  const value = readField(record, names);
+  if (value === undefined) {
+    throw new Error(`Malformed position: missing ${field}`);
+  }
+  return toInteger(value, field, "position");
+}
+
+/**
+ * Decodes the four liquidation getters into {@link LiquidationParams}.
+ * Every basis-point field is a bigint; only the grace period is a number.
+ */
+export function decodeLiquidationParams(scVals: LiquidationParamsScVals): LiquidationParams {
+  const context = "liquidation params";
   return {
-    liquidationThresholdBps: BigInt(responses[0] || '0'),
-    closeFactorBps: BigInt(responses[1] || '0'),
-    liquidationIncentiveBps: BigInt(responses[2] || '0'),
-    gracePeriodSeconds: Number(responses[3] || '0'),
+    liquidationThresholdBps: toInteger(
+      scValToNativeField(scVals.liquidationThresholdBps, "liquidationThresholdBps"),
+      "liquidationThresholdBps",
+      context,
+    ),
+    closeFactorBps: toInteger(
+      scValToNativeField(scVals.closeFactorBps, "closeFactorBps"),
+      "closeFactorBps",
+      context,
+    ),
+    liquidationIncentiveBps: toInteger(
+      scValToNativeField(scVals.liquidationIncentiveBps, "liquidationIncentiveBps"),
+      "liquidationIncentiveBps",
+      context,
+    ),
+    gracePeriodSeconds: toSeconds(
+      scValToNativeField(scVals.gracePeriodSeconds, "gracePeriodSeconds"),
+      "gracePeriodSeconds",
+      context,
+    ),
   };
 }
 
 /**
- * Fetches a borrower's position from the contract.
- * Note: This is a simplified implementation. In production, use the Stellar SDK
- * to build proper Soroban transactions for contract reads.
+ * Decodes the lending contract's `PositionSummary` (`collateral`, `debt`,
+ * `health_factor`) into a {@link BorrowerPosition}.
+ *
+ * The contract position has no timestamp of its own, so the optional
+ * `get_first_unhealthy_timestamp` ScVal supplies `lastUpdateTimestamp`; when it
+ * is absent or `None` the position has no recorded unhealthy timestamp (0).
  */
-export async function getBorrowerPosition(borrower: string): Promise<BorrowerPosition> {
-  // For now, return mock data to allow the UI to function
-  // In production, this would build a proper Soroban transaction and simulate it
-  // Using different mock data based on address to simulate different states
-  if (borrower.startsWith('GB')) {
-    // Unhealthy position (liquidatable)
-    return {
-      collateralAmount: 2000n,
-      debtAmount: 1000n,
-      healthFactor: 8000n, // < 10000 = unhealthy
-      lastUpdateTimestamp: Math.floor(Date.now() / 1000) - 4000, // 4000 seconds ago
-    };
-  } else if (borrower.startsWith('GC')) {
-    // Healthy position
-    return {
-      collateralAmount: 5000n,
-      debtAmount: 1000n,
-      healthFactor: 15000n, // > 10000 = healthy
-      lastUpdateTimestamp: Math.floor(Date.now() / 1000),
-    };
+export function decodeBorrowerPosition(
+  positionScVal: xdr.ScVal,
+  firstUnhealthyAtScVal?: xdr.ScVal | null,
+): BorrowerPosition {
+  const raw = scValToNativeField(positionScVal, "position");
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(
+      `Malformed position: expected a struct ScVal (got ${describeNative(raw)})`,
+    );
+  }
+  const record = raw as Record<string, unknown>;
+
+  let lastUpdateTimestamp = 0;
+  if (firstUnhealthyAtScVal) {
+    const nativeTimestamp = scValToNativeField(firstUnhealthyAtScVal, "lastUpdateTimestamp");
+    if (nativeTimestamp !== null && nativeTimestamp !== undefined) {
+      lastUpdateTimestamp = toSeconds(
+        nativeTimestamp,
+        "lastUpdateTimestamp",
+        "position",
+      );
+    }
   }
 
-  // Default: no debt
   return {
-    collateralAmount: 0n,
-    debtAmount: 0n,
-    healthFactor: 100_000_000n, // Sentinel for no debt
-    lastUpdateTimestamp: 0,
+    collateralAmount: requireBigIntField(
+      record,
+      ["collateral", "collateral_amount", "collateralAmount"],
+      "collateralAmount",
+    ),
+    debtAmount: requireBigIntField(
+      record,
+      ["debt", "debt_amount", "debtAmount"],
+      "debtAmount",
+    ),
+    healthFactor: requireBigIntField(
+      record,
+      ["health_factor", "healthFactor"],
+      "health_factor",
+    ),
+    lastUpdateTimestamp,
   };
+}
+
+/**
+ * Fetches liquidation parameters from the configured lending contract.
+ * Successful reads are cached for about 30 seconds.
+ */
+export async function getLiquidationParams(): Promise<LiquidationParams> {
+  const now = Date.now();
+  if (liquidationParamsCache && now < liquidationParamsCache.expiresAt) {
+    return liquidationParamsCache.value;
+  }
+
+  const contractId = requireLendingContractId();
+  const [liquidationThresholdBps, closeFactorBps, liquidationIncentiveBps, gracePeriodSeconds] =
+    await Promise.all([
+      readContractValue(contractId, "get_liquidation_threshold_bps"),
+      readContractValue(contractId, "get_close_factor_bps"),
+      readContractValue(contractId, "get_liquidation_incentive_bps"),
+      readContractValue(contractId, "get_liquidation_grace_period"),
+    ]);
+
+  const params = decodeLiquidationParams({
+    liquidationThresholdBps,
+    closeFactorBps,
+    liquidationIncentiveBps,
+    gracePeriodSeconds,
+  });
+
+  liquidationParamsCache = {
+    value: params,
+    expiresAt: now + LIQUIDATION_PARAMS_CACHE_TTL_MS,
+  };
+  return params;
+}
+
+/**
+ * Fetches a borrower's position from the configured lending contract.
+ * The contract's grace clock (`get_first_unhealthy_timestamp`) is read
+ * alongside the position; if that read is unavailable it falls back to 0.
+ */
+export async function getBorrowerPosition(borrower: string): Promise<BorrowerPosition> {
+  const contractId = requireLendingContractId();
+  const borrowerScVal = new Address(borrower).toScVal();
+
+  const [positionScVal, firstUnhealthyAtScVal] = await Promise.all([
+    readContractValue(contractId, "get_position", [borrowerScVal]),
+    readContractValue(contractId, "get_first_unhealthy_timestamp", [borrowerScVal]).catch(
+      () => null,
+    ),
+  ]);
+
+  return decodeBorrowerPosition(positionScVal, firstUnhealthyAtScVal);
 }
 
 /**
@@ -150,45 +322,4 @@ export function isPositionLiquidatable(
   }
 
   return { liquidatable: true };
-}
-
-/**
- * Reads a contract method via Soroban RPC.
- * Note: This is a simplified implementation. In production, use the Stellar SDK
- * to build proper XDR transactions for contract reads.
- */
-async function readContractMethod(
-  rpcUrl: string,
-  contractId: string,
-  method: string,
-  args: Array<{ type: string; value: string }> = [],
-): Promise<string> {
-  // For now, return mock values to allow the UI to function
-  // In production, this would build a proper Soroban transaction and simulate it
-  switch (method) {
-    case 'get_liquidation_threshold_bps':
-      return '8500';
-    case 'get_close_factor_bps':
-      return '5000';
-    case 'get_liquidation_incentive_bps':
-      return '500';
-    case 'get_liquidation_grace_period':
-      return '3600';
-    default:
-      return '0';
-  }
-}
-
-/**
- * Builds a simple invoke transaction for reading contract state.
- * Note: This is a placeholder. In production, use the Stellar SDK to build proper XDR.
- */
-function buildInvokeTransaction(
-  contractId: string,
-  method: string,
-  args: Array<{ type: string; value: string }>,
-): string {
-  // For now, return empty string as placeholder
-  // The actual implementation would use @stellar/stellar-sdk to build XDR
-  return '';
 }
