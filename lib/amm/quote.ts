@@ -206,3 +206,24 @@ export function calculateEffectivePrice(
 
   return fraction ? `${whole}.${fraction}` : whole.toString();
 }
+
+/**
+ * Computes minimum acceptable output amount after applying slippage tolerance in basis points.
+ * Uses integer-only BigInt floor division (rounds down):
+ *   minOut = amountOut * (10_000 - bps) / 10_000
+ */
+export function minOutFromSlippage(
+  quote: bigint | Pick<SwapQuoteResult, "amountOut">,
+  bps: bigint | number,
+): bigint {
+  const amountOut = typeof quote === "bigint" ? quote : quote.amountOut;
+  if (typeof bps === "number" && !Number.isInteger(bps)) {
+    throw new RangeError("Slippage bps must be an integer.");
+  }
+  const slippageBps = typeof bps === "bigint" ? bps : BigInt(bps);
+  if (slippageBps < 0n || slippageBps > 10_000n) {
+    throw new RangeError("Slippage bps must be between 0 and 10000.");
+  }
+  if (amountOut <= 0n) return 0n;
+  return (amountOut * (10_000n - slippageBps)) / 10_000n;
+}

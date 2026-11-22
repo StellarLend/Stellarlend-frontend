@@ -15,10 +15,21 @@ export interface BalanceDetail {
 
 export type AccountBalancesMap = Record<string, BalanceDetail>;
 
+/** XLM locked into the account's reserve for one additional trustline. */
+export const TRUSTLINE_RESERVE_XLM = 0.5;
+
+/** Minimal shape of a Horizon account payload needed for reserve math. */
+export interface HorizonAccount {
+  subentry_count?: number;
+  num_sponsoring?: number;
+  num_sponsored?: number;
+  [key: string]: unknown;
+}
+
 export interface AccountBalancesResult {
   isUnfunded: boolean;
   balances: AccountBalancesMap;
-  rawAccount?: any;
+  rawAccount?: HorizonAccount;
 }
 
 export function getAssetKey(asset: AssetIdentity): string {
@@ -26,12 +37,45 @@ export function getAssetKey(asset: AssetIdentity): string {
   return `${asset.code}:${asset.issuer}`;
 }
 
+/**
+ * Whether the account still needs a trustline for the market's classic asset.
+ * Detection looks the asset up via getAssetKey against the balances map.
+ * Native markets never need a trustline.
+ */
+export function needsTrustline(
+  market: { asset?: AssetIdentity } | null | undefined,
+  balances: AccountBalancesMap
+): boolean {
+  const asset = market?.asset;
+  if (!asset || asset === "native") return false;
+  return !balances[getAssetKey(asset)];
+}
+
+export type TrustlineErrorKind = "rejected" | "lowReserve" | "failed";
+
+/** Classifies a trustline failure so the UI can render a localized message. */
+export function classifyTrustlineError(error: unknown): TrustlineErrorKind {
+  const message = (error instanceof Error ? error.message : String(error ?? "")).toLowerCase();
+  if (
+    message.includes("op_low_reserve") ||
+    message.includes("insufficient xlm") ||
+    message.includes("reserve")
+  ) {
+    return "lowReserve";
+  }
+  if (
+    message.includes("reject") ||
+    message.includes("cancel") ||
+    message.includes("declin") ||
+    message.includes("closed")
+  ) {
+    return "rejected";
+  }
+  return "failed";
+}
+
 export function calculateMinReserve(
-  account: {
-    subentry_count?: number;
-    num_sponsoring?: number;
-    num_sponsored?: number;
-  },
+  account: HorizonAccount,
   baseReserve = 0.5
 ): number {
   const subentries = account.subentry_count ?? 0;
@@ -196,7 +240,7 @@ export async function addTrustline(params: {
   const balances = parseAccountBalances(accountData);
 
   const nativeAvailable = parseFloat(balances["native"]?.available ?? "0");
-  if (nativeAvailable < 0.5) {
+  if (nativeAvailable < TRUSTLINE_RESERVE_XLM) {
     throw new Error("Insufficient XLM to cover the trustline reserve (requires at least 0.5 XLM).");
   }
 
@@ -227,8 +271,10 @@ export async function addTrustline(params: {
 
   const submitJson = await submitRes.json();
   if (!submitRes.ok) {
+    const resultCodes = submitJson?.extras?.result_codes;
     const errorMsg =
-      submitJson?.extras?.result_codes?.transaction ||
+      resultCodes?.operations?.[0] ||
+      resultCodes?.transaction ||
       submitJson?.detail ||
       submitJson?.title ||
       "Failed to submit changeTrust transaction";
