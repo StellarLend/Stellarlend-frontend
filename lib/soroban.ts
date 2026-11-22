@@ -66,25 +66,29 @@ export async function simulateRead<T = any>(
 
   const res = await rpcServer.simulateTransaction(tx);
 
-  if (rpc.Api.isSimulationSuccess(res) && res.result?.retval) {
-    const retval = res.result.retval;
-    let native: T | null = null;
-    try {
-      native = scValToNative(retval) as T;
-    } catch {
-      native = null;
+  if (rpc.Api.isSimulationSuccess(res)) {
+    if (res.result?.retval) {
+      const retval = res.result.retval;
+      let native: T | null = null;
+      try {
+        native = scValToNative(retval) as T;
+      } catch {
+        native = null;
+      }
+      return {
+        result: retval,
+        native,
+        raw: res,
+      };
     }
-    return {
-      result: retval,
-      native,
-      raw: res,
-    };
+
+    throw new Error(
+      `Simulation error for ${method}: Simulation returned error or no retval`
+    );
   }
 
-  const errorString =
-    (res as any).error ||
-    (res.result?.retval
-      ? "Simulation failed"
-      : "Simulation returned error or no retval");
+  const errorString = rpc.Api.isSimulationError(res)
+    ? res.error || "Simulation returned error or no retval"
+    : "Simulation returned error or no retval";
   throw new Error(`Simulation error for ${method}: ${errorString}`);
 }

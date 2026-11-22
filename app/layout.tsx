@@ -27,7 +27,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/docs" className="hover:text-white">Docs</a>
             </nav>
             <div className="ml-auto min-w-0 max-w-[45% truncate text-sm text-slate-300 sm:max-w-none">
-              <w3m-button />
             </div>
           </div>
         </header>

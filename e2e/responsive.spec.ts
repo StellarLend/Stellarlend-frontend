@@ -57,7 +57,7 @@ test.describe('markets trade sheet', () => {
 
     const closeButton = page.getByTestId('trade-sheet-close');
     await closeButton.click();
-    await expect(sheet).hidden();
+    await expect(sheet).toBeHidden();
 
     const scrollYAfter = await page.evaluate(() => window.scrollY);
     expect(Math.abs(scrollYAfter - scrollYbefore)).toBeLessThanOrEqual(2);
