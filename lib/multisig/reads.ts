@@ -1,6 +1,7 @@
-import { rpc, xdr, nativeToScVal, scValToNative } from "@stellar/stellar-sdk";
+import { rpc, xdr, scValToNative } from "@stellar/stellar-sdk";
 import { config } from "../config";
-import { simulateRead, getRpcServer } from "../soroban";
+import { simulateRead } from "../soroban-read";
+import { getRpcServer } from "../soroban";
 import { decodeProposalAction } from "./decode";
 import { effectiveStatus, estimateProposalExpiry } from "./status";
 import { Proposal, ProposalStatus } from "./types";
@@ -43,9 +44,9 @@ export async function getMultisigOverview(
   try {
     const [thresholdRes, signersRes, signerSetHashRes, latestLedgerRes] =
       await Promise.all([
-        simulateRead(contractId, "get_threshold", [], { customRpcServer: rpcServer }),
-        simulateRead(contractId, "get_signers", [], { customRpcServer: rpcServer }),
-        simulateRead(contractId, "get_signer_set_hash", [], { customRpcServer: rpcServer }),
+        simulateRead({ contractId, method: "get_threshold", args: [], rpcServer }),
+        simulateRead({ contractId, method: "get_signers", args: [], rpcServer }),
+        simulateRead({ contractId, method: "get_signer_set_hash", args: [], rpcServer }),
         rpcServer.getLatestLedger(),
       ]);
 
@@ -81,6 +82,9 @@ export async function getMultisigOverview(
  */
 function normalizeProposal(raw: any, id: number): Proposal {
   let obj = raw;
+  if (Array.isArray(obj) && obj.length === 2 && typeof obj[1] === "object" && obj[1] !== null) {
+    obj = obj[1];
+  }
   if (obj instanceof Map) {
     obj = Object.fromEntries(obj.entries());
   }
@@ -143,12 +147,12 @@ export async function getProposal(
   if (!contractId) return null;
 
   try {
-    const res = await simulateRead(
+    const res = await simulateRead({
       contractId,
-      "get_proposal",
-      [xdr.ScVal.scvU32(proposalId)],
-      { customRpcServer: rpcServer }
-    );
+      method: "get_proposal",
+      args: [xdr.ScVal.scvU32(proposalId)],
+      rpcServer,
+    });
 
     if (res.native) {
       return normalizeProposal(res.native, proposalId);
@@ -174,12 +178,12 @@ export async function getProposalSignerSetHash(
   if (!contractId) return null;
 
   try {
-    const res = await simulateRead(
+    const res = await simulateRead({
       contractId,
-      "get_proposal_signer_set_hash",
-      [xdr.ScVal.scvU32(proposalId)],
-      { customRpcServer: rpcServer }
-    );
+      method: "get_proposal_signer_set_hash",
+      args: [xdr.ScVal.scvU32(proposalId)],
+      rpcServer,
+    });
 
     if (Buffer.isBuffer(res.native) || res.native instanceof Uint8Array) {
       return Buffer.from(res.native).toString("hex");
@@ -204,12 +208,12 @@ export async function getProposalNonce(
   if (!contractId) return null;
 
   try {
-    const res = await simulateRead(
+    const res = await simulateRead({
       contractId,
-      "get_proposal_nonce",
-      [xdr.ScVal.scvU32(proposalId)],
-      { customRpcServer: rpcServer }
-    );
+      method: "get_proposal_nonce",
+      args: [xdr.ScVal.scvU32(proposalId)],
+      rpcServer,
+    });
 
     if (res.native !== null && res.native !== undefined) {
       return typeof res.native === "bigint" ? res.native.toString() : Number(res.native);
