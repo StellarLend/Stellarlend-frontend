@@ -16,6 +16,13 @@ export interface Proposal {
   expiresAtLedger: number;
   threshold?: number;
   totalSigners?: number;
+  nonce?: number | string;
+  proposalSignerSetHash?: string;
+  currentSignerSetHash?: string;
+  signerSetChanged?: boolean;
+  effectiveStatus?: ProposalStatus;
+  decodedAction?: any;
+  timeToExpiry?: string;
 }
 
 export type MultisigActionStatus =

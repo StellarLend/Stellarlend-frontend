@@ -2,8 +2,9 @@ import { MultisigApp } from "@/components/multisig/multisig-app";
 import { PageShell } from "@/components/page-shell";
 
 export const metadata = {
-  title: "Multisig Governance - StellarLend",
-  description: "Signer management and proposal execution for StellarLend multisig contract.",
+  title: "Multisig Governance Explorer - StellarLend",
+  description:
+    "Explore StellarLend multisig signers, quorum threshold, decoded proposal actions, and ledger expiry.",
 };
 
 export default function Page() {

@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "main",
+    "origin",
+    "security/issue-1733-ui-make-the-markets-page-usable-on-phones-with"
+  ],
+  "parent": {
+    "main": null,
+    "origin": "main",
+    "security/issue-1733-ui-make-the-markets-page-usable-on-phones-with": "main"
+  },
+  "order": [
+    "main",
+    "origin",
+    "security/issue-1733-ui-make-the-markets-page-usable-on-phones-with"
+  ]
+}

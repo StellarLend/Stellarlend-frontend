@@ -78,7 +78,7 @@ export function SolvencyPanel({ metrics, writeOffs, compact = false, detailed = 
           <div className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{copy.title}</div>
           <h2 className="mt-1 text-xl font-semibold">{copy.title}</h2>
         </div>
-        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700">
+        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400">
           {metrics.coverageLabel}
         </span>
       </div>

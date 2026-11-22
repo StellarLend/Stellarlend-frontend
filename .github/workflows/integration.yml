@@ -1,0 +1,139 @@
+name: Contract Client Integration Tests
+
+on:
+  pull_request:
+    paths:
+      - "lib/**"
+      - "integration/**"
+      - "scripts/integration-setup.ts"
+      - ".github/workflows/integration.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "lib/**"
+      - "integration/**"
+      - "scripts/integration-setup.ts"
+      - ".github/workflows/integration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: Quickstart Soroban Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      CONTRACTS_REPO: "StellarLend/stellarlend-contracts"
+      CONTRACTS_COMMIT: "44c85641891f56500adc5c05cc87c00069a47cf1"
+      QUICKSTART_IMAGE: "stellar/quickstart:latest"
+
+    steps:
+      - name: Checkout frontend repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache contract WASM build
+        id: cache-wasm
+        uses: actions/cache@v4
+        with:
+          path: |
+            contracts-repo/target/wasm32v1-none/release/stellar_lend_lending.wasm
+            contracts-repo/target/wasm32-unknown-unknown/release/stellar_lend_lending.wasm
+          key: soroban-contracts-wasm-${{ env.CONTRACTS_COMMIT }}
+
+      - name: Set up Rust toolchain
+        if: steps.cache-wasm.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none wasm32-unknown-unknown
+
+      - name: Set up Stellar CLI
+        if: steps.cache-wasm.outputs.cache-hit != 'true'
+        uses: stellar/stellar-cli@v28.1.0
+
+      - name: Checkout pinned stellarlend-contracts
+        if: steps.cache-wasm.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CONTRACTS_REPO }}
+          ref: ${{ env.CONTRACTS_COMMIT }}
+          path: contracts-repo
+
+      - name: Build pinned contract WASM
+        if: steps.cache-wasm.outputs.cache-hit != 'true'
+        run: |
+          echo "Building lending contract at pinned commit ${{ env.CONTRACTS_COMMIT }}..."
+          cd contracts-repo
+          if [ -d "stellar-lend/contracts/lending" ]; then
+            cd stellar-lend/contracts/lending
+          elif [ -d "contracts/lending" ]; then
+            cd contracts/lending
+          fi
+          stellar contract build --package stellar-lend-lending || cargo build --target wasm32-unknown-unknown --release
+
+      - name: Locate compiled WASM
+        run: |
+          echo "Contract pinned commit: ${{ env.CONTRACTS_COMMIT }}"
+          mkdir -p contracts
+          WASM_FILE=$(find contracts-repo -name "*.wasm" | grep -i "lending" | head -n 1 || true)
+          if [ -n "$WASM_FILE" ]; then
+            cp "$WASM_FILE" contracts/stellar_lend_lending.wasm
+            echo "Found and staged WASM: $WASM_FILE"
+          else
+            echo "Searching for any compiled contract wasm..."
+            find contracts-repo -name "*.wasm"
+          fi
+
+      - name: Start Stellar Quickstart local network
+        run: |
+          docker run -d \
+            --name stellar-quickstart \
+            -p 8000:8000 \
+            ${{ env.QUICKSTART_IMAGE }} \
+            --local \
+            --enable-soroban-rpc
+
+      - name: Wait for Soroban RPC readiness
+        run: |
+          echo "Waiting for Soroban RPC readiness at http://localhost:8000/rpc..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=60
+          until curl -s -X POST -H 'Content-Type: application/json' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' \
+            http://localhost:8000/rpc | grep -q "healthy"; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+              echo "Timeout waiting for Soroban RPC to be ready."
+              docker logs --tail 100 stellar-quickstart
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Soroban RPC is healthy and operational!"
+
+      - name: Run integration setup
+        run: |
+          npx tsx scripts/integration-setup.ts
+
+      - name: Run contract-client integration tests
+        run: |
+          set -a
+          [ -f .env.integration ] && . ./.env.integration
+          set +a
+          npm run test:integration
+
+      - name: Cleanup Docker containers
+        if: always()
+        run: |
+          docker rm -f stellar-quickstart || true

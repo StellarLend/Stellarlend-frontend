@@ -91,6 +91,7 @@ vi.mock("@/lib/config", () => ({
     ammTokenBId: "CTOKENB",
     ammTokenAHorizonAsset: "",
     ammTokenBHorizonAsset: "",
+    networkPassphrase: "testnet-passphrase",
   },
 }));
 
