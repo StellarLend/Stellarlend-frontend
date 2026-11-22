@@ -61,6 +61,110 @@ function isStellarAddress(str: string): boolean {
   );
 }
 
+const SCVAL_DECODERS: Partial<Record<xdr.ScVal["type"], (val: xdr.ScVal) => DecodedVal>> = {
+  scvBool: (val) => {
+    const b = val.type === "scvBool" ? val.b : Boolean(scValToNative(val));
+    return { type: "bool", value: b, formatted: b ? "true" : "false" };
+  },
+  scvVoid: () => ({ type: "Void", value: null, formatted: "()" }),
+  scvU32: (val) => {
+    const n = val.type === "scvU32" ? val.u32 : Number(scValToNative(val));
+    return { type: "u32", value: n, formatted: String(n) };
+  },
+  scvI32: (val) => {
+    const n = val.type === "scvI32" ? val.i32 : Number(scValToNative(val));
+    return { type: "i32", value: n, formatted: String(n) };
+  },
+  scvU64: (val) => {
+    const native = scValToNative(val);
+    return { type: "u64", value: native, formatted: String(native) };
+  },
+  scvI64: (val) => {
+    const native = scValToNative(val);
+    return { type: "i64", value: native, formatted: String(native) };
+  },
+  scvTimepoint: (val) => {
+    const native = scValToNative(val);
+    return { type: "Timepoint", value: native, formatted: String(native) };
+  },
+  scvDuration: (val) => {
+    const native = scValToNative(val);
+    return { type: "Duration", value: native, formatted: String(native) };
+  },
+  scvU128: (val) => {
+    const native = scValToNative(val);
+    return { type: "u128", value: native, formatted: String(native) };
+  },
+  scvI128: (val) => {
+    const native = scValToNative(val);
+    return { type: "i128", value: native, formatted: String(native) };
+  },
+  scvU256: (val) => {
+    const native = scValToNative(val);
+    return { type: "u256", value: native, formatted: String(native) };
+  },
+  scvI256: (val) => {
+    const native = scValToNative(val);
+    return { type: "i256", value: native, formatted: String(native) };
+  },
+  scvBytes: (val) => {
+    const bytes = val.type === "scvBytes" ? val.bytes.value : Buffer.from(scValToNative(val));
+    const hex = Buffer.from(bytes).toString("hex");
+    return { type: "Bytes", value: hex, formatted: `0x${hex}` };
+  },
+  scvString: (val) => {
+    const str = val.type === "scvString" ? val.value : String(scValToNative(val));
+    return { type: "String", value: str, formatted: `"${str}"` };
+  },
+  scvSymbol: (val) => {
+    const sym = val.type === "scvSymbol" ? val.value : String(scValToNative(val));
+    return { type: "Symbol", value: sym, formatted: `:${sym}` };
+  },
+  scvAddress: (val) => {
+    try {
+      const addr = Address.fromScVal(val).toString();
+      return {
+        type: "Address",
+        value: addr,
+        address: addr,
+        isAddress: true,
+        formatted: addr,
+      };
+    } catch {
+      const native = String(scValToNative(val));
+      return {
+        type: "Address",
+        value: native,
+        address: native,
+        isAddress: true,
+        formatted: native,
+      };
+    }
+  },
+  scvVec: (val) => {
+    const rawItems = val.type === "scvVec" ? val.vec || [] : [];
+    const items = rawItems.map((item) => decodeScVal(item));
+    return {
+      type: "Vec",
+      value: items.map((i: DecodedVal) => i.value),
+      formatted: `[${items.map((i: DecodedVal) => i.formatted).join(", ")}]`,
+    };
+  },
+  scvMap: (val) => {
+    const rawEntries = val.type === "scvMap" ? val.map || [] : [];
+    const entries = rawEntries.map((entry) => {
+      const k = decodeScVal(entry.key);
+      const v = decodeScVal(entry.val);
+      return `${k.formatted}: ${v.formatted}`;
+    });
+    return {
+      type: "Map",
+      value: scValToNative(val),
+      formatted: `{ ${entries.join(", ")} }`,
+    };
+  },
+};
+
 /**
  * Decodes a Soroban ScVal (or native value) into a typed DecodedVal with ScVal type and formatted text.
  */
@@ -70,123 +174,20 @@ export function decodeScVal(val: xdr.ScVal | any): DecodedVal {
   }
 
   // Handle xdr.ScVal instance
-  if (typeof val?.switch === "function") {
-    const scType = val.switch();
-
-    switch (scType) {
-      case xdr.ScValType.scvBool(): {
-        const b = val.b();
-        return { type: "bool", value: b, formatted: b ? "true" : "false" };
-      }
-      case xdr.ScValType.scvVoid(): {
-        return { type: "Void", value: null, formatted: "()" };
-      }
-      case xdr.ScValType.scvU32(): {
-        const n = val.u32();
-        return { type: "u32", value: n, formatted: String(n) };
-      }
-      case xdr.ScValType.scvI32(): {
-        const n = val.i32();
-        return { type: "i32", value: n, formatted: String(n) };
-      }
-      case xdr.ScValType.scvU64(): {
-        const native = scValToNative(val);
-        return { type: "u64", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvI64(): {
-        const native = scValToNative(val);
-        return { type: "i64", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvTimepoint(): {
-        const native = scValToNative(val);
-        return { type: "Timepoint", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvDuration(): {
-        const native = scValToNative(val);
-        return { type: "Duration", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvU128(): {
-        const native = scValToNative(val);
-        return { type: "u128", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvI128(): {
-        const native = scValToNative(val);
-        return { type: "i128", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvU256(): {
-        const native = scValToNative(val);
-        return { type: "u256", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvI256(): {
-        const native = scValToNative(val);
-        return { type: "i256", value: native, formatted: String(native) };
-      }
-      case xdr.ScValType.scvBytes(): {
-        const bytes = val.bytes();
-        const hex = Buffer.from(bytes).toString("hex");
-        return { type: "Bytes", value: hex, formatted: `0x${hex}` };
-      }
-      case xdr.ScValType.scvString(): {
-        const str = val.str().toString();
-        return { type: "String", value: str, formatted: `"${str}"` };
-      }
-      case xdr.ScValType.scvSymbol(): {
-        const sym = val.sym().toString();
-        return { type: "Symbol", value: sym, formatted: `:${sym}` };
-      }
-      case xdr.ScValType.scvAddress(): {
-        try {
-          const addr = Address.fromScVal(val).toString();
-          return {
-            type: "Address",
-            value: addr,
-            address: addr,
-            isAddress: true,
-            formatted: addr,
-          };
-        } catch {
-          const native = String(scValToNative(val));
-          return {
-            type: "Address",
-            value: native,
-            address: native,
-            isAddress: true,
-            formatted: native,
-          };
-        }
-      }
-      case xdr.ScValType.scvVec(): {
-        const items = (val.vec() || []).map((item: any) => decodeScVal(item));
-        return {
-          type: "Vec",
-          value: items.map((i: DecodedVal) => i.value),
-          formatted: `[${items.map((i: DecodedVal) => i.formatted).join(", ")}]`,
-        };
-      }
-      case xdr.ScValType.scvMap(): {
-        const entries = (val.map() || []).map((entry: any) => {
-          const k = decodeScVal(entry.key());
-          const v = decodeScVal(entry.val());
-          return `${k.formatted}: ${v.formatted}`;
-        });
-        return {
-          type: "Map",
-          value: scValToNative(val),
-          formatted: `{ ${entries.join(", ")} }`,
-        };
-      }
-      default: {
-        try {
-          const native = scValToNative(val);
-          return {
-            type: "Unknown",
-            value: native,
-            formatted: String(native),
-          };
-        } catch {
-          return { type: "Unknown", value: val, formatted: "Unknown" };
-        }
-      }
+  if (xdr.ScVal.is(val)) {
+    const decoder = SCVAL_DECODERS[val.type];
+    if (decoder) {
+      return decoder(val);
+    }
+    try {
+      const native = scValToNative(val);
+      return {
+        type: "Unknown",
+        value: native,
+        formatted: String(native),
+      };
+    } catch {
+      return { type: "Unknown", value: val, formatted: "Unknown" };
     }
   }
 
@@ -241,22 +242,22 @@ export function decodeProposalAction(action: xdr.ScVal | any): DecodedProposalAc
 
   try {
     // 1. ScVal vector representation (standard Soroban enum tuple variant)
-    if (typeof action?.switch === "function" && action.switch() === xdr.ScValType.scvVec()) {
-      const vec = action.vec() || [];
+    if (xdr.ScVal.is(action) && action.type === "scvVec") {
+      const vec = action.vec || [];
       if (vec.length >= 2) {
         const tagVal = vec[0];
         let tag = "";
-        if (tagVal.switch() === xdr.ScValType.scvSymbol()) {
-          tag = tagVal.sym().toString();
-        } else if (tagVal.switch() === xdr.ScValType.scvString()) {
-          tag = tagVal.str().toString();
+        if (tagVal.type === "scvSymbol") {
+          tag = tagVal.value;
+        } else if (tagVal.type === "scvString") {
+          tag = tagVal.value;
         }
 
         if (tag === "SetThreshold") {
           const thresholdVal = vec[1];
           const threshold =
-            thresholdVal.switch() === xdr.ScValType.scvU32()
-              ? thresholdVal.u32()
+            thresholdVal.type === "scvU32"
+              ? thresholdVal.u32
               : Number(scValToNative(thresholdVal));
           return {
             kind: "SetThreshold",
@@ -268,9 +269,9 @@ export function decodeProposalAction(action: xdr.ScVal | any): DecodedProposalAc
         if (tag === "RotateSigners") {
           const signersVal = vec[1];
           let signers: string[] = [];
-          if (signersVal.switch() === xdr.ScValType.scvVec()) {
-            signers = (signersVal.vec() || []).map((s: any) => {
-              if (s.switch() === xdr.ScValType.scvAddress()) {
+          if (signersVal.type === "scvVec") {
+            signers = (signersVal.vec || []).map((s) => {
+              if (s.type === "scvAddress") {
                 return Address.fromScVal(s).toString();
               }
               return String(scValToNative(s));
@@ -293,22 +294,22 @@ export function decodeProposalAction(action: xdr.ScVal | any): DecodedProposalAc
           const argsVal = vec[3];
 
           let contract = "";
-          if (contractVal.switch() === xdr.ScValType.scvAddress()) {
+          if (contractVal.type === "scvAddress") {
             contract = Address.fromScVal(contractVal).toString();
           } else {
             contract = String(scValToNative(contractVal));
           }
 
           let functionName = "";
-          if (funcVal.switch() === xdr.ScValType.scvSymbol()) {
-            functionName = funcVal.sym().toString();
+          if (funcVal.type === "scvSymbol") {
+            functionName = funcVal.value;
           } else {
             functionName = String(scValToNative(funcVal));
           }
 
           let args: DecodedVal[] = [];
-          if (argsVal.switch() === xdr.ScValType.scvVec()) {
-            args = (argsVal.vec() || []).map(decodeScVal);
+          if (argsVal.type === "scvVec") {
+            args = (argsVal.vec || []).map(decodeScVal);
           } else {
             const nativeArgs = scValToNative(argsVal);
             if (Array.isArray(nativeArgs)) {

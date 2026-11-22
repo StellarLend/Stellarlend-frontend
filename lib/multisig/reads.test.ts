@@ -21,17 +21,34 @@ describe("Multisig Reads & Discovery", () => {
   // Helper to create a mock simulation response
   const createMockSimulationResponse = (retval: xdr.ScVal) => ({
     _parsed: true,
+    transactionData: null,
     result: {
       retval,
     },
   });
 
+  // Helper to extract invoke-contract function name and args from SDK v17 operations
+  const getInvokeContractDetails = (tx: { operations: Array<Record<string, unknown>> }) => {
+    const op = tx.operations[0] as {
+      function?: string;
+      args?: xdr.ScVal[];
+      func?: { invokeContract?: { functionName?: { toString(): string }; args?: xdr.ScVal[] } };
+    };
+    const func = op.function ?? op.func?.invokeContract?.functionName?.toString();
+    const args = op.args ?? op.func?.invokeContract?.args ?? [];
+    return { func, args };
+  };
+
+  const getU32Arg = (arg: xdr.ScVal): number => {
+    if (arg.type === "scvU32") return arg.u32;
+    throw new Error(`Expected scvU32 arg, got ${arg.type}`);
+  };
+
   describe("getMultisigOverview", () => {
     it("returns overview with threshold, signers, signerSetHash, and currentLedger", async () => {
       const mockRpcServer = {
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
-          const func = op.function;
+          const { func } = getInvokeContractDetails(tx);
 
           if (func === "get_threshold") {
             return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU32(2)));
@@ -134,12 +151,10 @@ describe("Multisig Reads & Discovery", () => {
 
       const mockRpcServer = {
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
-          const func = op.function;
+          const { func, args } = getInvokeContractDetails(tx);
 
           if (func === "get_proposal") {
-            const idVal = op.args[0];
-            const id = idVal.u32();
+            const id = getU32Arg(args[0]);
             probedIds.push(id);
 
             // IDs 1 and 2 exist, ID 3 returns ProposalNotFound (Contract error #2)
@@ -219,8 +234,7 @@ describe("Multisig Reads & Discovery", () => {
         getLatestLedger: vi.fn().mockResolvedValue({ sequence: 1250000 }),
         getEvents: vi.fn().mockRejectedValue(new Error("RPC retention window expired")),
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
-          const func = op.function;
+          const { func, args } = getInvokeContractDetails(tx);
 
           if (func === "get_threshold") {
             return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU32(2)));
@@ -240,7 +254,7 @@ describe("Multisig Reads & Discovery", () => {
             );
           }
           if (func === "get_proposal") {
-            const id = op.args[0].u32();
+            const id = getU32Arg(args[0]);
             if (id === 1) {
               return Promise.resolve(
                 createMockSimulationResponse(
@@ -295,7 +309,7 @@ describe("Multisig Reads & Discovery", () => {
             );
           }
           if (func === "get_proposal_nonce") {
-            return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU64(new xdr.Uint64(1))));
+            return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU64(1n)));
           }
           return Promise.resolve({ _parsed: true, error: "Not found" });
         }),
@@ -330,8 +344,7 @@ describe("Multisig Reads & Discovery", () => {
           ],
         }),
         simulateTransaction: vi.fn().mockImplementation((tx) => {
-          const op = tx.operations[0];
-          const func = op.function;
+          const { func, args } = getInvokeContractDetails(tx);
 
           if (func === "get_threshold") {
             return Promise.resolve(createMockSimulationResponse(xdr.ScVal.scvU32(1)));
@@ -347,7 +360,7 @@ describe("Multisig Reads & Discovery", () => {
             );
           }
           if (func === "get_proposal") {
-            const id = op.args[0].u32();
+            const id = getU32Arg(args[0]);
             if (id === 1) {
               return Promise.resolve(
                 createMockSimulationResponse(

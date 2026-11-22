@@ -275,8 +275,8 @@ export function extractProposalIdFromEvent(event: any): number | null {
   // 1. Check topic items
   if (Array.isArray(event.topic)) {
     for (const t of event.topic) {
-      if (typeof t?.switch === "function" && t.switch() === xdr.ScValType.scvU32()) {
-        return t.u32();
+      if (xdr.ScVal.is(t) && t.type === "scvU32") {
+        return t.u32;
       }
       try {
         const native = scValToNative(t);
@@ -288,8 +288,8 @@ export function extractProposalIdFromEvent(event: any): number | null {
 
   // 2. Check event value
   if (event.value) {
-    if (typeof event.value?.switch === "function" && event.value.switch() === xdr.ScValType.scvU32()) {
-      return event.value.u32();
+    if (xdr.ScVal.is(event.value) && event.value.type === "scvU32") {
+      return event.value.u32;
     }
     try {
       const native = scValToNative(event.value);
