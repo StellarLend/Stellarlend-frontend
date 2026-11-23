@@ -14,7 +14,7 @@ export default defineConfig(async () => {
       environment: "jsdom",
       globals: true,
       setupFiles: ["./vitest.setup.ts"],
-      include: ["lib/**/*.test.ts", "hooks/**/*.test.{ts,tsx}", "components/**/*.test.tsx"],
+      include: ["lib/**/*.test.ts", "hooks/**/*.test.{ts,tsx}", "components/**/*.test.tsx", "middleware.test.ts"],
     },
   };
 });

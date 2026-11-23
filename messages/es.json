@@ -465,7 +465,20 @@
     "txSuccessTitle": "Transacción Confirmada",
     "txHashLabel": "Hash de Transacción",
     "viewExplorer": "Ver en Stellar Expert",
-    "statusUpdated": "Estado del protocolo actualizado con éxito."
+    "statusUpdated": "Estado del protocolo actualizado con éxito.",
+    "timelineTitle": "Cronología de auditoría de emergencias y roles",
+    "timelineSubtitle": "Registro histórico de modificaciones de pausa, transiciones de emergencia y asignaciones de roles.",
+    "filterAll": "Todas las acciones",
+    "loadMore": "Cargar más",
+    "loading": "Cargando eventos de auditoría...",
+    "noEvents": "No se encontraron eventos de administración.",
+    "retry": "Reintentar",
+    "errorLoading": "Error al cargar eventos de auditoría.",
+    "expiredBadge": "Expirado",
+    "expiresIn": "Expira en ~{time} (ledger {ledger})",
+    "actor": "Actor",
+    "ledger": "Ledger",
+    "tx": "Transacción"
   },
   "history": {
     "title": "Historial de transacciones",
