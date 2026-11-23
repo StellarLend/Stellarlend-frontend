@@ -229,4 +229,9 @@ describe("MarketsApp search, sort, and position filter", () => {
     expect((screen.getByLabelText("My positions only") as HTMLInputElement).checked).toBe(true);
     expect(screen.getAllByText("No markets match your current filters.").length).toBeGreaterThan(0);
   });
+
+  it("hides the health monitor chip when no wallet is connected", () => {
+    renderMarketsApp();
+    expect(screen.queryByTestId("health-chip")).not.toBeInTheDocument();
+  });
 });

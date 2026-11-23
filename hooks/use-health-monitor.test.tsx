@@ -151,4 +151,37 @@ describe("useHealthMonitor notifications", () => {
     await tick(0);
     expect(notified).not.toHaveBeenCalled();
   });
+
+  it("does not notify on first poll", async () => {
+    healthLib.setNotifyEnabled(true);
+    mockHealth.mockResolvedValueOnce(at(11000)); // danger on first poll
+    renderHook(() => useHealthMonitor(USER));
+    await tick(0);
+    expect(notified).not.toHaveBeenCalled();
+  });
+
+  it("notifies when level moves safe->warning", async () => {
+    healthLib.setNotifyEnabled(true);
+    mockHealth
+      .mockResolvedValueOnce(at(20000)) // safe
+      .mockResolvedValueOnce(at(14000)); // warning
+    renderHook(() => useHealthMonitor(USER));
+    await tick(0);
+    expect(notified).not.toHaveBeenCalled();
+
+    await tick(60_000);
+    expect(notified).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects danger >= warning and does not save thresholds", async () => {
+    mockHealth.mockResolvedValue(at(20000));
+    const { result } = renderHook(() => useHealthMonitor(USER));
+    await tick(0);
+
+    const before = result.current.thresholds;
+    const error = result.current.setThresholds({ warning: 1.2, danger: 1.5 });
+    expect(error).toBe(healthLib.validateThresholds({ warning: 1.2, danger: 1.5 }));
+    expect(error).toBeTruthy();
+    expect(result.current.thresholds).toEqual(before);
+  });
 });

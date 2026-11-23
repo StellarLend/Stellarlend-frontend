@@ -282,7 +282,17 @@
     "healthStatus": {
       "healthy": "Healthy",
       "atRisk": "At risk",
-      "liquidatable": "Liquidatable"
+      "liquidatable": "Liquidatable",
+      "settingsLabel": "Health alert settings",
+      "settingsTitle": "Health alert settings",
+      "warningBelow": "Warning below",
+      "dangerBelow": "Danger below",
+      "saveThresholds": "Save thresholds",
+      "saved": "Saved.",
+      "close": "Close",
+      "notifyToggle": "Notify me when my health factor gets worse",
+      "notificationsUnsupported": "Browser notifications are not supported here.",
+      "notificationsDenied": "Notifications are blocked in your browser settings, so alerts are unavailable."
     },
     "actions": "Actions",
     "ltv": "LTV",
@@ -306,6 +316,10 @@
       "step3": "Open Markets and click Connect Freighter. Without a wallet the app runs in demo mode.",
       "step4": "Pick an asset, then Supply, Borrow, Withdraw or Repay."
     },
+    "sourceBadge": {
+      "chain": "source: chain",
+      "demo": "source: demo"
+    },
     "riskParameters": {
       "title": "Risk parameters",
       "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable.",
@@ -313,8 +327,14 @@
       "maxLtv": "Max LTV",
       "liquidationThreshold": "Liquidation threshold",
       "supplyCap": "Supply cap",
+      "borrowCap": "Borrow cap",
+      "supplyApy": "Supply APY",
+      "borrowApy": "Borrow APY",
       "minBorrow": "Min borrow",
-      "uncapped": "Uncapped"
+      "source": "Source",
+      "uncapped": "Uncapped",
+      "notSet": "—",
+      "rpcFallbackNote": "Could not load live values from chain; showing static fallback parameters."
     },
     "flashLoans": {
       "title": "Flash loans",
@@ -328,7 +348,19 @@
     "contracts": {
       "title": "Deployed contracts (testnet)",
       "label": "Lending contract",
-      "notDeployed": "not deployed"
+      "contract": "Contract",
+      "address": "Contract ID",
+      "source": "Source",
+      "notDeployed": "not deployed",
+      "names": {
+        "lending": "Lending contract",
+        "oracle": "Oracle contract",
+        "token": "Token contract",
+        "multisig": "Multisig contract",
+        "amm": "AMM contract",
+        "ammTokenA": "AMM Token A",
+        "ammTokenB": "AMM Token B"
+      }
     },
     "env": {
       "title": "Environment variables"
