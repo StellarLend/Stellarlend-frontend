@@ -186,6 +186,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
   const t = useTranslations("wallet");
   const queryClient = useQueryClient();
   const [address, setAddress] = useState<string | null>(null);
+  const addressRef = useRef<string | null>(null);
   const [isFunding, setIsFunding] = useState(false);
   const [fundError, setFundError] = useState<string | null>(null);
   const fundAbortRef = useRef<AbortController | null>(null);
@@ -199,6 +200,13 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
   const [adapter, setAdapter] = useState<WalletAdapter | null>(initialAdapter ?? null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [lastWalletId, setLastWalletId] = useState<string | null>(null);
+
+  const clearAddressCache = useCallback(
+    (previous: string | null) => {
+      if (previous) queryClient.removeQueries({ queryKey: qk.account(previous) });
+    },
+    [queryClient]
+  );
 
   useEffect(() => {
     try {
@@ -240,6 +248,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
           return;
         }
         setAddress(addr);
+        addressRef.current = addr;
         setAdapter(targetAdapter);
         setActiveWalletId(targetAdapter.id);
         setLastWalletId(targetAdapter.id);
@@ -280,7 +289,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     }
     if (address) {
       // Clear cached data for the disconnected address to avoid leaking data across accounts
-      queryClient.removeQueries({ queryKey: qk.account(address) });
+      clearAddressCache(address);
     }
     fundAbortRef.current?.abort();
     setIsFunding(false);
@@ -289,9 +298,10 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     setNetwork(null);
     setNetworkPassphrase(null);
     setAddress(null);
+    addressRef.current = null;
     setAdapter(null);
     setActiveWalletId(null);
-  }, [adapter, address, queryClient]);
+  }, [adapter, address, clearAddressCache]);
 
   const assertCanSign = useCallback(() => {
     if (networkMismatch) {
@@ -326,6 +336,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
           setActiveWalletId(freighter.id);
         }
         setAddress(res.address);
+        addressRef.current = res.address;
         const net = await readFreighterNetwork();
         if (active && net) {
           setNetwork(net.network);
@@ -355,7 +366,12 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
         instance.watch((params) => {
           if (cancelled || params.error) return;
           if (params.address !== undefined) {
-            setAddress((prev) => (prev !== params.address ? params.address || null : prev));
+            const nextAddress = params.address || null;
+            if (addressRef.current !== nextAddress) {
+              clearAddressCache(addressRef.current);
+              setAddress(nextAddress);
+              addressRef.current = nextAddress;
+            }
           }
           if (params.network !== undefined) setNetwork(params.network || null);
           if (params.networkPassphrase !== undefined) setNetworkPassphrase(params.networkPassphrase || null);
@@ -368,7 +384,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
       cancelled = true;
       watcher?.stop();
     };
-  }, [activeWalletId]);
+  }, [activeWalletId, clearAddressCache]);
 
   const signTransaction = useCallback(
     async (xdr: string, options?: SignTransactionOptions) => {
