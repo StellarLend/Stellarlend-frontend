@@ -71,6 +71,7 @@ import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-promp
 import { useProtocolStatus } from "./protocol-status";
 import { HealthIndicator } from "./health-indicator";
 import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
+import { usePendingTxs } from "@/hooks/use-pending-txs";
 
 export default function MarketsApp() {
   return (
@@ -121,6 +122,18 @@ function MarketsAppInner() {
   const [positionError, setPositionError] = useState("");
   const [loadingPosition, setLoadingPosition] = useState(false);
   const [tx, setTx] = useState<LendingTx | null>(null);
+
+  // Persistent pending-tx store: persists hashes to localStorage, resumes
+  // polling on reload, and surfaces the duplicate guard.
+  const pendingTxs = usePendingTxs({
+    address,
+    onSettled: (entry) => {
+      // Invalidate the position query so the UI reflects the confirmed state.
+      if (entry.status === "confirmed") {
+        void refreshPosition();
+      }
+    },
+  });
 
   const configured = isOnChainConfigured();
   const onChainMode = Boolean(address && configured);
@@ -432,6 +445,13 @@ function MarketsAppInner() {
     if (onChainMode && sel.live && address) {
       setMsg(null);
       const action = mode === "supply" ? "deposit" : mode;
+
+      // Block duplicate: same action + asset already pending.
+      if (pendingTxs.isDuplicate(action, sel.symbol)) {
+        setMsg({ text: t("status.duplicatePending"), isError: true });
+        return;
+      }
+
       const toastId = addToast({
         action,
         symbol: sel.symbol,
@@ -441,6 +461,17 @@ function MarketsAppInner() {
       const result = await submitLendingAction(address, action, n, (updatedTx) => {
         setTx(updatedTx);
         addToast({ id: toastId, action, symbol: sel.symbol, tx: updatedTx });
+        // Persist to localStorage as soon as the hash is available.
+        if (updatedTx.hash && updatedTx.status === "pending") {
+          pendingTxs.record({
+            hash: updatedTx.hash,
+            action,
+            asset: sel.symbol,
+            amount: n.toString(),
+            submittedAt: Date.now(),
+            status: "pending",
+          });
+        }
       });
       if (result.status === "confirmed") {
         setAmt("");
@@ -550,6 +581,11 @@ function MarketsAppInner() {
   const oracleGuard = useMemo(() => evaluateOracle(mode), [evaluateOracle, mode]);
   const oracleReasonId = oracleGuard.reason ? "oracle-guard-reason" : undefined;
 
+  // Duplicate guard: block re-submission while the same action+asset is pending.
+  const lendingAction = mode === "supply" ? "deposit" : mode;
+  const duplicatePending =
+    onChainMode && Boolean(sel) && pendingTxs.isDuplicate(lendingAction, sel?.symbol ?? "");
+
   const tradePanel = sel ? (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-1 text-sm" role="tablist" aria-label={`${sel.symbol} ${t("actions")}`}>
@@ -608,8 +644,14 @@ function MarketsAppInner() {
       <button
         className="btn w-full"
         onClick={submit}
-        disabled={busy || currentBlocked || trustlineBlocksAction}
-        title={currentBlockedReason ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason }) : undefined}
+        disabled={busy || currentBlocked || trustlineBlocksAction || duplicatePending}
+        title={
+          duplicatePending
+            ? t("status.duplicatePending")
+            : currentBlockedReason
+            ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason })
+            : undefined
+        }
       >
         {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
       </button>
