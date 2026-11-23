@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   reportError,
+  createBeaconSink,
   redactStellarIds,
   sanitizeContext,
   setErrorSink,
@@ -186,6 +187,45 @@ describe("report-error", () => {
         process.env.NEXT_PUBLIC_ERROR_ENDPOINT = originalEnv;
         vi.unstubAllGlobals();
       }
+  describe("createBeaconSink", () => {
+    it("beacon sink falls back to fetch", () => {
+      const sendBeaconMock = vi.fn().mockReturnValue(false);
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      vi.stubGlobal("navigator", { sendBeacon: sendBeaconMock });
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("window", {});
+
+      const sink = createBeaconSink("/api/v1/client-errors", 1);
+      sink({
+        name: "TestError",
+        message: "Sink test",
+        context: {},
+        timestamp: new Date().toISOString(),
+      });
+
+      expect(sendBeaconMock).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    });
+
+    it("sample rate 0 sends nothing", () => {
+      const sendBeaconMock = vi.fn().mockReturnValue(true);
+      const fetchMock = vi.fn();
+      vi.stubGlobal("navigator", { sendBeacon: sendBeaconMock });
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("window", {});
+
+      const sink = createBeaconSink("/api/v1/client-errors", 0);
+      sink({
+        name: "TestError",
+        message: "Sample rate 0",
+        context: {},
+        timestamp: new Date().toISOString(),
+      });
+
+      expect(sendBeaconMock).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      vi.unstubAllGlobals();
     });
   });
 });
