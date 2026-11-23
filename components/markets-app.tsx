@@ -49,6 +49,7 @@ import {
   type Ledger,
 } from "@/lib/demo-ledger";
 import OraclePanel from "./oracle-panel";
+import { PortfolioRisk } from "./portfolio-risk";
 import { useOracleGuard } from "@/hooks/use-oracle-guard";
 import { TradePreview } from "./trade-preview";
 import {
@@ -688,6 +689,8 @@ export default function MarketsApp() {
           />
         </div>
       </Card>
+
+      <PortfolioRisk ledger={marketPositions as Ledger} markets={activeMarkets} />
 
       {/* Search, sort, and position filter controls */}
       <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

@@ -551,5 +551,29 @@
   },
   "amm": {
     "loadingTwapChart": "Cargando gráfico de precios TWAP..."
+  },
+  "portfolioRisk": {
+    "title": "Riesgo de portafolio",
+    "subtitle": "Posiciones por activo, precios estimados de liquidación y simulación instantánea de choque de precios.",
+    "aggregateHealth": "Salud agregada",
+    "projectedHealth": "Salud proyectada",
+    "noDebt": "Sin deuda",
+    "noPositions": "Aporta o toma prestado un activo para ver el desglose de riesgo de tu portafolio.",
+    "priceShock": "Choque de precio del colateral",
+    "reset": "Restablecer",
+    "columns": {
+      "asset": "Activo",
+      "supplied": "Aportado",
+      "borrowed": "Prestado",
+      "currentPrice": "Precio actual",
+      "liqPrice": "Precio est. de liquidación"
+    },
+    "levels": {
+      "safe": "Seguro",
+      "warning": "Advertencia",
+      "danger": "Peligro",
+      "liquidatable": "Liquidable"
+    },
+    "notApplicable": "-"
   }
 }
