@@ -1,35 +1,71 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import {
+  MARKETS,
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+  type Market,
+} from '@/lib/markets';
 import MarketCard from './market-card';
 
-// TODO(drips-wave): re-enable — test expects string-valued market fields and a different prop shape than components/markets/market-card.tsx
-describe.skip('MarketCard', () => {
-  const market = {
-    symbol: 'XLM',
-    name: 'Stellar',
-    price: '0.1234',
-    supplyApy: '4.25',
-    borrowApy: '6.50',
-    position: '1234.56',
-    available: '5000.00',
-  };
+describe('MarketCard', () => {
+  const market: Market = { ...MARKETS[0] };
 
-  it('renders all fields', () => {
-    render(<MarketCard market={market as any} onTrade={vi.fn()} />);
+  it('renders en values', () => {
+    render(<MarketCard market={market} locale="en" onTrade={vi.fn()} />);
 
-    expect(screen.getByText('XLM')).toBeInTheDocument();
-    expect(screen.getByText('Stellar')).toBeInTheDocument();
-    expect(screen.getByText('$0.1234')).toBeInTheDocument();
-    expect(screen.getByText('4.25%')).toBeInTheDocument();
-    expect(screen.getByText('6.50%')).toBeInTheDocument();
-    expect(screen.getByText('$1,234.56')).toBeInTheDocument();
+    expect(screen.getByText(market.symbol)).toBeInTheDocument();
+    expect(screen.getByText(market.name)).toBeInTheDocument();
+    expect(screen.getByText(formatCurrency(market.price, 'en'))).toBeInTheDocument();
+    expect(screen.getByText(formatPercent(market.supplyApy, 'en'))).toBeInTheDocument();
+    expect(screen.getByText(formatPercent(market.borrowApy, 'en'))).toBeInTheDocument();
   });
 
-  it('calls onTrade with the right market', () => {
-    const onTrade = vi.fn();
-    render(<MarketCard market={market as any} onTrade={onTrade} />);
+  it('renders es values', () => {
+    render(<MarketCard market={market} locale="es" onTrade={vi.fn()} />);
 
-    fireEvent.click(screen.getByText('Trade'));
+    const expectedPrice = formatCurrency(market.price, 'es');
+    const expectedSupplyApy = formatPercent(market.supplyApy, 'es');
+    const expectedBorrowApy = formatPercent(market.borrowApy, 'es');
+
+    expect(expectedPrice).toContain(',');
+    expect(expectedSupplyApy).toContain(',');
+    expect(expectedBorrowApy).toContain(',');
+
+    const exact = { normalizer: (text: string) => text };
+    expect(screen.getByText(expectedPrice, exact)).toBeInTheDocument();
+    expect(screen.getByText(expectedSupplyApy, exact)).toBeInTheDocument();
+    expect(screen.getByText(expectedBorrowApy, exact)).toBeInTheDocument();
+  });
+
+  it('hides supplied and borrowed when null', () => {
+    const { rerender } = render(
+      <MarketCard market={market} supplied={null} borrowed={null} onTrade={vi.fn()} />
+    );
+
+    expect(screen.queryByText('Supplied')).not.toBeInTheDocument();
+    expect(screen.queryByText('Borrowed')).not.toBeInTheDocument();
+
+    rerender(<MarketCard market={market} supplied={0} borrowed={0} onTrade={vi.fn()} />);
+
+    expect(screen.getByText('Supplied')).toBeInTheDocument();
+    expect(screen.getByText('Borrowed')).toBeInTheDocument();
+    expect(screen.getAllByText(formatNumber(0, 'en', 4))).toHaveLength(2);
+
+    rerender(
+      <MarketCard market={market} supplied={1234.5678} borrowed={42.5} onTrade={vi.fn()} />
+    );
+
+    expect(screen.getByText(formatNumber(1234.5678, 'en', 4))).toBeInTheDocument();
+    expect(screen.getByText(formatNumber(42.5, 'en', 4))).toBeInTheDocument();
+  });
+
+  it('calls onTrade with market', () => {
+    const onTrade = vi.fn();
+    render(<MarketCard market={market} onTrade={onTrade} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trade XLM' }));
 
     expect(onTrade).toHaveBeenCalledTimes(1);
     expect(onTrade).toHaveBeenCalledWith(market);
