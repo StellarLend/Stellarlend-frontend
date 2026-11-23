@@ -12,9 +12,10 @@ export function NetworkBanner() {
     return null;
   }
 
-  // Derive human-readable expected network label from config or expectedPassphrase
-  const expectedLabel = expectedPassphrase.includes("Test") ? "Testnet" : "Public";
-  const currentLabel = network ? network.toUpperCase() : "Unknown";
+  const expectedLabel = expectedPassphrase.includes("Test")
+    ? t("networkTestnet")
+    : t("networkPublic");
+  const currentLabel = network ? network.toUpperCase() : t("networkUnknown");
 
   return (
     <div

@@ -8,7 +8,8 @@ test.describe("Site Navigation", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Lend and borrow on Stellar");
 
     // 2. Navigate to /markets via nav header link
-    const marketsNavLink = page.getByRole("link", { name: /^Markets$/i });
+    const navigation = page.getByRole("navigation", { name: "Main navigation" });
+    const marketsNavLink = navigation.getByRole("link", { name: /^Markets$/i });
     await expect(marketsNavLink).toBeVisible();
     await marketsNavLink.click();
 
@@ -16,7 +17,7 @@ test.describe("Site Navigation", () => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Markets");
 
     // 3. Navigate to /docs via nav link
-    const docsNavLink = page.getByRole("link", { name: /^Docs$/i });
+    const docsNavLink = navigation.getByRole("link", { name: /^Docs$/i });
     await expect(docsNavLink).toBeVisible();
     await docsNavLink.click();
 

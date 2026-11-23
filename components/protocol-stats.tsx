@@ -3,7 +3,8 @@
 import React from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { MARKETS, formatCompactCurrency, type Locale } from "@/lib/markets";
-import { getProtocolMetrics, type ProtocolMetrics } from "@/lib/protocol";
+import { fetchProtocol } from "@/lib/api/client";
+import type { ProtocolMetrics } from "@/lib/protocol";
 import { formatTokenDisplay, formatPercentFromBps } from "@/lib/format";
 
 export interface ProtocolStatsProps {
@@ -23,14 +24,15 @@ export function ProtocolStats({ initialMetrics = null, pollIntervalMs = 30_000 }
 
     async function fetchMetrics() {
       try {
-        const result = await getProtocolMetrics();
+        const result = await fetchProtocol();
         if (!active) return;
-        if (result) {
-          setMetrics(result);
-          setIsDemoFallback(false);
-        } else {
-          setIsDemoFallback(true);
-        }
+        setMetrics({
+          totalSupply: BigInt(result.totalSupply),
+          totalBorrow: BigInt(result.totalBorrow),
+          utilizationBps: Number(result.utilizationBps),
+          ledger: result.ledger,
+        });
+        setIsDemoFallback(false);
       } catch {
         if (!active) return;
         setIsDemoFallback(true);

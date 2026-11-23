@@ -1,6 +1,7 @@
 {
   "nav": {
     "brand": "Stellar",
+    "skipToContent": "Saltar al contenido",
     "markets": "Mercados",
     "history": "Historial",
     "docs": "Documentación",
@@ -92,9 +93,19 @@
     "fundCooldown": "Por favor, espera {seconds}s antes de volver a solicitar fondos a Friendbot.",
     "fundFailed": "Falló la financiación con Friendbot.",
     "fundTimeout": "Se completó la solicitud de fondos, pero la cuenta aún no se detecta. Vuelve a verificar en unos momentos.",
+    "networkTestnet": "Red de pruebas",
+    "networkPublic": "Red pública",
+    "networkUnknown": "Desconocida",
     "networkMismatchTitle": "Discrepancia de red detectada",
     "networkMismatchDescription": "Freighter está conectado a una red diferente ({currentNetwork}). Cambia Freighter a {expectedNetwork} para interactuar y firmar transacciones.",
-    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}."
+    "networkMismatchSigningBlocked": "La firma está bloqueada hasta que cambies Freighter a {expectedNetwork}.",
+    "errors": {
+      "user_rejected": "La solicitud fue rechazada en tu cartera.",
+      "not_installed": "La extensión de la cartera no está instalada. Instálala para continuar.",
+      "locked": "Tu cartera está bloqueada. Desbloquéala e inténtalo de nuevo.",
+      "wrong_network": "Tu cartera está conectada a una red incorrecta. Cambia de red e inténtalo de nuevo.",
+      "unknown": "Ocurrió un error inesperado con la cartera. Inténtalo de nuevo."
+    }
   },
   "market": {
     "title": "Mercados",
@@ -115,6 +126,12 @@
     "addTrustline": "Añadir línea de confianza",
     "addingTrustline": "Añadiendo línea de confianza...",
     "trustlineAdded": "Línea de confianza añadida con éxito.",
+    "trustlineRequired": "Este mercado usa el activo clásico {symbol}. Añade una línea de confianza para mantener {symbol} y para depositar o pagar; bloquea {reserve} XLM como reserva.",
+    "trustlineInsufficientReserve": "Necesitas al menos {reserve} XLM de saldo disponible para añadir la línea de confianza de {symbol}. Libera XLM o financia tu cuenta primero.",
+    "trustlineRejected": "La solicitud de línea de confianza fue rechazada en tu cartera.",
+    "trustlineLowReserve": "La red rechazó la línea de confianza: la cuenta no tiene suficiente XLM para cubrir la reserva. Añade XLM e inténtalo de nuevo.",
+    "trustlineFailed": "No se pudo añadir la línea de confianza. Inténtalo de nuevo.",
+    "viewIssuer": "Ver emisor en el explorador",
     "txCancelled": "Transacción cancelada o rechazada.",
     "unfunded": "0.00 (sin fondos en testnet)",
     "connectFreighter": "Conectar Freighter",
@@ -154,6 +171,18 @@
     "notDeployed": "no desplegado",
     "balance": "{balance} XLM",
     "resetDemo": "Restablecer datos de demostración",
+    "controls": {
+      "searchLabel": "Buscar mercados",
+      "searchPlaceholder": "Buscar por símbolo o nombre...",
+      "sortLabel": "Ordenar por",
+      "sortDefault": "Orden predeterminado",
+      "sortSupplyApy": "APY de depósito (mayor a menor)",
+      "sortBorrowApy": "APY de préstamo (mayor a menor)",
+      "sortUtilization": "Utilización (mayor a menor)",
+      "myPositionsOnly": "Solo mis posiciones",
+      "noResults": "Ningún mercado coincide con tus filtros actuales.",
+      "clearFilters": "Limpiar filtros"
+    },
     "oracle": {
       "title": "Precios de oráculo en cadena",
       "subtitle": "Precios, frescura y límites registrados por el contrato de préstamo.",
@@ -174,7 +203,15 @@
       "noBounds": "Sin límites establecidos",
       "timeSourceLedger": "Hora del libro mayor",
       "timeSourceBrowser": "Reloj del navegador",
-      "loading": "Cargando precios de oráculo..."
+      "loading": "Cargando precios de oráculo...",
+      "guard": {
+        "stale": "El precio del oráculo está obsoleto. Pedir prestado y retirar están deshabilitados hasta que se publique un precio fresco.",
+        "future": "La marca temporal del oráculo está en el futuro. Pedir prestado y retirar están deshabilitados hasta que sea válida.",
+        "missing": "Falta el precio del oráculo. Pedir prestado y retirar están deshabilitados hasta que haya un precio en cadena.",
+        "outOfBounds": "El precio del oráculo está fuera de los límites de seguridad configurados. Pedir prestado y retirar están deshabilitados.",
+        "warningPrefix": "Aviso de oráculo:",
+        "viewOracle": "Ver estado del oráculo"
+      }
     },
     "rateModel": {
       "eyebrow": "Modelo de tasas de interés",
@@ -198,6 +235,7 @@
       "summaryActive": "Con una utilización de {utilization}, la tasa objetivo es {targetRate} ({targetBps} bps) y la tasa suavizada aplicada es {appliedRate} ({appliedBps} bps). El quiebre está en {kink} de utilización.",
       "summaryInactive": "El modelo dinámico de tasas está inactivo. El protocolo aplica la tasa predeterminada de {defaultRate} ({defaultBps} bps) independientemente de la utilización ({utilization}).",
       "legendCurve": "Curva de tasa de préstamo",
+      "legendProposedCurve": "Curva propuesta",
       "legendCurrentUtil": "Utilización actual",
       "legendAppliedRate": "Tasa aplicada",
       "legendTargetRate": "Tasa objetivo",
@@ -220,7 +258,22 @@
       "markerCurrent": "Actual",
       "markerSurcharge": "Quiebre de recargo",
       "historyTableCaption": "Muestras del historial de utilización",
-      "colLedger": "Ledger"
+      "colLedger": "Ledger",
+      "loadingChart": "Cargando gráfico del modelo de tasas de interés..."
+    },
+    "rateSimulator": {
+      "title": "Simulador del modelo de tasas",
+      "subtitle": "Explora cómo la utilización y los parámetros de tasas cambian las tasas anuales estimadas de préstamo y depósito. Los cambios son locales y no llaman al contrato.",
+      "utilization": "Utilización (%)",
+      "baseRate": "Tasa base (% APR)",
+      "slope1": "Pendiente 1 (% APR)",
+      "slope2": "Pendiente 2 (% APR)",
+      "kink": "Quiebre (%)",
+      "sliderLabel": "Control deslizante de {label}",
+      "reset": "Restablecer parámetros en cadena",
+      "borrowApy": "APY estimado del préstamo",
+      "supplyApy": "APY estimado del depósito",
+      "invalidInput": "Introduce tasas no negativas con un máximo de dos decimales. La utilización y el quiebre deben estar entre 0 y 100%."
     },
     "comingSoon": "Próximamente",
     "onchainMode": "Modo on-chain (testnet de Stellar)",
@@ -393,6 +446,8 @@
     "loadingMore": "Cargando más...",
     "emptyTitle": "No se encontraron transacciones",
     "emptySubtitle": "No se encontraron transacciones para tu dirección dentro de la ventana de retención de RPC (~7 días). Las transacciones más antiguas no se pueden consultar mediante Soroban RPC.",
+    "emptyFilteredTitle": "No hay transacciones coincidentes",
+    "emptyFilteredSubtitle": "Ninguna transacción cargada coincide con los filtros seleccionados. Intenta ajustar los filtros o cargar toda la ventana de retención.",
     "errorTitle": "Error al cargar el historial de transacciones",
     "retry": "Intentar de nuevo",
     "type": "Tipo",
@@ -402,6 +457,15 @@
     "tx": "Transacción",
     "viewTx": "Ver",
     "loadMore": "Cargar más",
+    "loadAll": "Cargar toda la ventana de retención",
+    "loadingAllProgress": "Cargando páginas ({pages} cargadas, {rows} eventos)...",
+    "cancelLoadAll": "Cancelar",
+    "exportCsv": "Exportar CSV",
+    "filterKindLabel": "Tipo",
+    "filterAllKinds": "Todos los tipos",
+    "filterFromLabel": "Desde fecha",
+    "filterToLabel": "Hasta fecha",
+    "clearFilters": "Limpiar filtros",
     "deposit": "Depósito",
     "withdraw": "Retiro",
     "borrow": "Préstamo",
@@ -441,5 +505,51 @@
       "repay": "Pagar",
       "liquidate": "Liquidar"
     }
+  },
+  "governance": {
+    "metaTitle": "Gobernanza - StellarLend",
+    "heading": "Gobernanza y configuración de riesgos",
+    "notConfigured": "El contrato de préstamos no está configurado.",
+    "contract": "Contrato:",
+    "unavailable": "no disponible",
+    "notSet": "sin configurar",
+    "tokens": "{amount} tokens",
+    "bpsRaw": "{value} bps",
+    "cards": {
+      "roles": "Roles",
+      "limits": "Límites de suministro y préstamo",
+      "liquidation": "Liquidación",
+      "rateModel": "Modelo de tasa de interés",
+      "flashLoans": "Préstamos flash",
+      "oracle": "Oráculo"
+    },
+    "fields": {
+      "admin": "Administrador",
+      "guardian": "Guardián",
+      "minBorrow": "Préstamo mínimo",
+      "depositCap": "Límite de depósito",
+      "borrowCap": "Límite de préstamo",
+      "closeFactor": "Factor de cierre",
+      "liquidationThreshold": "Umbral de liquidación",
+      "liquidationIncentive": "Incentivo de liquidación",
+      "rateParameters": "Parámetros de tasa",
+      "maxFlashLoan": "Préstamo flash máximo",
+      "oracleKey": "Clave de oráculo"
+    },
+    "audit": {
+      "title": "Registro de auditoría de gobernanza",
+      "entryCount": "{count, plural, =0 {Sin entradas aún.} one {# entrada} other {# entradas}}",
+      "empty": "Sin entradas aún.",
+      "showMore": "Mostrar más",
+      "columns": {
+        "sequence": "Secuencia",
+        "action": "Acción",
+        "actor": "Actor",
+        "ledger": "Ledger"
+      }
+    }
+  },
+  "amm": {
+    "loadingTwapChart": "Cargando gráfico de precios TWAP..."
   }
 }

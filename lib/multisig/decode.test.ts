@@ -209,4 +209,123 @@ describe("ProposalAction Decoding", () => {
       expect(shortenAddress("")).toBe("");
     });
   });
+
+  describe("decodeScVal round-trips nativeToScVal", () => {
+    const cases: Array<{
+      name: string;
+      scVal: xdr.ScVal;
+      expectedType: string;
+      expectedValue: unknown;
+      expectedFormatted: string;
+    }> = [
+      {
+        name: "bool",
+        scVal: nativeToScVal(true, { type: "bool" }),
+        expectedType: "bool",
+        expectedValue: true,
+        expectedFormatted: "true",
+      },
+      {
+        name: "void",
+        scVal: nativeToScVal(null),
+        expectedType: "Void",
+        expectedValue: null,
+        expectedFormatted: "()",
+      },
+      {
+        name: "u32",
+        scVal: nativeToScVal(42, { type: "u32" }),
+        expectedType: "u32",
+        expectedValue: 42,
+        expectedFormatted: "42",
+      },
+      {
+        name: "i32",
+        scVal: nativeToScVal(-42, { type: "i32" }),
+        expectedType: "i32",
+        expectedValue: -42,
+        expectedFormatted: "-42",
+      },
+      {
+        name: "u64",
+        scVal: nativeToScVal(1234567890123n, { type: "u64" }),
+        expectedType: "u64",
+        expectedValue: 1234567890123n,
+        expectedFormatted: "1234567890123",
+      },
+      {
+        name: "i64",
+        scVal: nativeToScVal(-1234567890123n, { type: "i64" }),
+        expectedType: "i64",
+        expectedValue: -1234567890123n,
+        expectedFormatted: "-1234567890123",
+      },
+      {
+        name: "u128",
+        scVal: nativeToScVal(340282366920938463463374607431768211455n, { type: "u128" }),
+        expectedType: "u128",
+        expectedValue: 340282366920938463463374607431768211455n,
+        expectedFormatted: "340282366920938463463374607431768211455",
+      },
+      {
+        name: "i128",
+        scVal: nativeToScVal(-12500000000n, { type: "i128" }),
+        expectedType: "i128",
+        expectedValue: -12500000000n,
+        expectedFormatted: "-12500000000",
+      },
+      {
+        name: "symbol",
+        scVal: nativeToScVal("transfer", { type: "symbol" }),
+        expectedType: "Symbol",
+        expectedValue: "transfer",
+        expectedFormatted: ":transfer",
+      },
+      {
+        name: "string",
+        scVal: nativeToScVal("hello world", { type: "string" }),
+        expectedType: "String",
+        expectedValue: "hello world",
+        expectedFormatted: '"hello world"',
+      },
+      {
+        name: "address",
+        scVal: nativeToScVal(signer1, { type: "address" }),
+        expectedType: "Address",
+        expectedValue: signer1,
+        expectedFormatted: signer1,
+      },
+      {
+        name: "bytes",
+        scVal: nativeToScVal(Buffer.from("deadbeef", "hex"), { type: "bytes" }),
+        expectedType: "Bytes",
+        expectedValue: "deadbeef",
+        expectedFormatted: "0xdeadbeef",
+      },
+      {
+        name: "vec",
+        scVal: nativeToScVal([1, 2], { type: ["u32", "u32"] }),
+        expectedType: "Vec",
+        expectedValue: [1, 2],
+        expectedFormatted: "[1, 2]",
+      },
+      {
+        name: "map",
+        scVal: nativeToScVal({ count: 7 }, { type: { count: ["symbol", "u32"] } }),
+        expectedType: "Map",
+        expectedValue: { count: 7 },
+        expectedFormatted: "{ :count: 7 }",
+      },
+    ];
+
+    it.each(cases)(
+      "decodes $name ScVal accurately",
+      ({ scVal, expectedType, expectedValue, expectedFormatted }) => {
+        const decoded = decodeScVal(scVal);
+        expect(decoded.type).toBe(expectedType);
+        expect(decoded.value).toEqual(expectedValue);
+        expect(decoded.formatted).toBe(expectedFormatted);
+      }
+    );
+  });
 });

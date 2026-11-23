@@ -65,7 +65,7 @@ export default function OraclePanel({
   const priceList = Object.values(prices);
 
   return (
-    <div className="card space-y-4 p-5" data-testid="oracle-panel">
+    <div id="oracle-panel" className="card space-y-4 p-5" data-testid="oracle-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold">{t("title")}</h2>

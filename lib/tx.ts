@@ -8,6 +8,12 @@ import {
 import { signTransaction } from "@stellar/freighter-api";
 import { config } from "./config";
 import { decodeContractError } from "./errors/decode";
+import {
+  getRpcServer,
+  pollTransactionStatus as pollSharedTransactionStatus,
+} from "./rpc-tx";
+
+export { getRpcServer };
 
 export interface TxSubmitOptions {
   signerAddress: string;
@@ -24,10 +30,6 @@ export interface TxSubmitOptions {
   timeoutMs?: number;
 }
 
-export function getRpcServer(custom?: rpc.Server, rpcUrl?: string): rpc.Server {
-  return custom || new rpc.Server(rpcUrl || config.rpc);
-}
-
 /**
  * Polls for transaction confirmation using getTransaction until SUCCESS, FAILED, or timeout.
  */
@@ -37,21 +39,11 @@ export async function pollTransactionStatus(
   pollIntervalMs = 1500,
   timeoutMs = 60000
 ): Promise<rpc.Api.GetTransactionResponse> {
-  const start = Date.now();
-
-  while (Date.now() - start < timeoutMs) {
-    const tx = await rpcServer.getTransaction(txHash);
-    if (tx.status === rpc.Api.GetTransactionStatus.SUCCESS) {
-      return tx;
-    }
-    if (tx.status === rpc.Api.GetTransactionStatus.FAILED) {
-      const errorDetail = tx.resultXdr?.toXDR("base64") || "Transaction execution failed";
-      throw new Error(`Transaction failed on-chain: ${errorDetail}`);
-    }
-    await new Promise((r) => setTimeout(r, pollIntervalMs));
-  }
-
-  throw new Error(`Transaction timed out while waiting for confirmation: ${txHash}`);
+  return pollSharedTransactionStatus(txHash, {
+    server: rpcServer,
+    intervalMs: pollIntervalMs,
+    timeoutMs,
+  });
 }
 
 /**

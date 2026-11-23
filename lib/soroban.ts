@@ -1,90 +1,186 @@
 import {
-  rpc,
-  TransactionBuilder,
-  Operation,
   Account,
-  xdr,
+  BASE_FEE,
+  Contract,
+  Networks,
+  TransactionBuilder,
+  rpc,
   scValToNative,
+  xdr,
 } from "@stellar/stellar-sdk";
 import { config } from "./config";
+import {
+  SIMULATION_SOURCE_ACCOUNT,
+  SimulationError,
+  simulateRead as simulateReadEntry,
+  type SimulateReadOutput,
+  type SimulateReadParams,
+} from "./soroban-read";
+
+export { SIMULATION_SOURCE_ACCOUNT, SimulationError };
+export type { SimulateReadOutput, SimulateReadParams };
 
 export interface SimulateReadOptions {
   rpcUrl?: string;
   customRpcServer?: rpc.Server;
   networkPassphrase?: string;
+  timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
-export interface SimulateReadResult<T = any> {
+export interface SimulateReadResult<T = unknown> {
+  result: xdr.ScVal | null;
+  scVal: xdr.ScVal | null;
+  native: T | null;
+  latestLedger: number;
+}
+
+export function getRpcServer(custom?: rpc.Server, rpcUrl?: string): rpc.Server {
+  if (custom) {
+    return custom;
+  }
+  const resolvedRpcUrl = rpcUrl || getSorobanRpcUrl();
+  return new rpc.Server(resolvedRpcUrl, {
+    allowHttp: resolvedRpcUrl.startsWith("http://"),
+  });
+}
+
+export function getSorobanRpcUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ||
+    config.rpc ||
+    "https://soroban-testnet.stellar.org"
+  );
+}
+
+export function getNetworkPassphrase(): string {
+  const network =
+    process.env.NEXT_PUBLIC_STELLAR_NETWORK || config.network || "testnet";
+  return network === "mainnet" || network === "public"
+    ? Networks.PUBLIC
+    : Networks.TESTNET;
+}
+
+export interface ContractReadResult<T = unknown> {
   result: xdr.ScVal | null;
   native: T | null;
   raw: rpc.Api.SimulateTransactionResponse;
 }
 
-export function getRpcServer(custom?: rpc.Server, rpcUrl?: string): rpc.Server {
-  return custom || new rpc.Server(rpcUrl || config.rpc);
+/**
+ * Simulate a read-only contract call and return the raw ScVal, decoded native
+ * value, and complete RPC response.
+ */
+export async function simulateContractRead<T = unknown>(
+  contractId: string,
+  method: string,
+  args: xdr.ScVal[] = [],
+): Promise<ContractReadResult<T>> {
+  const rpcUrl = getSorobanRpcUrl();
+  const passphrase = getNetworkPassphrase();
+  const server = getRpcServer(undefined, rpcUrl);
+  const source = new Account(SIMULATION_SOURCE_ACCOUNT, "0");
+  const tx = new TransactionBuilder(source, {
+    fee: BASE_FEE,
+    networkPassphrase: passphrase,
+  })
+    .addOperation(new Contract(contractId).call(method, ...args))
+    .setTimeout(30)
+    .build();
+
+  let simulation: rpc.Api.SimulateTransactionResponse;
+  try {
+    simulation = await server.simulateTransaction(tx);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Simulation error for ${method}: ${message}`);
+  }
+
+  const responseRecord = simulation as unknown as Record<string, unknown>;
+  const errorMessage =
+    typeof responseRecord.error === "string"
+      ? responseRecord.error
+      : typeof rpc.Api?.isSimulationError === "function" &&
+          rpc.Api.isSimulationError(simulation)
+        ? "Simulation error"
+        : null;
+  if (errorMessage) {
+    throw new Error(`Simulation error for ${method}: ${errorMessage}`);
+  }
+
+  const success =
+    simulation as rpc.Api.SimulateTransactionSuccessResponse;
+  const scVal =
+    "result" in success &&
+    success.result &&
+    typeof success.result === "object" &&
+    "retval" in success.result
+      ? (success.result.retval as xdr.ScVal)
+      : null;
+  if (!scVal) {
+    throw new Error(
+      `Simulation error for ${method}: No return value for ${method}`,
+    );
+  }
+
+  let native: T | null;
+  try {
+    native = scValToNative(scVal) as T;
+  } catch {
+    native = null;
+  }
+
+  return {
+    result: scVal,
+    native,
+    raw: simulation,
+  };
 }
 
 /**
  * Generic helper to simulate a read-only contract call on Soroban RPC (no signature, no fee).
- * Reusable across multisig and other protocol features.
+ * Supports both `{ contractId, method, args, rpcUrl?, passphrase? }` and legacy positional arguments.
  */
-export async function simulateRead<T = any>(
+export async function simulateRead<T = unknown>(
+  params: SimulateReadParams,
+): Promise<SimulateReadOutput<T>>;
+export async function simulateRead<T = unknown>(
   contractId: string,
   method: string,
+  args?: xdr.ScVal[],
+  options?: SimulateReadOptions,
+): Promise<SimulateReadResult<T>>;
+export async function simulateRead<T = unknown>(
+  contractIdOrParams: string | SimulateReadParams,
+  method?: string,
   args: xdr.ScVal[] = [],
-  options: SimulateReadOptions = {}
-): Promise<SimulateReadResult<T>> {
+  options: SimulateReadOptions = {},
+): Promise<SimulateReadOutput<T> | SimulateReadResult<T>> {
+  if (typeof contractIdOrParams === "object" && contractIdOrParams !== null) {
+    return simulateReadEntry<T>(contractIdOrParams);
+  }
+
+  const contractId = contractIdOrParams;
+  const fnName = method ?? "";
   if (!contractId) {
-    throw new Error("Contract ID is required for simulateRead");
+    throw new SimulationError("", fnName, "Contract ID is required for simulateRead");
   }
 
-  const rpcServer = getRpcServer(options.customRpcServer, options.rpcUrl);
-  const networkPassphrase =
-    options.networkPassphrase ||
-    config.networkPassphrase ||
-    "Test SDF Network ; September 2015";
+  const out = await simulateReadEntry<T>({
+    contractId,
+    method: fnName,
+    args,
+    rpcUrl: options.rpcUrl,
+    passphrase: options.networkPassphrase,
+    rpcServer: options.customRpcServer,
+    timeoutMs: options.timeoutMs,
+    signal: options.signal,
+  });
 
-  // Build simulated transaction using a dummy source account
-  const dummyAccount = new Account(
-    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-    "0"
-  );
-
-  const tx = new TransactionBuilder(dummyAccount, {
-    fee: "100",
-    networkPassphrase,
-  })
-    .addOperation(
-      Operation.invokeContractFunction({
-        contract: contractId,
-        function: method,
-        args,
-      })
-    )
-    .setTimeout(30)
-    .build();
-
-  const res = await rpcServer.simulateTransaction(tx);
-
-  if (rpc.Api.isSimulationSuccess(res) && res.result?.retval) {
-    const retval = res.result.retval;
-    let native: T | null = null;
-    try {
-      native = scValToNative(retval) as T;
-    } catch {
-      native = null;
-    }
-    return {
-      result: retval,
-      native,
-      raw: res,
-    };
-  }
-
-  const errorString =
-    (res as any).error ||
-    (res.result?.retval
-      ? "Simulation failed"
-      : "Simulation returned error or no retval");
-  throw new Error(`Simulation error for ${method}: ${errorString}`);
+  return {
+    result: out.scVal,
+    scVal: out.scVal,
+    native: out.native,
+    latestLedger: out.latestLedger,
+  };
 }

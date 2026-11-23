@@ -1,17 +1,44 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { config, explorer } from "@/lib/config";
 import { getPoolSnapshot, type PoolSnapshot, type ReadResult } from "@/lib/amm/reads";
 import { twapSeries, type TwapPoint } from "@/lib/amm/twap";
-import { TwapChart } from "./twap-chart";
 import { formatTokenAmount } from "@/lib/amm/liquidity-math";
+
+function TwapChartSkeleton() {
+  const t = useTranslations("amm");
+  const label = t("loadingTwapChart");
+  return (
+    <div
+      className="card space-y-4 p-5"
+      role="status"
+      aria-busy="true"
+      aria-label={label}
+      data-testid="twap-chart-skeleton"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="h-5 w-40 animate-pulse rounded bg-white/10" />
+        <div className="h-7 w-32 animate-pulse rounded bg-white/10" />
+      </div>
+      <div className="h-44 w-full animate-pulse rounded-lg bg-white/5" />
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+}
+
+const TwapChart = dynamic(() => import("./twap-chart").then((mod) => mod.TwapChart), {
+  ssr: false,
+  loading: () => <TwapChartSkeleton />,
+});
 
 export function PoolOverview() {
   const [snapshot, setSnapshot] = useState<PoolSnapshot | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [timeWindow, setTimeWindow] = useState<number | undefined>(undefined);
+  const [timeWindow, setTimeWindow] = useState<number>(3600);
 
   const isConfigured = Boolean(config.ammId);
 

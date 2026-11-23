@@ -1,6 +1,7 @@
-import { rpc, xdr, nativeToScVal, scValToNative } from "@stellar/stellar-sdk";
+import { rpc, xdr, scValToNative } from "@stellar/stellar-sdk";
 import { config } from "../config";
-import { simulateRead, getRpcServer } from "../soroban";
+import { simulateRead } from "../soroban-read";
+import { getRpcServer } from "../soroban";
 import { decodeProposalAction } from "./decode";
 import { effectiveStatus, estimateProposalExpiry } from "./status";
 import { Proposal, ProposalStatus } from "./types";
@@ -16,6 +17,69 @@ export interface ListProposalsOptions {
   contractId?: string;
   rpcServer?: rpc.Server;
   forceProbing?: boolean;
+  cursor?: number;
+  pageSize?: number;
+  status?: ProposalStatus;
+}
+
+const PROPOSAL_ID_CACHE_TTL_MS = 60_000;
+const proposalIdCache = new Map<
+  string,
+  { promise: Promise<number[]>; expiresAt: number }
+>();
+
+export function clearProposalIdDiscoveryCache(contractId?: string): void {
+  if (contractId) {
+    proposalIdCache.delete(contractId);
+  } else {
+    proposalIdCache.clear();
+  }
+}
+
+async function getDiscoveredProposalIds(
+  contractId: string,
+  rpcServer: rpc.Server,
+  currentLedger: number,
+  forceProbing: boolean
+): Promise<number[]> {
+  const cached = proposalIdCache.get(contractId);
+  if (!forceProbing && cached && cached.expiresAt > Date.now()) {
+    return [...(await cached.promise)];
+  }
+
+  const discovery = (async () => {
+    let proposalIds: number[] = [];
+
+    if (!forceProbing) {
+      try {
+        proposalIds = await discoverProposalIdsViaEvents(
+          contractId,
+          rpcServer,
+          currentLedger
+        );
+      } catch {
+        // Event discovery failed or is unsupported; use the probing fallback.
+      }
+    }
+
+    if (proposalIds.length === 0) {
+      proposalIds = await probeProposalIds(contractId, rpcServer);
+    }
+
+    return proposalIds;
+  })();
+
+  if (!forceProbing) {
+    const entry = { promise: discovery, expiresAt: Date.now() + PROPOSAL_ID_CACHE_TTL_MS };
+    proposalIdCache.set(contractId, entry);
+    discovery.catch(() => {
+      if (proposalIdCache.get(contractId) === entry) {
+        proposalIdCache.delete(contractId);
+      }
+    });
+  }
+
+  return [...(await discovery)];
 }
 
 /**
@@ -43,9 +107,9 @@ export async function getMultisigOverview(
   try {
     const [thresholdRes, signersRes, signerSetHashRes, latestLedgerRes] =
       await Promise.all([
-        simulateRead(contractId, "get_threshold", [], { customRpcServer: rpcServer }),
-        simulateRead(contractId, "get_signers", [], { customRpcServer: rpcServer }),
-        simulateRead(contractId, "get_signer_set_hash", [], { customRpcServer: rpcServer }),
+        simulateRead({ contractId, method: "get_threshold", args: [], rpcServer }),
+        simulateRead({ contractId, method: "get_signers", args: [], rpcServer }),
+        simulateRead({ contractId, method: "get_signer_set_hash", args: [], rpcServer }),
         rpcServer.getLatestLedger(),
       ]);
 
@@ -81,6 +145,9 @@ export async function getMultisigOverview(
  */
 function normalizeProposal(raw: any, id: number): Proposal {
   let obj = raw;
+  if (Array.isArray(obj) && obj.length === 2 && typeof obj[1] === "object" && obj[1] !== null) {
+    obj = obj[1];
+  }
   if (obj instanceof Map) {
     obj = Object.fromEntries(obj.entries());
   }
@@ -143,12 +210,12 @@ export async function getProposal(
   if (!contractId) return null;
 
   try {
-    const res = await simulateRead(
+    const res = await simulateRead({
       contractId,
-      "get_proposal",
-      [xdr.ScVal.scvU32(proposalId)],
-      { customRpcServer: rpcServer }
-    );
+      method: "get_proposal",
+      args: [xdr.ScVal.scvU32(proposalId)],
+      rpcServer,
+    });
 
     if (res.native) {
       return normalizeProposal(res.native, proposalId);
@@ -174,12 +241,12 @@ export async function getProposalSignerSetHash(
   if (!contractId) return null;
 
   try {
-    const res = await simulateRead(
+    const res = await simulateRead({
       contractId,
-      "get_proposal_signer_set_hash",
-      [xdr.ScVal.scvU32(proposalId)],
-      { customRpcServer: rpcServer }
-    );
+      method: "get_proposal_signer_set_hash",
+      args: [xdr.ScVal.scvU32(proposalId)],
+      rpcServer,
+    });
 
     if (Buffer.isBuffer(res.native) || res.native instanceof Uint8Array) {
       return Buffer.from(res.native).toString("hex");
@@ -204,12 +271,12 @@ export async function getProposalNonce(
   if (!contractId) return null;
 
   try {
-    const res = await simulateRead(
+    const res = await simulateRead({
       contractId,
-      "get_proposal_nonce",
-      [xdr.ScVal.scvU32(proposalId)],
-      { customRpcServer: rpcServer }
-    );
+      method: "get_proposal_nonce",
+      args: [xdr.ScVal.scvU32(proposalId)],
+      rpcServer,
+    });
 
     if (res.native !== null && res.native !== undefined) {
       return typeof res.native === "bigint" ? res.native.toString() : Number(res.native);
@@ -275,8 +342,8 @@ export function extractProposalIdFromEvent(event: any): number | null {
   // 1. Check topic items
   if (Array.isArray(event.topic)) {
     for (const t of event.topic) {
-      if (typeof t?.switch === "function" && t.switch() === xdr.ScValType.scvU32()) {
-        return t.u32();
+      if (xdr.ScVal.is(t) && t.type === "scvU32") {
+        return t.u32;
       }
       try {
         const native = scValToNative(t);
@@ -288,8 +355,8 @@ export function extractProposalIdFromEvent(event: any): number | null {
 
   // 2. Check event value
   if (event.value) {
-    if (typeof event.value?.switch === "function" && event.value.switch() === xdr.ScValType.scvU32()) {
-      return event.value.u32();
+    if (xdr.ScVal.is(event.value) && event.value.type === "scvU32") {
+      return event.value.u32;
     }
     try {
       const native = scValToNative(event.value);
@@ -402,49 +469,64 @@ export async function probeProposalIds(
  */
 export async function listProposals(
   options: ListProposalsOptions = {}
-): Promise<{ overview: MultisigOverview | null; proposals: Proposal[] }> {
+): Promise<{
+  overview: MultisigOverview | null;
+  proposals: Proposal[];
+  nextCursor: number | null;
+  failedProposalIds: number[];
+}> {
   const contractId = options.contractId || config.multisigId;
   if (!contractId) {
-    return { overview: null, proposals: [] };
+    return { overview: null, proposals: [], nextCursor: null, failedProposalIds: [] };
   }
 
   const rpcServer = options.rpcServer || getRpcServer();
   const overview = await getMultisigOverview(contractId, rpcServer);
   if (!overview) {
-    return { overview: null, proposals: [] };
+    return { overview: null, proposals: [], nextCursor: null, failedProposalIds: [] };
   }
 
-  let proposalIds: number[] = [];
-
-  if (!options.forceProbing) {
-    try {
-      proposalIds = await discoverProposalIdsViaEvents(
-        contractId,
-        rpcServer,
-        overview.currentLedger
-      );
-    } catch {
-      // Event discovery failed or unsupported, fall back to probing
-      proposalIds = [];
-    }
-  }
-
-  // If no IDs found via events (e.g. outside retention window or empty), use probing fallback
-  if (proposalIds.length === 0) {
-    proposalIds = await probeProposalIds(contractId, rpcServer);
-  }
+  const proposalIds = await getDiscoveredProposalIds(
+    contractId,
+    rpcServer,
+    overview.currentLedger,
+    Boolean(options.forceProbing)
+  );
+  const requestedCursor = options.cursor ?? 0;
+  const requestedPageSize = options.pageSize ?? 10;
+  const cursor = Number.isFinite(requestedCursor)
+    ? Math.max(0, Math.floor(requestedCursor))
+    : 0;
+  const pageSize = Number.isFinite(requestedPageSize)
+    ? Math.max(1, Math.floor(requestedPageSize))
+    : 10;
+  const pageIds = proposalIds.slice(cursor, cursor + pageSize);
 
   const proposals: Proposal[] = [];
-  for (const id of proposalIds) {
+  const failedProposalIds: number[] = [];
+  for (const id of pageIds) {
     try {
       const detail = await getProposalDetail(id, contractId, rpcServer, overview);
       if (detail) {
         proposals.push(detail);
       }
-    } catch {
-      // Gracefully continue on individual failure
+    } catch (error) {
+      if (isProposalNotFoundError(error)) {
+        continue;
+      }
+      failedProposalIds.push(id);
     }
   }
 
-  return { overview, proposals };
+  const nextCursor = cursor + pageIds.length < proposalIds.length
+    ? cursor + pageIds.length
+    : null;
+
+  const filteredProposals = options.status
+    ? proposals.filter(
+        (proposal) => (proposal.effectiveStatus ?? proposal.status) === options.status
+      )
+    : proposals;
+
+  return { overview, proposals: filteredProposals, nextCursor, failedProposalIds };
 }
