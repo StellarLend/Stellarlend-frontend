@@ -16,10 +16,10 @@ export type Thresholds = {
   danger: number;
 };
 
-export const DEFAULT_THRESHOLDS: Readonly<Thresholds> = Object.freeze({
+export const DEFAULT_THRESHOLDS: Thresholds = {
   warning: 1.5,
   danger: 1.2,
-});
+};
 
 const HEALTH_FACTOR_SCALE = 10_000n;
 const NOTIFY_KEY = "stellarlend:health:notifications";
