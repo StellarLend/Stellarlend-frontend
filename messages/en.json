@@ -608,6 +608,21 @@
     },
     "notApplicable": "-"
   },
+  "txToasts": {
+    "pending": "{action} of {symbol} pending…",
+    "confirmed": "{action} of {symbol} confirmed.",
+    "cancelled": "{action} of {symbol} cancelled.",
+    "timeout": "{action} of {symbol} timed out. Check the explorer before retrying.",
+    "unknownError": "The transaction failed.",
+    "viewTx": "View transaction",
+    "dismiss": "Dismiss notification",
+    "action": {
+      "deposit": "Supply",
+      "withdraw": "Withdraw",
+      "borrow": "Borrow",
+      "repay": "Repay"
+    }
+  },
   "meta": {
     "home": {
       "title": "StellarLend - Lending on Stellar",

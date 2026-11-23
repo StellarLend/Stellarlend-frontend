@@ -70,8 +70,19 @@ import TradeSheet from "./markets/trade-sheet";
 import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-prompt";
 import { useProtocolStatus } from "./protocol-status";
 import { HealthIndicator } from "./health-indicator";
+import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
 
 export default function MarketsApp() {
+  return (
+    <TxToastsProvider>
+      <MarketsAppInner />
+      <TxToastRegion />
+    </TxToastsProvider>
+  );
+}
+
+function MarketsAppInner() {
+  const { addToast } = useTxToasts();
   const {
     address,
     balance,
@@ -420,9 +431,17 @@ export default function MarketsApp() {
 
     if (onChainMode && sel.live && address) {
       setMsg(null);
-      setTx({ status: "pending", hash: null, error: null });
       const action = mode === "supply" ? "deposit" : mode;
-      const result = await submitLendingAction(address, action, n, setTx);
+      const toastId = addToast({
+        action,
+        symbol: sel.symbol,
+        tx: { status: "pending", hash: null, error: null },
+      });
+      setTx({ status: "pending", hash: null, error: null });
+      const result = await submitLendingAction(address, action, n, (updatedTx) => {
+        setTx(updatedTx);
+        addToast({ id: toastId, action, symbol: sel.symbol, tx: updatedTx });
+      });
       if (result.status === "confirmed") {
         setAmt("");
         await refreshPosition();
