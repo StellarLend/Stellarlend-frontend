@@ -19,7 +19,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const metrics = await protocolCache.getOrLoad(
+    const { value: metrics, isStale } = await protocolCache.getOrLoadWithMeta(
       "protocol",
       PROTOCOL_TTL,
       fetchProtocolMetrics,
@@ -33,7 +33,12 @@ export async function GET(request: Request): Promise<Response> {
       fetchedAt: metrics.fetchedAt,
     };
 
-    return jsonResponse(body, 200, PROTOCOL_CACHE_CONTROL);
+    return jsonResponse(
+      body,
+      200,
+      PROTOCOL_CACHE_CONTROL,
+      isStale ? { "X-Cache": "stale" } : undefined,
+    );
   } catch (error) {
     return mapApiError(error);
   }

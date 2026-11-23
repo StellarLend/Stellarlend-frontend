@@ -14,7 +14,12 @@ export default defineConfig(async () => {
       environment: "jsdom",
       globals: true,
       setupFiles: ["./vitest.setup.ts"],
-      include: ["lib/**/*.test.ts", "hooks/**/*.test.{ts,tsx}", "components/**/*.test.tsx"],
+      include: [
+        "app/**/*.test.{ts,tsx}",
+        "lib/**/*.test.ts",
+        "hooks/**/*.test.{ts,tsx}",
+        "components/**/*.test.tsx",
+      ],
     },
   };
 });

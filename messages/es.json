@@ -113,6 +113,7 @@
     "wallet": "Cartera",
     "demoMode": "Modo demo (sin cartera conectada)",
     "collateral": "Colateral",
+    "supplied": "Aportado",
     "borrowed": "Prestado",
     "health": "Salud",
     "nA": "n/a",
@@ -123,6 +124,7 @@
     "totalSupplied": "Total suministrado",
     "yourPosition": "Tu posición",
     "trade": "Operar",
+    "tradeAriaLabel": "Operar {symbol}",
     "addTrustline": "Añadir línea de confianza",
     "addingTrustline": "Añadiendo línea de confianza...",
     "trustlineAdded": "Línea de confianza añadida con éxito.",
@@ -282,7 +284,17 @@
     "healthStatus": {
       "healthy": "Saludable",
       "atRisk": "En riesgo",
-      "liquidatable": "Liquidable"
+      "liquidatable": "Liquidable",
+      "settingsLabel": "Configuración de alertas de salud",
+      "settingsTitle": "Configuración de alertas de salud",
+      "warningBelow": "Advertencia por debajo de",
+      "dangerBelow": "Peligro por debajo de",
+      "saveThresholds": "Guardar umbrales",
+      "saved": "Guardado.",
+      "close": "Cerrar",
+      "notifyToggle": "Notificarme cuando mi factor de salud empeore",
+      "notificationsUnsupported": "Las notificaciones del navegador no son compatibles aquí.",
+      "notificationsDenied": "Las notificaciones están bloqueadas en la configuración de tu navegador, por lo que las alertas no están disponibles."
     },
     "actions": "Acciones",
     "ltv": "LTV",
@@ -306,6 +318,10 @@
       "step3": "Abre Mercados y haz clic en Conectar Freighter. Sin cartera la app funciona en modo demo.",
       "step4": "Elige un activo y luego Depositar, Pedir prestado, Retirar o Pagar."
     },
+    "sourceBadge": {
+      "chain": "fuente: chain",
+      "demo": "fuente: demo"
+    },
     "riskParameters": {
       "title": "Parámetros de riesgo",
       "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable.",
@@ -313,8 +329,14 @@
       "maxLtv": "LTV máximo",
       "liquidationThreshold": "Umbral de liquidación",
       "supplyCap": "Límite de suministro",
+      "borrowCap": "Límite de préstamo",
+      "supplyApy": "APY suministro",
+      "borrowApy": "APY préstamo",
       "minBorrow": "Préstamo mínimo",
-      "uncapped": "Sin límite"
+      "source": "Fuente",
+      "uncapped": "Sin límite",
+      "notSet": "—",
+      "rpcFallbackNote": "No se pudieron cargar los valores en vivo desde la cadena; se muestran los parámetros estáticos de respaldo."
     },
     "flashLoans": {
       "title": "Préstamos flash",
@@ -328,7 +350,19 @@
     "contracts": {
       "title": "Contratos desplegados (testnet)",
       "label": "Contrato de préstamo",
-      "notDeployed": "no desplegado"
+      "contract": "Contrato",
+      "address": "ID del contrato",
+      "source": "Fuente",
+      "notDeployed": "no desplegado",
+      "names": {
+        "lending": "Contrato de préstamo",
+        "oracle": "Contrato de oráculo",
+        "token": "Contrato de token",
+        "multisig": "Contrato multifirma",
+        "amm": "Contrato AMM",
+        "ammTokenA": "Token A de AMM",
+        "ammTokenB": "Token B de AMM"
+      }
     },
     "env": {
       "title": "Variables de entorno"
@@ -575,5 +609,47 @@
       "liquidatable": "Liquidable"
     },
     "notApplicable": "-"
+  },
+  "meta": {
+    "home": {
+      "title": "StellarLend - Préstamos en Stellar",
+      "description": "Suministra y pide prestado activos en Stellar con StellarLend, un protocolo de préstamos impulsado por Soroban (testnet)."
+    },
+    "markets": {
+      "title": "Mercados - StellarLend",
+      "description": "Explora los mercados de StellarLend: suministra activos para ganar rendimiento o pide prestado con garantías en la testnet de Stellar."
+    },
+    "amm": {
+      "title": "Pool AMM, intercambio y liquidez - StellarLend",
+      "description": "Consulta el pool AMM de StellarLend, obtén cotizaciones de intercambio y gestiona tu liquidez en Stellar."
+    },
+    "docs": {
+      "title": "Documentación - StellarLend",
+      "description": "Aprende cómo funciona StellarLend: mercados, préstamos, préstamos flash y gobernanza en la testnet de Stellar."
+    },
+    "flashLoans": {
+      "title": "Préstamos flash - StellarLend",
+      "description": "Pide prestado y devuelve el importe en una sola transacción con los préstamos flash de StellarLend en Soroban."
+    },
+    "history": {
+      "title": "Historial - StellarLend",
+      "description": "Revisa tus transacciones de suministro, préstamo, retirada y pago registradas en la cadena por StellarLend."
+    },
+    "multisig": {
+      "title": "Gobernanza multifirma - StellarLend",
+      "description": "Gestión de firmantes y ejecución de propuestas del contrato multifirma de StellarLend."
+    },
+    "multisigProposal": {
+      "title": "Propuesta multifirma - StellarLend",
+      "description": "Revisa y firma propuestas de gobernanza multifirma con la cartera Freighter."
+    },
+    "governance": {
+      "title": "Gobernanza - StellarLend",
+      "description": "Consulta el estado de gobernanza de StellarLend, la configuración de riesgos y el registro de auditoría en la cadena."
+    },
+    "adminEmergency": {
+      "title": "Administración de emergencia - StellarLend",
+      "description": "Controles de emergencia y pausas granulares para el protocolo StellarLend."
+    }
   }
 }

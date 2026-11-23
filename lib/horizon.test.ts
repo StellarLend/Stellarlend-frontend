@@ -7,6 +7,7 @@ import {
   needsTrustline,
   classifyTrustlineError,
   fetchWithRetry,
+  HorizonTimeoutError,
   getAccountBalances,
   buildChangeTrustTransaction,
   addTrustline,
@@ -174,6 +175,7 @@ describe("lib/horizon", () => {
 
     afterEach(() => {
       vi.unstubAllGlobals();
+      vi.useRealTimers();
     });
 
     it("handles 404 unfunded account gracefully without throwing", async () => {
@@ -208,6 +210,107 @@ describe("lib/horizon", () => {
       expect(result.balances["native"]).toBeDefined();
       expect(Number(result.balances["native"].available)).toBeCloseTo(49.0, 4);
       expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("uses the default 8 second timeout and aborts a hung request", async () => {
+      vi.useFakeTimers();
+      let aborted = false;
+      vi.mocked(fetch).mockImplementation((_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            aborted = true;
+            reject(init.signal?.reason);
+          });
+        })
+      );
+
+      const request = fetchWithRetry("https://horizon.example/accounts/G...", {}, 1);
+      const assertion = expect(request).rejects.toBeInstanceOf(HorizonTimeoutError);
+      await vi.advanceTimersByTimeAsync(7_999);
+      expect(aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await assertion;
+      expect(aborted).toBe(true);
+    });
+
+    it("retries timed out attempts and throws a typed timeout after exhaustion", async () => {
+      vi.useFakeTimers();
+      const signals: AbortSignal[] = [];
+      vi.mocked(fetch).mockImplementation((_url, init) => {
+        signals.push(init?.signal as AbortSignal);
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        });
+      });
+
+      const request = fetchWithRetry("https://horizon.example/accounts/G...", {}, 2, 10, {
+        timeoutMs: 50,
+        random: () => 0.5,
+      });
+      const assertion = expect(request).rejects.toMatchObject({ name: "HorizonTimeoutError", timeoutMs: 50 });
+      await vi.advanceTimersByTimeAsync(50);
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(50);
+      await assertion;
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+    });
+
+    it("respects caller cancellation without misreporting it as a timeout", async () => {
+      vi.useFakeTimers();
+      const caller = new AbortController();
+      vi.mocked(fetch).mockImplementation((_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        })
+      );
+
+      const request = fetchWithRetry("https://horizon.example/accounts/G...", { signal: caller.signal }, 2, 10, {
+        timeoutMs: 8_000,
+      });
+      caller.abort(new Error("caller cancelled"));
+      await expect(request).rejects.toThrow("caller cancelled");
+      await expect(request).rejects.not.toBeInstanceOf(HorizonTimeoutError);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not retry 4xx responses", async () => {
+      vi.mocked(fetch).mockResolvedValue({ status: 429, ok: false } as Response);
+      const response = await fetchWithRetry("https://horizon.example/accounts/G...");
+      expect(response.status).toBe(429);
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns the final 5xx response after retries are exhausted", async () => {
+      vi.useFakeTimers();
+      vi.mocked(fetch).mockResolvedValue({ status: 503, ok: false } as Response);
+      const request = fetchWithRetry("https://horizon.example/accounts/G...", {}, 2, 10, {
+        random: () => 0.5,
+      });
+      await vi.advanceTimersByTimeAsync(10);
+      await expect(request).resolves.toMatchObject({ status: 503 });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps retry jitter within 80% to 120% of the base delay", async () => {
+      vi.useFakeTimers();
+      vi.mocked(fetch).mockResolvedValue({ status: 503, ok: false } as Response);
+      const low = fetchWithRetry("https://horizon.example/accounts/G...", {}, 2, 200, {
+        random: () => 0,
+      });
+      await vi.advanceTimersByTimeAsync(159);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await low;
+
+      vi.mocked(fetch).mockReset().mockResolvedValue({ status: 503, ok: false } as Response);
+      const high = fetchWithRetry("https://horizon.example/accounts/G...", {}, 2, 200, {
+        random: () => 1,
+      });
+      await vi.advanceTimersByTimeAsync(239);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await high;
     });
   });
 

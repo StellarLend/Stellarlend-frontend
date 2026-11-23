@@ -69,6 +69,7 @@ import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
 import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-prompt";
 import { useProtocolStatus } from "./protocol-status";
+import { HealthIndicator } from "./health-indicator";
 
 export default function MarketsApp() {
   const {
@@ -679,6 +680,7 @@ export default function MarketsApp() {
             {t("connectFreighter")}
           </Button>
         )}
+        <HealthIndicator />
         <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:gap-6">
           <Stat k={t("collateral")} v={collateralText} />
           <Stat k={t("borrowed")} v={borrowedText} />

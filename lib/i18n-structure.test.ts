@@ -24,7 +24,6 @@ describe('i18n catalogs', () => {
       path.join('app', 'governance', 'page.tsx'),
       path.join('components', 'governance-view.tsx'),
       path.join('components', 'health-chip.tsx'),
-      path.join('components', 'markets', 'market-card.tsx'),
     ];
     const files: string[] = [];
 
