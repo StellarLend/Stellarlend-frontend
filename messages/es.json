@@ -306,6 +306,10 @@
       "step3": "Abre Mercados y haz clic en Conectar Freighter. Sin cartera la app funciona en modo demo.",
       "step4": "Elige un activo y luego Depositar, Pedir prestado, Retirar o Pagar."
     },
+    "sourceBadge": {
+      "chain": "fuente: chain",
+      "demo": "fuente: demo"
+    },
     "riskParameters": {
       "title": "Parámetros de riesgo",
       "body": "Cada activo tiene una ratio de préstamo sobre valor (LTV). Tu límite de endeudamiento es la suma del valor del colateral multiplicado por el LTV. El factor de salud es el límite de endeudamiento dividido entre el valor prestado; por debajo de 1,0 la posición se vuelve liquidable.",
@@ -313,8 +317,14 @@
       "maxLtv": "LTV máximo",
       "liquidationThreshold": "Umbral de liquidación",
       "supplyCap": "Límite de suministro",
+      "borrowCap": "Límite de préstamo",
+      "supplyApy": "APY suministro",
+      "borrowApy": "APY préstamo",
       "minBorrow": "Préstamo mínimo",
-      "uncapped": "Sin límite"
+      "source": "Fuente",
+      "uncapped": "Sin límite",
+      "notSet": "—",
+      "rpcFallbackNote": "No se pudieron cargar los valores en vivo desde la cadena; se muestran los parámetros estáticos de respaldo."
     },
     "flashLoans": {
       "title": "Préstamos flash",
@@ -328,7 +338,19 @@
     "contracts": {
       "title": "Contratos desplegados (testnet)",
       "label": "Contrato de préstamo",
-      "notDeployed": "no desplegado"
+      "contract": "Contrato",
+      "address": "ID del contrato",
+      "source": "Fuente",
+      "notDeployed": "no desplegado",
+      "names": {
+        "lending": "Contrato de préstamo",
+        "oracle": "Contrato de oráculo",
+        "token": "Contrato de token",
+        "multisig": "Contrato multifirma",
+        "amm": "Contrato AMM",
+        "ammTokenA": "Token A de AMM",
+        "ammTokenB": "Token B de AMM"
+      }
     },
     "env": {
       "title": "Variables de entorno"

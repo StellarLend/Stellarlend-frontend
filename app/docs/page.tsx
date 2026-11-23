@@ -4,17 +4,22 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { WalletProvider } from "@/components/wallet";
 import { DocsPage } from "@/components/docs-page";
+import { getDocsData } from "@/lib/docs-data";
 
+export const revalidate = 300;
 export const metadata = { title: "Docs - StellarLend" };
 
 export default async function Page() {
-  const messages = await getMessages({ locale: "en" });
+  const [messages, docsData] = await Promise.all([
+    getMessages({ locale: "en" }),
+    getDocsData(),
+  ]);
 
   return (
     <NextIntlClientProvider locale="en" messages={messages}>
       <WalletProvider>
         <Header />
-        <main className="mx-auto max-w-6xl px-4 py-10"><DocsPage /></main>
+        <main className="mx-auto max-w-6xl px-4 py-10"><DocsPage data={docsData} /></main>
         <Footer />
       </WalletProvider>
     </NextIntlClientProvider>
