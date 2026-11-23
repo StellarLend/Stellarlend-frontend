@@ -294,6 +294,15 @@
       "notificationsUnsupported": "Browser notifications are not supported here.",
       "notificationsDenied": "Notifications are blocked in your browser settings, so alerts are unavailable."
     },
+    "preview": {
+      "title": "Projected Impact",
+      "borrowLimitUsed": "Borrow limit used",
+      "healthFactor": "Health factor",
+      "collateral": "Collateral",
+      "debt": "Debt",
+      "warningLiquidation": "Caution: Projected health factor is close to liquidation (< 1.2).",
+      "dangerLiquidation": "Action would put your position below minimum health factor (< 1.0) and risk liquidation."
+    },
     "actions": "Actions",
     "ltv": "LTV",
     "liquidationThreshold": "Liquidation threshold",

@@ -294,6 +294,15 @@
       "notificationsUnsupported": "Las notificaciones del navegador no son compatibles aquí.",
       "notificationsDenied": "Las notificaciones están bloqueadas en la configuración de tu navegador, por lo que las alertas no están disponibles."
     },
+    "preview": {
+      "title": "Impacto proyectado",
+      "borrowLimitUsed": "Límite de préstamo usado",
+      "healthFactor": "Factor de salud",
+      "collateral": "Colateral",
+      "debt": "Deuda",
+      "warningLiquidation": "Atención: El factor de salud proyectado está cerca de la liquidación (< 1,2).",
+      "dangerLiquidation": "Esta acción pondría tu posición por debajo del factor de salud mínimo (< 1,0) y arriesga la liquidación."
+    },
     "actions": "Acciones",
     "ltv": "LTV",
     "liquidationThreshold": "Umbral de liquidación",
