@@ -4,16 +4,22 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { WalletProvider } from "@/components/wallet";
 import { DocsPage } from "@/components/docs-page";
+import { getDocsData } from "@/lib/docs-data";
+
+export const revalidate = 300;
 
 export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const messages = await getMessages({ locale });
+  const [messages, docsData] = await Promise.all([
+    getMessages({ locale }),
+    getDocsData(),
+  ]);
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <WalletProvider>
         <Header />
-        <main className="mx-auto max-w-6xl px-4 py-10"><DocsPage /></main>
+        <main className="mx-auto max-w-6xl px-4 py-10"><DocsPage data={docsData} /></main>
         <Footer />
       </WalletProvider>
     </NextIntlClientProvider>
