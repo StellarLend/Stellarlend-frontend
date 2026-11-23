@@ -55,6 +55,8 @@ Read-only, rate-limited JSON endpoints backed by in-memory single-flight TTL cac
 - `GET /api/v1/positions/[address]` — per-address collateral, debt, and health factor
 - `GET /api/v1/markets` — per-market supply/borrow APY, utilization, supply/borrow caps, oracle price, LTV, liquidation threshold, and active status (`bigint` fields are encoded as decimal strings):
 
+Responses include weak `ETag` validators supporting conditional GETs (`If-None-Match`, returning `304 Not Modified`) and `x-request-id` headers for tracing.
+
 ```json
 {
   "markets": [

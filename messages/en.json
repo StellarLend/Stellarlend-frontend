@@ -365,7 +365,36 @@
       }
     },
     "env": {
-      "title": "Environment variables"
+      "title": "Environment variables",
+      "optional": "optional",
+      "descriptions": {
+        "NEXT_PUBLIC_STELLAR_NETWORK": "Target Stellar network (testnet, futurenet, mainnet).",
+        "NEXT_PUBLIC_HORIZON_URL": "Horizon API endpoint URL for account balances and fee stats.",
+        "NEXT_PUBLIC_SOROBAN_RPC_URL": "Soroban RPC endpoint URL for simulations and transactions.",
+        "NEXT_PUBLIC_LENDING_CONTRACT_ID": "Deployed StellarLend lending contract ID.",
+        "NEXT_PUBLIC_ORACLE_CONTRACT_ID": "Oracle contract ID for asset pricing.",
+        "NEXT_PUBLIC_TOKEN_CONTRACT_ID": "Default token contract ID.",
+        "NEXT_PUBLIC_MULTISIG_CONTRACT_ID": "Multisig contract ID for treasury operations.",
+        "NEXT_PUBLIC_AMM_CONTRACT_ID": "AMM liquidity pool contract ID.",
+        "NEXT_PUBLIC_AMM_TOKEN_A_CONTRACT_ID": "Contract ID for AMM pool token A.",
+        "NEXT_PUBLIC_AMM_TOKEN_B_CONTRACT_ID": "Contract ID for AMM pool token B.",
+        "NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET": "Classic asset identity (CODE:ISSUER) for AMM token A trustlines.",
+        "NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET": "Classic asset identity (CODE:ISSUER) for AMM token B trustlines.",
+        "NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE": "Stellar network passphrase override.",
+        "NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS": "Comma-separated fallback Soroban RPC endpoint URLs.",
+        "NEXT_PUBLIC_XLM_ASSET_ADDRESS": "Contract address for XLM market operations.",
+        "NEXT_PUBLIC_USDC_ASSET_ADDRESS": "Contract address for USDC market operations.",
+        "NEXT_PUBLIC_EURC_ASSET_ADDRESS": "Contract address for EURC market operations.",
+        "NEXT_PUBLIC_BTC_ASSET_ADDRESS": "Contract address for BTC market operations.",
+        "NEXT_PUBLIC_SITE_URL": "Public site URL for metadata and Open Graph.",
+        "NEXT_PUBLIC_CSP_REPORT_URI": "Endpoint URL for CSP violation reports.",
+        "NEXT_PUBLIC_ERROR_ENDPOINT": "Client error reporting endpoint URL.",
+        "NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS": "Maximum acceptable age in seconds for oracle prices.",
+        "NEXT_PUBLIC_USDC_ISSUER": "Issuer address override for testnet USDC.",
+        "NEXT_PUBLIC_EURC_ISSUER": "Issuer address override for testnet EURC.",
+        "NEXT_PUBLIC_BTC_ISSUER": "Issuer address override for testnet BTC.",
+        "TRUSTED_PROXY_HOPS": "Number of trusted reverse proxy hops for IP rate limiting."
+      }
     }
   },
   "footer": {

@@ -365,7 +365,36 @@
       }
     },
     "env": {
-      "title": "Variables de entorno"
+      "title": "Variables de entorno",
+      "optional": "opcional",
+      "descriptions": {
+        "NEXT_PUBLIC_STELLAR_NETWORK": "Red Stellar de destino (testnet, futurenet, mainnet).",
+        "NEXT_PUBLIC_HORIZON_URL": "URL del endpoint de la API Horizon para saldos y comisiones.",
+        "NEXT_PUBLIC_SOROBAN_RPC_URL": "URL del endpoint RPC de Soroban para simulaciones y transacciones.",
+        "NEXT_PUBLIC_LENDING_CONTRACT_ID": "ID del contrato de préstamos StellarLend desplegado.",
+        "NEXT_PUBLIC_ORACLE_CONTRACT_ID": "ID del contrato de oráculo para precios de activos.",
+        "NEXT_PUBLIC_TOKEN_CONTRACT_ID": "ID del contrato de token por defecto.",
+        "NEXT_PUBLIC_MULTISIG_CONTRACT_ID": "ID del contrato multifirma para operaciones de tesorería.",
+        "NEXT_PUBLIC_AMM_CONTRACT_ID": "ID del contrato del pool de liquidez AMM.",
+        "NEXT_PUBLIC_AMM_TOKEN_A_CONTRACT_ID": "ID del contrato para el token A del pool AMM.",
+        "NEXT_PUBLIC_AMM_TOKEN_B_CONTRACT_ID": "ID del contrato para el token B del pool AMM.",
+        "NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET": "Identidad del activo clásico (CÓDIGO:EMISOR) para líneas de confianza del token A de AMM.",
+        "NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET": "Identidad del activo clásico (CÓDIGO:EMISOR) para líneas de confianza del token B de AMM.",
+        "NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE": "Frase de contraseña de la red Stellar personalizada.",
+        "NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS": "URLs de respaldo separadas por comas para endpoints RPC de Soroban.",
+        "NEXT_PUBLIC_XLM_ASSET_ADDRESS": "Dirección del contrato para operaciones del mercado XLM.",
+        "NEXT_PUBLIC_USDC_ASSET_ADDRESS": "Dirección del contrato para operaciones del mercado USDC.",
+        "NEXT_PUBLIC_EURC_ASSET_ADDRESS": "Dirección del contrato para operaciones del mercado EURC.",
+        "NEXT_PUBLIC_BTC_ASSET_ADDRESS": "Dirección del contrato para operaciones del mercado BTC.",
+        "NEXT_PUBLIC_SITE_URL": "URL pública del sitio para metadatos y Open Graph.",
+        "NEXT_PUBLIC_CSP_REPORT_URI": "URL de endpoint para reportes de violaciones de CSP.",
+        "NEXT_PUBLIC_ERROR_ENDPOINT": "URL del endpoint para reportes de errores del cliente.",
+        "NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS": "Edad máxima aceptable en segundos para los precios del oráculo.",
+        "NEXT_PUBLIC_USDC_ISSUER": "Emisor personalizado para USDC en testnet.",
+        "NEXT_PUBLIC_EURC_ISSUER": "Emisor personalizado para EURC en testnet.",
+        "NEXT_PUBLIC_BTC_ISSUER": "Emisor personalizado para BTC en testnet.",
+        "TRUSTED_PROXY_HOPS": "Número de saltos de proxy inverso de confianza para límite de tasa por IP."
+      }
     }
   },
   "footer": {

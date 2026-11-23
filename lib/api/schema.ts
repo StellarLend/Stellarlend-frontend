@@ -27,6 +27,7 @@ export const ApiErrorBodySchema = z.object({
   error: z.object({
     code: ApiErrorCodeSchema,
     message: z.string().min(1),
+    requestId: z.string().optional(),
   }),
 });
 
