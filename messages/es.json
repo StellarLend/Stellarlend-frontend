@@ -551,5 +551,47 @@
   },
   "amm": {
     "loadingTwapChart": "Cargando gráfico de precios TWAP..."
+  },
+  "meta": {
+    "home": {
+      "title": "StellarLend - Préstamos en Stellar",
+      "description": "Suministra y pide prestado activos en Stellar con StellarLend, un protocolo de préstamos impulsado por Soroban (testnet)."
+    },
+    "markets": {
+      "title": "Mercados - StellarLend",
+      "description": "Explora los mercados de StellarLend: suministra activos para ganar rendimiento o pide prestado con garantías en la testnet de Stellar."
+    },
+    "amm": {
+      "title": "Pool AMM, intercambio y liquidez - StellarLend",
+      "description": "Consulta el pool AMM de StellarLend, obtén cotizaciones de intercambio y gestiona tu liquidez en Stellar."
+    },
+    "docs": {
+      "title": "Documentación - StellarLend",
+      "description": "Aprende cómo funciona StellarLend: mercados, préstamos, préstamos flash y gobernanza en la testnet de Stellar."
+    },
+    "flashLoans": {
+      "title": "Préstamos flash - StellarLend",
+      "description": "Pide prestado y devuelve el importe en una sola transacción con los préstamos flash de StellarLend en Soroban."
+    },
+    "history": {
+      "title": "Historial - StellarLend",
+      "description": "Revisa tus transacciones de suministro, préstamo, retirada y pago registradas en la cadena por StellarLend."
+    },
+    "multisig": {
+      "title": "Gobernanza multifirma - StellarLend",
+      "description": "Gestión de firmantes y ejecución de propuestas del contrato multifirma de StellarLend."
+    },
+    "multisigProposal": {
+      "title": "Propuesta multifirma - StellarLend",
+      "description": "Revisa y firma propuestas de gobernanza multifirma con la cartera Freighter."
+    },
+    "governance": {
+      "title": "Gobernanza - StellarLend",
+      "description": "Consulta el estado de gobernanza de StellarLend, la configuración de riesgos y el registro de auditoría en la cadena."
+    },
+    "adminEmergency": {
+      "title": "Administración de emergencia - StellarLend",
+      "description": "Controles de emergencia y pausas granulares para el protocolo StellarLend."
+    }
   }
 }

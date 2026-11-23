@@ -1,11 +1,29 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { ProposalDetail } from "@/components/multisig/proposal-detail";
 import { PageShell } from "@/components/page-shell";
+import { defaultLocale } from "@/i18n/routing";
+import { buildMetadata } from "@/lib/site";
 
-export const metadata = {
-  title: "Multisig Proposal Details - StellarLend",
-  description:
-    "Review decoded proposal actions, signer quorum progress, and ledger expiry for StellarLend multisig governance.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const proposalId = parseInt(id, 10) || 1;
+  const t = await getTranslations({
+    locale: defaultLocale,
+    namespace: "meta.multisigProposal",
+  });
+
+  return buildMetadata({
+    locale: defaultLocale,
+    path: `/multisig/${proposalId}`,
+    title: t("title"),
+    description: t("description"),
+  });
+}
 
 export default async function Page({
   params,

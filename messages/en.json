@@ -551,5 +551,47 @@
   },
   "amm": {
     "loadingTwapChart": "Loading TWAP price chart..."
+  },
+  "meta": {
+    "home": {
+      "title": "StellarLend - Lending on Stellar",
+      "description": "Supply and borrow assets on Stellar with StellarLend, a Soroban-powered lending protocol (testnet)."
+    },
+    "markets": {
+      "title": "Markets - StellarLend",
+      "description": "Explore StellarLend markets: supply assets to earn yield or borrow against collateral on the Stellar testnet."
+    },
+    "amm": {
+      "title": "AMM Pool, Swap & Liquidity - StellarLend",
+      "description": "Inspect the StellarLend AMM pool, get swap quotes, and manage your liquidity on Stellar."
+    },
+    "docs": {
+      "title": "Docs - StellarLend",
+      "description": "Learn how StellarLend works: markets, borrowing, flash loans, and governance on the Stellar testnet."
+    },
+    "flashLoans": {
+      "title": "Flash loans - StellarLend",
+      "description": "Borrow and repay within a single transaction using StellarLend flash loans on Soroban."
+    },
+    "history": {
+      "title": "History - StellarLend",
+      "description": "Review your StellarLend supply, borrow, withdraw, and repay transactions recorded on-chain."
+    },
+    "multisig": {
+      "title": "Multisig Governance - StellarLend",
+      "description": "Signer management and proposal execution for the StellarLend multisig contract."
+    },
+    "multisigProposal": {
+      "title": "Multisig Proposal - StellarLend",
+      "description": "Review and sign multisig governance proposals with the Freighter wallet."
+    },
+    "governance": {
+      "title": "Governance - StellarLend",
+      "description": "Track StellarLend governance state, risk configuration, and the on-chain audit log."
+    },
+    "adminEmergency": {
+      "title": "Emergency Administration - StellarLend",
+      "description": "Emergency circuit-breaker and granular pause controls for the StellarLend protocol."
+    }
   }
 }
