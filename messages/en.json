@@ -551,5 +551,29 @@
   },
   "amm": {
     "loadingTwapChart": "Loading TWAP price chart..."
+  },
+  "portfolioRisk": {
+    "title": "Portfolio risk",
+    "subtitle": "Per-asset positions, estimated liquidation prices, and instant collateral price-shock simulation.",
+    "aggregateHealth": "Aggregate health",
+    "projectedHealth": "Projected health",
+    "noDebt": "No debt",
+    "noPositions": "Supply or borrow an asset to view your portfolio risk breakdown.",
+    "priceShock": "Collateral price shock",
+    "reset": "Reset",
+    "columns": {
+      "asset": "Asset",
+      "supplied": "Supplied",
+      "borrowed": "Borrowed",
+      "currentPrice": "Current price",
+      "liqPrice": "Est. liquidation price"
+    },
+    "levels": {
+      "safe": "Safe",
+      "warning": "Warning",
+      "danger": "Danger",
+      "liquidatable": "Liquidatable"
+    },
+    "notApplicable": "-"
   }
 }
