@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { projectPosition, maxAmount, floorToDecimals } from "./projection";
+import fc from "fast-check";
+import {
+  projectPosition,
+  maxAmount,
+  floorToDecimals,
+  liquidationPrice,
+  classifyHealth,
+} from "./projection";
 import { parseAmount } from "./demo-ledger";
 import type { Ledger, MarketParams } from "./demo-ledger";
 
@@ -245,5 +252,85 @@ describe("maxAmount", () => {
       walletBalance: "200",
     });
     expect(maxOverBal).toBe("100");
+  });
+});
+
+describe("liquidationPrice", () => {
+  it("liquidationPrice null when debt is zero", () => {
+    const ledger: Ledger = {
+      XLM: { supplied: parseSafe("1000", 7), borrowed: BigInt(0) },
+    };
+    expect(liquidationPrice(ledger, MARKETS, "XLM")).toBeNull();
+  });
+
+  it("returns null when target asset has no supplied collateral", () => {
+    const ledger: Ledger = {
+      USDC: { supplied: BigInt(0), borrowed: parseSafe("50", 7) },
+    };
+    expect(liquidationPrice(ledger, MARKETS, "XLM")).toBeNull();
+  });
+
+  it("computes exact liquidation price from debt and collateral factor", () => {
+    // 1000 XLM supplied (LTV 0.7), 50 USDC borrowed ($50)
+    // Liquidation price = 50 / (1000 * 0.7) = 0.07142857...
+    const ledger: Ledger = {
+      XLM: { supplied: parseSafe("1000", 7), borrowed: BigInt(0) },
+      USDC: { supplied: BigInt(0), borrowed: parseSafe("50", 7) },
+    };
+    const liq = liquidationPrice(ledger, MARKETS, "XLM");
+    expect(liq).not.toBeNull();
+    expect(liq!).toBeCloseTo(50 / 700, 6);
+  });
+
+  it("handles very large BigInt balances without overflow", () => {
+    // 10^18 XLM supplied (10^25 base units), 7 * 10^16 USDC borrowed
+    // Liquidation price = (7e16) / (1e18 * 0.7) = 0.1
+    const ledger: Ledger = {
+      XLM: { supplied: BigInt("10000000000000000000000000"), borrowed: BigInt(0) },
+      USDC: { supplied: BigInt(0), borrowed: BigInt("700000000000000000000000") },
+    };
+    const liq = liquidationPrice(ledger, MARKETS, "XLM");
+    expect(liq).not.toBeNull();
+    expect(liq!).toBeCloseTo(0.1, 6);
+  });
+
+  it("fast-check: liquidation price monotonic in collateral", () => {
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: BigInt(10_000_000), max: BigInt(100_000_000_000_000) }),
+        fc.bigInt({ min: BigInt(0), max: BigInt(100_000_000_000_000) }),
+        fc.bigInt({ min: BigInt(10_000_000), max: BigInt(50_000_000_000_000) }),
+        (baseCollateral, extraCollateral, debtUsdc) => {
+          const ledgerLow: Ledger = {
+            XLM: { supplied: baseCollateral, borrowed: BigInt(0) },
+            USDC: { supplied: BigInt(0), borrowed: debtUsdc },
+          };
+          const ledgerHigh: Ledger = {
+            XLM: { supplied: baseCollateral + extraCollateral, borrowed: BigInt(0) },
+            USDC: { supplied: BigInt(0), borrowed: debtUsdc },
+          };
+          const liqLow = liquidationPrice(ledgerLow, MARKETS, "XLM");
+          const liqHigh = liquidationPrice(ledgerHigh, MARKETS, "XLM");
+          expect(liqLow).not.toBeNull();
+          expect(liqHigh).not.toBeNull();
+          // More collateral means a safer position, so liquidation price is never higher
+          expect(liqHigh!).toBeLessThanOrEqual(liqLow!);
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});
+
+describe("classifyHealth", () => {
+  it("classifies health factor boundaries accurately", () => {
+    expect(classifyHealth(Infinity)).toBe("safe");
+    expect(classifyHealth(null)).toBe("safe");
+    expect(classifyHealth(1.5)).toBe("safe");
+    expect(classifyHealth(1.49)).toBe("warning");
+    expect(classifyHealth(1.2)).toBe("warning");
+    expect(classifyHealth(1.19)).toBe("danger");
+    expect(classifyHealth(1.0)).toBe("danger");
+    expect(classifyHealth(0.99)).toBe("liquidatable");
   });
 });
