@@ -7,6 +7,8 @@ import {
   decodeHealthFactor,
   formatHealthFactor,
   validateThresholds,
+  loadThresholds,
+  saveThresholds,
 } from "./health";
 
 const raw = (n: number) => BigInt(n);
@@ -70,5 +72,39 @@ describe("validateThresholds", () => {
   it("rejects danger at or below 1.0 and non-numbers", () => {
     expect(validateThresholds({ warning: 1.5, danger: 1 })).toMatch(/above 1/);
     expect(validateThresholds({ warning: NaN, danger: 1.2 })).toMatch(/numbers/);
+  });
+});
+describe("health monitor storage", () => {
+  it("loadThresholds falls back on corrupt JSON", () => {
+    window.localStorage.setItem("stellarlend:health:thresholds:wallet-a", "{invalid");
+    expect(loadThresholds("wallet-a")).toEqual(DEFAULT_THRESHOLDS);
+  });
+
+  it("loadThresholds falls back when storage throws", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+    try {
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        get() {
+          throw new Error("Storage access denied");
+        },
+      });
+      expect(loadThresholds("wallet-a")).toEqual(DEFAULT_THRESHOLDS);
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(window, "localStorage", descriptor);
+      }
+    }
+  });
+
+  it("thresholds are stored per user", () => {
+    const walletA = { warning: 1.8, danger: 1.3 };
+    const walletB = { warning: 1.6, danger: 1.1 };
+
+    saveThresholds("GUSERA", walletA);
+    saveThresholds("GUSERB", walletB);
+
+    expect(loadThresholds("GUSERA")).toEqual(walletA);
+    expect(loadThresholds("GUSERB")).toEqual(DEFAULT_THRESHOLDS);
   });
 });
