@@ -118,6 +118,6 @@ describe("health monitor storage", () => {
     saveThresholds("GUSERB", walletB);
 
     expect(loadThresholds("GUSERA")).toEqual(walletA);
-    expect(loadThresholds("GUSERB")).toEqual(DEFAULT_THRESHOLDS);
+    expect(loadThresholds("GUSERB")).toEqual(walletB);
   });
 });
