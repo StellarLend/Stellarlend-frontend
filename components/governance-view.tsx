@@ -182,10 +182,11 @@ export function GovernanceView({
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr>
-                    <th className="p-2">{t("audit.columns.sequence")}</th>
-                    <th className="p-2">{t("audit.columns.action")}</th>
-                    <th className="p-2">{t("audit.columns.actor")}</th>
-                    <th className="p-2">{t("audit.columns.ledger")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.sequence")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.action")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.actor")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.ledger")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.diffs")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,6 +206,37 @@ export function GovernanceView({
                         </a>
                       </td>
                       <td className="p-2">{numberFormatter.format(e.ledger)}</td>
+                      <td className="p-2">
+                        {e.diffs && e.diffs.length > 0 ? (
+                          <ul className="space-y-1">
+                            {e.diffs.map((d) => (
+                              <li key={d.field} className="flex items-center gap-1.5 text-xs">
+                                <span className="font-mono text-gray-600">{d.field}:</span>
+                                <span>{d.prevFormatted} → {d.nextFormatted}</span>
+                                {d.direction === "increase" && (
+                                  <span className="inline-flex items-center text-green-700" title={t("audit.increase")}>
+                                    <span aria-hidden="true">▲</span>
+                                    <span className="ml-0.5 font-medium">(+ {t("audit.increase")})</span>
+                                  </span>
+                                )}
+                                {d.direction === "decrease" && (
+                                  <span className="inline-flex items-center text-amber-700" title={t("audit.decrease")}>
+                                    <span aria-hidden="true">▼</span>
+                                    <span className="ml-0.5 font-medium">(- {t("audit.decrease")})</span>
+                                  </span>
+                                )}
+                                {d.direction === "unknown" && (
+                                  <span className="inline-flex items-center text-gray-500" title={t("audit.unknown")}>
+                                    <span className="font-medium">({t("audit.unknown")})</span>
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

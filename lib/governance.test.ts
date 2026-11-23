@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getGovernanceSnapshot, type ContractReader } from "./governance";
+import { diffParams, getGovernanceSnapshot, type ContractReader } from "./governance";
 
 const ADMIN = "GADMINADMINADMINADMINADMINADMINADMINADMINADMINADMINADMINAD";
 const responses: Record<string, unknown> = {
@@ -52,5 +52,38 @@ describe("getGovernanceSnapshot", () => {
     const s = await getGovernanceSnapshot(reader({ get_governance_audit_entries: () => { auditCalls++; return responses.get_governance_audit_entries; } }));
     expect(auditCalls).toBe(1);
     expect(s.audit.ok && s.audit.value.map((e) => e.sequence)).toEqual([3n, 2n, 1n]);
+  });
+
+  describe("diffParams", () => {
+    it("diffParams ignores unchanged", () => {
+      const prev = { base_rate_bps: 200n, kink_bps: 8000n, slope: 3n };
+      const next = { base_rate_bps: 200n, kink_bps: 8500n, slope: 3n };
+      const diffs = diffParams(prev, next);
+      expect(diffs).toEqual([
+        {
+          field: "kink_bps",
+          prev: 8000n,
+          next: 8500n,
+          prevFormatted: "80%",
+          nextFormatted: "85%",
+          direction: "increase",
+        },
+      ]);
+    });
+
+    it("unknown previous value renders unknown", () => {
+      const next = { base_rate_bps: 300n };
+      const diffs = diffParams(null, next);
+      expect(diffs).toEqual([
+        {
+          field: "base_rate_bps",
+          prev: null,
+          next: 300n,
+          prevFormatted: "unknown",
+          nextFormatted: "3%",
+          direction: "unknown",
+        },
+      ]);
+    });
   });
 });

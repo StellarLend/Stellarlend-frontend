@@ -5,7 +5,23 @@ import { simulateRead } from "@/lib/soroban-read";
 /** Result of a single read: a value or an "unavailable" marker (failed getter). */
 export type Field<T> = { ok: true; value: T } | { ok: false; error: string };
 
-export type AuditLogEntry = { sequence: bigint; action: string; actor: string; ledger: number };
+export type ParamDiff = {
+  field: string;
+  prev: bigint | null;
+  next: bigint;
+  prevFormatted: string;
+  nextFormatted: string;
+  direction: "increase" | "decrease" | "unknown";
+};
+
+export type AuditLogEntry = {
+  sequence: bigint;
+  action: string;
+  actor: string;
+  ledger: number;
+  params?: Record<string, bigint | number>;
+  diffs?: ParamDiff[];
+};
 
 export type GovernanceSnapshot = {
   admin: Field<string | null>;
@@ -62,11 +78,87 @@ export function decodeRateParams(raw: unknown): Record<string, bigint | number> 
   return out;
 }
 
+export function diffParams(
+  prev: Record<string, bigint | number> | null | undefined,
+  next: Record<string, bigint | number> | null | undefined,
+  locale = "en"
+): ParamDiff[] {
+  if (!next) return [];
+  const diffs: ParamDiff[] = [];
+  for (const [key, nextValRaw] of Object.entries(next)) {
+    const nextVal = typeof nextValRaw === "bigint" ? nextValRaw : BigInt(Math.round(Number(nextValRaw)));
+    const isBps = key.endsWith("_bps");
+    const nextFormatted = isBps
+      ? new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 2 }).format(Number(nextVal) / 10_000)
+      : nextVal.toString();
+
+    if (!prev || !(key in prev) || prev[key] === null || prev[key] === undefined) {
+      diffs.push({
+        field: key,
+        prev: null,
+        next: nextVal,
+        prevFormatted: "unknown",
+        nextFormatted,
+        direction: "unknown",
+      });
+      continue;
+    }
+
+    const prevValRaw = prev[key];
+    const prevVal = typeof prevValRaw === "bigint" ? prevValRaw : BigInt(Math.round(Number(prevValRaw)));
+    if (prevVal === nextVal) {
+      continue;
+    }
+
+    const prevFormatted = isBps
+      ? new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 2 }).format(Number(prevVal) / 10_000)
+      : prevVal.toString();
+
+    const direction = nextVal > prevVal ? "increase" : "decrease";
+    diffs.push({
+      field: key,
+      prev: prevVal,
+      next: nextVal,
+      prevFormatted,
+      nextFormatted,
+      direction,
+    });
+  }
+  return diffs;
+}
+
+export function attachAuditDiffs(entries: AuditLogEntry[], locale = "en"): AuditLogEntry[] {
+  for (let i = 0; i < entries.length; i++) {
+    const curr = entries[i];
+    if (curr.diffs) continue;
+    if (curr.params) {
+      const prevEntry = entries.slice(i + 1).find((e) => e.params);
+      curr.diffs = diffParams(prevEntry?.params ?? null, curr.params, locale);
+    }
+  }
+  return entries;
+}
+
 export function decodeAuditEntries(raw: unknown): AuditLogEntry[] {
   if (!Array.isArray(raw)) throw new Error("Invalid audit log");
-  return raw
-    .map((e) => ({ sequence: toBig(e.sequence), action: String(e.action), actor: String(e.actor), ledger: toNum(e.ledger) }))
+  const entries: AuditLogEntry[] = raw
+    .map((e) => {
+      const entry: AuditLogEntry = {
+        sequence: toBig(e.sequence),
+        action: String(e.action),
+        actor: String(e.actor),
+        ledger: toNum(e.ledger),
+      };
+      if (e.params && typeof e.params === "object") {
+        entry.params = decodeRateParams(e.params);
+      }
+      if (Array.isArray(e.diffs)) {
+        entry.diffs = e.diffs;
+      }
+      return entry;
+    })
     .sort((a, b) => (a.sequence < b.sequence ? 1 : a.sequence > b.sequence ? -1 : 0));
+  return attachAuditDiffs(entries);
 }
 
 /**

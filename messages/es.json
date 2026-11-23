@@ -577,8 +577,12 @@
         "sequence": "Secuencia",
         "action": "Acción",
         "actor": "Actor",
-        "ledger": "Ledger"
-      }
+        "ledger": "Ledger",
+        "diffs": "Cambios de parámetros"
+      },
+      "increase": "aumento",
+      "decrease": "disminución",
+      "unknown": "desconocido"
     }
   },
   "amm": {
