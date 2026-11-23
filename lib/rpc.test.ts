@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createRpc, RpcError, validateRpcUrl } from "./rpc";
+import { createRpc, parseRpcFallbackUrls, RpcError, validateRpcUrl } from "./rpc";
 
 describe("validateRpcUrl", () => {
   it("allows valid https URL in production", () => {
@@ -114,7 +114,7 @@ describe("createRpc", () => {
     );
   });
 
-  it("5xx server error -> fails over to next URL", async () => {
+  it("fails over on 503", async () => {
     const mockFetch = vi
       .fn()
       // First call 503 Service Unavailable
@@ -166,7 +166,7 @@ describe("createRpc", () => {
     expect(mockFetch).toHaveBeenCalledTimes(2); // 2 distinct calls from the 2 expect assertions, 1 fetch each
   });
 
-  it("contract or simulation JSON-RPC errors are not failed over or retried", async () => {
+  it("does not fail over on simulation error", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       status: 200,
       ok: true,
@@ -239,5 +239,109 @@ describe("createRpc", () => {
     ).rejects.toThrow("Cancelled by caller");
 
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("createRpc endpoint ordering", () => {
+  const ok = (result: unknown) => ({
+    status: 200,
+    ok: true,
+    json: async () => ({ jsonrpc: "2.0", id: 1, result }),
+  });
+  const down = {
+    status: 503,
+    ok: false,
+    statusText: "Service Unavailable",
+    text: async () => "Service Unavailable",
+  };
+  const urls = [
+    "https://primary-rpc.example.com",
+    "https://fallback-a.example.com",
+    "https://fallback-b.example.com",
+  ];
+
+  it("tries the primary first, then fallbacks in configured order", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce(ok({ status: "healthy" }));
+
+    const rpc = createRpc({ urls, fetchFn: mockFetch as unknown as typeof fetch, isProduction: false });
+    await expect(rpc.request({ method: "getHealth" })).resolves.toEqual({ status: "healthy" });
+
+    expect(mockFetch.mock.calls.map((c) => c[0])).toEqual(urls);
+  });
+
+  it("sticks to the fallback that succeeded for later requests", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(down) // primary down
+      .mockResolvedValueOnce(ok(1)) // fallback A answers
+      .mockResolvedValueOnce(ok(2)); // next request goes straight to fallback A
+
+    const rpc = createRpc({ urls, fetchFn: mockFetch as unknown as typeof fetch, isProduction: false });
+    expect(rpc.activeUrl).toBe(urls[0]);
+
+    await rpc.request({ method: "getHealth" });
+    expect(rpc.activeUrl).toBe(urls[1]);
+
+    await rpc.request({ method: "getHealth" });
+    expect(mockFetch.mock.calls.map((c) => c[0])).toEqual([urls[0], urls[1], urls[1]]);
+  });
+
+  it("falls back to configured order when the sticky endpoint later fails", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(down) // 1st request: primary down
+      .mockResolvedValueOnce(ok("a")) // 1st request: fallback A ok -> sticky
+      .mockResolvedValueOnce(down) // 2nd request: sticky fallback A now down
+      .mockResolvedValueOnce(ok("primary")); // 2nd request: primary (configured order) recovers
+
+    const rpc = createRpc({ urls, fetchFn: mockFetch as unknown as typeof fetch, isProduction: false });
+    await rpc.request({ method: "getHealth" });
+    await expect(rpc.request({ method: "getHealth" })).resolves.toBe("primary");
+
+    expect(mockFetch.mock.calls.map((c) => c[0])).toEqual([urls[0], urls[1], urls[1], urls[0]]);
+    expect(rpc.activeUrl).toBe(urls[0]);
+  });
+
+  it("keeps the current endpoint when a simulation error is returned", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(down)
+      .mockResolvedValueOnce(ok("a"))
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          jsonrpc: "2.0",
+          id: 1,
+          error: { code: -32000, message: "Transaction simulation failed" },
+        }),
+      });
+
+    const rpc = createRpc({ urls, fetchFn: mockFetch as unknown as typeof fetch, isProduction: false });
+    await rpc.request({ method: "getHealth" });
+    await expect(rpc.request({ method: "simulateTransaction" })).rejects.toMatchObject({
+      isSimulationError: true,
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(3); // no failover attempt for the simulation error
+    expect(rpc.activeUrl).toBe(urls[1]);
+  });
+});
+
+describe("parseRpcFallbackUrls", () => {
+  it("returns an empty list for unset or blank input", () => {
+    expect(parseRpcFallbackUrls(undefined)).toEqual([]);
+    expect(parseRpcFallbackUrls("")).toEqual([]);
+    expect(parseRpcFallbackUrls(" , ,, ")).toEqual([]);
+  });
+
+  it("trims entries, drops empties, strips trailing slashes and removes duplicates in order", () => {
+    expect(
+      parseRpcFallbackUrls(" https://a.example/ ,https://b.example,, https://a.example ,https://c.example//")
+    ).toEqual(["https://a.example", "https://b.example", "https://c.example"]);
   });
 });

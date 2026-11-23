@@ -47,6 +47,25 @@ export function validateRpcUrl(urlStr: string, isProduction = process.env.NODE_E
   return trimmed;
 }
 
+/**
+ * Splits a comma separated list of RPC URLs (e.g. NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS)
+ * into trimmed, de-duplicated entries, preserving order. Empty entries are dropped.
+ * Trailing slashes are ignored when comparing so "https://a.example/" and
+ * "https://a.example" count as the same endpoint. Does not validate the URLs.
+ */
+export function parseRpcFallbackUrls(raw?: string | null): string[] {
+  if (!raw) return [];
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const part of raw.split(",")) {
+    const url = part.trim().replace(/\/+$/, "");
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    urls.push(url);
+  }
+  return urls;
+}
+
 export interface CreateRpcOptions {
   urls: string[];
   timeoutMs?: number;
@@ -84,6 +103,20 @@ export function createRpc(options: CreateRpcOptions) {
   // Validate all URLs upfront
   const validatedUrls = options.urls.map((u) => validateRpcUrl(u, isProduction));
 
+  // Index of the endpoint that last answered successfully. Requests try it first
+  // (so a healthy fallback "sticks" for the session instead of re-probing a dead
+  // primary on every call); if it fails we fall back to the configured order:
+  // primary first, then the remaining fallbacks.
+  let activeIndex = 0;
+
+  function attemptOrder(): number[] {
+    const order = [activeIndex];
+    for (let i = 0; i < validatedUrls.length; i++) {
+      if (i !== activeIndex) order.push(i);
+    }
+    return order;
+  }
+
   async function request<T = unknown>(
     body: JsonRpcRequest | Record<string, unknown>,
     init?: { signal?: AbortSignal }
@@ -96,9 +129,12 @@ export function createRpc(options: CreateRpcOptions) {
 
     const errors: Array<{ url: string; error: unknown }> = [];
 
-    for (let i = 0; i < validatedUrls.length; i++) {
+    const order = attemptOrder();
+
+    for (let attempt = 0; attempt < order.length; attempt++) {
+      const i = order[attempt];
       const currentUrl = validatedUrls[i];
-      const isLast = i === validatedUrls.length - 1;
+      const isLast = attempt === order.length - 1;
 
       const timeoutController = new AbortController();
       const timer = setTimeout(() => {
@@ -173,6 +209,8 @@ export function createRpc(options: CreateRpcOptions) {
           });
         }
 
+        // Remember the endpoint that worked so later requests start here.
+        activeIndex = i;
         return data.result as T;
       } catch (err: unknown) {
         clearTimeout(timer);
@@ -211,6 +249,10 @@ export function createRpc(options: CreateRpcOptions) {
 
   return {
     urls: validatedUrls,
+    /** The endpoint that currently receives requests first (last known healthy). */
+    get activeUrl(): string {
+      return validatedUrls[activeIndex];
+    },
     request,
   };
 }
