@@ -17,12 +17,35 @@ StellarLend is an over-collateralised lending market on Stellar (Soroban). This 
 - `/docs`: user docs, risk parameters, deployed contract list, env vars
 
 ## Architecture
-Next.js 15 (App Router, React 19, Tailwind 4). Wallet signing via `@stellar/freighter-api`, balances from Horizon, contract IDs from `NEXT_PUBLIC_*` env vars. With a wallet on testnet and `NEXT_PUBLIC_LENDING_CONTRACT_ID` set, the XLM market reads positions and submits deposit / borrow / withdraw / repay transactions to the deployed lending contract. Without a wallet (or before the contract is configured) the app falls back to a clearly labelled browser-local demo ledger. Contracts live in [StellarLend/stellarlend-contracts](https://github.com/StellarLend/stellarlend-contracts).
+Next.js 16 (`^16.4.2`, App Router, React 19, Tailwind 4) with `next-intl` locale routing. English is the default and uses unprefixed URLs; Spanish routes use the `/es` prefix. Wallet signing uses `@stellar/freighter-api`, balances come from Horizon, and contract IDs are configured with `NEXT_PUBLIC_*` environment variables. With a wallet on testnet and `NEXT_PUBLIC_LENDING_CONTRACT_ID` set, the XLM market reads positions and submits deposit / borrow / withdraw / repay transactions to the deployed lending contract. Without a wallet (or before the contract is configured) the app falls back to a clearly labelled browser-local demo ledger. Contracts live in [StellarLend/stellarlend-contracts](https://github.com/StellarLend/stellarlend-contracts).
 
 ```
-app/            routes (/, /markets, /docs)
-components/     wallet provider, markets app
-lib/            config (env), market data
+app/
+  [locale]/
+    admin/emergency/page.tsx
+    amm/page.tsx
+    docs/page.tsx
+    flash-loans/page.tsx
+    history/page.tsx
+    markets/page.tsx
+    multisig/page.tsx
+    multisig/[id]/page.tsx
+    page.tsx
+  admin/emergency/page.tsx  /admin/emergency
+  amm/page.tsx              /amm
+  docs/page.tsx             /docs
+  flash-loans/page.tsx      /flash-loans
+  governance/page.tsx       /governance
+  history/page.tsx          /history
+  markets/page.tsx          /markets
+  multisig/page.tsx         /multisig
+  multisig/[id]/page.tsx    /multisig/[id]
+  api/v1/positions/[address]/route.ts  /api/v1/positions/[address]
+  api/v1/protocol/route.ts             /api/v1/protocol
+components/                  wallet provider, markets app
+lib/                         config (env), market data
+i18n/                        next-intl routing and request config
+messages/                    en and es translations
 ```
 
 ## Public Read API
@@ -60,6 +83,21 @@ cp .env.example .env.local
 npm run dev     # http://localhost:3000
 npm run build
 ```
+
+## Scripts
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the Next.js development server. |
+| `npm run build` | Create the production build. |
+| `npm run start` | Start the production server. |
+| `npm run lint` | Run ESLint across the project. |
+| `npm run type-check` | Run TypeScript without emitting files. |
+| `npm run check-lockfile` | Verify the lockfile matches the package manifest. |
+| `npm test` | Run lockfile, unit, Node, and lending-error checks. |
+| `npm run test:coverage` | Run tests with coverage and lending-error checks. |
+| `npm run test:e2e` | Run the Playwright end-to-end tests. |
+| `npm run test:integration` | Run the Vitest integration tests. |
+| `npm run check-lending-errors` | Check lending-contract error definitions against the frontend. |
 
 ## Environment variables
 | Name | Purpose |
