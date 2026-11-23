@@ -75,6 +75,19 @@ describe("validateThresholds", () => {
   });
 });
 describe("health monitor storage", () => {
+
+  it("loadThresholds falls back when no value is stored", () => {
+    expect(loadThresholds("new-wallet")).toEqual(DEFAULT_THRESHOLDS);
+  });
+
+  it("loadThresholds falls back when stored thresholds fail validation", () => {
+    window.localStorage.setItem(
+      "stellarlend:health:thresholds:wallet-invalid",
+      JSON.stringify({ warning: 1.1, danger: 1.3 }),
+    );
+    expect(loadThresholds("wallet-invalid")).toEqual(DEFAULT_THRESHOLDS);
+  });
+
   it("loadThresholds falls back on corrupt JSON", () => {
     window.localStorage.setItem("stellarlend:health:thresholds:wallet-a", "{invalid");
     expect(loadThresholds("wallet-a")).toEqual(DEFAULT_THRESHOLDS);
