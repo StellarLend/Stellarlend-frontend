@@ -68,11 +68,27 @@ npm run build
 | `NEXT_PUBLIC_HORIZON_URL` | Horizon endpoint |
 | `NEXT_PUBLIC_SOROBAN_RPC_URL` | Soroban RPC endpoint |
 | `NEXT_PUBLIC_LENDING_CONTRACT_ID` | Deployed lending contract (testnet) |
+| `NEXT_PUBLIC_ORACLE_CONTRACT_ID` | Oracle Soroban contract |
+| `NEXT_PUBLIC_TOKEN_CONTRACT_ID` | Token Soroban contract |
+| `NEXT_PUBLIC_MULTISIG_CONTRACT_ID` | Optional multisig Soroban contract |
 | `NEXT_PUBLIC_AMM_CONTRACT_ID` | Deployed AMM pool contract |
 | `NEXT_PUBLIC_AMM_TOKEN_A_CONTRACT_ID` | Token A Soroban contract used by the pool |
 | `NEXT_PUBLIC_AMM_TOKEN_B_CONTRACT_ID` | Token B Soroban contract used by the pool |
 | `NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET` | Optional Token A Horizon asset in `CODE:ISSUER` form |
 | `NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET` | Optional Token B Horizon asset in `CODE:ISSUER` form |
+| `NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE` | Optional network passphrase override |
+| `NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS` | Optional comma-separated Soroban RPC fallback URLs |
+| `NEXT_PUBLIC_XLM_ASSET_ADDRESS` | Optional XLM asset contract address |
+| `NEXT_PUBLIC_USDC_ASSET_ADDRESS` | Optional USDC asset contract address |
+| `NEXT_PUBLIC_EURC_ASSET_ADDRESS` | Optional EURC asset contract address |
+| `NEXT_PUBLIC_BTC_ASSET_ADDRESS` | Optional BTC asset contract address |
+| `NEXT_PUBLIC_SITE_URL` | Public site URL |
+| `NEXT_PUBLIC_CSP_REPORT_URI` | Optional CSP violation reporting endpoint |
+| `NEXT_PUBLIC_ERROR_ENDPOINT` | Optional client error reporting endpoint |
+| `NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS` | Optional testnet maximum oracle price age in seconds |
+| `NEXT_PUBLIC_USDC_ISSUER` | Optional USDC testnet asset issuer override |
+| `NEXT_PUBLIC_EURC_ISSUER` | Optional EURC testnet asset issuer override |
+| `NEXT_PUBLIC_BTC_ISSUER` | Optional BTC testnet asset issuer override |
 
 ## Deployed contracts (testnet)
 Lending contract (Stellar testnet): [`CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6`](https://stellar.expert/explorer/testnet/contract/CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6)
