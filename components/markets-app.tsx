@@ -527,7 +527,7 @@ export default function MarketsApp() {
   };
   const currentBlockedReason = !isDemoMode ? getBlockedReason(mode) : null;
   const currentBlocked = !isDemoMode && !isActionAllowed(mode);
-  const oracleGuard = useMemo(() => evaluateOracle(mode), [evaluateOracle, mode]);
+  const oracleGuard = evaluateOracle(mode);
   const oracleReasonId = oracleGuard.reason ? "oracle-guard-reason" : undefined;
 
   const tradePanel = sel ? (
