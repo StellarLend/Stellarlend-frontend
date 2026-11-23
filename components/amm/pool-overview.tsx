@@ -38,7 +38,7 @@ export function PoolOverview() {
   const [snapshot, setSnapshot] = useState<PoolSnapshot | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [timeWindow, setTimeWindow] = useState<number | undefined>(undefined);
+  const [timeWindow, setTimeWindow] = useState<number>(3600);
 
   const isConfigured = Boolean(config.ammId);
 
