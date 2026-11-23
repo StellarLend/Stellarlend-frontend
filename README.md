@@ -97,3 +97,6 @@ Set as `NEXT_PUBLIC_LENDING_CONTRACT_ID` in Vercel. Oracle and token contracts a
 
 ## Deploy
 Deployed on Vercel; set the env vars above in the project settings.
+
+## Contributing
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, test commands, lockfile/error-snapshot checks, and pull request guidelines.
