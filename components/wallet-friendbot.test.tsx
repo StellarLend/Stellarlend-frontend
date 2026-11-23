@@ -126,6 +126,7 @@ describe("Wallet Context", () => {
     await waitFor(() => {
       expect(result.current.accountStatus).toBe("error");
       expect(result.current.balance).toBeNull();
+      expect(result.current.error).toBe("Network failed");
     });
   });
 

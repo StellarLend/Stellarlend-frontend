@@ -9,6 +9,7 @@ import { qk } from "@/lib/query-keys";
 import { fundWithFriendbot, pollUntilFunded } from "@/lib/friendbot";
 import {
   addTrustline as horizonAddTrustline,
+  fetchWithRetry,
   parseAccountBalances,
   type AccountBalancesMap,
   type HorizonAccount,
@@ -402,12 +403,16 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     [adapter, address, assertCanSign]
   );
 
-  const { data: account = null, isError: balanceError } = useQuery<{ balance: string; status: AccountStatus; balances: AccountBalancesMap; rawAccount: HorizonAccount | null } | null>({
+  const {
+    data: account = null,
+    isError: balanceError,
+    error: balanceQueryError,
+  } = useQuery<{ balance: string; status: AccountStatus; balances: AccountBalancesMap; rawAccount: HorizonAccount | null } | null>({
     queryKey: qk.accountBalance(address),
     queryFn: async ({ signal }) => {
       if (!address) return null;
       try {
-        const res = await fetch(`${config.horizon}/accounts/${address}`, { signal });
+        const res = await fetchWithRetry(`${config.horizon}/accounts/${address}`, { signal });
         if (res.status === 404) {
           return { balance: t("unfunded"), status: "unfunded", balances: {}, rawAccount: null };
         }
@@ -444,6 +449,11 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
     : balanceError
       ? "error"
       : account?.status ?? "unknown";
+  const balanceErrorMessage = balanceError
+    ? balanceQueryError instanceof Error
+      ? balanceQueryError.message
+      : String(balanceQueryError ?? "Failed to load Horizon balance")
+    : null;
 
   const invalidateBalance = useCallback(async () => {
     if (!address) return;
@@ -516,7 +526,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
       value={{
         address,
         balance,
-        error,
+        error: balanceErrorMessage ?? error,
         activeWalletId,
         isPickerOpen,
         openPicker,
