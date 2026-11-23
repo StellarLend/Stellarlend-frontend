@@ -9,11 +9,13 @@ export function jsonResponse<T>(
   body: T,
   status: number,
   cacheControl: string,
+  extraHeaders: Record<string, string> = {},
 ): Response {
   return Response.json(body, {
     status,
     headers: {
       "Cache-Control": cacheControl,
+      ...extraHeaders,
     },
   });
 }

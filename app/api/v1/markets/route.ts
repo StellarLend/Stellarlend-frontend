@@ -19,7 +19,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const snapshot = await marketsCache.getOrLoad(
+    const { value: snapshot, isStale } = await marketsCache.getOrLoadWithMeta(
       "markets",
       MARKETS_TTL,
       fetchMarkets,
@@ -42,7 +42,12 @@ export async function GET(request: Request): Promise<Response> {
       fetchedAt: snapshot.fetchedAt,
     };
 
-    return jsonResponse(body, 200, MARKETS_CACHE_CONTROL);
+    return jsonResponse(
+      body,
+      200,
+      MARKETS_CACHE_CONTROL,
+      isStale ? { "X-Cache": "stale" } : undefined,
+    );
   } catch (error) {
     return mapApiError(error);
   }

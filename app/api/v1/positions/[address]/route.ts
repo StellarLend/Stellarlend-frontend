@@ -32,7 +32,7 @@ export async function GET(
   }
 
   try {
-    const position = await positionCache.getOrLoad(
+    const { value: position, isStale } = await positionCache.getOrLoadWithMeta(
       address,
       POSITION_TTL,
       () => fetchPosition(address),
@@ -46,7 +46,12 @@ export async function GET(
       fetchedAt: position.fetchedAt,
     };
 
-    return jsonResponse(body, 200, POSITION_CACHE_CONTROL);
+    return jsonResponse(
+      body,
+      200,
+      POSITION_CACHE_CONTROL,
+      isStale ? { "X-Cache": "stale" } : undefined,
+    );
   } catch (error) {
     return mapApiError(error);
   }
