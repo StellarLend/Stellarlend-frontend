@@ -4,12 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetApiCaches } from "./cache";
 import { ContractNotConfiguredError, UpstreamRpcError } from "./errors";
 import { resetApiRateLimiter } from "./rate-limit";
+import type {
+  MarketsSnapshot,
+  PositionSummary,
+  ProtocolMetrics,
+} from "./lending";
 import {
   ApiErrorBodySchema,
   PositionResponseSchema,
   ProtocolResponseSchema,
 } from "./schema";
-import type { PositionSummary, ProtocolMetrics } from "./lending";
 
 const mocks = vi.hoisted(() => ({
   fetchProtocolMetrics: vi.fn(),

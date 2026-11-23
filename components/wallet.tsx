@@ -15,6 +15,41 @@ import {
 } from "@/lib/horizon";
 import { QueryProvider } from "./query-provider";
 import { ProtocolStatusProvider } from "@/components/protocol-status";
+
+function WalletPickerSkeleton() {
+  const t = useTranslations("wallet");
+  const label = t("loadingWallets");
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      role="status"
+      aria-busy="true"
+      aria-label={label}
+      data-testid="wallet-picker-skeleton"
+    >
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111318] p-6 shadow-2xl space-y-4">
+        <div className="h-6 w-40 animate-pulse rounded bg-white/10" />
+        <div className="space-y-3">
+          <div className="h-14 w-full animate-pulse rounded-xl bg-white/5" />
+          <div className="h-14 w-full animate-pulse rounded-xl bg-white/5" />
+        </div>
+        <span className="sr-only">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+const loadWalletPicker = () =>
+  import("./wallet-picker").then((mod) => mod.WalletPickerModal);
+
+export function prefetchWalletPicker(): void {
+  void loadWalletPicker();
+}
+
+const WalletPickerModal = dynamic(loadWalletPicker, {
+  ssr: false,
+  loading: () => <WalletPickerSkeleton />,
+});
 import {
   WalletAdapter,
   SignTransactionOptions,
@@ -23,7 +58,6 @@ import {
   normalizeWalletError,
   withSigningTimeout,
 } from "@/lib/wallets";
-import { WalletPickerModal } from "./wallet-picker";
 
 export type AccountStatus = "unknown" | "unfunded" | "funded" | "error";
 

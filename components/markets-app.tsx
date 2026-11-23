@@ -399,7 +399,7 @@ export default function MarketsApp() {
   }
 
   async function submit() {
-    if (!sel || busy) return;
+    if (!sel || busy || oracleGuard.blocked) return;
     // A missing classic-asset trustline makes supply/repay fail on-chain; block it.
     if (trustlineBlocksAction) return;
     // Accept locale-formatted input (e.g. "1.234,5" in Spanish), then parse
