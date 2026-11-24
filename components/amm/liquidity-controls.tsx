@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { formatTokenAmount, parseTokenAmount, proportionalAmount } from "@/lib/amm/liquidity-math";
 
 export function MatchPoolRatioButton({
@@ -18,6 +19,7 @@ export function MatchPoolRatioButton({
   reserveB: bigint;
   onMatch: (amountB: string) => void;
 }) {
+  const t = useTranslations("amm");
   const parsed = parseTokenAmount(amountA, decimalsA);
   const amount = parsed === null ? null : proportionalAmount(parsed, reserveA, reserveB);
   return (
@@ -28,12 +30,13 @@ export function MatchPoolRatioButton({
         if (amount !== null) onMatch(formatTokenAmount(amount, decimalsB, decimalsB));
       }}
     >
-      Match pool ratio
+      {t("matchPoolRatio")}
     </button>
   );
 }
 
 export function SharePresets({ balance, onSelect }: { balance: bigint; onSelect: (shares: string) => void }) {
+  const t = useTranslations("amm");
   return (
     <div className="grid grid-cols-4 gap-2">
       {[25, 50, 75, 100].map((percent) => (
@@ -43,7 +46,7 @@ export function SharePresets({ balance, onSelect }: { balance: bigint; onSelect:
           disabled={balance <= 0n}
           onClick={() => onSelect((balance * BigInt(percent) / 100n).toString())}
         >
-          {percent === 100 ? "Max" : `${percent}%`}
+          {percent === 100 ? t("max") : `${percent}%`}
         </button>
       ))}
     </div>

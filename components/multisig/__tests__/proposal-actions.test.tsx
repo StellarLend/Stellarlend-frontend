@@ -1,8 +1,21 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import enMessages from "@/messages/en.json";
+import esMessages from "@/messages/es.json";
 import { ProposalActions, BatchProposalActions } from "../proposal-actions";
 import { Proposal } from "@/lib/multisig/types";
+
+const render = (ui: React.ReactElement, options?: any, locale = "en", messages: any = enMessages) =>
+  rtlRender(ui, {
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <NextIntlClientProvider locale={locale} messages={messages}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+    ...options,
+  });
 
 // Mock wallet
 vi.mock("@/components/wallet", () => ({
@@ -145,6 +158,11 @@ describe("ProposalActions Component", () => {
     fireEvent.click(cancelModalBtn);
 
     expect(screen.queryByTestId("action-confirmation-modal")).toBeNull();
+  });
+
+  it("ProposalActions shows Spanish approve button", () => {
+    render(<ProposalActions proposal={activeProposal} isSignerOverride={true} />, undefined, "es", esMessages);
+    expect(screen.getByRole("button", { name: "Aprobar" })).toBeDefined();
   });
 });
 
