@@ -9,7 +9,8 @@
     "switchLocale": "ES",
     "flashLoans": "Flash loans",
     "governance": "Governance",
-    "amm": "AMM"
+    "amm": "AMM",
+    "liquidate": "Liquidate"
   },
   "errors": {
     "boundary": {
@@ -819,6 +820,36 @@
       "repay": "Repay"
     }
   },
+  "liquidate": {
+    "title": "Liquidate position",
+    "subtitle": "Repay part of a borrower's debt and seize collateral at a discount.",
+    "borrowerLabel": "Borrower address",
+    "borrowerPlaceholder": "G...",
+    "invalidAddress": "Enter a valid G-address",
+    "lookupButton": "Look up position",
+    "lookingUp": "Looking up…",
+    "positionHeading": "Position",
+    "collateral": "Collateral",
+    "debt": "Debt",
+    "healthFactor": "Health factor",
+    "closeFactor": "Close factor",
+    "incentive": "Incentive",
+    "notLiquidatable": "This position is healthy and cannot be liquidated.",
+    "repayLabel": "Repay amount",
+    "repayPlaceholder": "0.0000000",
+    "maxRepay": "Max repay",
+    "preview": "Preview",
+    "actualRepay": "Actual repay",
+    "seizedEstimate": "Seized collateral (est.)",
+    "submitButton": "Liquidate",
+    "submitting": "Submitting…",
+    "connectWallet": "Connect wallet to liquidate",
+    "amountTooLarge": "Amount exceeds the close-factor cap",
+    "txSuccessHeading": "Liquidation submitted",
+    "viewOnExplorer": "View transaction",
+    "errorHeading": "Liquidation failed",
+    "lookupError": "Could not load position"
+  },
   "meta": {
     "home": {
       "title": "StellarLend - Lending on Stellar",
@@ -859,6 +890,10 @@
     "adminEmergency": {
       "title": "Emergency Administration - StellarLend",
       "description": "Emergency circuit-breaker and granular pause controls for the StellarLend protocol."
+    },
+    "liquidate": {
+      "title": "Liquidate - StellarLend",
+      "description": "Repay an undercollateralised borrower's debt and claim collateral at a discount on StellarLend."
     }
   },
   "multisig": {
