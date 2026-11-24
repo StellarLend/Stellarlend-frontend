@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
 import enMessages from "@/messages/en.json";
+import esMessages from "@/messages/es.json";
 import { HealthChip } from "./health-chip";
 import {
   DEFAULT_THRESHOLDS,
@@ -10,6 +11,7 @@ import {
   classifyHealth,
   decodeHealthFactor,
   validateThresholds,
+  type HealthLevel,
 } from "@/lib/health";
 import type {
   MonitorStatus,
@@ -26,11 +28,15 @@ function renderChip(
     enable?: () => void;
     disable?: () => void;
   },
+  locale: "en" | "es" = "en",
 ) {
   const health = raw === null ? null : decodeHealthFactor(raw);
   const level = health ? classifyHealth(health, DEFAULT_THRESHOLDS) : null;
   render(
-    <NextIntlClientProvider locale="en" messages={enMessages}>
+    <NextIntlClientProvider
+      locale={locale}
+      messages={locale === "es" ? esMessages : enMessages}
+    >
       <HealthChip
         health={health}
         level={level}
@@ -77,6 +83,49 @@ describe("HealthChip", () => {
 
   it("renders the i128::MAX overflow as Very safe, not a number", () => {
     expect(renderChip(I128_MAX).textContent).toBe("Very safe");
+  });
+
+  it("exposes the numeric value and level in aria-label and tooltip", () => {
+    const chip = renderChip(BigInt(20000));
+    expect(chip).toHaveAttribute("aria-label", "Health factor 2.00, Safe");
+    expect(chip).toHaveAttribute("title", "Health factor 2.00 (Safe)");
+  });
+
+  it("renders Spanish danger labels with locale-formatted numbers", () => {
+    const chip = renderChip(BigInt(11000), "ok", undefined, "es");
+    expect(chip.textContent).toContain("1,10");
+    expect(chip.textContent).toContain("Peligro");
+    expect(chip).toHaveAttribute(
+      "aria-label",
+      "Factor de salud 1,10, Peligro"
+    );
+    expect(chip).toHaveAttribute("title", "Factor de salud 1,10 (Peligro)");
+  });
+
+  it("renders the no-debt sentinel in Spanish", () => {
+    expect(
+      renderChip(HEALTH_FACTOR_NO_DEBT, "ok", undefined, "es").textContent
+    ).toBe("Sin deuda");
+  });
+
+  it("renders the very-safe overflow state in Spanish", () => {
+    expect(
+      renderChip(I128_MAX, "ok", undefined, "es").textContent
+    ).toBe("Muy seguro");
+  });
+
+  it("has a translated message for every health level in both catalogs", () => {
+    const levels: HealthLevel[] = [
+      "safe",
+      "warning",
+      "danger",
+      "liquidatable",
+    ];
+    for (const messages of [enMessages, esMessages]) {
+      for (const level of levels) {
+        expect(messages.market.healthStatus.levels[level]).toBeTruthy();
+      }
+    }
   });
 
   it("shows loading and error states", () => {

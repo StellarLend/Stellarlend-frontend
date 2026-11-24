@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   BPS_DENOM,
   DEFAULT_APR_BPS,
   DEFAULT_RATE_PARAMS,
   borrowRateBps,
-  formatBpsPercent,
   sampleBorrowRateCurve,
   type RateModelDiagnostics,
   type RateParams,
@@ -59,6 +59,9 @@ export type RateChartLabels = {
   markerSurcharge: string;
   historyTableCaption: string;
   colLedger: string;
+  bpsValue: string;
+  bpsRange: string;
+  curveSummary: string;
 };
 
 export const defaultRateChartLabels: RateChartLabels = {
@@ -112,6 +115,10 @@ export const defaultRateChartLabels: RateChartLabels = {
   markerSurcharge: "Surcharge kink",
   historyTableCaption: "Utilization history samples",
   colLedger: "Ledger",
+  bpsValue: "{value} bps",
+  bpsRange: "{floor}–{ceiling} bps",
+  curveSummary:
+    "Interest-rate curve: base rate {baseRate} ({baseRateBps} bps), kink utilization {kinkUtilization} ({kinkBps} bps), maximum rate {maxRate} ({maxRateBps} bps).",
 };
 
 export type RateChartProps = {
@@ -152,6 +159,20 @@ function clampBps(bps: bigint): bigint {
   return bps;
 }
 
+function createNumberFormatters(locale: string) {
+  return {
+    percent: (bps: bigint | number, digits = 2) =>
+      `${new Intl.NumberFormat(locale, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      }).format(Number(bps) / 100)}%`,
+    integer: (value: bigint | number) =>
+      new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(
+        Number(value)
+      ),
+  };
+}
+
 export function RateChart({
   params = DEFAULT_RATE_PARAMS,
   diagnostics = DEFAULT_DIAGNOSTICS,
@@ -160,9 +181,22 @@ export function RateChart({
   labels,
   overlay,
 }: RateChartProps) {
+  const locale = useLocale();
+  const t = useTranslations("market.rateModel");
+  const { percent: formatPercent, integer: formatInteger } = useMemo(
+    () => createNumberFormatters(locale),
+    [locale]
+  );
+
+  const translatedLabels = useMemo(() => {
+    const keys = Object.keys(defaultRateChartLabels) as Array<
+      keyof RateChartLabels
+    >;
+    return Object.fromEntries(keys.map((key) => [key, t.raw(key)])) as RateChartLabels;
+  }, [t]);
   const copy = useMemo(
-    () => ({ ...defaultRateChartLabels, ...labels }),
-    [labels]
+    () => ({ ...translatedLabels, ...labels }),
+    [labels, translatedLabels]
   );
 
   const currentUtilBps = clampBps(diagnostics.utilization_bps);
@@ -367,24 +401,33 @@ export function RateChart({
 
   const summaryText = diagnostics.rate_model_active
     ? interpolate(copy.summaryActive, {
-        utilization: formatBpsPercent(currentUtilBps),
-        targetRate: formatBpsPercent(diagnostics.target_rate_bps),
-        targetBps: diagnostics.target_rate_bps.toString(),
-        appliedRate: formatBpsPercent(diagnostics.applied_rate_bps),
-        appliedBps: diagnostics.applied_rate_bps.toString(),
-        kink: formatBpsPercent(kinkUtilBps),
+        utilization: formatPercent(currentUtilBps),
+        targetRate: formatPercent(diagnostics.target_rate_bps),
+        targetBps: formatInteger(diagnostics.target_rate_bps),
+        appliedRate: formatPercent(diagnostics.applied_rate_bps),
+        appliedBps: formatInteger(diagnostics.applied_rate_bps),
+        kink: formatPercent(kinkUtilBps),
       })
     : interpolate(copy.summaryInactive, {
-        defaultRate: formatBpsPercent(DEFAULT_APR_BPS),
-        defaultBps: DEFAULT_APR_BPS.toString(),
-        utilization: formatBpsPercent(currentUtilBps),
+        defaultRate: formatPercent(DEFAULT_APR_BPS),
+        defaultBps: formatInteger(DEFAULT_APR_BPS),
+        utilization: formatPercent(currentUtilBps),
       });
+
+  const curveSummary = interpolate(copy.curveSummary, {
+    baseRate: formatPercent(params.base_rate_bps),
+    baseRateBps: formatInteger(params.base_rate_bps),
+    kinkUtilization: formatPercent(params.kink_utilization_bps),
+    kinkBps: formatInteger(params.kink_utilization_bps),
+    maxRate: formatPercent(params.rate_ceiling_bps),
+    maxRateBps: formatInteger(params.rate_ceiling_bps),
+  });
 
   const badgeLabel = source === "contract" ? copy.liveBadge : copy.demoBadge;
   const surchargeDisplay = surchargeActive
-    ? `>${formatBpsPercent(params.surcharge_kink_bps)} (+${formatBpsPercent(params.surcharge_slope)})`
+    ? `>${formatPercent(params.surcharge_kink_bps)} (+${formatPercent(params.surcharge_slope)})`
     : copy.surchargeDisabled;
-  const floorCeilingDisplay = `${formatBpsPercent(params.rate_floor_bps)} / ${formatBpsPercent(params.rate_ceiling_bps)}`;
+  const floorCeilingDisplay = `${formatPercent(params.rate_floor_bps)} / ${formatPercent(params.rate_ceiling_bps)}`;
 
   const oldestSample =
     chronologicalHistory.length > 0 ? chronologicalHistory[0] : null;
@@ -428,7 +471,20 @@ export function RateChart({
       )}
 
       {/* Text summary for screen readers and quick visual inspection */}
-      <p className="mut text-sm" data-testid="rate-model-summary">
+      <span
+        className="sr-only"
+        role="img"
+        aria-label={curveSummary}
+        data-testid="rate-curve-summary"
+      />
+      <p
+        className="mut text-sm focus:outline-2 focus:outline-offset-2 focus:outline-[var(--acc)]"
+        data-testid="rate-model-summary"
+        role="tooltip"
+        tabIndex={0}
+        aria-label={summaryText}
+        title={summaryText}
+      >
         {summaryText}
       </p>
 
@@ -440,9 +496,11 @@ export function RateChart({
             className="mt-1 text-lg font-semibold"
             data-testid="diag-utilization"
           >
-            {formatBpsPercent(currentUtilBps)}
+            {formatPercent(currentUtilBps)}
           </div>
-          <div className="mut text-xs">{`${currentUtilBps.toString()} bps`}</div>
+          <div className="mut text-xs">
+            {t("bpsValue", { value: formatInteger(currentUtilBps) })}
+          </div>
         </div>
         <div className="rounded-xl border border-[var(--line)] bg-[#0a1020] p-3">
           <div className="mut text-xs">{copy.appliedRate}</div>
@@ -450,9 +508,11 @@ export function RateChart({
             className="mt-1 text-lg font-semibold text-emerald-400"
             data-testid="diag-applied-rate"
           >
-            {formatBpsPercent(diagnostics.applied_rate_bps)}
+            {formatPercent(diagnostics.applied_rate_bps)}
           </div>
-          <div className="mut text-xs">{`${diagnostics.applied_rate_bps.toString()} bps`}</div>
+          <div className="mut text-xs">
+            {t("bpsValue", { value: formatInteger(diagnostics.applied_rate_bps) })}
+          </div>
         </div>
         <div className="rounded-xl border border-[var(--line)] bg-[#0a1020] p-3">
           <div className="mut text-xs">{copy.targetRate}</div>
@@ -460,28 +520,37 @@ export function RateChart({
             className="mt-1 text-lg font-semibold text-indigo-300"
             data-testid="diag-target-rate"
           >
-            {formatBpsPercent(diagnostics.target_rate_bps)}
+            {formatPercent(diagnostics.target_rate_bps)}
           </div>
-          <div className="mut text-xs">{`${diagnostics.target_rate_bps.toString()} bps`}</div>
+          <div className="mut text-xs">
+            {t("bpsValue", { value: formatInteger(diagnostics.target_rate_bps) })}
+          </div>
         </div>
         <div className="rounded-xl border border-[var(--line)] bg-[#0a1020] p-3">
           <div className="mut text-xs">{copy.kink}</div>
           <div className="mt-1 text-lg font-semibold">
-            {formatBpsPercent(kinkUtilBps)}
+            {formatPercent(kinkUtilBps)}
           </div>
-          <div className="mut text-xs">{`${kinkUtilBps.toString()} bps`}</div>
+          <div className="mut text-xs">
+            {t("bpsValue", { value: formatInteger(kinkUtilBps) })}
+          </div>
         </div>
         <div className="rounded-xl border border-[var(--line)] bg-[#0a1020] p-3">
           <div className="mut text-xs">{copy.floorCeiling}</div>
           <div className="mt-1 text-sm font-semibold">{floorCeilingDisplay}</div>
-          <div className="mut text-xs">{`${params.rate_floor_bps.toString()}–${params.rate_ceiling_bps.toString()} bps`}</div>
+          <div className="mut text-xs">
+            {t("bpsRange", {
+              floor: formatInteger(params.rate_floor_bps),
+              ceiling: formatInteger(params.rate_ceiling_bps),
+            })}
+          </div>
         </div>
         <div className="rounded-xl border border-[var(--line)] bg-[#0a1020] p-3">
           <div className="mut text-xs">{copy.surchargeBand}</div>
           <div className="mt-1 text-sm font-semibold">{surchargeDisplay}</div>
           <div className="mut text-xs">
             {interpolate(copy.elapsedLedgers, {
-              count: diagnostics.elapsed_ledgers,
+              count: formatInteger(diagnostics.elapsed_ledgers),
             })}
           </div>
         </div>
@@ -559,7 +628,7 @@ export function RateChart({
                   fill="#8b97b2"
                   fontSize="10"
                 >
-                  {formatBpsPercent(rateAtTick, 1)}
+                  {formatPercent(rateAtTick, 1)}
                 </text>
               </g>
             );
@@ -585,7 +654,7 @@ export function RateChart({
                   fill="#8b97b2"
                   fontSize="10"
                 >
-                  {formatBpsPercent(uTick, 0)}
+                  {formatPercent(uTick, 0)}
                 </text>
               </g>
             );
@@ -707,14 +776,14 @@ export function RateChart({
             <div className="mut text-right text-xs">
               <div>
                 {interpolate(copy.historyLedgerRange, {
-                  oldest: oldestSample.ledger,
-                  newest: newestSample.ledger,
+                  oldest: formatInteger(oldestSample.ledger),
+                  newest: formatInteger(newestSample.ledger),
                 })}
               </div>
               <div className="text-[var(--fg)]">
                 {interpolate(copy.historyLatestSample, {
-                  utilization: formatBpsPercent(newestSample.utilization_bps),
-                  ledger: newestSample.ledger,
+                  utilization: formatPercent(newestSample.utilization_bps),
+                  ledger: formatInteger(newestSample.ledger),
                 })}
               </div>
             </div>
@@ -765,7 +834,7 @@ export function RateChart({
                     fill="#8b97b2"
                     fontSize="9"
                   >
-                    {formatBpsPercent(uTick, 0)}
+                    {formatPercent(uTick, 0)}
                   </text>
                 </g>
               );
@@ -789,7 +858,7 @@ export function RateChart({
                   fill="#8b97b2"
                   fontSize="9"
                 >
-                  {`#${oldestSample.ledger}`}
+                  {`#${formatInteger(oldestSample.ledger)}`}
                 </text>
                 <text
                   x={sparkWidth - sparkPadR}
@@ -798,7 +867,7 @@ export function RateChart({
                   fill="#8b97b2"
                   fontSize="9"
                 >
-                  {`#${newestSample.ledger}`}
+                  {`#${formatInteger(newestSample.ledger)}`}
                 </text>
               </>
             )}
@@ -839,20 +908,20 @@ export function RateChart({
                   className="border-b border-[var(--line)] last:border-0"
                 >
                   <td className="py-2 pr-4 font-medium">
-                    {formatBpsPercent(row.utilizationBps)}
+                    {formatPercent(row.utilizationBps)}
                   </td>
                   <td className="py-2 pr-4 font-mono">
                     {row.utilizationBps.toString()}
                   </td>
                   <td className="py-2 pr-4 text-emerald-400">
-                    {formatBpsPercent(row.borrowRateBps)}
+                    {formatPercent(row.borrowRateBps)}
                   </td>
                   <td className="py-2 pr-4 font-mono">
                     {row.borrowRateBps.toString()}
                   </td>
                   {overlay && (
                     <td className="py-2 pr-4 text-amber-300">
-                      {formatBpsPercent(
+                      {formatPercent(
                         borrowRateBps(row.utilizationBps, overlay.params)
                       )}
                     </td>
@@ -885,9 +954,11 @@ export function RateChart({
                     key={`${sample.ledger}-${sample.utilization_bps.toString()}`}
                     className="border-b border-[var(--line)] last:border-0"
                   >
-                    <td className="py-2 pr-4 font-mono">{sample.ledger}</td>
+                    <td className="py-2 pr-4 font-mono">
+                      {formatInteger(sample.ledger)}
+                    </td>
                     <td className="py-2 pr-4">
-                      {formatBpsPercent(sample.utilization_bps)}
+                      {formatPercent(sample.utilization_bps)}
                     </td>
                     <td className="py-2 font-mono">
                       {sample.utilization_bps.toString()}

@@ -1,12 +1,29 @@
 import React from "react";
 import { render, screen, within } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it } from "vitest";
+import enMessages from "@/messages/en.json";
+import esMessages from "@/messages/es.json";
 import { RateChart } from "./rate-chart";
 import {
   DEFAULT_RATE_PARAMS,
   type RateModelDiagnostics,
   type UtilizationSample,
 } from "@/lib/rate-model";
+
+function renderChart(
+  chart: React.ReactElement,
+  locale: "en" | "es" = "en"
+) {
+  return render(
+    <NextIntlClientProvider
+      locale={locale}
+      messages={locale === "es" ? esMessages : enMessages}
+    >
+      {chart}
+    </NextIntlClientProvider>
+  );
+}
 
 describe("RateChart component", () => {
   const activeDiagnostics: RateModelDiagnostics = {
@@ -25,7 +42,7 @@ describe("RateChart component", () => {
   ];
 
   it("renders accessible chart names, marks current utilization and applied vs target rate, and populates the fallback table", () => {
-    render(
+    renderChart(
       <RateChart
         params={DEFAULT_RATE_PARAMS}
         diagnostics={activeDiagnostics}
@@ -70,12 +87,75 @@ describe("RateChart component", () => {
       "utilization-history-fallback-table"
     );
     const historyScope = within(historyTable);
-    expect(historyScope.getByText("500120")).toBeInTheDocument();
-    expect(historyScope.getByText("500100")).toBeInTheDocument();
+    expect(historyScope.getByText("500,120")).toBeInTheDocument();
+    expect(historyScope.getByText("500,100")).toBeInTheDocument();
+  });
+
+  it("exposes the rate summary as a keyboard-focusable tooltip", () => {
+    renderChart(
+      <RateChart
+        params={DEFAULT_RATE_PARAMS}
+        diagnostics={activeDiagnostics}
+        history={[]}
+        source="contract"
+      />
+    );
+
+    const tooltip = screen.getByTestId("rate-model-summary");
+    expect(tooltip).toHaveAttribute("role", "tooltip");
+    expect(tooltip).toHaveAttribute("tabindex", "0");
+    expect(tooltip).toHaveAttribute("aria-label", tooltip.textContent);
+
+    tooltip.focus();
+    expect(tooltip).toHaveFocus();
+    expect(tooltip).toHaveAttribute("title", tooltip.textContent);
+  });
+
+  it("renders a Spanish axis label and a curve summary built from the supplied parameters", () => {
+    const params = {
+      ...DEFAULT_RATE_PARAMS,
+      base_rate_bps: 250n,
+      kink_utilization_bps: 7_500n,
+      rate_ceiling_bps: 12_000n,
+    };
+
+    renderChart(
+      <RateChart
+        params={params}
+        diagnostics={activeDiagnostics}
+        history={sampleHistory}
+        source="contract"
+        overlay={{
+          params: DEFAULT_RATE_PARAMS,
+          utilizationBps: 5_000n,
+        }}
+      />,
+      "es"
+    );
+
+    expect(screen.getByText("Utilización (%)")).toBeInTheDocument();
+    expect(screen.getByText("Curva de tasa de préstamo")).toBeInTheDocument();
+    expect(screen.queryByText("Borrow rate curve")).not.toBeInTheDocument();
+
+    const curveSummary = screen.getByTestId("rate-curve-summary");
+    expect(curveSummary).toHaveAttribute("role", "img");
+    expect(curveSummary).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("2,50%")
+    );
+    expect(curveSummary).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("75,00%")
+    );
+    expect(curveSummary).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("120,00%")
+    );
+    expect(screen.getByTestId("diag-utilization")).toHaveTextContent("85,00%");
   });
 
   it("renders an explanatory empty state when utilization history is empty", () => {
-    render(
+    renderChart(
       <RateChart
         params={DEFAULT_RATE_PARAMS}
         diagnostics={activeDiagnostics}
@@ -101,7 +181,7 @@ describe("RateChart component", () => {
       elapsed_ledgers: 0,
     };
 
-    render(
+    renderChart(
       <RateChart
         params={DEFAULT_RATE_PARAMS}
         diagnostics={inactiveDiagnostics}
@@ -120,7 +200,7 @@ describe("RateChart component", () => {
   });
 
   it("overlays a proposed curve without removing the live curve", () => {
-    render(
+    renderChart(
       <RateChart
         params={DEFAULT_RATE_PARAMS}
         diagnostics={activeDiagnostics}
