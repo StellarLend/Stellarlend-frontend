@@ -76,3 +76,27 @@ export function fromBaseUnits(baseUnits: bigint, decimals: number = DECIMALS): s
   const fractionText = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
   return `${sign}${whole}.${fractionText}`;
 }
+
+export function getAmountErrorMessage(
+  error: AmountError,
+  locale: "en" | "es" = "en",
+  decimals: number = DECIMALS,
+): string {
+  const messages: Record<"en" | "es", Record<AmountError, string>> = {
+    en: {
+      empty: "Please enter an amount greater than zero.",
+      "invalid-format": "Please enter a valid amount.",
+      negative: "Amount cannot be negative.",
+      "too-many-decimals": `Amount can have at most ${decimals} decimal places.`,
+      "too-large": "Amount is too large.",
+    },
+    es: {
+      empty: "Por favor introduce un importe superior a cero.",
+      "invalid-format": "Por favor introduce un importe válido.",
+      negative: "El importe no puede ser negativo.",
+      "too-many-decimals": `El importe puede tener como máximo ${decimals} decimales.`,
+      "too-large": "El importe es demasiado grande.",
+    },
+  };
+  return messages[locale]?.[error] ?? messages.en[error];
+}

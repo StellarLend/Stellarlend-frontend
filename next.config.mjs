@@ -51,7 +51,7 @@ const nextConfig = {
             // Disable DNS prefetching of links on the page to reduce
             // information leakage and improve privacy
             key: "X-DNS-Prefetch-Control",
-            value: "on",
+            value: "off",
           },
           {
             // Isolate browsing context group while allowing popups (e.g. Albedo/xBull wallets)
@@ -69,6 +69,9 @@ const nextConfig = {
     ];
   },
 };
+
+// Named export so tests can inspect the static headers without the plugin wrappers.
+export { nextConfig };
 
 // Enable bundle analyzer when ANALYZE=true
 const withAnalyzer = withBundleAnalyzer({

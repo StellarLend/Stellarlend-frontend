@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Proposal, ProposalStatus } from "@/lib/multisig/types";
 import { listProposals } from "@/lib/multisig/reads";
@@ -13,20 +14,20 @@ import { config, explorer, accountExplorer } from "@/lib/config";
 
 const PROPOSALS_PAGE_SIZE = 10;
 
-const STATUS_TABS = [
-  { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "executed", label: "Executed" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "expired", label: "Expired" },
+const STATUS_TAB_KEYS = [
+  { value: "all", labelKey: "tabAll" },
+  { value: "pending", labelKey: "tabPending" },
+  { value: "approved", labelKey: "tabApproved" },
+  { value: "executed", labelKey: "tabExecuted" },
+  { value: "cancelled", labelKey: "tabCancelled" },
+  { value: "expired", labelKey: "tabExpired" },
 ] as const;
 
-type ProposalFilter = (typeof STATUS_TABS)[number]["value"];
+type ProposalFilter = (typeof STATUS_TAB_KEYS)[number]["value"];
 
 function readFilterFromUrl(): ProposalFilter {
   const value = new URLSearchParams(window.location.search).get("filter");
-  return STATUS_TABS.find((tab) => tab.value === value)?.value ?? "all";
+  return STATUS_TAB_KEYS.find((tab) => tab.value === value)?.value ?? "all";
 }
 
 function readPageFromUrl(): number {
@@ -35,6 +36,7 @@ function readPageFromUrl(): number {
 }
 
 export function MultisigApp() {
+  const t = useTranslations("multisig");
   const isConfigured = Boolean(config.multisigId);
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<ProposalFilter>("all");
@@ -89,21 +91,21 @@ export function MultisigApp() {
     window.history.pushState(
       null,
       "",
-      `${window.location.pathname}?${params.toString()}${window.location.hash}`
+      `${window.location.pathname}?${params.toString()}${window.location.hash}`,
     );
   }, []);
 
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    const currentIndex = STATUS_TABS.findIndex((tab) => tab.value === filter);
+    const currentIndex = STATUS_TAB_KEYS.findIndex((tab) => tab.value === filter);
     let nextIndex = currentIndex;
-    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % STATUS_TABS.length;
-    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + STATUS_TABS.length) % STATUS_TABS.length;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % STATUS_TAB_KEYS.length;
+    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + STATUS_TAB_KEYS.length) % STATUS_TAB_KEYS.length;
     else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = STATUS_TABS.length - 1;
+    else if (event.key === "End") nextIndex = STATUS_TAB_KEYS.length - 1;
     else return;
 
     event.preventDefault();
-    navigate(STATUS_TABS[nextIndex].value, 1);
+    navigate(STATUS_TAB_KEYS[nextIndex].value, 1);
     tabRefs.current[nextIndex]?.focus();
   };
 
@@ -138,7 +140,7 @@ export function MultisigApp() {
             return true;
         }
       }),
-    [enrichedProposals, filter]
+    [enrichedProposals, filter],
   );
   const counts = useMemo(
     () => ({
@@ -149,7 +151,7 @@ export function MultisigApp() {
       cancelled: enrichedProposals.filter((p) => p.effectiveStatus === "Cancelled").length,
       expired: enrichedProposals.filter((p) => p.effectiveStatus === "Expired").length,
     }),
-    [enrichedProposals]
+    [enrichedProposals],
   );
 
   // Status badge styling
@@ -175,25 +177,20 @@ export function MultisigApp() {
     return (
       <div className="space-y-8" data-testid="multisig-not-configured">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Multisig Governance Explorer</h1>
-          <p className="mut mt-1 text-sm">
-            Inspect on-chain proposals, decoded contract calls, quorum threshold progress, and signers.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="mut mt-1 text-sm">{t("subtitle")}</p>
         </div>
 
         <div className="card p-8 text-center space-y-4 max-w-2xl mx-auto border-dashed">
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-400 text-2xl mb-2">
             ⚙️
           </div>
-          <h2 className="text-xl font-bold">Multisig Contract Not Configured</h2>
-          <p className="text-sm mut max-w-lg mx-auto">
-            The multisig explorer requires a valid Stellar/Soroban multisig contract ID.
-            Configure <code className="px-1.5 py-0.5 rounded bg-[var(--line)] text-amber-300 font-mono text-xs">NEXT_PUBLIC_MULTISIG_CONTRACT_ID</code> in
-            your <code className="px-1.5 py-0.5 rounded bg-[var(--line)] text-xs">.env.local</code> to enable on-chain proposal discovery and quorum tracking.
-          </p>
+          <h2 className="text-xl font-bold">{t("notConfiguredTitle")}</h2>
+          <p className="text-sm mut max-w-lg mx-auto">{t("notConfiguredDesc")}</p>
           <div className="pt-2 text-xs font-mono text-gray-400 bg-[var(--bg)] p-3 rounded-lg border border-[var(--line)] text-left">
-            # .env.local<br />
-            NEXT_PUBLIC_MULTISIG_CONTRACT_ID=CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6
+            <span>{"# .env.local"}</span>
+            <br />
+            <span>{"NEXT_PUBLIC_MULTISIG_CONTRACT_ID=CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6"}</span>
           </div>
         </div>
       </div>
@@ -208,10 +205,8 @@ export function MultisigApp() {
       {/* Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Multisig Governance Explorer</h1>
-          <p className="mut mt-1 text-sm">
-            Real-time explorer for StellarLend multisig signers, quorum threshold, and decoded proposals.
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="mut mt-1 text-sm">{t("realtimeSubtitle")}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -220,10 +215,10 @@ export function MultisigApp() {
             className="btn-ghost text-xs px-3 py-1.5 rounded-lg border border-[var(--line)]"
             title="Refresh on-chain state"
           >
-            {isFetching ? "Refreshing..." : "↻ Refresh"}
+            {isFetching ? t("refreshing") : t("refresh")}
           </button>
           <div className="text-xs mut">
-            Multisig Contract:{" "}
+            <span>{t("multisigContract")}{" "}</span>
             <a
               href={explorer(config.multisigId)}
               target="_blank"
@@ -238,49 +233,51 @@ export function MultisigApp() {
 
       {error && (
         <div className="card p-4 border-red-500/30 bg-red-500/10 text-red-300 text-sm flex items-center justify-between">
-          <span>⚠️ {error instanceof Error ? error.message : "Failed to load multisig governance state from RPC."}</span>
+          <span>⚠️ {error instanceof Error ? error.message : t("loadError")}</span>
           <button onClick={refreshData} className="underline text-xs">
-            Retry
+            {t("retry")}
           </button>
         </div>
       )}
-      {data?.failedProposalIds.length ? (
+      {Boolean(data?.failedProposalIds.length) && (
         <div
           className="card p-4 border-amber-500/30 bg-amber-500/10 text-amber-300 text-sm"
           role="status"
           aria-live="polite"
         >
-          Could not load details for proposal{data.failedProposalIds.length === 1 ? "" : "s"}{" "}
-          {data.failedProposalIds.map((id) => `#${id}`).join(", ")}.
+          {t("failedProposals", {
+            plural: data!.failedProposalIds.length > 1,
+            ids: data!.failedProposalIds.map((id) => `#${id}`).join(", "),
+          })}
         </div>
-      ) : null}
+      )}
 
       {/* Multisig Contract Overview Card */}
       <div className="card p-6 space-y-4">
-        <h2 className="text-sm uppercase tracking-wider font-semibold mut">Contract Overview</h2>
+        <h2 className="text-sm uppercase tracking-wider font-semibold mut">{t("contractOverview")}</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--line)] space-y-1">
-            <span className="text-xs mut">Quorum Threshold</span>
+            <span className="text-xs mut">{t("quorumThreshold")}</span>
             <p className="text-xl font-bold">
               {overview ? `${overview.threshold} of ${signers.length}` : "—"}{" "}
-              <span className="text-xs font-normal mut">signers required</span>
+              <span className="text-xs font-normal mut">{t("signersRequired")}</span>
             </p>
           </div>
 
           <div className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--line)] space-y-1">
-            <span className="text-xs mut">Active Signers</span>
+            <span className="text-xs mut">{t("activeSigners")}</span>
             <p className="text-xl font-bold">{overview ? signers.length : "—"}</p>
           </div>
 
           <div className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--line)] space-y-1">
-            <span className="text-xs mut">Current Ledger</span>
+            <span className="text-xs mut">{t("currentLedger")}</span>
             <p className="text-xl font-bold font-mono">
               {overview?.currentLedger ? `#${overview.currentLedger.toLocaleString()}` : "—"}
             </p>
           </div>
 
           <div className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--line)] space-y-1">
-            <span className="text-xs mut">Signer Set Hash</span>
+            <span className="text-xs mut">{t("signerSetHash")}</span>
             <p className="text-xs font-mono break-all text-slate-300">
               {overview?.signerSetHash ? shortenAddress(overview.signerSetHash, 8, 8) : "—"}
             </p>
@@ -288,16 +285,16 @@ export function MultisigApp() {
         </div>
 
         {/* Signers List */}
-        {signers.length > 0 && (
+        {Boolean(signers.length > 0) && (
           <div className="pt-2 border-t border-[var(--line)]">
             <div className="flex items-center justify-between text-xs mut mb-2">
-              <span>Registered Signers ({signers.length})</span>
-              {signers.length > 3 && (
+              <span>{t("registeredSigners", { count: signers.length })}</span>
+              {Boolean(signers.length > 3) && (
                 <button
                   onClick={() => setShowAllSigners(!showAllSigners)}
                   className="text-blue-400 hover:underline"
                 >
-                  {showAllSigners ? "Show less" : `Show all (${signers.length})`}
+                  {showAllSigners ? t("showLess") : t("showAll", { count: signers.length })}
                 </button>
               )}
             </div>
@@ -318,13 +315,13 @@ export function MultisigApp() {
         )}
       </div>
 
-      {/* Proposal Status Tabs */}
       {/* Create Proposal Form (rendered only for authorized signers) */}
-      <CreateProposal contractId={config.multisigId} onRefresh={loadData} />
+      <CreateProposal contractId={config.multisigId} onRefresh={refreshData} />
 
+      {/* Proposal Status Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-2 text-xs" role="tablist" aria-label="Filter proposals by status">
-          {STATUS_TABS.map((tab, index) => (
+        <div className="flex flex-wrap gap-2 text-xs" role="tablist" aria-label={t("filterByStatus")}>
+          {STATUS_TAB_KEYS.map((tab, index) => (
             <button
               key={tab.value}
               ref={(element) => {
@@ -343,7 +340,7 @@ export function MultisigApp() {
                   : "border-[var(--line)] text-gray-400 hover:text-white"
               }`}
             >
-              {tab.label} ({counts[tab.value]})
+              {t(tab.labelKey)} ({counts[tab.value]})
             </button>
           ))}
         </div>
@@ -353,19 +350,21 @@ export function MultisigApp() {
             onClick={() => navigate(filter, page - 1)}
             disabled={page <= 1 || loading}
             className="btn-ghost px-3 py-1.5 rounded-lg border border-[var(--line)] disabled:opacity-40"
-            aria-label="Previous proposal page"
+            aria-label={t("prevAriaLabel")}
           >
-            Previous
+            {t("previous")}
           </button>
-          <span className="mut" aria-live="polite">Page {page}</span>
+          <span className="mut" aria-live="polite">
+            {t("page", { page })}
+          </span>
           <button
             type="button"
             onClick={() => navigate(filter, page + 1)}
             disabled={!hasNextPage || loading}
             className="btn-ghost px-3 py-1.5 rounded-lg border border-[var(--line)] disabled:opacity-40"
-            aria-label="Next proposal page"
+            aria-label={t("nextAriaLabel")}
           >
-            Next
+            {t("next")}
           </button>
         </div>
       </div>
@@ -378,26 +377,28 @@ export function MultisigApp() {
         aria-labelledby={`proposal-tab-${filter}`}
       >
         {loading ? (
-          <div className="p-12 text-center mut">Loading multisig proposals from Soroban RPC...</div>
+          <div className="p-12 text-center mut">{t("loadingProposals")}</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center mut space-y-2">
-            <p className="text-base font-semibold">No proposals found</p>
+            <p className="text-base font-semibold">{t("noProposalsFound")}</p>
             <p className="text-xs">
               {filter === "all"
-                ? "No multisig proposals have been created yet on this contract."
-                : `No proposals found with status ${STATUS_TABS.find((tab) => tab.value === filter)?.label}.`}
+                ? t("noProposalsCreated")
+                : t("noProposalsWithStatus", {
+                    status: t(STATUS_TAB_KEYS.find((tab) => tab.value === filter)?.labelKey ?? "tabAll"),
+                  })}
             </p>
           </div>
         ) : (
           <table className="w-full text-left text-sm min-w-[750px]">
             <thead className="mut border-b border-[var(--line)] text-xs">
               <tr>
-                <th className="p-4">Proposal</th>
-                <th className="p-4">Decoded Action</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Quorum Progress</th>
-                <th className="p-4">Expiry (Ledgers & Est. Time)</th>
-                <th className="p-4 text-right">Details</th>
+                <th className="p-4">{t("thProposal")}</th>
+                <th className="p-4">{t("thDecodedAction")}</th>
+                <th className="p-4">{t("thStatus")}</th>
+                <th className="p-4">{t("thQuorumProgress")}</th>
+                <th className="p-4">{t("thExpiry")}</th>
+                <th className="p-4 text-right">{t("thDetails")}</th>
               </tr>
             </thead>
             <tbody>
@@ -411,17 +412,16 @@ export function MultisigApp() {
                     key={p.id}
                     className="border-b border-[var(--line)] last:border-0 hover:bg-[var(--line)]/20 transition-colors"
                   >
-                    <td className="p-4 font-bold whitespace-nowrap">
-                      #{p.id}
-                    </td>
+                    <td className="p-4 font-bold whitespace-nowrap">#{p.id}</td>
 
                     <td className="p-4 text-xs font-mono max-w-sm">
                       <div className="truncate font-semibold text-slate-200">
-                        {p.decodedAction?.summary || (typeof p.action === "string" ? p.action : JSON.stringify(p.action))}
+                        {p.decodedAction?.summary ||
+                          (typeof p.action === "string" ? p.action : JSON.stringify(p.action))}
                       </div>
                       {p.signerSetChanged && (
                         <span className="inline-block mt-1 text-[11px] font-sans px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                          ⚠️ signer set changed; approvals invalid
+                          {t("signerSetChangedWarning")}
                         </span>
                       )}
                     </td>
@@ -431,16 +431,16 @@ export function MultisigApp() {
                         <div className="space-y-0.5">
                           <span
                             className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(
-                              p.effectiveStatus || "Expired"
+                              p.effectiveStatus || "Expired",
                             )}`}
                           >
-                            stored: {p.status} · effective: {p.effectiveStatus}
+                            {t("storedVsEffective", { stored: p.status, effective: p.effectiveStatus })}
                           </span>
                         </div>
                       ) : (
                         <span
                           className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(
-                            p.status
+                            p.status,
                           )}`}
                         >
                           {p.status}
@@ -450,7 +450,7 @@ export function MultisigApp() {
 
                     <td className="p-4 text-xs min-w-[140px]">
                       <div className="flex items-center justify-between mb-1 text-[11px] font-medium">
-                        <span>{p.approvals.length} / {threshold} signers</span>
+                        <span>{t("signersCount", { count: p.approvals.length, total: threshold })}</span>
                         <span>{progressPct}%</span>
                       </div>
                       <div className="h-1.5 w-full bg-[var(--bg)] rounded-full overflow-hidden border border-[var(--line)]">
@@ -465,14 +465,12 @@ export function MultisigApp() {
 
                     <td className="p-4 text-xs whitespace-nowrap">
                       <div className="font-mono">#{p.expiresAtLedger.toLocaleString()}</div>
-                      <div className="text-[11px] mut mt-0.5">
-                        {p.timeToExpiry || "—"}
-                      </div>
+                      <div className="text-[11px] mut mt-0.5">{p.timeToExpiry || "—"}</div>
                     </td>
 
                     <td className="p-4 text-right whitespace-nowrap">
                       <Link href={`/multisig/${p.id}`} className="btn-ghost text-xs">
-                        View Details →
+                        {t("viewDetails")}
                       </Link>
                     </td>
                   </tr>
@@ -484,7 +482,7 @@ export function MultisigApp() {
       </div>
 
       {/* Batch Proposal Actions for Signers */}
-      {proposals.length > 0 && (
+      {Boolean(proposals.length > 0) && (
         <div className="card p-6">
           <BatchProposalActions proposals={proposals} onRefresh={refreshData} />
         </div>

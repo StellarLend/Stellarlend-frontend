@@ -1,8 +1,20 @@
 import React, { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import { TwapChart } from "./twap-chart";
 import { twapSeries, type TwapObservation } from "@/lib/amm/twap";
+
+const render = (ui: React.ReactElement, options?: any) =>
+  rtlRender(ui, {
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+    ...options,
+  });
 
 function TwapChartHarness({ observations }: { observations: TwapObservation[] }) {
   const [windowSecs, setWindowSecs] = useState(3600);
