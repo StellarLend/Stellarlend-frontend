@@ -152,9 +152,8 @@ export function OnboardingChecklist({ hasSupplied = false }: OnboardingChecklist
         <button
           onClick={handleDismiss}
           className="text-xs text-neutral-400 hover:text-neutral-100 px-2 py-1 rounded hover:bg-white/5 transition-colors"
-          aria-label={t("dismiss")}
         >
-          Γ£ò {t("dismiss")}
+          <span aria-hidden="true">&times;</span> {t("dismiss")}
         </button>
       </div>
 

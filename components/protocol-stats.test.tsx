@@ -1,11 +1,15 @@
 import React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect as vitestExpect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { axe } from "vitest-axe";
 import { NextIntlClientProvider } from "next-intl";
 import { ProtocolStats } from "./protocol-stats";
 import * as apiClient from "@/lib/api/client";
 import type { ProtocolMetrics } from "@/lib/protocol";
 import enMessages from "@/messages/en.json";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const expect = vitestExpect as any;
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
@@ -64,6 +68,17 @@ describe("ProtocolStats Component", () => {
     renderWithIntl(<ProtocolStats initialMetrics={null} />);
 
     expect(screen.getByTestId("protocol-stats-loading")).toBeInTheDocument();
+  });
+
+  it("keeps loading labels outside the pulsing placeholder and has no axe violations", async () => {
+    vi.spyOn(apiClient, "fetchProtocol").mockReturnValue(new Promise(() => {}));
+
+    const { container } = renderWithIntl(<ProtocolStats initialMetrics={null} />);
+    const label = screen.getByText("Total supplied");
+
+    expect(label.closest(".animate-pulse")).toBeNull();
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 
   it("renders fallback state with demo data badge when API client rejects", async () => {

@@ -21,3 +21,17 @@ for (const { path, name } of routes) {
     expect(seriousOrCriticalViolations).toEqual([]);
   });
 }
+
+test('Markets page (/markets) should have no serious or critical accessibility violations at mobile width', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/markets');
+  await page.waitForLoadState('domcontentloaded');
+
+  const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+
+  const seriousOrCriticalViolations = accessibilityScanResults.violations.filter(
+    (violation) => violation.impact === 'serious' || violation.impact === 'critical'
+  );
+
+  expect(seriousOrCriticalViolations).toEqual([]);
+});

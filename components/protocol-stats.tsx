@@ -63,8 +63,8 @@ export function ProtocolStats({ initialMetrics = null, pollIntervalMs = 30_000 }
     return (
       <section data-testid="protocol-stats-loading" className="grid gap-4 sm:grid-cols-4">
         {[t("totalSupplied"), t("totalBorrowed"), t("utilization"), t("markets")].map((label) => (
-          <div key={label} className="card p-6 text-center animate-pulse">
-            <div className="h-8 bg-[var(--line)] rounded w-24 mx-auto mb-2"></div>
+          <div key={label} className="card p-6 text-center">
+            <div className="h-8 bg-[var(--line)] rounded w-24 mx-auto mb-2 animate-pulse"></div>
             <div className="mut text-sm">{label}</div>
           </div>
         ))}

@@ -596,7 +596,7 @@ export function RateChart({
 
         <svg
           role="img"
-          aria-label={copy.chartAriaLabel}
+          aria-label={`${copy.chartAriaLabel}. ${summaryText}`}
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           className="h-auto w-full overflow-visible"
           data-testid="borrow-rate-curve-svg"
@@ -891,14 +891,14 @@ export function RateChart({
             </caption>
             <thead className="mut border-b border-[var(--line)]">
               <tr>
-                <th className="py-2 pr-4">{copy.colUtilization}</th>
-                <th className="py-2 pr-4">{copy.colUtilizationBps}</th>
-                <th className="py-2 pr-4">{copy.colBorrowApr}</th>
-                <th className="py-2 pr-4">{copy.colBorrowBps}</th>
+                <th scope="col" className="py-2 pr-4">{copy.colUtilization}</th>
+                <th scope="col" className="py-2 pr-4">{copy.colUtilizationBps}</th>
+                <th scope="col" className="py-2 pr-4">{copy.colBorrowApr}</th>
+                <th scope="col" className="py-2 pr-4">{copy.colBorrowBps}</th>
                 {overlay && (
-                  <th className="py-2 pr-4">{copy.legendProposedCurve}</th>
+                  <th scope="col" className="py-2 pr-4">{copy.legendProposedCurve}</th>
                 )}
-                <th className="py-2">{copy.colNote}</th>
+                <th scope="col" className="py-2">{copy.colNote}</th>
               </tr>
             </thead>
             <tbody>
@@ -943,9 +943,9 @@ export function RateChart({
               </caption>
               <thead className="mut border-b border-[var(--line)]">
                 <tr>
-                  <th className="py-2 pr-4">{copy.colLedger}</th>
-                  <th className="py-2 pr-4">{copy.colUtilization}</th>
-                  <th className="py-2">{copy.colUtilizationBps}</th>
+                  <th scope="col" className="py-2 pr-4">{copy.colLedger}</th>
+                  <th scope="col" className="py-2 pr-4">{copy.colUtilization}</th>
+                  <th scope="col" className="py-2">{copy.colUtilizationBps}</th>
                 </tr>
               </thead>
               <tbody>

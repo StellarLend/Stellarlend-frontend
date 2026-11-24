@@ -202,6 +202,7 @@ function MarketsAppInner() {
   } | null>(null);
 
   const panelRef = useRef<HTMLElement | null>(null);
+  const selectedSymbol = sel?.symbol;
 
   const { prices: oraclePrices, timeSource, isLoading: isLoadingOracle, evaluate: evaluateOracle } = useOracleGuard();
   // Oracle prices and staleness are managed by useOracleGuard (30s React Query refetch).
@@ -363,12 +364,16 @@ function MarketsAppInner() {
 
   // Scroll the inline (sm+) panel into view when a market is selected.
   useEffect(() => {
-    if (!sel) return;
+    if (!selectedSymbol) return;
     if (typeof window === "undefined") return;
-    if (window.matchMedia("(min-width: 640px)").matches) {
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(min-width: 640px)").matches
+    ) {
       panelRef.current?.scrollIntoView({ block: "nearest" });
+      panelRef.current?.querySelector("h2")?.focus();
     }
-  }, [sel]);
+  }, [selectedSymbol]);
 
   function closeSheet() {
     setSel(null);
@@ -581,6 +586,7 @@ function MarketsAppInner() {
   const currentBlocked = !isDemoMode && !isActionAllowed(mode);
   const oracleGuard = evaluateOracle(mode);
   const oracleReasonId = oracleGuard.reason ? "oracle-guard-reason" : undefined;
+  const tradeActions = ["supply", "borrow", "withdraw", "repay"] as const;
 
   // Duplicate guard: block re-submission while the same action+asset is pending.
   const lendingAction = mode === "supply" ? "deposit" : mode;
@@ -590,16 +596,43 @@ function MarketsAppInner() {
   const tradePanel = sel ? (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-1 text-sm" role="tablist" aria-label={`${sel.symbol} ${t("actions")}`}>
-        {(["supply", "borrow", "withdraw", "repay"] as const).map((x) => {
+        {tradeActions.map((x) => {
           const blockedReason = !isDemoMode ? getBlockedReason(x) : null;
           const isBlocked = !isDemoMode && !isActionAllowed(x);
           return (
             <button
               key={x}
               role="tab"
+              data-action={x}
               aria-selected={mode === x}
+              tabIndex={mode === x ? 0 : -1}
               disabled={isBlocked}
               title={blockedReason ? tStatus("actionBlockedTooltip", { reason: blockedReason }) : undefined}
+              onKeyDown={(event) => {
+                const direction =
+                  event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+                if (!direction) return;
+
+                const tabs = Array.from(
+                  event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                    '[role="tab"]:not(:disabled)'
+                  ) ?? []
+                );
+                const currentIndex = tabs.indexOf(event.currentTarget);
+                if (currentIndex < 0 || tabs.length < 2) return;
+
+                event.preventDefault();
+                const nextTab = tabs[(currentIndex + direction + tabs.length) % tabs.length];
+                const nextAction = tradeActions.find(
+                  (action) => action === nextTab.dataset.action
+                );
+                if (!nextAction) return;
+
+                nextTab.focus();
+                setMode(nextAction);
+                setMsg(null);
+                setTx(null);
+              }}
               onClick={() => {
                 if (isBlocked) return;
                 setMode(x);
@@ -831,7 +864,7 @@ function MarketsAppInner() {
 
       {/* sm+: table */}
       <Card className="hidden overflow-x-auto sm:block">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table aria-label={t("title")} className="w-full min-w-[640px] text-left text-sm">
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
               {[
@@ -845,9 +878,9 @@ function MarketsAppInner() {
                 t("totalSupplied"),
                 t("yourPosition"),
                 t("wallet"),
-                "",
+                t("trade"),
               ].map((h) => (
-                <th key={String(h)} className="p-4 font-medium">
+                <th key={String(h)} scope="col" className="p-4 font-medium">
                   {h}
                 </th>
               ))}
@@ -1021,7 +1054,7 @@ function MarketsAppInner() {
             className="card hidden max-w-md space-y-4 p-6 sm:block"
           >
             <div className="flex items-center justify-between">
-              <h2 id={`trade-heading-${sel.symbol}`} className="text-xl font-semibold">{sel.symbol}</h2>
+              <h2 id={`trade-heading-${sel.symbol}`} tabIndex={-1} className="text-xl font-semibold">{sel.symbol}</h2>
               {sel.depositCapRemaining !== null && sel.depositCapRemaining !== undefined && (
                 <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
                   {t("remainingCapacity", {

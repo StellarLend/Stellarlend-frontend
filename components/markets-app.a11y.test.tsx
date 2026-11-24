@@ -1,11 +1,35 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect as vitestExpect, it } from 'vitest';
+import { beforeEach, describe, expect as vitestExpect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { NextIntlClientProvider } from 'next-intl';
 import MarketsApp from './markets-app';
 import messages from '@/messages/en.json';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => '/markets',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+vi.mock('./markets/trade-sheet', () => ({
+  default: () => null,
+}));
+
+beforeEach(() => {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: query === '(min-width: 640px)',
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const expect = vitestExpect as any;
@@ -29,7 +53,7 @@ describe('MarketsApp accessibility (vitest-axe)', () => {
     const user = userEvent.setup();
     const { container } = renderMarketsApp();
 
-    const tradeButton = screen.getByRole('button', { name: 'Trade XLM' });
+    const tradeButton = screen.getAllByRole('button', { name: 'Trade XLM' })[0];
     await user.click(tradeButton);
 
     const panelHeading = screen.getByRole('heading', { level: 2, name: 'XLM' });
@@ -44,7 +68,7 @@ describe('MarketsApp accessibility (vitest-axe)', () => {
     const user = userEvent.setup();
     const { container } = renderMarketsApp();
 
-    const tradeButton = screen.getByRole('button', { name: 'Trade XLM' });
+    const tradeButton = screen.getAllByRole('button', { name: 'Trade XLM' })[0];
     await user.click(tradeButton);
 
     const input = screen.getByRole('textbox', { name: 'Amount in XLM' });
@@ -64,7 +88,7 @@ describe('MarketsApp accessibility (vitest-axe)', () => {
     const user = userEvent.setup();
     const { container } = renderMarketsApp();
 
-    const tradeButton = screen.getByRole('button', { name: 'Trade XLM' });
+    const tradeButton = screen.getAllByRole('button', { name: 'Trade XLM' })[0];
     await user.click(tradeButton);
 
     const input = screen.getByRole('textbox', { name: 'Amount in XLM' });
@@ -85,7 +109,7 @@ describe('MarketsApp accessibility (vitest-axe)', () => {
     const user = userEvent.setup();
     renderMarketsApp();
 
-    const tradeButton = screen.getByRole('button', { name: 'Trade XLM' });
+    const tradeButton = screen.getAllByRole('button', { name: 'Trade XLM' })[0];
     tradeButton.focus();
     expect(tradeButton).toHaveFocus();
     await user.keyboard('{Enter}');
