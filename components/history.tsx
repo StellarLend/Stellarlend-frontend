@@ -50,16 +50,19 @@ export default function History() {
   let router: ReturnType<typeof useRouter> | null = null;
   let pathname: string | null = null;
   try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- Next.js router hooks throw in unit tests without an App Router provider; guarded with try/catch
     searchParams = useSearchParams();
   } catch {
     searchParams = null;
   }
   try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- Next.js router hooks throw in unit tests without an App Router provider; guarded with try/catch
     router = useRouter();
   } catch {
     router = null;
   }
   try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- Next.js router hooks throw in unit tests without an App Router provider; guarded with try/catch
     pathname = usePathname();
   } catch {
     pathname = null;

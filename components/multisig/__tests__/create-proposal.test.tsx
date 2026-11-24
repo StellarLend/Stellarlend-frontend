@@ -1,9 +1,21 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render as rtlRender, screen, fireEvent, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import { CreateProposal } from "../create-proposal";
 import { buildProposalArgs, createProposal, isSigner } from "@/lib/multisig/actions";
 import { decodeScVal } from "@/lib/multisig/decode";
+
+const render = (ui: React.ReactElement, options?: any) =>
+  rtlRender(ui, {
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+    ...options,
+  });
 
 const mockPush = vi.fn();
 

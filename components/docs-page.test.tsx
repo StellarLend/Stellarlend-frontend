@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
@@ -103,5 +105,24 @@ describe("DocsPage", () => {
 
     // Demo source badges
     expect(screen.getAllByText("source: demo").length).toBeGreaterThan(0);
+  });
+
+  it("lists every variable from .env.example", async () => {
+    const envExample = fs.readFileSync(
+      path.resolve(process.cwd(), ".env.example"),
+      "utf8",
+    );
+    const vars = envExample
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => line.split("=")[0].trim());
+
+    const data = await getDocsData(async () => MARKETS);
+    renderDocs(data);
+
+    for (const v of vars) {
+      expect(screen.getByText(new RegExp(`^${v}$`))).toBeTruthy();
+    }
   });
 });

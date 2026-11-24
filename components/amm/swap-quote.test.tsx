@@ -1,9 +1,21 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import SwapQuotePanel from "./swap-quote";
 import type { PoolSnapshot, SimulatedSwapQuote } from "@/lib/amm/liquidity-client";
 import { IMPACT_GUARD_DISABLED } from "@/lib/amm/quote";
+
+const render = (ui: React.ReactElement, options?: any) =>
+  rtlRender(ui, {
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+    ...options,
+  });
 
 const walletState = vi.hoisted(() => ({
   address: "GUSER123456789012345678901234567890123456789012345678901234" as string | null,

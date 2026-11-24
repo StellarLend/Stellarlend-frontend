@@ -208,8 +208,9 @@ export function useOracleGuard(options?: UseOracleGuardOptions) {
 
   const prices = useMemo(() => query.data?.prices ?? {}, [query.data]);
   const timeSource = query.data?.timeSource ?? "ledger";
+  const [fallbackTimeSeconds] = useState(() => Math.floor(Date.now() / 1000));
   const referenceTimeSeconds =
-    query.data?.referenceTimeSeconds ?? Math.floor(Date.now() / 1000);
+    query.data?.referenceTimeSeconds ?? fallbackTimeSeconds;
 
   const byAsset = useMemo(() => {
     const result: Record<string, AssetOracleGuard> = {};

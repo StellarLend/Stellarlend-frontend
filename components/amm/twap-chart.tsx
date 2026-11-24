@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import type { TwapPoint } from "@/lib/amm/twap";
 
 interface TwapChartProps {
@@ -32,7 +33,22 @@ export function TwapChart({
   onWindowChange,
   labels,
 }: TwapChartProps) {
-  const copy = { ...defaultTwapChartLabels, ...labels };
+  let t: any;
+  try {
+    t = useTranslations("amm");
+  } catch {
+    // Graceful fallback if rendered outside NextIntlClientProvider
+  }
+
+  const translatedLabels: TwapChartLabels = {
+    title: t ? t("twapTitle") : defaultTwapChartLabels.title,
+    subtitle: t ? t("twapSubtitle") : defaultTwapChartLabels.subtitle,
+    windowSelectorLabel: t ? t("twapWindowSelector") : defaultTwapChartLabels.windowSelectorLabel,
+    emptyMessage: t ? t("twapEmpty") : defaultTwapChartLabels.emptyMessage,
+    latestTwap: t ? t("latestTwap") : defaultTwapChartLabels.latestTwap,
+  };
+
+  const copy = { ...translatedLabels, ...labels };
 
   const chartData = useMemo(() => {
     if (points.length < 2) return null;

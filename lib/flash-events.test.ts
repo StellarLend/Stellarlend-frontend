@@ -1,6 +1,6 @@
 import { Address, nativeToScVal } from "@stellar/stellar-sdk";
 import { describe, expect, it } from "vitest";
-import { decodeFlashEvent, deriveFeeBps } from "./flash-events";
+import { decodeFlashEvent, deriveFeeBps, summarizeFees, type FlashActivity } from "./flash-events";
 
 const account = Address.fromString("GA5WUJ54Z23KILLCUOUNAKTPBVZWKMQVO4O6EQ5GHLAERIMLLHNCSKYH");
 const contract = Address.fromString("CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6");
@@ -23,6 +23,24 @@ function fixture(eventName: string, data: Record<string, unknown>, schema: Fixtu
     txHash: "a".repeat(64),
     topic: [nativeToScVal(eventName, { type: "symbol" })],
     value: nativeToScVal(data, { type: schema }),
+  };
+}
+
+function loanActivity(id: string, fee: bigint, amount: bigint): Extract<FlashActivity, { kind: "loan" }> {
+  return {
+    id,
+    kind: "loan",
+    initiator: account.toString(),
+    receiver: contract.toString(),
+    asset: contract.toString(),
+    amount,
+    fee,
+    feeBps: deriveFeeBps(fee, amount),
+    ledger: 123,
+    transactionIndex: 1,
+    operationIndex: 0,
+    timestamp: "2024-01-01T00:00:00.000Z",
+    txHash: "a".repeat(64),
   };
 }
 
@@ -138,5 +156,41 @@ describe("flash-loan event decoding", () => {
     expect(decodeFlashEvent(unknownSchema)).toBeNull();
     expect(decodeFlashEvent(unknownTopic)).toBeNull();
     expect(decodeFlashEvent(malformed)).toBeNull();
+  });
+});
+
+describe("summarizeFees", () => {
+  it("median ignores null fees", () => {
+    const summary = summarizeFees([
+      loanActivity("low", BigInt(50_000), BigInt(100_000_000)),
+      { ...loanActivity("null", BigInt(1), BigInt(0)), feeBps: null },
+      loanActivity("high", BigInt(150_000), BigInt(100_000_000)),
+    ]);
+
+    expect(summary.count).toBe(3);
+    expect(summary.observedCount).toBe(2);
+    expect(summary.median).toBe("10");
+    expect(summary.max).toBe("15");
+  });
+
+  it("averages an even number of observations and keeps decimal precision", () => {
+    const summary = summarizeFees([
+      loanActivity("one", BigInt(51_500), BigInt(100_000_000)),
+      loanActivity("two", BigInt(62_500), BigInt(100_000_000)),
+      loanActivity("three", BigInt(100_000), BigInt(100_000_000)),
+      loanActivity("four", BigInt(250_000), BigInt(100_000_000)),
+    ]);
+
+    expect(summary.median).toBe("8.13");
+    expect(summary.max).toBe("25");
+  });
+
+  it("reports no observations instead of a zero fee", () => {
+    const summary = summarizeFees([{ ...loanActivity("null", BigInt(1), BigInt(0)), feeBps: null }]);
+
+    expect(summary.count).toBe(1);
+    expect(summary.observedCount).toBe(0);
+    expect(summary.median).toBeNull();
+    expect(summary.max).toBeNull();
   });
 });

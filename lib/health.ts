@@ -1,5 +1,5 @@
-import { readPosition } from "@/lib/lending-client";
-export { HEALTH_FACTOR_NO_DEBT } from "@/lib/lending-client";
+import { HEALTH_FACTOR_NO_DEBT, readPosition } from "@/lib/lending-client";
+export { HEALTH_FACTOR_NO_DEBT };
 
 export const I128_MAX = (1n << 127n) - 1n;
 

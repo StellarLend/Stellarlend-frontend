@@ -154,3 +154,66 @@ describe("validateConfig", () => {
     expect(config.rpc).toBe("https://soroban-testnet.stellar.org");
   });
 });
+
+describe("validateConfig fallback RPC URLs", () => {
+  const baseEnv = {
+    NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
+    NEXT_PUBLIC_HORIZON_URL: "https://horizon-testnet.stellar.org",
+    NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org",
+  };
+
+  it("defaults to no fallbacks", () => {
+    expect(validateConfig(baseEnv, { isDev: false }).rpcFallbacks).toEqual([]);
+    expect(
+      validateConfig({ ...baseEnv, NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: "" }, { isDev: false }).rpcFallbacks
+    ).toEqual([]);
+  });
+
+  it("parses an ordered comma separated list and normalises whitespace and trailing slashes", () => {
+    const config = validateConfig(
+      {
+        ...baseEnv,
+        NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: " https://rpc-b.example.com/ , https://rpc-c.example.com ",
+      },
+      { isDev: false }
+    );
+    expect(config.rpc).toBe("https://soroban-testnet.stellar.org");
+    expect(config.rpcFallbacks).toEqual(["https://rpc-b.example.com", "https://rpc-c.example.com"]);
+  });
+
+  it("drops duplicates, including a fallback that repeats the primary", () => {
+    const config = validateConfig(
+      {
+        ...baseEnv,
+        NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS:
+          "https://soroban-testnet.stellar.org,https://rpc-b.example.com,https://rpc-b.example.com/",
+      },
+      { isDev: false }
+    );
+    expect(config.rpcFallbacks).toEqual(["https://rpc-b.example.com"]);
+  });
+
+  it("rejects an invalid fallback URL with a clear message naming the entry", () => {
+    expect(() =>
+      validateConfig(
+        { ...baseEnv, NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: "https://rpc-b.example.com,not-a-url" },
+        { isDev: false }
+      )
+    ).toThrow(/NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS contains an invalid URL "not-a-url"/);
+  });
+
+  it("rejects http fallback URLs in production", () => {
+    expect(() =>
+      validateConfig(
+        { ...baseEnv, NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: "http://rpc-b.example.com" },
+        { isDev: false }
+      )
+    ).toThrow(/must be a valid https URL/);
+  });
+
+  it("allows http localhost fallbacks in development only", () => {
+    const env = { ...baseEnv, NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: "http://localhost:8000" };
+    expect(validateConfig(env, { isDev: true }).rpcFallbacks).toEqual(["http://localhost:8000"]);
+    expect(() => validateConfig(env, { isDev: false })).toThrow(/NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS/);
+  });
+});
