@@ -22,6 +22,9 @@ vi.mock("@/lib/config", () => ({
   config: { multisigId: "test-contract" },
   explorer: () => "#",
   accountExplorer: () => "#",
+  getExpectedNetworkPassphrase: () => "test-passphrase",
+  isNetworkMismatch: () => false,
+  NetworkMismatchError: class extends Error {},
 }));
 
 vi.mock("@/lib/multisig/reads", () => ({
@@ -30,6 +33,10 @@ vi.mock("@/lib/multisig/reads", () => ({
 
 vi.mock("./proposal-actions", () => ({
   BatchProposalActions: () => null,
+}));
+
+vi.mock("./create-proposal", () => ({
+  CreateProposal: () => null,
 }));
 
 const proposals = [

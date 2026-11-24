@@ -32,6 +32,9 @@
       "tryAgain": "Try again"
     }
   },
+  "common": {
+    "loading": "Loading..."
+  },
   "home": {
     "brand": "Stellar",
     "eyebrow": "Live on Stellar testnet",
