@@ -167,7 +167,8 @@
       "demoFallback": "Showing the demo ledger until the contract is configured.",
       "loadingPosition": "Loading on-chain position…",
       "depositCapExceeded": "This deposit would exceed the market deposit limit.",
-      "belowMinimumBorrow": "The requested borrow is below the minimum amount."
+      "belowMinimumBorrow": "The requested borrow is below the minimum amount.",
+      "duplicatePending": "A transaction for this asset is already pending. Please wait for it to confirm before submitting again."
     },
     "contract": "Lending contract",
     "notDeployed": "not deployed",

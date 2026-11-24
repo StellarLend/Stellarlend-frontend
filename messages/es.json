@@ -167,7 +167,8 @@
       "demoFallback": "Se muestra el libro de demostración hasta que el contrato esté configurado.",
       "loadingPosition": "Cargando posición on-chain…",
       "depositCapExceeded": "Este depósito superaría el límite de depósito del mercado.",
-      "belowMinimumBorrow": "El préstamo solicitado está por debajo del monto mínimo."
+      "belowMinimumBorrow": "El préstamo solicitado está por debajo del monto mínimo.",
+      "duplicatePending": "Ya hay una transacción pendiente para este activo. Espera a que se confirme antes de enviar otra."
     },
     "contract": "Contrato de préstamo",
     "notDeployed": "no desplegado",
