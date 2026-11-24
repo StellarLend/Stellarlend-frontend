@@ -88,6 +88,67 @@ export function deriveFeeBps(fee: bigint, amount: bigint): string | null {
   return fraction === "00" ? whole.toString() : `${whole}.${fraction}`;
 }
 
+export type FeeSummary = {
+  count: number;
+  eventCount: number;
+  observedCount: number;
+  median: string | null;
+  max: string | null;
+  medianBps: string | null;
+  maxBps: string | null;
+};
+
+function bpsToHundredths(value: string): number {
+  const [whole = "0", fraction = ""] = value.split(".");
+  return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+}
+
+function hundredthsToBps(value: number): string {
+  const whole = Math.floor(value / 100);
+  const fraction = String(value % 100).padStart(2, "0");
+  return fraction === "00" ? String(whole) : `${whole}.${fraction}`;
+}
+
+export function summarizeFees(activity: readonly FlashActivity[]): FeeSummary {
+  const observed = activity.flatMap((event) => {
+    if (event.kind !== "loan") return [];
+    const bps = deriveFeeBps(event.fee, event.amount);
+    return bps === null ? [] : [bps];
+  });
+  const count = activity.length;
+
+  if (observed.length === 0) {
+    return {
+      count,
+      eventCount: count,
+      observedCount: 0,
+      median: null,
+      max: null,
+      medianBps: null,
+      maxBps: null,
+    };
+  }
+
+  const sorted = observed.map(bpsToHundredths).sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  const medianHundredths =
+    sorted.length % 2 === 1
+      ? sorted[middle]
+      : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+  const median = hundredthsToBps(medianHundredths);
+  const max = hundredthsToBps(sorted[sorted.length - 1]);
+
+  return {
+    count,
+    eventCount: count,
+    observedCount: observed.length,
+    median,
+    max,
+    medianBps: median,
+    maxBps: max,
+  };
+}
+
 export function decodeFlashEvent(event: EventRecord): FlashActivity | null {
   try {
     const eventName = event.topic[0] ? scValToNative(event.topic[0]) : null;
