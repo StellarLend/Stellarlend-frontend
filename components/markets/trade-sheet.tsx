@@ -31,15 +31,25 @@ export default function TradeSheet({
   children,
 }: TradSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Close on Escape and lock body scroll while open.
   useEffect(() => {
     if (!open) return;
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(min-width: 640px)").matches
+    ) {
+      return;
+    }
 
+    const previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
     };
 
@@ -60,8 +70,9 @@ export default function TradeSheet({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
       window.clearTimeout(timer);
+      previouslyFocusedElement?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

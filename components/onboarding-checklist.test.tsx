@@ -1,9 +1,13 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect as vitestExpect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { axe } from "vitest-axe";
 import { OnboardingChecklist } from "./onboarding-checklist";
 import { useWallet } from "./wallet";
 import { config } from "@/lib/config";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const expect = vitestExpect as any;
 
 vi.mock("./wallet", () => ({
   useWallet: vi.fn(),
@@ -61,6 +65,12 @@ describe("OnboardingChecklist", () => {
     render(<OnboardingChecklist hasSupplied={false} />);
     expect(screen.getByTestId("onboarding-checklist")).toBeInTheDocument();
     expect(screen.getByText("Testnet Quickstart Checklist")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations in the checklist", async () => {
+    const { container } = render(<OnboardingChecklist hasSupplied={false} />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 
   it("does not render when network is not testnet", () => {

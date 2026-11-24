@@ -34,9 +34,11 @@ describe("RateChart component", () => {
       />
     );
 
-    // Accessible SVG names
+    // Accessible SVG names include a live summary of the curve.
     expect(
-      screen.getByRole("img", { name: "Two-slope borrow rate curve chart" })
+      screen.getByRole("img", {
+        name: /Two-slope borrow rate curve chart.*85\.00% utilization/,
+      })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("img", {
