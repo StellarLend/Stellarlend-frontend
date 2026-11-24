@@ -71,6 +71,7 @@ import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-promp
 import { useProtocolStatus } from "./protocol-status";
 import { HealthIndicator } from "./health-indicator";
 import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
+import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
 import { usePendingTxs } from "@/hooks/use-pending-txs";
 
 export default function MarketsApp() {
@@ -578,7 +579,7 @@ function MarketsAppInner() {
   };
   const currentBlockedReason = !isDemoMode ? getBlockedReason(mode) : null;
   const currentBlocked = !isDemoMode && !isActionAllowed(mode);
-  const oracleGuard = useMemo(() => evaluateOracle(mode), [evaluateOracle, mode]);
+  const oracleGuard = evaluateOracle(mode);
   const oracleReasonId = oracleGuard.reason ? "oracle-guard-reason" : undefined;
 
   // Duplicate guard: block re-submission while the same action+asset is pending.

@@ -15,6 +15,24 @@ export interface BalanceDetail {
 
 export type AccountBalancesMap = Record<string, BalanceDetail>;
 
+export const DEFAULT_HORIZON_TIMEOUT_MS = 8_000;
+
+export class HorizonTimeoutError extends Error {
+  readonly timeoutMs: number;
+
+  constructor(timeoutMs: number) {
+    super(`Horizon request timed out after ${timeoutMs}ms`);
+    this.name = "HorizonTimeoutError";
+    this.timeoutMs = timeoutMs;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export interface FetchRetryOptions {
+  timeoutMs?: number;
+  random?: () => number;
+}
+
 /** XLM locked into the account's reserve for one additional trustline. */
 export const TRUSTLINE_RESERVE_XLM = 0.5;
 
@@ -140,28 +158,77 @@ export async function fetchWithRetry(
   url: string,
   options?: RequestInit,
   maxRetries = 3,
-  initialBackoffMs = 200
+  initialBackoffMs = 200,
+  retryOptions: FetchRetryOptions = {}
 ): Promise<Response> {
+  const timeoutMs = retryOptions.timeoutMs ?? DEFAULT_HORIZON_TIMEOUT_MS;
+  const random = retryOptions.random ?? Math.random;
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+    throw new RangeError(`timeoutMs must be a non-negative finite number, got ${timeoutMs}`);
+  }
+
   let attempt = 0;
   let delay = initialBackoffMs;
+  let allAttemptsTimedOut = true;
+
+  const wait = (ms: number, signal?: AbortSignal) =>
+    new Promise<void>((resolve, reject) => {
+      const timerId = setTimeout(() => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timerId);
+        signal?.removeEventListener("abort", onAbort);
+        reject(signal?.reason ?? new DOMException("The operation was aborted", "AbortError"));
+      };
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener("abort", onAbort, { once: true });
+    });
 
   while (attempt < maxRetries) {
     attempt++;
+    const controller = new AbortController();
+    let timedOut = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const callerSignal = options?.signal;
+    const abortFromCaller = () => controller.abort(callerSignal?.reason);
+
+    if (callerSignal?.aborted) {
+      throw callerSignal.reason ?? new DOMException("The operation was aborted", "AbortError");
+    }
+    callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+    if (timeoutMs > 0) {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort(new HorizonTimeoutError(timeoutMs));
+      }, timeoutMs);
+    }
+
+    const requestOptions: RequestInit = { ...options, signal: controller.signal };
     try {
-      const res = await fetch(url, options);
+      const res = await fetch(url, requestOptions);
       if (res.ok || (res.status >= 400 && res.status < 500)) {
         return res;
       }
       if (attempt >= maxRetries) {
         return res;
       }
+      allAttemptsTimedOut = false;
     } catch (err) {
       if (attempt >= maxRetries) {
+        if (timedOut && allAttemptsTimedOut) throw new HorizonTimeoutError(timeoutMs);
         throw err;
       }
+      if (!timedOut) allAttemptsTimedOut = false;
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      callerSignal?.removeEventListener("abort", abortFromCaller);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    const boundedRandom = Math.min(1, Math.max(0, random()));
+    const jitteredDelay = delay * (0.8 + boundedRandom * 0.4);
+    await wait(jitteredDelay, options?.signal ?? undefined);
     delay *= 2;
   }
 

@@ -3,6 +3,16 @@ import type { MarketsSnapshot, PositionSummary, ProtocolMetrics } from "./lendin
 interface CacheEntry<V> {
   value: V;
   expiresAt: number;
+  staleUntil: number;
+}
+
+export interface CacheResult<V> {
+  value: V;
+  isStale: boolean;
+}
+
+export interface TtlSingleFlightCacheOptions {
+  staleIfErrorMs?: number;
 }
 
 /**
@@ -14,12 +24,21 @@ interface CacheEntry<V> {
  */
 export class TtlSingleFlightCache<K, V> {
   private entries = new Map<K, CacheEntry<V>>();
-  private inflight = new Map<K, Promise<V>>();
+  private inflight = new Map<K, Promise<CacheResult<V>>>();
+  private readonly staleIfErrorMs: number;
 
-  constructor(private readonly maxEntries: number) {
+  constructor(
+    private readonly maxEntries: number,
+    options: TtlSingleFlightCacheOptions = {},
+  ) {
     if (maxEntries < 1) {
       throw new Error("maxEntries must be at least 1");
     }
+    const staleIfErrorMs = options.staleIfErrorMs ?? 0;
+    if (!Number.isFinite(staleIfErrorMs) || staleIfErrorMs < 0) {
+      throw new Error("staleIfErrorMs must be a non-negative finite number");
+    }
+    this.staleIfErrorMs = staleIfErrorMs;
   }
 
   async getOrLoad(
@@ -28,15 +47,22 @@ export class TtlSingleFlightCache<K, V> {
     load: () => Promise<V>,
     now: number = Date.now(),
   ): Promise<V> {
+    const result = await this.getOrLoadWithMeta(key, ttlMs, load, now);
+    return result.value;
+  }
+
+  async getOrLoadWithMeta(
+    key: K,
+    ttlMs: number,
+    load: () => Promise<V>,
+    now: number = Date.now(),
+  ): Promise<CacheResult<V>> {
     const entry = this.entries.get(key);
     if (entry && entry.expiresAt > now) {
       // Refresh insertion order so the least-recently-used entry is evicted.
       this.entries.delete(key);
       this.entries.set(key, entry);
-      return entry.value;
-    }
-    if (entry) {
-      this.entries.delete(key);
+      return { value: entry.value, isStale: false };
     }
 
     const existing = this.inflight.get(key);
@@ -47,9 +73,25 @@ export class TtlSingleFlightCache<K, V> {
     const promise = (async () => {
       try {
         const value = await load();
-        this.entries.set(key, { value, expiresAt: now + ttlMs });
+        const expiresAt = now + ttlMs;
+        this.entries.set(key, {
+          value,
+          expiresAt,
+          staleUntil: expiresAt + this.staleIfErrorMs,
+        });
         this.evict();
-        return value;
+        return { value, isStale: false };
+      } catch (error) {
+        const currentEntry = this.entries.get(key);
+        if (entry && currentEntry === entry && entry.staleUntil > now) {
+          this.entries.delete(key);
+          this.entries.set(key, entry);
+          return { value: entry.value, isStale: true };
+        }
+        if (currentEntry === entry) {
+          this.entries.delete(key);
+        }
+        throw error;
       } finally {
         this.inflight.delete(key);
       }
@@ -76,10 +118,19 @@ export class TtlSingleFlightCache<K, V> {
 const PROTOCOL_TTL_MS = 15_000;
 const POSITION_TTL_MS = 10_000;
 const MARKETS_TTL_MS = 15_000;
+export const PROTOCOL_STALE_IF_ERROR_MS = 60_000;
+export const POSITION_STALE_IF_ERROR_MS = 30_000;
+export const MARKETS_STALE_IF_ERROR_MS = 60_000;
 
-export const protocolCache = new TtlSingleFlightCache<string, ProtocolMetrics>(1);
-export const positionCache = new TtlSingleFlightCache<string, PositionSummary>(500);
-export const marketsCache = new TtlSingleFlightCache<string, MarketsSnapshot>(1);
+export const protocolCache = new TtlSingleFlightCache<string, ProtocolMetrics>(1, {
+  staleIfErrorMs: PROTOCOL_STALE_IF_ERROR_MS,
+});
+export const positionCache = new TtlSingleFlightCache<string, PositionSummary>(500, {
+  staleIfErrorMs: POSITION_STALE_IF_ERROR_MS,
+});
+export const marketsCache = new TtlSingleFlightCache<string, MarketsSnapshot>(1, {
+  staleIfErrorMs: MARKETS_STALE_IF_ERROR_MS,
+});
 
 export const PROTOCOL_TTL = PROTOCOL_TTL_MS;
 export const POSITION_TTL = POSITION_TTL_MS;

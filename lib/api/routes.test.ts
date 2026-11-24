@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetApiCaches } from "./cache";
 import { ContractNotConfiguredError, UpstreamRpcError } from "./errors";
 import { resetApiRateLimiter } from "./rate-limit";
@@ -118,6 +118,10 @@ beforeEach(() => {
   mocks.fetchMarkets.mockResolvedValue(marketsSnapshot());
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("GET /api/v1/protocol", () => {
   it("returns the documented shape with string-encoded i128 values", async () => {
     const response = await getProtocol(protocolRequest());
@@ -127,6 +131,7 @@ describe("GET /api/v1/protocol", () => {
     expect(response.headers.get("Cache-Control")).toContain(
       "stale-while-revalidate=60",
     );
+    expect(response.headers.get("X-Cache")).toBeNull();
     const parsed = ProtocolResponseSchema.parse(await response.json());
     expect(parsed).toEqual({
       totalSupply: "1000",
@@ -199,6 +204,27 @@ describe("GET /api/v1/protocol", () => {
         code: "UPSTREAM_RPC_ERROR",
         message: "Failed to read from Soroban RPC",
       },
+    });
+  });
+
+  it("serves stale protocol data with an explicit cache header after refresh failure", async () => {
+    await getProtocol(protocolRequest("203.0.113.26"));
+    mocks.fetchProtocolMetrics.mockRejectedValueOnce(
+      new UpstreamRpcError("temporary failure"),
+    );
+
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 16_000);
+    const response = await getProtocol(protocolRequest("203.0.113.27"));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-Cache")).toBe("stale");
+    expect(ProtocolResponseSchema.parse(await response.json())).toEqual({
+      totalSupply: "1000",
+      totalBorrow: "400",
+      utilizationBps: "4000",
+      ledger: 123,
+      fetchedAt: FIXED_FETCHED_AT,
     });
   });
 
