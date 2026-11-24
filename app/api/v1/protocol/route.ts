@@ -1,7 +1,7 @@
 import { protocolCache, PROTOCOL_TTL } from "@/lib/api/cache";
 import { fetchProtocolMetrics } from "@/lib/api/lending";
 import { checkApiRateLimit } from "@/lib/api/rate-limit";
-import { errorResponse, jsonResponse, mapApiError } from "@/lib/api/response";
+import { errorResponse, jsonResponse, mapApiError, withRequestId } from "@/lib/api/response";
 import {
   PROTOCOL_CACHE_CONTROL,
   type ProtocolResponse,
@@ -10,12 +10,12 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request): Promise<Response> {
+export const GET = withRequestId(async (request: Request, _context: unknown, requestId: string): Promise<Response> => {
   const rate = checkApiRateLimit(request);
   if (!rate.allowed) {
     return errorResponse("RATE_LIMITED", "Too many requests", 429, {
       "Retry-After": String(rate.retryAfterSec),
-    });
+    }, requestId);
   }
 
   try {
@@ -37,9 +37,11 @@ export async function GET(request: Request): Promise<Response> {
       body,
       200,
       PROTOCOL_CACHE_CONTROL,
+      request,
+      requestId,
       isStale ? { "X-Cache": "stale" } : undefined,
     );
   } catch (error) {
-    return mapApiError(error);
+    return mapApiError(error, requestId);
   }
-}
+});

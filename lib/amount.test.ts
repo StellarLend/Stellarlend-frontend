@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import fc from "fast-check";
 import { toBaseUnits, fromBaseUnits, MAX_I128 } from "./amount";
+import { parseAmount } from "./demo-ledger";
 
 describe("toBaseUnits", () => {
   it("converts whole and fractional XLM exactly", () => {
@@ -55,5 +57,28 @@ describe("fromBaseUnits", () => {
     expect(fromBaseUnits(15_000_000n)).toBe("1.5");
     expect(fromBaseUnits(10_000_000n)).toBe("1");
     expect(fromBaseUnits(1n)).toBe("0.0000001");
+  });
+
+  it("demo and on-chain parsers agree on table", () => {
+    const table = ["", "0", "1.", ".5", "1e3", "0.00000001", "1".repeat(1000), "-1", "1,5"];
+    for (const item of table) {
+      const onchain = toBaseUnits(item);
+      const demo = parseAmount(item);
+      expect(demo).toEqual(onchain);
+    }
+  });
+
+  it("round trips", () => {
+    fc.assert(
+      fc.property(
+        fc.bigInt({ min: 0n, max: MAX_I128 }),
+        (baseUnits) => {
+          const str = fromBaseUnits(baseUnits);
+          const parsed = toBaseUnits(str);
+          expect(parsed).toEqual({ ok: true, value: baseUnits });
+        },
+      ),
+      { numRuns: 100 },
+    );
   });
 });

@@ -35,6 +35,35 @@ function SourceBadge({
   );
 }
 
+const ENV_VARS = [
+  { name: "NEXT_PUBLIC_STELLAR_NETWORK", optional: false },
+  { name: "NEXT_PUBLIC_HORIZON_URL", optional: false },
+  { name: "NEXT_PUBLIC_SOROBAN_RPC_URL", optional: false },
+  { name: "NEXT_PUBLIC_LENDING_CONTRACT_ID", optional: false },
+  { name: "NEXT_PUBLIC_ORACLE_CONTRACT_ID", optional: true },
+  { name: "NEXT_PUBLIC_TOKEN_CONTRACT_ID", optional: true },
+  { name: "NEXT_PUBLIC_MULTISIG_CONTRACT_ID", optional: true },
+  { name: "NEXT_PUBLIC_AMM_CONTRACT_ID", optional: true },
+  { name: "NEXT_PUBLIC_AMM_TOKEN_A_CONTRACT_ID", optional: true },
+  { name: "NEXT_PUBLIC_AMM_TOKEN_B_CONTRACT_ID", optional: true },
+  { name: "NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET", optional: true },
+  { name: "NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET", optional: true },
+  { name: "NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE", optional: true },
+  { name: "NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS", optional: true },
+  { name: "NEXT_PUBLIC_XLM_ASSET_ADDRESS", optional: true },
+  { name: "NEXT_PUBLIC_USDC_ASSET_ADDRESS", optional: true },
+  { name: "NEXT_PUBLIC_EURC_ASSET_ADDRESS", optional: true },
+  { name: "NEXT_PUBLIC_BTC_ASSET_ADDRESS", optional: true },
+  { name: "NEXT_PUBLIC_SITE_URL", optional: true },
+  { name: "NEXT_PUBLIC_CSP_REPORT_URI", optional: true },
+  { name: "NEXT_PUBLIC_ERROR_ENDPOINT", optional: true },
+  { name: "NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS", optional: true },
+  { name: "NEXT_PUBLIC_USDC_ISSUER", optional: true },
+  { name: "NEXT_PUBLIC_EURC_ISSUER", optional: true },
+  { name: "NEXT_PUBLIC_BTC_ISSUER", optional: true },
+  { name: "TRUSTED_PROXY_HOPS", optional: true },
+];
+
 export function DocsPage({ data }: DocsPageProps) {
   const t = useTranslations("docs");
   const locale = useLocale();
@@ -184,37 +213,21 @@ export function DocsPage({ data }: DocsPageProps) {
       </Section>
 
       <Section contentClassName="mut space-y-3 text-sm leading-relaxed" title={t("env.title")}>
-        <ul className="list-disc space-y-1 pl-5 font-mono text-xs">
-          {[
-            "NEXT_PUBLIC_STELLAR_NETWORK",
-            "NEXT_PUBLIC_HORIZON_URL",
-            "NEXT_PUBLIC_SOROBAN_RPC_URL",
-            "NEXT_PUBLIC_LENDING_CONTRACT_ID",
-            "NEXT_PUBLIC_ORACLE_CONTRACT_ID",
-            "NEXT_PUBLIC_TOKEN_CONTRACT_ID",
-            "NEXT_PUBLIC_MULTISIG_CONTRACT_ID",
-            "NEXT_PUBLIC_AMM_CONTRACT_ID",
-            "NEXT_PUBLIC_AMM_TOKEN_A_CONTRACT_ID",
-            "NEXT_PUBLIC_AMM_TOKEN_B_CONTRACT_ID",
-            "NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET",
-            "NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET",
-            "NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE",
-            "NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS",
-            "NEXT_PUBLIC_XLM_ASSET_ADDRESS",
-            "NEXT_PUBLIC_USDC_ASSET_ADDRESS",
-            "NEXT_PUBLIC_EURC_ASSET_ADDRESS",
-            "NEXT_PUBLIC_BTC_ASSET_ADDRESS",
-            "NEXT_PUBLIC_SITE_URL",
-            "NEXT_PUBLIC_CSP_REPORT_URI",
-            "NEXT_PUBLIC_ERROR_ENDPOINT",
-            "NEXT_PUBLIC_ORACLE_MAX_AGE_SECONDS",
-            "NEXT_PUBLIC_USDC_ISSUER",
-            "NEXT_PUBLIC_EURC_ISSUER",
-            "NEXT_PUBLIC_BTC_ISSUER",
-          ].map((entry) => (
-            <li key={entry}>{entry}</li>
+        <dl className="space-y-3 text-xs">
+          {ENV_VARS.map(({ name, optional }) => (
+            <div key={name} className="flex flex-col gap-1 border-b border-[var(--line)] pb-2 last:border-0">
+              <dt className="font-mono font-medium text-foreground">
+                {name}
+                {optional && (
+                  <span className="ml-2 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                    {t("env.optional")}
+                  </span>
+                )}
+              </dt>
+              <dd className="mut">{t(`env.descriptions.${name}`)}</dd>
+            </div>
           ))}
-        </ul>
+        </dl>
       </Section>
     </article>
   );

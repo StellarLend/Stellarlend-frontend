@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { useWallet } from "@/components/wallet";
 import { Proposal, parseMultisigError, MultisigActionStatus } from "@/lib/multisig/types";
 import {
@@ -14,7 +15,7 @@ import { config, txExplorer } from "@/lib/config";
 
 export interface ProposalActionsProps {
   proposal: Proposal;
-  onRefresh?: () => void | Promise<void>;
+  onRefresh?: () => (void | Promise<void>);
   contractId?: string;
   className?: string;
   isSignerOverride?: boolean;
@@ -27,6 +28,7 @@ export function ProposalActions({
   className = "",
   isSignerOverride,
 }: ProposalActionsProps) {
+  const t = useTranslations("multisig");
   const { address } = useWallet();
   const [signerAuthorized, setSignerAuthorized] = useState<boolean>(false);
   const [checkingRole, setCheckingRole] = useState<boolean>(false);
@@ -154,16 +156,16 @@ export function ProposalActions({
     <div className={`space-y-4 ${className}`} data-testid="proposal-actions">
       {!address && (
         <div className="card p-3 text-xs mut flex items-center justify-between" data-testid="wallet-notice">
-          <span>Connect Freighter wallet to sign governance proposals</span>
+          <span>{t("walletNotice")}</span>
         </div>
       )}
 
-      {address && !checkingRole && !signerAuthorized && (
+      {Boolean(address && !checkingRole && !signerAuthorized) && (
         <div
           className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-300"
           data-testid="unauthorized-signer-notice"
         >
-          Connected address ({address.slice(0, 4)}...{address.slice(-4)}) is not an authorized multisig signer.
+          {t("unauthorizedNotice", { address: `${address!.slice(0, 4)}...${address!.slice(-4)}` })}
         </div>
       )}
 
@@ -180,7 +182,7 @@ export function ProposalActions({
           className="btn text-sm px-4 py-2"
           title={hasAlreadyApproved ? "Connected wallet already approved this proposal" : "Approve proposal"}
         >
-          {hasAlreadyApproved ? "Approved ✓" : "Approve"}
+          {hasAlreadyApproved ? t("approvedCheck") : t("approve")}
         </button>
 
         <button
@@ -195,7 +197,7 @@ export function ProposalActions({
           className="btn text-sm px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
           title={proposal.status !== "Passed" ? "Proposal must reach quorum before execution" : "Execute proposal"}
         >
-          Execute
+          {t("execute")}
         </button>
 
         <button
@@ -210,7 +212,7 @@ export function ProposalActions({
           className="btn-ghost text-sm px-4 py-2 text-red-400 hover:border-red-400"
           title="Cancel proposal"
         >
-          Cancel
+          {t("cancel")}
         </button>
       </div>
 
@@ -223,7 +225,7 @@ export function ProposalActions({
           <div className="card max-w-lg w-full p-6 space-y-4 border border-[var(--line)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
               <h3 className="text-lg font-bold capitalize">
-                Confirm {activeModalAction} Proposal #{proposal.id}
+                {t("confirmActionTitle", { action: activeModalAction, id: proposal.id })}
               </h3>
               <button
                 type="button"
@@ -239,20 +241,20 @@ export function ProposalActions({
             <div className="space-y-3 text-sm">
               <div className="bg-[var(--bg)] p-3 rounded-lg space-y-2">
                 <div className="flex justify-between">
-                  <span className="mut">Proposer:</span>
+                  <span className="mut">{t("proposer")}</span>
                   <span className="font-mono text-xs">{proposal.proposer}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="mut">Current Status:</span>
+                  <span className="mut">{t("currentStatus")}</span>
                   <span className="font-semibold">{proposal.status}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="mut">Approvals:</span>
-                  <span>{proposal.approvals.length} registered</span>
+                  <span className="mut">{t("approvals")}</span>
+                  <span>{t("approvalsRegistered", { count: proposal.approvals.length })}</span>
                 </div>
                 {activeModalAction === "execute" && (
                   <div className="flex justify-between">
-                    <span className="mut">Payload Hash:</span>
+                    <span className="mut">{t("payloadHash")}</span>
                     <span className="font-mono text-xs break-all">{proposal.payloadHash}</span>
                   </div>
                 )}
@@ -260,31 +262,22 @@ export function ProposalActions({
 
               {activeModalAction === "approve" && (
                 <div className="rounded border border-teal-900/40 bg-teal-950/20 p-3 text-xs text-teal-300">
-                  <p className="font-semibold mb-1">Domain-bound Authorization Security:</p>
-                  <p className="mut">
-                    The transaction simulation will produce a domain-bound authorization entry. StellarLend cross-checks
-                    the canonical preimage hash (<code>STELLARLEND_MULTISIG_APPROVAL_V1</code>) locally before opening
-                    Freighter to guarantee zero authorization spoofing.
-                  </p>
+                  <p className="font-semibold mb-1">{t("domainBoundSecurity")}</p>
+                  <p className="mut">{t("domainBoundSecurityDesc")}</p>
                 </div>
               )}
 
               {activeModalAction === "execute" && (
                 <div className="rounded border border-indigo-900/40 bg-indigo-950/20 p-3 text-xs text-indigo-300">
-                  <p className="font-semibold mb-1">Execution Notice:</p>
-                  <p className="mut">
-                    This action dispatches the stored proposal payload to on-chain contracts. Once executed, state changes
-                    are final and immutable.
-                  </p>
+                  <p className="font-semibold mb-1">{t("executionNotice")}</p>
+                  <p className="mut">{t("executionNoticeDesc")}</p>
                 </div>
               )}
 
               {activeModalAction === "cancel" && (
                 <div className="rounded border border-red-900/40 bg-red-950/20 p-3 text-xs text-red-300">
-                  <p className="font-semibold mb-1">Cancellation Warning:</p>
-                  <p className="mut">
-                    Cancelling this proposal will permanently invalidate all pending approvals and mark it as Cancelled.
-                  </p>
+                  <p className="font-semibold mb-1">{t("cancellationWarning")}</p>
+                  <p className="mut">{t("cancellationWarningDesc")}</p>
                 </div>
               )}
 
@@ -306,7 +299,7 @@ export function ProposalActions({
                         rel="noreferrer"
                         className="underline text-emerald-400 hover:text-emerald-300"
                       >
-                        View confirmed transaction on StellarExpert ↗
+                        {t("viewConfirmedTx")}
                       </a>
                     </div>
                   )}
@@ -318,8 +311,8 @@ export function ProposalActions({
                   className="p-3 rounded-lg text-xs bg-red-950/40 text-red-300 border border-red-800"
                   data-testid="error-message"
                 >
-                  <span className="font-semibold">Error: </span>
-                  {errorMessage}
+                  <span className="font-semibold">{t("errorPrefix")}</span>
+                  <span>{errorMessage}</span>
                 </div>
               )}
             </div>
@@ -332,7 +325,7 @@ export function ProposalActions({
                 className="btn-ghost text-sm px-4 py-2"
                 data-testid="btn-modal-cancel"
               >
-                {status === "confirmed" ? "Close" : "Cancel"}
+                {status === "confirmed" ? t("close") : t("cancel")}
               </button>
 
               {status !== "confirmed" && (
@@ -344,8 +337,8 @@ export function ProposalActions({
                   data-testid="btn-modal-confirm"
                 >
                   {status === "submitting" || status === "polling" || status === "simulating"
-                    ? "Processing..."
-                    : `Confirm & Sign with Freighter`}
+                    ? t("processing")
+                    : t("confirmAndSign")}
                 </button>
               )}
             </div>
@@ -358,7 +351,7 @@ export function ProposalActions({
 
 export interface BatchProposalActionsProps {
   proposals: Proposal[];
-  onRefresh?: () => void | Promise<void>;
+  onRefresh?: () => (void | Promise<void>);
   contractId?: string;
   className?: string;
   isSignerOverride?: boolean;
@@ -371,6 +364,7 @@ export function BatchProposalActions({
   className = "",
   isSignerOverride,
 }: BatchProposalActionsProps) {
+  const t = useTranslations("multisig");
   const { address } = useWallet();
   const [signerAuthorized, setSignerAuthorized] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -459,10 +453,8 @@ export function BatchProposalActions({
     <div className={`space-y-4 ${className}`} data-testid="batch-proposal-actions">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="font-semibold text-lg">Batch Execution (Atomic)</h3>
-          <p className="text-xs mut">
-            Select up to 32 Passed proposals to execute atomically in a single signature transaction.
-          </p>
+          <h3 className="font-semibold text-lg">{t("batchExecutionTitle")}</h3>
+          <p className="text-xs mut">{t("batchExecutionDesc")}</p>
         </div>
 
         <button
@@ -476,22 +468,22 @@ export function BatchProposalActions({
           }}
           className="btn text-sm px-4 py-2 font-semibold"
         >
-          Execute Selected ({selectedIds.length})
+          {t("executeSelected", { count: selectedIds.length })}
         </button>
       </div>
 
       {passedProposals.length === 0 ? (
-        <div className="card p-4 text-xs mut text-center">No proposals currently in Passed status for batch execution.</div>
+        <div className="card p-4 text-xs mut text-center">{t("noPassedProposals")}</div>
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full text-left text-sm min-w-[500px]">
             <thead className="mut border-b border-[var(--line)]">
               <tr>
-                <th className="p-3 w-10">Select</th>
-                <th className="p-3">ID</th>
-                <th className="p-3">Proposer</th>
-                <th className="p-3">Payload Hash</th>
-                <th className="p-3">Approvals</th>
+                <th className="p-3 w-10">{t("thSelect")}</th>
+                <th className="p-3">{t("thId")}</th>
+                <th className="p-3">{t("thProposer")}</th>
+                <th className="p-3">{t("thPayloadHash")}</th>
+                <th className="p-3">{t("thApprovals")}</th>
               </tr>
             </thead>
             <tbody>
@@ -513,7 +505,7 @@ export function BatchProposalActions({
                     <td className="p-3 font-semibold">#{p.id}</td>
                     <td className="p-3 font-mono text-xs">{p.proposer.slice(0, 6)}...{p.proposer.slice(-4)}</td>
                     <td className="p-3 font-mono text-xs">{p.payloadHash.slice(0, 10)}...</td>
-                    <td className="p-3 text-xs">{p.approvals.length} signers</td>
+                    <td className="p-3 text-xs">{t("signers", { count: p.approvals.length })}</td>
                   </tr>
                 );
               })}
@@ -524,7 +516,7 @@ export function BatchProposalActions({
 
       {selectedIds.length >= 32 && (
         <div className="text-xs text-amber-400 p-2" data-testid="batch-limit-warning">
-          Maximum batch limit (32 proposals) reached.
+          {t("batchLimitReached")}
         </div>
       )}
 
@@ -533,7 +525,7 @@ export function BatchProposalActions({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs">
           <div className="card max-w-lg w-full p-6 space-y-4 border border-[var(--line)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
-              <h3 className="text-lg font-bold">Confirm Atomic Batch Execution</h3>
+              <h3 className="text-lg font-bold">{t("confirmBatchTitle")}</h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
@@ -546,23 +538,20 @@ export function BatchProposalActions({
 
             <div className="space-y-3 text-sm">
               <p className="mut text-xs">
-                You are about to execute <b>{selectedIds.length}</b> proposals atomically in a single Soroban transaction:
+                {t("batchModalDesc", { count: selectedIds.length })}
               </p>
               <div className="bg-[var(--bg)] p-3 rounded-lg max-h-40 overflow-y-auto font-mono text-xs space-y-1">
                 {selectedIds.map((id) => (
                   <div key={id} className="flex justify-between">
-                    <span>Proposal #{id}</span>
-                    <span className="mut">Passed</span>
+                    <span>{t("proposalItem", { id })}</span>
+                    <span className="mut">{t("passed")}</span>
                   </div>
                 ))}
               </div>
 
               <div className="rounded border border-indigo-900/40 bg-indigo-950/20 p-3 text-xs text-indigo-300">
-                <p className="font-semibold mb-1">Atomic All-or-Nothing Guarantee:</p>
-                <p className="mut">
-                  If any single proposal in this batch fails execution or payload mismatch on-chain, all proposals revert
-                  completely without partial state change.
-                </p>
+                <p className="font-semibold mb-1">{t("atomicGuarantee")}</p>
+                <p className="mut">{t("atomicGuaranteeDesc")}</p>
               </div>
 
               {statusMessage && (
@@ -583,7 +572,7 @@ export function BatchProposalActions({
                         rel="noreferrer"
                         className="underline text-emerald-400 hover:text-emerald-300"
                       >
-                        View confirmed transaction on StellarExpert ↗
+                        {t("viewConfirmedTx")}
                       </a>
                     </div>
                   )}
@@ -592,8 +581,8 @@ export function BatchProposalActions({
 
               {errorMessage && (
                 <div className="p-3 rounded-lg text-xs bg-red-950/40 text-red-300 border border-red-800">
-                  <span className="font-semibold">Error: </span>
-                  {errorMessage}
+                  <span className="font-semibold">{t("errorPrefix")}</span>
+                  <span>{errorMessage}</span>
                 </div>
               )}
             </div>
@@ -605,7 +594,7 @@ export function BatchProposalActions({
                 disabled={status === "submitting" || status === "polling"}
                 className="btn-ghost text-sm px-4 py-2"
               >
-                {status === "confirmed" ? "Close" : "Cancel"}
+                {status === "confirmed" ? t("close") : t("cancel")}
               </button>
 
               {status !== "confirmed" && (
@@ -616,7 +605,9 @@ export function BatchProposalActions({
                   className="btn text-sm px-5 py-2 font-semibold"
                   data-testid="btn-batch-modal-confirm"
                 >
-                  {status === "submitting" || status === "polling" ? "Processing..." : `Execute Batch (${selectedIds.length})`}
+                  {status === "submitting" || status === "polling"
+                    ? t("processing")
+                    : t("executeBatchBtn", { count: selectedIds.length })}
                 </button>
               )}
             </div>

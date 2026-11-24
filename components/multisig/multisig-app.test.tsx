@@ -1,10 +1,22 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import { listProposals } from "@/lib/multisig/reads";
 import { MultisigApp } from "./multisig-app";
+
+const render = (ui: React.ReactElement, options?: any) =>
+  rtlRender(ui, {
+    wrapper: ({ children }: { children: React.ReactNode }) => (
+      <NextIntlClientProvider locale="en" messages={messages}>
+        {children}
+      </NextIntlClientProvider>
+    ),
+    ...options,
+  });
 
 vi.mock("@/lib/config", () => ({
   config: { multisigId: "test-contract" },

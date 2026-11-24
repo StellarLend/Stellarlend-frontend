@@ -19,11 +19,8 @@ describe('i18n catalogs', () => {
     // Feature areas merged before they were localized. Remove an entry once its
     // strings move into messages/*.json.
     const pendingTranslation = [
-      path.join('components', 'multisig'),
-      path.join('components', 'amm'),
       path.join('app', 'governance', 'page.tsx'),
       path.join('components', 'governance-view.tsx'),
-      path.join('components', 'health-chip.tsx'),
     ];
     const files: string[] = [];
 
@@ -32,7 +29,7 @@ describe('i18n catalogs', () => {
         const full = path.join(dir, entry.name);
         if (pendingTranslation.includes(full)) continue;
         if (entry.isDirectory()) {
-          walk(full);
+          if (entry.name !== '__tests__') walk(full);
           continue;
         }
         if (

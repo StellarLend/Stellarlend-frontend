@@ -21,6 +21,7 @@ import {
 } from "@/lib/admin";
 import { getRpcServer } from "@/lib/tx";
 import type { rpc } from "@stellar/stellar-sdk";
+import { AuditTimeline } from "./audit-timeline";
 
 export interface EmergencyControlsProps {
   initialAdmin?: string | null;
@@ -568,6 +569,10 @@ export function EmergencyControls({
           </div>
         </div>
       )}
+
+      <div className="pt-8">
+        <AuditTimeline currentLedger={currentLedger} />
+      </div>
     </div>
   );
 }

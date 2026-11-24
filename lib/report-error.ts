@@ -108,6 +108,49 @@ const defaultSink: ErrorSink = (payload: ReportedErrorPayload) => {
 
 let currentSink: ErrorSink = defaultSink;
 
+export function createBeaconSink(
+  endpoint = "/api/v1/client-errors",
+  sampleRate?: number,
+): ErrorSink {
+  return (payload: ReportedErrorPayload) => {
+    try {
+      const rawRate =
+        sampleRate ??
+        (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ERROR_SAMPLE_RATE
+          ? Number(process.env.NEXT_PUBLIC_ERROR_SAMPLE_RATE)
+          : 1);
+      const rate = isNaN(rawRate) ? 1 : Math.min(Math.max(rawRate, 0), 1);
+      if (rate <= 0 || (rate < 1 && Math.random() > rate)) {
+        return;
+      }
+
+      if (typeof window === "undefined") return;
+
+      const data = JSON.stringify(payload);
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        const sent = navigator.sendBeacon(
+          endpoint,
+          new Blob([data], { type: "application/json" }),
+        );
+        if (sent) return;
+      }
+
+      if (typeof fetch === "function") {
+        fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: data,
+          keepalive: true,
+        }).catch(() => {
+          // Sink errors are swallowed and never throw
+        });
+      }
+    } catch {
+      // Swallowed
+    }
+  };
+}
+
 /**
  * Allows plugging in a custom error sink.
  */
