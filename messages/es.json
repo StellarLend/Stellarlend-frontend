@@ -9,7 +9,8 @@
     "switchLocale": "EN",
     "flashLoans": "Préstamos flash",
     "governance": "Gobernanza",
-    "amm": "AMM"
+    "amm": "AMM",
+    "liquidate": "Liquidar"
   },
   "errors": {
     "boundary": {
@@ -610,6 +611,36 @@
     },
     "notApplicable": "-"
   },
+  "liquidate": {
+    "title": "Liquidar posición",
+    "subtitle": "Repaga parte de la deuda de un prestatario y confisca colateral con descuento.",
+    "borrowerLabel": "Dirección del prestatario",
+    "borrowerPlaceholder": "G...",
+    "invalidAddress": "Ingresa una dirección G válida",
+    "lookupButton": "Buscar posición",
+    "lookingUp": "Buscando…",
+    "positionHeading": "Posición",
+    "collateral": "Colateral",
+    "debt": "Deuda",
+    "healthFactor": "Factor de salud",
+    "closeFactor": "Factor de cierre",
+    "incentive": "Incentivo",
+    "notLiquidatable": "Esta posición está saludable y no puede ser liquidada.",
+    "repayLabel": "Monto a repagar",
+    "repayPlaceholder": "0.0000000",
+    "maxRepay": "Máximo a repagar",
+    "preview": "Vista previa",
+    "actualRepay": "Repago real",
+    "seizedEstimate": "Colateral confiscado (est.)",
+    "submitButton": "Liquidar",
+    "submitting": "Enviando…",
+    "connectWallet": "Conecta tu billetera para liquidar",
+    "amountTooLarge": "El monto supera el límite del factor de cierre",
+    "txSuccessHeading": "Liquidación enviada",
+    "viewOnExplorer": "Ver transacción",
+    "errorHeading": "Liquidación fallida",
+    "lookupError": "No se pudo cargar la posición"
+  },
   "meta": {
     "home": {
       "title": "StellarLend - Préstamos en Stellar",
@@ -650,6 +681,10 @@
     "adminEmergency": {
       "title": "Administración de emergencia - StellarLend",
       "description": "Controles de emergencia y pausas granulares para el protocolo StellarLend."
+    },
+    "liquidate": {
+      "title": "Liquidar - StellarLend",
+      "description": "Repaga la deuda de un prestatario subcolateralizado y reclama colateral con descuento en StellarLend."
     }
   }
 }

@@ -16,6 +16,7 @@ export function Header() {
   const flashLoansHref = locale === "es" ? "/es/flash-loans" : "/flash-loans";
   const ammHref = locale === "es" ? "/es/amm" : "/amm";
   const governanceHref = locale === "es" ? "/es/governance" : "/governance";
+  const liquidateHref = locale === "es" ? "/es/liquidate" : "/liquidate";
   const docsHref = locale === "es" ? "/es/docs" : "/docs";
   const homeHref = locale === "es" ? "/es" : "/";
 
@@ -41,6 +42,7 @@ export function Header() {
           <Link href={marketsHref} className="hover:text-white">{t("markets")}</Link>
           <Link href={historyHref} className="hover:text-white">{t("history")}</Link>
           <Link href={flashLoansHref} className="hover:text-white">{t("flashLoans")}</Link>
+          <Link href={liquidateHref} className="hover:text-white">{t("liquidate")}</Link>
           <Link href={ammHref} className="hover:text-white">{t("amm")}</Link>
           <Link href={governanceHref} className="hover:text-white">{t("governance")}</Link>
           <Link href={docsHref} className="hover:text-white">{t("docs")}</Link>
