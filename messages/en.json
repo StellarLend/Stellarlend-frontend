@@ -167,7 +167,8 @@
       "demoFallback": "Showing the demo ledger until the contract is configured.",
       "loadingPosition": "Loading on-chain position…",
       "depositCapExceeded": "This deposit would exceed the market deposit limit.",
-      "belowMinimumBorrow": "The requested borrow is below the minimum amount."
+      "belowMinimumBorrow": "The requested borrow is below the minimum amount.",
+      "duplicatePending": "A transaction for this asset is already pending. Please wait for it to confirm before submitting again."
     },
     "contract": "Lending contract",
     "notDeployed": "not deployed",
@@ -295,6 +296,15 @@
       "notifyToggle": "Notify me when my health factor gets worse",
       "notificationsUnsupported": "Browser notifications are not supported here.",
       "notificationsDenied": "Notifications are blocked in your browser settings, so alerts are unavailable."
+    },
+    "preview": {
+      "title": "Projected Impact",
+      "borrowLimitUsed": "Borrow limit used",
+      "healthFactor": "Health factor",
+      "collateral": "Collateral",
+      "debt": "Debt",
+      "warningLiquidation": "Caution: Projected health factor is close to liquidation (< 1.2).",
+      "dangerLiquidation": "Action would put your position below minimum health factor (< 1.0) and risk liquidation."
     },
     "actions": "Actions",
     "ltv": "LTV",
@@ -467,7 +477,20 @@
     "txSuccessTitle": "Transaction Confirmed",
     "txHashLabel": "Transaction Hash",
     "viewExplorer": "View on Stellar Expert",
-    "statusUpdated": "Protocol state refreshed successfully."
+    "statusUpdated": "Protocol state refreshed successfully.",
+    "timelineTitle": "Emergency & Role Audit Timeline",
+    "timelineSubtitle": "Historical record of pause modifications, emergency transitions, and role assignments.",
+    "filterAll": "All Actions",
+    "loadMore": "Load More",
+    "loading": "Loading audit events...",
+    "noEvents": "No admin events found.",
+    "retry": "Retry",
+    "errorLoading": "Failed to load audit events.",
+    "expiredBadge": "Expired",
+    "expiresIn": "Expires in ~{time} (ledger {ledger})",
+    "actor": "Actor",
+    "ledger": "Ledger",
+    "tx": "Transaction"
   },
   "history": {
     "title": "Transaction History",
@@ -579,8 +602,12 @@
         "sequence": "Sequence",
         "action": "Action",
         "actor": "Actor",
-        "ledger": "Ledger"
-      }
+        "ledger": "Ledger",
+        "diffs": "Parameter changes"
+      },
+      "increase": "increase",
+      "decrease": "decrease",
+      "unknown": "unknown"
     }
   },
   "amm": {
@@ -714,6 +741,21 @@
       "liquidatable": "Liquidatable"
     },
     "notApplicable": "-"
+  },
+  "txToasts": {
+    "pending": "{action} of {symbol} pending…",
+    "confirmed": "{action} of {symbol} confirmed.",
+    "cancelled": "{action} of {symbol} cancelled.",
+    "timeout": "{action} of {symbol} timed out. Check the explorer before retrying.",
+    "unknownError": "The transaction failed.",
+    "viewTx": "View transaction",
+    "dismiss": "Dismiss notification",
+    "action": {
+      "deposit": "Supply",
+      "withdraw": "Withdraw",
+      "borrow": "Borrow",
+      "repay": "Repay"
+    }
   },
   "meta": {
     "home": {

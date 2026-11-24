@@ -167,7 +167,8 @@
       "demoFallback": "Se muestra el libro de demostración hasta que el contrato esté configurado.",
       "loadingPosition": "Cargando posición on-chain…",
       "depositCapExceeded": "Este depósito superaría el límite de depósito del mercado.",
-      "belowMinimumBorrow": "El préstamo solicitado está por debajo del monto mínimo."
+      "belowMinimumBorrow": "El préstamo solicitado está por debajo del monto mínimo.",
+      "duplicatePending": "Ya hay una transacción pendiente para este activo. Espera a que se confirme antes de enviar otra."
     },
     "contract": "Contrato de préstamo",
     "notDeployed": "no desplegado",
@@ -295,6 +296,15 @@
       "notifyToggle": "Notificarme cuando mi factor de salud empeore",
       "notificationsUnsupported": "Las notificaciones del navegador no son compatibles aquí.",
       "notificationsDenied": "Las notificaciones están bloqueadas en la configuración de tu navegador, por lo que las alertas no están disponibles."
+    },
+    "preview": {
+      "title": "Impacto proyectado",
+      "borrowLimitUsed": "Límite de préstamo usado",
+      "healthFactor": "Factor de salud",
+      "collateral": "Colateral",
+      "debt": "Deuda",
+      "warningLiquidation": "Atención: El factor de salud proyectado está cerca de la liquidación (< 1,2).",
+      "dangerLiquidation": "Esta acción pondría tu posición por debajo del factor de salud mínimo (< 1,0) y arriesga la liquidación."
     },
     "actions": "Acciones",
     "ltv": "LTV",
@@ -467,7 +477,20 @@
     "txSuccessTitle": "Transacción Confirmada",
     "txHashLabel": "Hash de Transacción",
     "viewExplorer": "Ver en Stellar Expert",
-    "statusUpdated": "Estado del protocolo actualizado con éxito."
+    "statusUpdated": "Estado del protocolo actualizado con éxito.",
+    "timelineTitle": "Cronología de auditoría de emergencias y roles",
+    "timelineSubtitle": "Registro histórico de modificaciones de pausa, transiciones de emergencia y asignaciones de roles.",
+    "filterAll": "Todas las acciones",
+    "loadMore": "Cargar más",
+    "loading": "Cargando eventos de auditoría...",
+    "noEvents": "No se encontraron eventos de administración.",
+    "retry": "Reintentar",
+    "errorLoading": "Error al cargar eventos de auditoría.",
+    "expiredBadge": "Expirado",
+    "expiresIn": "Expira en ~{time} (ledger {ledger})",
+    "actor": "Actor",
+    "ledger": "Ledger",
+    "tx": "Transacción"
   },
   "history": {
     "title": "Historial de transacciones",
@@ -579,8 +602,12 @@
         "sequence": "Secuencia",
         "action": "Acción",
         "actor": "Actor",
-        "ledger": "Ledger"
-      }
+        "ledger": "Ledger",
+        "diffs": "Cambios de parámetros"
+      },
+      "increase": "aumento",
+      "decrease": "disminución",
+      "unknown": "desconocido"
     }
   },
   "amm": {
@@ -755,6 +782,21 @@
     "adminEmergency": {
       "title": "Administración de emergencia - StellarLend",
       "description": "Controles de emergencia y pausas granulares para el protocolo StellarLend."
+    }
+  },
+  "txToasts": {
+    "pending": "{action} de {symbol} pendiente…",
+    "confirmed": "{action} de {symbol} confirmado.",
+    "cancelled": "{action} de {symbol} cancelado.",
+    "timeout": "{action} de {symbol} agotó el tiempo. Comprueba el explorador antes de reintentar.",
+    "unknownError": "La transacción falló.",
+    "viewTx": "Ver transacción",
+    "dismiss": "Descartar notificación",
+    "action": {
+      "deposit": "Depósito",
+      "withdraw": "Retirada",
+      "borrow": "Préstamo",
+      "repay": "Pago"
     }
   },
   "multisig": {
