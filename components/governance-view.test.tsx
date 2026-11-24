@@ -53,6 +53,36 @@ describe("GovernanceView", () => {
     expect(screen.getByText("1 entrada")).toBeTruthy();
   });
 
+  it("unknown previous value renders unknown", () => {
+    const snapWithDiff: GovernanceSnapshot = {
+      ...snapshot,
+      audit: ok([
+        {
+          sequence: 1n,
+          action: "update_params",
+          actor: "GBACTORACTORACTORACTOR",
+          ledger: 10,
+          diffs: [
+            {
+              field: "base_rate_bps",
+              prev: null,
+              next: 300n,
+              prevFormatted: "unknown",
+              nextFormatted: "3%",
+              direction: "unknown",
+            },
+          ],
+        },
+      ]),
+    };
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <GovernanceView snapshot={snapWithDiff} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(/unknown → 3%/)).toBeTruthy();
+  });
+
   it("renders localized not-configured message when snapshot is null", () => {
     const { rerender } = render(
       <NextIntlClientProvider locale="en" messages={en}>
