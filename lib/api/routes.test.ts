@@ -411,4 +411,31 @@ describe("GET /api/v1/markets", () => {
       },
     });
   });
+
+  it("304 still counts against rate limit", async () => {
+    mocks.fetchProtocolMetrics.mockResolvedValue(protocolMetrics());
+    const ip = "203.0.113.99";
+
+    const initial = await getProtocol(protocolRequest(ip));
+    expect(initial.status).toBe(200);
+    const etag = initial.headers.get("ETag");
+    expect(etag).toBeTruthy();
+
+    const conditionalReq = new Request("http://localhost/api/v1/protocol", {
+      headers: {
+        "x-forwarded-for": ip,
+        "if-none-match": etag!,
+      },
+    });
+
+    // Exhaust remaining tokens in bucket
+    for (let i = 0; i < 60; i++) {
+      const res = await getProtocol(conditionalReq);
+      if (res.status === 429) break;
+      expect(res.status).toBe(304);
+    }
+
+    const blocked = await getProtocol(conditionalReq);
+    expect(blocked.status).toBe(429);
+  });
 });

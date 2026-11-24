@@ -44,6 +44,12 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "onchain",
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
   ],
 
   /* Run local dev/build server before starting the tests */
