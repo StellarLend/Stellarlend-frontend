@@ -262,7 +262,10 @@
       "markerSurcharge": "Surcharge kink",
       "historyTableCaption": "Utilization history samples",
       "colLedger": "Ledger",
-      "loadingChart": "Loading interest-rate model chart..."
+      "loadingChart": "Loading interest-rate model chart...",
+      "bpsValue": "{value} bps",
+      "bpsRange": "{floor}–{ceiling} bps",
+      "curveSummary": "Interest-rate curve: base rate {baseRate} ({baseRateBps} bps), kink utilization {kinkUtilization} ({kinkBps} bps), maximum rate {maxRate} ({maxRateBps} bps)."
     },
     "rateSimulator": {
       "title": "Rate model simulator",
@@ -286,6 +289,20 @@
       "healthy": "Healthy",
       "atRisk": "At risk",
       "liquidatable": "Liquidatable",
+      "levels": {
+        "safe": "Safe",
+        "warning": "Warning",
+        "danger": "Danger",
+        "liquidatable": "Liquidatable"
+      },
+      "noDebt": "No debt",
+      "verySafe": "Very safe",
+      "unavailable": "Unavailable",
+      "loading": "Health: loading",
+      "error": "Health: unavailable",
+      "chip": "HF {value} · {level}",
+      "tooltip": "Health factor {value} ({level})",
+      "ariaLabel": "Health factor {value}, {level}",
       "settingsLabel": "Health alert settings",
       "settingsTitle": "Health alert settings",
       "warningBelow": "Warning below",

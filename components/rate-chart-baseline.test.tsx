@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { expect, it } from "vitest";
+import enMessages from "@/messages/en.json";
 import { DEFAULT_RATE_PARAMS, type RateModelDiagnostics } from "@/lib/rate-model";
 import { RateChart } from "./rate-chart";
 
@@ -14,12 +16,14 @@ it("preserves the fixed-input SVG curve geometry", () => {
   };
 
   render(
-    <RateChart
-      params={DEFAULT_RATE_PARAMS}
-      diagnostics={diagnostics}
-      history={[]}
-      source="contract"
-    />
+    <NextIntlClientProvider locale="en" messages={enMessages}>
+      <RateChart
+        params={DEFAULT_RATE_PARAMS}
+        diagnostics={diagnostics}
+        history={[]}
+        source="contract"
+      />
+    </NextIntlClientProvider>
   );
 
   const chart = screen.getByTestId("borrow-rate-curve-svg");

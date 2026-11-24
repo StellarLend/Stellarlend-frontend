@@ -262,7 +262,10 @@
       "markerSurcharge": "Quiebre de recargo",
       "historyTableCaption": "Muestras del historial de utilización",
       "colLedger": "Ledger",
-      "loadingChart": "Cargando gráfico del modelo de tasas de interés..."
+      "loadingChart": "Cargando gráfico del modelo de tasas de interés...",
+      "bpsValue": "{value} pb",
+      "bpsRange": "{floor}–{ceiling} pb",
+      "curveSummary": "Curva de tasas: tasa base {baseRate} ({baseRateBps} pb), utilización en el quiebre {kinkUtilization} ({kinkBps} pb), tasa máxima {maxRate} ({maxRateBps} pb)."
     },
     "rateSimulator": {
       "title": "Simulador del modelo de tasas",
@@ -286,6 +289,20 @@
       "healthy": "Saludable",
       "atRisk": "En riesgo",
       "liquidatable": "Liquidable",
+      "levels": {
+        "safe": "Seguro",
+        "warning": "Advertencia",
+        "danger": "Peligro",
+        "liquidatable": "Liquidable"
+      },
+      "noDebt": "Sin deuda",
+      "verySafe": "Muy seguro",
+      "unavailable": "No disponible",
+      "loading": "Salud: cargando",
+      "error": "Salud: no disponible",
+      "chip": "FS {value} · {level}",
+      "tooltip": "Factor de salud {value} ({level})",
+      "ariaLabel": "Factor de salud {value}, {level}",
       "settingsLabel": "Configuración de alertas de salud",
       "settingsTitle": "Configuración de alertas de salud",
       "warningBelow": "Advertencia por debajo de",

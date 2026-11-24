@@ -21,7 +21,6 @@ describe('i18n catalogs', () => {
     const pendingTranslation = [
       path.join('app', 'governance', 'page.tsx'),
       path.join('components', 'governance-view.tsx'),
-      path.join('components', 'health-chip.tsx'),
     ];
     const files: string[] = [];
 
@@ -30,10 +29,14 @@ describe('i18n catalogs', () => {
         const full = path.join(dir, entry.name);
         if (pendingTranslation.includes(full)) continue;
         if (entry.isDirectory()) {
-          walk(full);
+          if (entry.name !== '__tests__') walk(full);
           continue;
         }
-        if (entry.isFile() && /(\.tsx|\.ts)$/.test(entry.name) && !/\.(test|spec)\.tsx?$/.test(entry.name)) {
+        if (
+          entry.isFile() &&
+          /(\.tsx|\.ts)$/.test(entry.name) &&
+          !/\.test\.(tsx|ts)$/.test(entry.name)
+        ) {
           files.push(full);
         }
       }
