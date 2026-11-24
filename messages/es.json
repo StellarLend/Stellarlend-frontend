@@ -395,9 +395,24 @@
     "precisionHint": "Los importes usan la precisión de tokens de Stellar (7 decimales).",
     "lendingContract": "Contrato de préstamos",
     "loadingActivity": "Cargando actividad on-chain...",
+    "filter": {
+      "label": "Filtrar por tipo",
+      "all": "Todos",
+      "loans": "Préstamos",
+      "repayments": "Reembolsos"
+    },
+    "summary": {
+      "title": "Resumen de comisiones observadas",
+      "count": "Eventos cargados",
+      "median": "Comisión mediana (pb)",
+      "max": "Comisión máxima (pb)",
+      "utilization": "Límite de utilización",
+      "noData": "sin datos"
+    },
     "empty": {
       "title": "No se encontró actividad de préstamos flash",
-      "body": "El RPC solo conserva una ventana limitada de eventos del contrato. Puede que no haya actividad si no hubo préstamos flash recientes o si los ledgers correspondientes ya expiraron de la retención del RPC."
+      "body": "El RPC solo conserva una ventana limitada de eventos del contrato. Puede que no haya actividad si no hubo préstamos flash recientes o si los ledgers correspondientes ya expiraron de la retención del RPC.",
+      "filtered": "No hay eventos de este tipo en la actividad cargada."
     },
     "columns": {
       "activity": "Actividad",
@@ -407,6 +422,7 @@
       "amount": "Importe",
       "fee": "Comisión",
       "ledger": "Ledger",
+      "tx": "Transacción",
       "time": "Hora"
     },
     "kind": {

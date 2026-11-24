@@ -395,9 +395,24 @@
     "precisionHint": "Amounts use Stellar token precision (7 decimal places).",
     "lendingContract": "Lending contract",
     "loadingActivity": "Loading on-chain activity...",
+    "filter": {
+      "label": "Filter by kind",
+      "all": "All",
+      "loans": "Loans",
+      "repayments": "Repayments"
+    },
+    "summary": {
+      "title": "Observed fee summary",
+      "count": "Loaded events",
+      "median": "Median fee (bps)",
+      "max": "Maximum fee (bps)",
+      "utilization": "Utilization limit",
+      "noData": "no data"
+    },
     "empty": {
       "title": "No flash-loan activity found",
-      "body": "The RPC only retains a limited window of contract events. Activity may be unavailable if there are no recent flash loans or the relevant ledgers have expired from RPC retention."
+      "body": "The RPC only retains a limited window of contract events. Activity may be unavailable if there are no recent flash loans or the relevant ledgers have expired from RPC retention.",
+      "filtered": "No events of this kind in the loaded activity."
     },
     "columns": {
       "activity": "Activity",
@@ -407,6 +422,7 @@
       "amount": "Amount",
       "fee": "Fee",
       "ledger": "Ledger",
+      "tx": "Transaction",
       "time": "Time"
     },
     "kind": {
