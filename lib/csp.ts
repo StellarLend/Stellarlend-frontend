@@ -12,6 +12,8 @@ export type CspOptions = {
   horizon: string;
   /** Soroban RPC endpoint URL (e.g. https://soroban-testnet.stellar.org) */
   rpc: string;
+  /** Optional fallback Soroban RPC URLs; each origin is allowed in connect-src */
+  rpcFallbacks?: string[];
   /** True in development — adds 'unsafe-eval' for React fast-refresh */
   dev?: boolean;
   /** Optional report-uri endpoint for CSP violation reports */
@@ -58,7 +60,7 @@ export function extractOrigin(url: string, dev = false): string | null {
  * Directives:
  * - script-src:  'self' + nonce + 'strict-dynamic' (no eval in prod)
  * - style-src:   'self' 'unsafe-inline' (required for Tailwind class generation)
- * - connect-src: 'self' + Horizon + RPC origins
+ * - connect-src: 'self' + Horizon + RPC origin + any fallback RPC origins
  * - img-src:     'self' data: blob: (blob: for wallet icons)
  * - font-src:    'self' data:
  * - frame-ancestors: 'none' (anti-clickjacking)
@@ -68,7 +70,7 @@ export function extractOrigin(url: string, dev = false): string | null {
  * - upgrade-insecure-requests (production only)
  */
 export function buildCsp(opts: CspOptions): string {
-  const { nonce, horizon, rpc, dev = false, reportUri } = opts;
+  const { nonce, horizon, rpc, rpcFallbacks = [], dev = false, reportUri } = opts;
 
   const horizonOrigin = extractOrigin(horizon, dev);
   const rpcOrigin = extractOrigin(rpc, dev);
@@ -77,6 +79,10 @@ export function buildCsp(opts: CspOptions): string {
   const connectSrcSet = new Set(["'self'"]);
   if (horizonOrigin) connectSrcSet.add(horizonOrigin);
   if (rpcOrigin) connectSrcSet.add(rpcOrigin);
+  for (const fallback of rpcFallbacks) {
+    const fallbackOrigin = extractOrigin(fallback, dev);
+    if (fallbackOrigin) connectSrcSet.add(fallbackOrigin);
+  }
   const connectSrc = [...connectSrcSet].join(" ");
 
   // script-src: nonce + strict-dynamic allows scripts loaded by trusted scripts

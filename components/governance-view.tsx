@@ -45,6 +45,21 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function Val<T>({
+  label,
+  f,
+  render,
+  unavailable,
+}: {
+  label: string;
+  f: Field<T>;
+  render: (value: T) => { text: ReactNode; raw?: string };
+  unavailable: ReactNode;
+}) {
+  const { text, raw } = f.ok ? render(f.value) : { text: unavailable };
+  return <Row label={label} title={raw}>{text}</Row>;
+}
+
 export function GovernanceView({
   snapshot,
   auditLimit = AUDIT_PAGE_SIZE,
@@ -69,24 +84,6 @@ export function GovernanceView({
 
   const s = snapshot;
   const unavailable = <span className="text-red-600">{t("unavailable")}</span>;
-
-  const renderField = <T,>(
-    f: Field<T>,
-    render: (value: T) => { text: ReactNode; raw?: string },
-  ): { text: ReactNode; raw?: string } => (f.ok ? render(f.value) : { text: unavailable });
-
-  const Val = <T,>({
-    label,
-    f,
-    render,
-  }: {
-    label: string;
-    f: Field<T>;
-    render: (value: T) => { text: ReactNode; raw?: string };
-  }) => {
-    const { text, raw } = renderField(f, render);
-    return <Row label={label} title={raw}>{text}</Row>;
-  };
 
   const addressOf = (v: string | null) =>
     v === null
@@ -124,18 +121,18 @@ export function GovernanceView({
         )}
         <div className="grid gap-4 md:grid-cols-2">
           <Card title={t("cards.roles")}>
-            <Val label={t("fields.admin")} f={s.admin} render={addressOf} />
-            <Val label={t("fields.guardian")} f={s.guardian} render={addressOf} />
+            <Val label={t("fields.admin")} f={s.admin} render={addressOf} unavailable={unavailable} />
+            <Val label={t("fields.guardian")} f={s.guardian} render={addressOf} unavailable={unavailable} />
           </Card>
           <Card title={t("cards.limits")}>
-            <Val label={t("fields.minBorrow")} f={s.minBorrow} render={tokens} />
-            <Val label={t("fields.depositCap")} f={s.depositCap} render={tokens} />
-            <Val label={t("fields.borrowCap")} f={s.borrowCap} render={tokens} />
+            <Val label={t("fields.minBorrow")} f={s.minBorrow} render={tokens} unavailable={unavailable} />
+            <Val label={t("fields.depositCap")} f={s.depositCap} render={tokens} unavailable={unavailable} />
+            <Val label={t("fields.borrowCap")} f={s.borrowCap} render={tokens} unavailable={unavailable} />
           </Card>
           <Card title={t("cards.liquidation")}>
-            <Val label={t("fields.closeFactor")} f={s.closeFactorBps} render={bps} />
-            <Val label={t("fields.liquidationThreshold")} f={s.liquidationThresholdBps} render={bps} />
-            <Val label={t("fields.liquidationIncentive")} f={s.liquidationIncentiveBps} render={bps} />
+            <Val label={t("fields.closeFactor")} f={s.closeFactorBps} render={bps} unavailable={unavailable} />
+            <Val label={t("fields.liquidationThreshold")} f={s.liquidationThresholdBps} render={bps} unavailable={unavailable} />
+            <Val label={t("fields.liquidationIncentive")} f={s.liquidationIncentiveBps} render={bps} unavailable={unavailable} />
           </Card>
           <Card title={t("cards.rateModel")}>
             {s.rateParams.ok ? (
@@ -157,10 +154,10 @@ export function GovernanceView({
             )}
           </Card>
           <Card title={t("cards.flashLoans")}>
-            <Val label={t("fields.maxFlashLoan")} f={s.maxFlashBps} render={bps} />
+            <Val label={t("fields.maxFlashLoan")} f={s.maxFlashBps} render={bps} unavailable={unavailable} />
           </Card>
           <Card title={t("cards.oracle")}>
-            <Val label={t("fields.oracleKey")} f={s.oracle} render={addressOf} />
+            <Val label={t("fields.oracleKey")} f={s.oracle} render={addressOf} unavailable={unavailable} />
           </Card>
         </div>
 
@@ -182,10 +179,11 @@ export function GovernanceView({
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr>
-                    <th className="p-2">{t("audit.columns.sequence")}</th>
-                    <th className="p-2">{t("audit.columns.action")}</th>
-                    <th className="p-2">{t("audit.columns.actor")}</th>
-                    <th className="p-2">{t("audit.columns.ledger")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.sequence")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.action")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.actor")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.ledger")}</th>
+                    <th scope="col" className="p-2">{t("audit.columns.diffs")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,6 +203,37 @@ export function GovernanceView({
                         </a>
                       </td>
                       <td className="p-2">{numberFormatter.format(e.ledger)}</td>
+                      <td className="p-2">
+                        {e.diffs && e.diffs.length > 0 ? (
+                          <ul className="space-y-1">
+                            {e.diffs.map((d) => (
+                              <li key={d.field} className="flex items-center gap-1.5 text-xs">
+                                <span className="font-mono text-gray-600">{d.field}:</span>
+                                <span>{d.prevFormatted} → {d.nextFormatted}</span>
+                                {d.direction === "increase" && (
+                                  <span className="inline-flex items-center text-green-700" title={t("audit.increase")}>
+                                    <span aria-hidden="true">▲</span>
+                                    <span className="ml-0.5 font-medium">(+ {t("audit.increase")})</span>
+                                  </span>
+                                )}
+                                {d.direction === "decrease" && (
+                                  <span className="inline-flex items-center text-amber-700" title={t("audit.decrease")}>
+                                    <span aria-hidden="true">▼</span>
+                                    <span className="ml-0.5 font-medium">(- {t("audit.decrease")})</span>
+                                  </span>
+                                )}
+                                {d.direction === "unknown" && (
+                                  <span className="inline-flex items-center text-gray-500" title={t("audit.unknown")}>
+                                    <span className="font-medium">({t("audit.unknown")})</span>
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

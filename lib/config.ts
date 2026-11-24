@@ -1,5 +1,6 @@
 import { Networks, StrKey } from "@stellar/stellar-sdk";
 import { z } from "zod";
+import { parseRpcFallbackUrls } from "./rpc";
 
 // Well-known Stellar testnet asset issuers
 // Source for USDC & EURC: Circle official testnet documentation
@@ -83,6 +84,33 @@ export function createUrlSchema(isDev: boolean, fieldName: string) {
     );
 }
 
+/**
+ * Optional comma separated list of fallback Soroban RPC URLs. Every entry must
+ * pass the same rules as NEXT_PUBLIC_SOROBAN_RPC_URL; the first invalid entry is
+ * reported by name so a typo in one URL is easy to find. Output is an ordered,
+ * de-duplicated string[] (empty when unset).
+ */
+export function createRpcFallbackUrlsSchema(isDev: boolean, fieldName: string) {
+  return z
+    .string()
+    .optional()
+    .transform((raw, ctx) => {
+      const urls = parseRpcFallbackUrls(raw);
+      for (const url of urls) {
+        if (!isValidHttpOrHttpsUrl(url, isDev)) {
+          ctx.addIssue({
+            code: "custom",
+            message: isDev
+              ? `${fieldName} contains an invalid URL "${url}": each entry must be a valid https URL (or http for localhost)`
+              : `${fieldName} contains an invalid URL "${url}": each entry must be a valid https URL`,
+          });
+          return z.NEVER;
+        }
+      }
+      return urls;
+    });
+}
+
 export function createContractIdSchema(fieldName: string, isOptional = false) {
   return z
     .string()
@@ -121,7 +149,10 @@ export function createConfigSchema(isDev: boolean) {
     NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET: z.string().optional().default(""),
     NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET: z.string().optional().default(""),
     NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE: z.string().optional(),
-    NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: z.string().optional(),
+    NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS: createRpcFallbackUrlsSchema(
+      isDev,
+      "NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS"
+    ),
     NEXT_PUBLIC_XLM_ASSET_ADDRESS: z.string().optional(),
     NEXT_PUBLIC_USDC_ASSET_ADDRESS: z.string().optional(),
     NEXT_PUBLIC_EURC_ASSET_ADDRESS: z.string().optional(),
@@ -218,10 +249,10 @@ export function validateConfig(
     network,
     horizon: data.NEXT_PUBLIC_HORIZON_URL,
     rpc: data.NEXT_PUBLIC_SOROBAN_RPC_URL,
-    rpcFallbacks: (data.NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS || "")
-      .split(",")
-      .map((u) => u.trim())
-      .filter(Boolean),
+    // Primary is always tried first, so drop it if it is repeated as a fallback.
+    rpcFallbacks: data.NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS.filter(
+      (u) => u !== data.NEXT_PUBLIC_SOROBAN_RPC_URL
+    ),
     lendingId: data.NEXT_PUBLIC_LENDING_CONTRACT_ID || "",
     oracleId: data.NEXT_PUBLIC_ORACLE_CONTRACT_ID || "",
     tokenId: data.NEXT_PUBLIC_TOKEN_CONTRACT_ID || "",

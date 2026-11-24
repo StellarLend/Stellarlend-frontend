@@ -2,7 +2,7 @@ import { isValidGAddress } from "@/lib/api/address";
 import { positionCache, POSITION_TTL } from "@/lib/api/cache";
 import { fetchPosition } from "@/lib/api/lending";
 import { checkApiRateLimit } from "@/lib/api/rate-limit";
-import { errorResponse, jsonResponse, mapApiError } from "@/lib/api/response";
+import { errorResponse, jsonResponse, mapApiError, withRequestId } from "@/lib/api/response";
 import {
   POSITION_CACHE_CONTROL,
   type PositionResponse,
@@ -15,20 +15,21 @@ interface RouteContext {
   params: Promise<{ address: string }>;
 }
 
-export async function GET(
+export const GET = withRequestId(async (
   request: Request,
   context: RouteContext,
-): Promise<Response> {
+  requestId: string,
+): Promise<Response> => {
   const rate = checkApiRateLimit(request);
   if (!rate.allowed) {
     return errorResponse("RATE_LIMITED", "Too many requests", 429, {
       "Retry-After": String(rate.retryAfterSec),
-    });
+    }, requestId);
   }
 
   const { address } = await context.params;
   if (!isValidGAddress(address)) {
-    return errorResponse("INVALID_ADDRESS", "Invalid Stellar address", 400);
+    return errorResponse("INVALID_ADDRESS", "Invalid Stellar address", 400, {}, requestId);
   }
 
   try {
@@ -50,9 +51,11 @@ export async function GET(
       body,
       200,
       POSITION_CACHE_CONTROL,
+      request,
+      requestId,
       isStale ? { "X-Cache": "stale" } : undefined,
     );
   } catch (error) {
-    return mapApiError(error);
+    return mapApiError(error, requestId);
   }
-}
+});

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useWallet } from "@/components/wallet";
 import { config } from "@/lib/config";
 import {
@@ -17,7 +18,7 @@ import { parseMultisigError, MultisigActionStatus } from "@/lib/multisig/types";
 
 export interface CreateProposalProps {
   contractId?: string;
-  onRefresh?: () => void | Promise<void>;
+  onRefresh?: () => (void | Promise<void>);
   onCreated?: (proposalId: number | null) => void;
   isSignerOverride?: boolean;
   className?: string;
@@ -57,11 +58,12 @@ export function CreateProposal({
   isSignerOverride,
   className = "",
 }: CreateProposalProps) {
+  const t = useTranslations("multisig");
   const { address } = useWallet();
   const router = useRouter();
 
   const [signerAuthorized, setSignerAuthorized] = useState<boolean>(
-    typeof isSignerOverride === "boolean" ? isSignerOverride : false
+    typeof isSignerOverride === "boolean" ? isSignerOverride : false,
   );
   const [actionType, setActionType] = useState<ProposalActionType>("InvokeContract");
 
@@ -210,17 +212,15 @@ export function CreateProposal({
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-3">
         <div>
-          <h2 className="text-lg font-bold">Create Proposal</h2>
-          <p className="text-xs mut">
-            Build, preview, and sign a new multisig governance proposal.
-          </p>
+          <h2 className="text-lg font-bold">{t("createProposal")}</h2>
+          <p className="text-xs mut">{t("createProposalDesc")}</p>
         </div>
       </div>
 
       {/* Action Type Selector */}
       <div className="space-y-2">
         <label htmlFor="proposal-action-type" className="block text-xs font-semibold uppercase tracking-wider mut">
-          Action Type
+          {t("actionType")}
         </label>
         <select
           id="proposal-action-type"
@@ -233,14 +233,14 @@ export function CreateProposal({
           disabled={isBusy}
           className="w-full rounded-lg border border-[var(--line)] bg-[var(--bg)] px-3 py-2 text-sm text-white focus:border-[var(--acc)] focus:outline-none"
         >
-          {ACTION_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
+          {ACTION_TYPES.map((act) => (
+            <option key={act.value} value={act.value}>
+              {act.label}
             </option>
           ))}
         </select>
         <p className="text-xs mut">
-          {ACTION_TYPES.find((t) => t.value === actionType)?.description}
+          {ACTION_TYPES.find((act) => act.value === actionType)?.description}
         </p>
       </div>
 
@@ -250,7 +250,7 @@ export function CreateProposal({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <label htmlFor="invoke-contract-id" className="block text-xs font-medium mut">
-                Target Contract Address (C...)
+                {t("targetContractAddress")}
               </label>
               <input
                 id="invoke-contract-id"
@@ -266,7 +266,7 @@ export function CreateProposal({
 
             <div className="space-y-1">
               <label htmlFor="invoke-function-name" className="block text-xs font-medium mut">
-                Function Name
+                {t("functionName")}
               </label>
               <input
                 id="invoke-function-name"
@@ -283,7 +283,7 @@ export function CreateProposal({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium mut">Arguments ({argRows.length})</span>
+              <span className="text-xs font-medium mut">{t("arguments", { count: argRows.length })}</span>
               <button
                 type="button"
                 onClick={addArgRow}
@@ -291,7 +291,7 @@ export function CreateProposal({
                 data-testid="btn-add-arg"
                 className="btn-ghost text-xs px-2.5 py-1 rounded border border-[var(--line)]"
               >
-                + Add Argument
+                {t("addArgument")}
               </button>
             </div>
 
@@ -368,7 +368,7 @@ export function CreateProposal({
       {actionType === "SetThreshold" && (
         <div className="space-y-1" data-testid="fields-set-threshold">
           <label htmlFor="proposal-threshold" className="block text-xs font-medium mut">
-            New Quorum Threshold (u32 ≥ 1)
+            {t("newQuorumThreshold")}
           </label>
           <input
             id="proposal-threshold"
@@ -387,7 +387,7 @@ export function CreateProposal({
       {actionType === "RotateSigners" && (
         <div className="space-y-1" data-testid="fields-rotate-signers">
           <label htmlFor="proposal-signers" className="block text-xs font-medium mut">
-            New Signer Addresses (one G-address per line)
+            {t("newSignerAddresses")}
           </label>
           <textarea
             id="proposal-signers"
@@ -405,7 +405,7 @@ export function CreateProposal({
       {/* Decoded Preview */}
       <div className="space-y-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] p-4">
         <span className="block text-xs font-semibold uppercase tracking-wider mut">
-          Decoded Payload Preview
+          {t("decodedPayloadPreview")}
         </span>
         {preview.ok ? (
           <div className="space-y-2">
@@ -432,8 +432,8 @@ export function CreateProposal({
           className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-xs text-red-300"
           data-testid="create-proposal-error"
         >
-          <span className="font-semibold">Error: </span>
-          {errorMessage}
+          <span className="font-semibold">{t("errorPrefix")}</span>
+          <span>{errorMessage}</span>
         </div>
       )}
 
@@ -444,7 +444,7 @@ export function CreateProposal({
           disabled={!preview.ok || isBusy}
           className="btn px-5 py-2 text-sm font-semibold"
         >
-          {isBusy ? "Signing & Submitting..." : "Sign & Create Proposal"}
+          {isBusy ? t("submitting") : t("submitProposal")}
         </button>
       </div>
     </form>
