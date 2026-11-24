@@ -35,7 +35,11 @@ describe('i18n catalogs', () => {
           walk(full);
           continue;
         }
-        if (entry.isFile() && /(\.tsx|\.ts)$/.test(entry.name)) {
+        if (
+          entry.isFile() &&
+          /(\.tsx|\.ts)$/.test(entry.name) &&
+          !/\.test\.(tsx|ts)$/.test(entry.name)
+        ) {
           files.push(full);
         }
       }
