@@ -651,5 +651,20 @@
       "title": "Administración de emergencia - StellarLend",
       "description": "Controles de emergencia y pausas granulares para el protocolo StellarLend."
     }
+  },
+  "txToasts": {
+    "pending": "{action} de {symbol} pendiente…",
+    "confirmed": "{action} de {symbol} confirmado.",
+    "cancelled": "{action} de {symbol} cancelado.",
+    "timeout": "{action} de {symbol} agotó el tiempo. Comprueba el explorador antes de reintentar.",
+    "unknownError": "La transacción falló.",
+    "viewTx": "Ver transacción",
+    "dismiss": "Descartar notificación",
+    "action": {
+      "deposit": "Depósito",
+      "withdraw": "Retirada",
+      "borrow": "Préstamo",
+      "repay": "Pago"
+    }
   }
 }
