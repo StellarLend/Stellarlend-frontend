@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import createIntlMiddleware from "next-intl/middleware";
 import { buildCsp } from "@/lib/csp";
+import { parseRpcFallbackUrls } from "@/lib/rpc";
 import { routing } from "./i18n/routing";
 
 // Locale detection / prefix handling from next-intl (en default, /es prefix).
@@ -33,11 +34,12 @@ export function middleware(request: NextRequest): NextResponse {
     process.env.NEXT_PUBLIC_HORIZON_URL || "https://horizon-testnet.stellar.org";
   const rpc =
     process.env.NEXT_PUBLIC_SOROBAN_RPC_URL || "https://soroban-testnet.stellar.org";
+  const rpcFallbacks = parseRpcFallbackUrls(process.env.NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS);
   const reportUri = process.env.NEXT_PUBLIC_CSP_REPORT_URI;
 
   let csp: string;
   try {
-    csp = buildCsp({ nonce, horizon, rpc, dev, reportUri });
+    csp = buildCsp({ nonce, horizon, rpc, rpcFallbacks, dev, reportUri });
   } catch (err) {
     // Misconfigured URL — fail loudly in development, use a safe fallback in prod.
     if (dev) throw err;

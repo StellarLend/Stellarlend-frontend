@@ -138,7 +138,7 @@ Reference: https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#
 | `NEXT_PUBLIC_AMM_TOKEN_A_HORIZON_ASSET` | Optional Token A Horizon asset in `CODE:ISSUER` form |
 | `NEXT_PUBLIC_AMM_TOKEN_B_HORIZON_ASSET` | Optional Token B Horizon asset in `CODE:ISSUER` form |
 | `NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE` | Optional network passphrase override |
-| `NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS` | Optional comma-separated Soroban RPC fallback URLs |
+| `NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS` | Optional comma-separated fallback Soroban RPC URLs, tried in order after `NEXT_PUBLIC_SOROBAN_RPC_URL` (see [Fallback RPC endpoints](#fallback-rpc-endpoints)) |
 | `NEXT_PUBLIC_XLM_ASSET_ADDRESS` | Optional XLM asset contract address |
 | `NEXT_PUBLIC_USDC_ASSET_ADDRESS` | Optional USDC asset contract address |
 | `NEXT_PUBLIC_EURC_ASSET_ADDRESS` | Optional EURC asset contract address |
@@ -150,6 +150,21 @@ Reference: https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#
 | `NEXT_PUBLIC_USDC_ISSUER` | Optional USDC testnet asset issuer override |
 | `NEXT_PUBLIC_EURC_ISSUER` | Optional EURC testnet asset issuer override |
 | `NEXT_PUBLIC_BTC_ISSUER` | Optional BTC testnet asset issuer override |
+
+### Fallback RPC endpoints
+
+If the public Soroban RPC is down, every contract read would fail. Set `NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS` to a comma-separated list of extra RPC endpoints to fail over to:
+
+```bash
+NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+NEXT_PUBLIC_SOROBAN_RPC_FALLBACK_URLS=https://rpc-b.example.com,https://rpc-c.example.com
+```
+
+- **Order:** the primary (`NEXT_PUBLIC_SOROBAN_RPC_URL`) is tried first, then each fallback in the order listed.
+- **When it fails over:** on network errors, timeouts and HTTP 5xx responses. HTTP 4xx responses and simulation/contract errors (`RpcError.isSimulationError`) are real answers and never trigger failover.
+- **Sticky for the session:** once an endpoint answers, later requests start with it instead of re-probing a dead primary. If it fails, the remaining endpoints are tried in the configured order.
+- **Validation:** every entry must be a valid `https` URL (`http` is accepted for `localhost` in development only). An invalid entry fails config validation with an error naming it. Duplicates, blank entries and trailing slashes are ignored.
+- **CSP:** the origin of every fallback is added to `connect-src` automatically, so the browser is allowed to reach it.
 
 ## Deployed contracts (testnet)
 Lending contract (Stellar testnet): [`CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6`](https://stellar.expert/explorer/testnet/contract/CC4A6A46O2KQA7KEMOFK3TQ4YRSLCJ4ZP26SQWXIKNF4DTEX3BOL2HF6)
