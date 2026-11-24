@@ -477,7 +477,20 @@
     "txSuccessTitle": "Transaction Confirmed",
     "txHashLabel": "Transaction Hash",
     "viewExplorer": "View on Stellar Expert",
-    "statusUpdated": "Protocol state refreshed successfully."
+    "statusUpdated": "Protocol state refreshed successfully.",
+    "timelineTitle": "Emergency & Role Audit Timeline",
+    "timelineSubtitle": "Historical record of pause modifications, emergency transitions, and role assignments.",
+    "filterAll": "All Actions",
+    "loadMore": "Load More",
+    "loading": "Loading audit events...",
+    "noEvents": "No admin events found.",
+    "retry": "Retry",
+    "errorLoading": "Failed to load audit events.",
+    "expiredBadge": "Expired",
+    "expiresIn": "Expires in ~{time} (ledger {ledger})",
+    "actor": "Actor",
+    "ledger": "Ledger",
+    "tx": "Transaction"
   },
   "history": {
     "title": "Transaction History",

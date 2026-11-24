@@ -1,4 +1,5 @@
 import { formatTokenAmount } from "./format";
+import { toBaseUnits, type AmountError, type AmountResult } from "./amount";
 
 /** Formats base units using the shared token amount formatter. */
 export { formatTokenAmount as formatAmount };
@@ -25,17 +26,8 @@ const MAX_BASE_UNITS = MAX_WHOLE_UNITS * SCALE;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ParseError =
-  | "empty"
-  | "invalid-format"
-  | "negative"
-  | "too-many-decimals"
-  | "too-large"
-  | "not-finite";
-
-export type ParseResult =
-  | { ok: true; value: bigint }
-  | { ok: false; error: ParseError };
+export type ParseError = AmountError | "not-finite";
+export type ParseResult = AmountResult;
 
 export type Position = {
   supplied: bigint;
@@ -48,47 +40,10 @@ export type Ledger = Record<string, Position>;
 
 /**
  * Strictly parse a user-supplied amount string into integer base units.
- *
- * Accepts:  "0", "1", "0.5", "100.0000001"
- * Rejects:  "", "1e3", "0x10", "Infinity", "NaN", "-1", " 5 ", "1.12345678"
+ * Delegated to the canonical `toBaseUnits` in `lib/amount.ts`.
  */
 export function parseAmount(input: string, decimals: number = DECIMALS): ParseResult {
-  if (input === "") return { ok: false, error: "empty" };
-  const trimmed = input.trim();
-  if (trimmed !== input) return { ok: false, error: "invalid-format" };
-
-  // Only allow: optional digits, optional dot, optional digits after dot — no
-  // signs, exponents, hex prefixes, or whitespace.
-  if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    // Detect specific bad cases for better error messages
-    if (trimmed === "Infinity" || trimmed === "NaN" || !isFinite(Number(trimmed))) {
-      return { ok: false, error: "not-finite" };
-    }
-    return { ok: false, error: "invalid-format" };
-  }
-
-  const [whole, frac = ""] = trimmed.split(".");
-
-  if (frac.length > decimals) {
-    return { ok: false, error: "too-many-decimals" };
-  }
-
-  // Pad the fractional part to exactly `decimals` digits
-  const paddedFrac = frac.padEnd(decimals, "0");
-
-  // Combine whole + fractional into a single bigint
-  const baseUnits = BigInt(whole) * BigInt(10 ** decimals) + BigInt(paddedFrac);
-
-  if (baseUnits === BigInt(0)) {
-    // "0" or "0.0000000" — still technically valid input but guard callers
-    return { ok: true, value: BigInt(0) };
-  }
-
-  if (baseUnits > MAX_BASE_UNITS) {
-    return { ok: false, error: "too-large" };
-  }
-
-  return { ok: true, value: baseUnits };
+  return toBaseUnits(input, decimals);
 }
 
 /**
