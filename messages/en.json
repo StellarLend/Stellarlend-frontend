@@ -113,6 +113,7 @@
     "wallet": "Wallet",
     "demoMode": "Demo mode (no wallet connected)",
     "collateral": "Collateral",
+    "supplied": "Supplied",
     "borrowed": "Borrowed",
     "health": "Health",
     "nA": "n/a",
@@ -123,6 +124,7 @@
     "totalSupplied": "Total supplied",
     "yourPosition": "Your position",
     "trade": "Trade",
+    "tradeAriaLabel": "Trade {symbol}",
     "addTrustline": "Add trustline",
     "addingTrustline": "Adding trustline...",
     "trustlineAdded": "Trustline added successfully.",
@@ -165,7 +167,8 @@
       "demoFallback": "Showing the demo ledger until the contract is configured.",
       "loadingPosition": "Loading on-chain position…",
       "depositCapExceeded": "This deposit would exceed the market deposit limit.",
-      "belowMinimumBorrow": "The requested borrow is below the minimum amount."
+      "belowMinimumBorrow": "The requested borrow is below the minimum amount.",
+      "duplicatePending": "A transaction for this asset is already pending. Please wait for it to confirm before submitting again."
     },
     "contract": "Lending contract",
     "notDeployed": "not deployed",
@@ -293,6 +296,15 @@
       "notifyToggle": "Notify me when my health factor gets worse",
       "notificationsUnsupported": "Browser notifications are not supported here.",
       "notificationsDenied": "Notifications are blocked in your browser settings, so alerts are unavailable."
+    },
+    "preview": {
+      "title": "Projected Impact",
+      "borrowLimitUsed": "Borrow limit used",
+      "healthFactor": "Health factor",
+      "collateral": "Collateral",
+      "debt": "Debt",
+      "warningLiquidation": "Caution: Projected health factor is close to liquidation (< 1.2).",
+      "dangerLiquidation": "Action would put your position below minimum health factor (< 1.0) and risk liquidation."
     },
     "actions": "Actions",
     "ltv": "LTV",
@@ -596,5 +608,86 @@
   },
   "amm": {
     "loadingTwapChart": "Loading TWAP price chart..."
+  },
+  "portfolioRisk": {
+    "title": "Portfolio risk",
+    "subtitle": "Per-asset positions, estimated liquidation prices, and instant collateral price-shock simulation.",
+    "aggregateHealth": "Aggregate health",
+    "projectedHealth": "Projected health",
+    "noDebt": "No debt",
+    "noPositions": "Supply or borrow an asset to view your portfolio risk breakdown.",
+    "priceShock": "Collateral price shock",
+    "reset": "Reset",
+    "columns": {
+      "asset": "Asset",
+      "supplied": "Supplied",
+      "borrowed": "Borrowed",
+      "currentPrice": "Current price",
+      "liqPrice": "Est. liquidation price"
+    },
+    "levels": {
+      "safe": "Safe",
+      "warning": "Warning",
+      "danger": "Danger",
+      "liquidatable": "Liquidatable"
+    },
+    "notApplicable": "-"
+  },
+  "txToasts": {
+    "pending": "{action} of {symbol} pending…",
+    "confirmed": "{action} of {symbol} confirmed.",
+    "cancelled": "{action} of {symbol} cancelled.",
+    "timeout": "{action} of {symbol} timed out. Check the explorer before retrying.",
+    "unknownError": "The transaction failed.",
+    "viewTx": "View transaction",
+    "dismiss": "Dismiss notification",
+    "action": {
+      "deposit": "Supply",
+      "withdraw": "Withdraw",
+      "borrow": "Borrow",
+      "repay": "Repay"
+    }
+  },
+  "meta": {
+    "home": {
+      "title": "StellarLend - Lending on Stellar",
+      "description": "Supply and borrow assets on Stellar with StellarLend, a Soroban-powered lending protocol (testnet)."
+    },
+    "markets": {
+      "title": "Markets - StellarLend",
+      "description": "Explore StellarLend markets: supply assets to earn yield or borrow against collateral on the Stellar testnet."
+    },
+    "amm": {
+      "title": "AMM Pool, Swap & Liquidity - StellarLend",
+      "description": "Inspect the StellarLend AMM pool, get swap quotes, and manage your liquidity on Stellar."
+    },
+    "docs": {
+      "title": "Docs - StellarLend",
+      "description": "Learn how StellarLend works: markets, borrowing, flash loans, and governance on the Stellar testnet."
+    },
+    "flashLoans": {
+      "title": "Flash loans - StellarLend",
+      "description": "Borrow and repay within a single transaction using StellarLend flash loans on Soroban."
+    },
+    "history": {
+      "title": "History - StellarLend",
+      "description": "Review your StellarLend supply, borrow, withdraw, and repay transactions recorded on-chain."
+    },
+    "multisig": {
+      "title": "Multisig Governance - StellarLend",
+      "description": "Signer management and proposal execution for the StellarLend multisig contract."
+    },
+    "multisigProposal": {
+      "title": "Multisig Proposal - StellarLend",
+      "description": "Review and sign multisig governance proposals with the Freighter wallet."
+    },
+    "governance": {
+      "title": "Governance - StellarLend",
+      "description": "Track StellarLend governance state, risk configuration, and the on-chain audit log."
+    },
+    "adminEmergency": {
+      "title": "Emergency Administration - StellarLend",
+      "description": "Emergency circuit-breaker and granular pause controls for the StellarLend protocol."
+    }
   }
 }

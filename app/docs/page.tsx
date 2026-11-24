@@ -1,13 +1,25 @@
+import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { getMessages, getTranslations } from "next-intl/server";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { WalletProvider } from "@/components/wallet";
 import { DocsPage } from "@/components/docs-page";
 import { getDocsData } from "@/lib/docs-data";
+import { defaultLocale } from "@/i18n/routing";
+import { buildMetadata } from "@/lib/site";
 
 export const revalidate = 300;
-export const metadata = { title: "Docs - StellarLend" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations({ locale: defaultLocale, namespace: "meta.docs" });
+
+  return buildMetadata({
+    locale: defaultLocale,
+    path: "/docs",
+    title: t("title"),
+    description: t("description"),
+  });
+}
 
 export default async function Page() {
   const [messages, docsData] = await Promise.all([

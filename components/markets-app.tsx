@@ -49,6 +49,7 @@ import {
   type Ledger,
 } from "@/lib/demo-ledger";
 import OraclePanel from "./oracle-panel";
+import { PortfolioRisk } from "./portfolio-risk";
 import { useOracleGuard } from "@/hooks/use-oracle-guard";
 import { TradePreview } from "./trade-preview";
 import {
@@ -69,8 +70,21 @@ import TradeSheet from "./markets/trade-sheet";
 import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-prompt";
 import { useProtocolStatus } from "./protocol-status";
 import { HealthIndicator } from "./health-indicator";
+import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
+import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
+import { usePendingTxs } from "@/hooks/use-pending-txs";
 
 export default function MarketsApp() {
+  return (
+    <TxToastsProvider>
+      <MarketsAppInner />
+      <TxToastRegion />
+    </TxToastsProvider>
+  );
+}
+
+function MarketsAppInner() {
+  const { addToast } = useTxToasts();
   const {
     address,
     balance,
@@ -109,6 +123,18 @@ export default function MarketsApp() {
   const [positionError, setPositionError] = useState("");
   const [loadingPosition, setLoadingPosition] = useState(false);
   const [tx, setTx] = useState<LendingTx | null>(null);
+
+  // Persistent pending-tx store: persists hashes to localStorage, resumes
+  // polling on reload, and surfaces the duplicate guard.
+  const pendingTxs = usePendingTxs({
+    address,
+    onSettled: (entry) => {
+      // Invalidate the position query so the UI reflects the confirmed state.
+      if (entry.status === "confirmed") {
+        void refreshPosition();
+      }
+    },
+  });
 
   const configured = isOnChainConfigured();
   const onChainMode = Boolean(address && configured);
@@ -419,9 +445,35 @@ export default function MarketsApp() {
 
     if (onChainMode && sel.live && address) {
       setMsg(null);
-      setTx({ status: "pending", hash: null, error: null });
       const action = mode === "supply" ? "deposit" : mode;
-      const result = await submitLendingAction(address, action, n, setTx);
+
+      // Block duplicate: same action + asset already pending.
+      if (pendingTxs.isDuplicate(action, sel.symbol)) {
+        setMsg({ text: t("status.duplicatePending"), isError: true });
+        return;
+      }
+
+      const toastId = addToast({
+        action,
+        symbol: sel.symbol,
+        tx: { status: "pending", hash: null, error: null },
+      });
+      setTx({ status: "pending", hash: null, error: null });
+      const result = await submitLendingAction(address, action, n, (updatedTx) => {
+        setTx(updatedTx);
+        addToast({ id: toastId, action, symbol: sel.symbol, tx: updatedTx });
+        // Persist to localStorage as soon as the hash is available.
+        if (updatedTx.hash && updatedTx.status === "pending") {
+          pendingTxs.record({
+            hash: updatedTx.hash,
+            action,
+            asset: sel.symbol,
+            amount: n.toString(),
+            submittedAt: Date.now(),
+            status: "pending",
+          });
+        }
+      });
       if (result.status === "confirmed") {
         setAmt("");
         await refreshPosition();
@@ -527,8 +579,13 @@ export default function MarketsApp() {
   };
   const currentBlockedReason = !isDemoMode ? getBlockedReason(mode) : null;
   const currentBlocked = !isDemoMode && !isActionAllowed(mode);
-  const oracleGuard = useMemo(() => evaluateOracle(mode), [evaluateOracle, mode]);
+  const oracleGuard = evaluateOracle(mode);
   const oracleReasonId = oracleGuard.reason ? "oracle-guard-reason" : undefined;
+
+  // Duplicate guard: block re-submission while the same action+asset is pending.
+  const lendingAction = mode === "supply" ? "deposit" : mode;
+  const duplicatePending =
+    onChainMode && Boolean(sel) && pendingTxs.isDuplicate(lendingAction, sel?.symbol ?? "");
 
   const tradePanel = sel ? (
     <div className="space-y-4">
@@ -588,8 +645,14 @@ export default function MarketsApp() {
       <button
         className="btn w-full"
         onClick={submit}
-        disabled={busy || currentBlocked || trustlineBlocksAction}
-        title={currentBlockedReason ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason }) : undefined}
+        disabled={busy || currentBlocked || trustlineBlocksAction || duplicatePending}
+        title={
+          duplicatePending
+            ? t("status.duplicatePending")
+            : currentBlockedReason
+            ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason })
+            : undefined
+        }
       >
         {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
       </button>
@@ -690,6 +753,8 @@ export default function MarketsApp() {
           />
         </div>
       </Card>
+
+      <PortfolioRisk ledger={marketPositions as Ledger} markets={activeMarkets} />
 
       {/* Search, sort, and position filter controls */}
       <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

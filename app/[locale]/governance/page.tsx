@@ -7,6 +7,7 @@ import { WalletProvider } from "@/components/wallet";
 import { GovernanceView } from "@/components/governance-view";
 import { config } from "@/lib/config";
 import { AUDIT_PAGE_SIZE, createContractReader, getGovernanceSnapshot } from "@/lib/governance";
+import { buildMetadata } from "@/lib/site";
 
 export const revalidate = 60;
 
@@ -16,8 +17,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "governance" });
-  return { title: t("metaTitle") };
+  const t = await getTranslations({ locale, namespace: "meta.governance" });
+
+  return buildMetadata({
+    locale,
+    path: "/governance",
+    title: t("title"),
+    description: t("description"),
+  });
 }
 
 export default async function Page({
