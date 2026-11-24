@@ -99,6 +99,29 @@ npm run build
 | `npm run test:integration` | Run the Vitest integration tests. |
 | `npm run check-lending-errors` | Check lending-contract error definitions against the frontend. |
 
+## TypeScript 7 and ESLint compatibility
+
+TypeScript 7.0 does not provide the classic JavaScript compiler API that
+`eslint-config-next` / `typescript-eslint` still use. To keep the native
+TypeScript 7 `tsc` and a working ESLint parser, we deliberately install two
+compiler versions:
+
+- `@typescript/native` is an npm alias for `typescript@7.0.2` and provides
+  the `tsc` CLI used by `npm run type-check` and the build.
+- `typescript` is an npm alias for `@typescript/typescript6@6.0.2` and provides
+  the TypeScript 6 compiler API used by `typescript-eslint`. This package
+  intentionally provides a `tsc6` CLI rather than replacing the native `tsc`.
+
+Do not replace the TypeScript 6 alias with TypeScript 7 or update these packages
+independently. Dependabot ignores both aliases until the parser officially
+supports TypeScript 7. Revisit the pairing when it does.
+
+After changing either alias, regenerate the npm lockfile with `npm install`
+and verify `npm run check-lockfile`, `npm run lint`, `npm run type-check`,
+`npm run build`, and `npm test`.
+
+Reference: https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-60
+
 ## Environment variables
 | Name | Purpose |
 |---|---|
