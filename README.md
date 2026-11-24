@@ -17,12 +17,35 @@ StellarLend is an over-collateralised lending market on Stellar (Soroban). This 
 - `/docs`: user docs, risk parameters, deployed contract list, env vars
 
 ## Architecture
-Next.js 15 (App Router, React 19, Tailwind 4). Wallet signing via `@stellar/freighter-api`, balances from Horizon, contract IDs from `NEXT_PUBLIC_*` env vars. With a wallet on testnet and `NEXT_PUBLIC_LENDING_CONTRACT_ID` set, the XLM market reads positions and submits deposit / borrow / withdraw / repay transactions to the deployed lending contract. Without a wallet (or before the contract is configured) the app falls back to a clearly labelled browser-local demo ledger. Contracts live in [StellarLend/stellarlend-contracts](https://github.com/StellarLend/stellarlend-contracts).
+Next.js 16 (`^16.4.2`, App Router, React 19, Tailwind 4) with `next-intl` locale routing. English is the default and uses unprefixed URLs; Spanish routes use the `/es` prefix. Wallet signing uses `@stellar/freighter-api`, balances come from Horizon, and contract IDs are configured with `NEXT_PUBLIC_*` environment variables. With a wallet on testnet and `NEXT_PUBLIC_LENDING_CONTRACT_ID` set, the XLM market reads positions and submits deposit / borrow / withdraw / repay transactions to the deployed lending contract. Without a wallet (or before the contract is configured) the app falls back to a clearly labelled browser-local demo ledger. Contracts live in [StellarLend/stellarlend-contracts](https://github.com/StellarLend/stellarlend-contracts).
 
 ```
-app/            routes (/, /markets, /docs)
-components/     wallet provider, markets app
-lib/            config (env), market data
+app/
+  [locale]/
+    admin/emergency/page.tsx
+    amm/page.tsx
+    docs/page.tsx
+    flash-loans/page.tsx
+    history/page.tsx
+    markets/page.tsx
+    multisig/page.tsx
+    multisig/[id]/page.tsx
+    page.tsx
+  admin/emergency/page.tsx  /admin/emergency
+  amm/page.tsx              /amm
+  docs/page.tsx             /docs
+  flash-loans/page.tsx      /flash-loans
+  governance/page.tsx       /governance
+  history/page.tsx          /history
+  markets/page.tsx          /markets
+  multisig/page.tsx         /multisig
+  multisig/[id]/page.tsx    /multisig/[id]
+  api/v1/positions/[address]/route.ts  /api/v1/positions/[address]
+  api/v1/protocol/route.ts             /api/v1/protocol
+components/                  wallet provider, markets app
+lib/                         config (env), market data
+i18n/                        next-intl routing and request config
+messages/                    en and es translations
 ```
 
 ## Public Read API
@@ -61,6 +84,44 @@ npm run dev     # http://localhost:3000
 npm run build
 ```
 
+## Scripts
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the Next.js development server. |
+| `npm run build` | Create the production build. |
+| `npm run start` | Start the production server. |
+| `npm run lint` | Run ESLint across the project. |
+| `npm run type-check` | Run TypeScript without emitting files. |
+| `npm run check-lockfile` | Verify the lockfile matches the package manifest. |
+| `npm test` | Run lockfile, unit, Node, and lending-error checks. |
+| `npm run test:coverage` | Run tests with coverage and lending-error checks. |
+| `npm run test:e2e` | Run the Playwright end-to-end tests. |
+| `npm run test:integration` | Run the Vitest integration tests. |
+| `npm run check-lending-errors` | Check lending-contract error definitions against the frontend. |
+
+## TypeScript 7 and ESLint compatibility
+
+TypeScript 7.0 does not provide the classic JavaScript compiler API that
+`eslint-config-next` / `typescript-eslint` still use. To keep the native
+TypeScript 7 `tsc` and a working ESLint parser, we deliberately install two
+compiler versions:
+
+- `@typescript/native` is an npm alias for `typescript@7.0.2` and provides
+  the `tsc` CLI used by `npm run type-check` and the build.
+- `typescript` is an npm alias for `@typescript/typescript6@6.0.2` and provides
+  the TypeScript 6 compiler API used by `typescript-eslint`. This package
+  intentionally provides a `tsc6` CLI rather than replacing the native `tsc`.
+
+Do not replace the TypeScript 6 alias with TypeScript 7 or update these packages
+independently. Dependabot ignores both aliases until the parser officially
+supports TypeScript 7. Revisit the pairing when it does.
+
+After changing either alias, regenerate the npm lockfile with `npm install`
+and verify `npm run check-lockfile`, `npm run lint`, `npm run type-check`,
+`npm run build`, and `npm test`.
+
+Reference: https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-60
+
 ## Environment variables
 | Name | Purpose |
 |---|---|
@@ -97,3 +158,6 @@ Set as `NEXT_PUBLIC_LENDING_CONTRACT_ID` in Vercel. Oracle and token contracts a
 
 ## Deploy
 Deployed on Vercel; set the env vars above in the project settings.
+
+## Contributing
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, test commands, lockfile/error-snapshot checks, and pull request guidelines.

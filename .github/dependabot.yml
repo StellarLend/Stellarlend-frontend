@@ -34,6 +34,10 @@ updates:
     # Ignore major version bumps for Next.js / React to avoid accidental
     # breaking-change upgrades.
     ignore:
+      # TypeScript 7 has no compiler API yet. Keep the TS6 compatibility alias
+      # and TS7 CLI paired until eslint-config-next / typescript-eslint support TS7.
+      - dependency-name: "typescript"
+      - dependency-name: "@typescript/native"
       - dependency-name: "next"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react"

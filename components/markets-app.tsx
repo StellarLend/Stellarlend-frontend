@@ -49,6 +49,7 @@ import {
   type Ledger,
 } from "@/lib/demo-ledger";
 import OraclePanel from "./oracle-panel";
+import { PortfolioRisk } from "./portfolio-risk";
 import { useOracleGuard } from "@/hooks/use-oracle-guard";
 import { TradePreview } from "./trade-preview";
 import {
@@ -68,6 +69,7 @@ import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
 import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-prompt";
 import { useProtocolStatus } from "./protocol-status";
+import { HealthIndicator } from "./health-indicator";
 
 export default function MarketsApp() {
   const {
@@ -678,6 +680,7 @@ export default function MarketsApp() {
             {t("connectFreighter")}
           </Button>
         )}
+        <HealthIndicator />
         <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:gap-6">
           <Stat k={t("collateral")} v={collateralText} />
           <Stat k={t("borrowed")} v={borrowedText} />
@@ -688,6 +691,8 @@ export default function MarketsApp() {
           />
         </div>
       </Card>
+
+      <PortfolioRisk ledger={marketPositions as Ledger} markets={activeMarkets} />
 
       {/* Search, sort, and position filter controls */}
       <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

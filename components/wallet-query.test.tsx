@@ -5,6 +5,49 @@ import { QueryClient } from "@tanstack/react-query";
 import { WalletProvider, useWallet } from "./wallet";
 import { QueryProvider, createQueryClient } from "./query-provider";
 import type { WalletAdapter } from "@/lib/wallets/types";
+import { qk } from "@/lib/query-keys";
+
+type WatcherParams = {
+  address?: string | null;
+  network?: string | null;
+  networkPassphrase?: string | null;
+  error?: string | null;
+};
+
+type FakeWatcher = {
+  callback: ((params: WatcherParams) => void) | null;
+  watch: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+};
+
+const freighterMocks = vi.hoisted(() => ({
+  instances: [] as FakeWatcher[],
+}));
+
+vi.mock("@stellar/freighter-api", () => {
+  class FakeWatchWalletChanges {
+    callback: ((params: WatcherParams) => void) | null = null;
+    watch = vi.fn((callback: (params: WatcherParams) => void) => {
+      this.callback = callback;
+    });
+    stop = vi.fn(() => {});
+
+    constructor() {
+      freighterMocks.instances.push(this as unknown as FakeWatcher);
+    }
+  }
+
+  return {
+    isConnected: vi.fn(async () => ({ isConnected: false })),
+    isAllowed: vi.fn(async () => ({ isAllowed: false })),
+    getAddress: vi.fn(async () => ({ error: true })),
+    getNetwork: vi.fn(async () => ({
+      network: "testnet",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    })),
+    WatchWalletChanges: FakeWatchWalletChanges,
+  };
+});
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => {
@@ -38,6 +81,32 @@ function createWrapper(client: QueryClient, address: string) {
   };
 }
 
+function createFreighterWrapper(client: QueryClient, address: string) {
+  const adapter: WalletAdapter = {
+    id: "freighter",
+    name: "Freighter",
+    icon: "icon.svg",
+    isAvailable: async () => true,
+    connect: async () => address,
+    signTransaction: async (xdr: string) => xdr,
+    disconnect: async () => {},
+  };
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryProvider client={client}>
+        <WalletProvider initialAdapter={adapter}>{children}</WalletProvider>
+      </QueryProvider>
+    );
+  };
+}
+
+async function waitForWatcher(): Promise<FakeWatcher> {
+  await waitFor(() => expect(freighterMocks.instances.length).toBeGreaterThan(0));
+  const watcher = freighterMocks.instances[freighterMocks.instances.length - 1];
+  await waitFor(() => expect(watcher.watch).toHaveBeenCalled());
+  return watcher;
+}
+
 describe("Wallet Balance Query Layer", () => {
   let queryClient: QueryClient;
   const originalFetch = globalThis.fetch;
@@ -45,6 +114,8 @@ describe("Wallet Balance Query Layer", () => {
   beforeEach(() => {
     queryClient = createQueryClient();
     vi.restoreAllMocks();
+    freighterMocks.instances.length = 0;
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -162,5 +233,55 @@ describe("Wallet Balance Query Layer", () => {
       .getQueryCache()
       .findAll({ queryKey: ["account", "GCCCC7PIRZGNMHGA728R4EUCHPT3LFQPUVAHEUMCM46U223EDPHIFCCC"] });
     expect(queries.length).toBe(0);
+  });
+
+  it("clears the previous Freighter account cache when the watcher switches accounts", async () => {
+    const oldAddress = "GDDDD7PIRZGNMHGA728R4EUCHPT3LFQPUVAHEUMCM46U223EDPHIFDDD";
+    const nextAddress = "GEEEE7PIRZGNMHGA728R4EUCHPT3LFQPUVAHEUMCM46U223EDPHIFEEE";
+    const fetchMock = vi.fn(async (input: unknown) => {
+      if (String(input).includes(nextAddress)) {
+        return { status: 404, ok: false } as Response;
+      }
+      return {
+        status: 200,
+        ok: true,
+        json: async () => ({
+          balances: [{ asset_type: "native", balance: "100.0000000" }],
+        }),
+      } as Response;
+    }) as unknown as typeof fetch;
+    globalThis.fetch = fetchMock;
+
+    const wrapper = createFreighterWrapper(queryClient, oldAddress);
+    const { result } = renderHook(() => useWallet(), { wrapper });
+
+    const watcher = await waitForWatcher();
+
+    await act(async () => {
+      watcher.callback?.({ address: oldAddress });
+    });
+
+    await waitFor(() => {
+      expect(result.current.balance).toBe("100.00");
+    });
+    expect(
+      queryClient.getQueryCache().findAll({ queryKey: qk.account(oldAddress) }).length
+    ).toBeGreaterThan(0);
+
+    const removeQueriesSpy = vi.spyOn(queryClient, "removeQueries");
+
+    await act(async () => {
+      watcher.callback?.({ address: nextAddress });
+    });
+
+    await waitFor(() => {
+      expect(result.current.address).toBe(nextAddress);
+    });
+    expect(removeQueriesSpy).toHaveBeenCalledWith({ queryKey: qk.account(oldAddress) });
+    expect(queryClient.getQueryCache().findAll({ queryKey: qk.account(oldAddress) })).toHaveLength(0);
+    await waitFor(() => {
+      expect(result.current.balances).toEqual({});
+    });
+    expect(result.current.balance).toBe("0.00 (Unfunded)");
   });
 });

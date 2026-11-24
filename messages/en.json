@@ -113,6 +113,7 @@
     "wallet": "Wallet",
     "demoMode": "Demo mode (no wallet connected)",
     "collateral": "Collateral",
+    "supplied": "Supplied",
     "borrowed": "Borrowed",
     "health": "Health",
     "nA": "n/a",
@@ -123,6 +124,7 @@
     "totalSupplied": "Total supplied",
     "yourPosition": "Your position",
     "trade": "Trade",
+    "tradeAriaLabel": "Trade {symbol}",
     "addTrustline": "Add trustline",
     "addingTrustline": "Adding trustline...",
     "trustlineAdded": "Trustline added successfully.",
@@ -282,7 +284,17 @@
     "healthStatus": {
       "healthy": "Healthy",
       "atRisk": "At risk",
-      "liquidatable": "Liquidatable"
+      "liquidatable": "Liquidatable",
+      "settingsLabel": "Health alert settings",
+      "settingsTitle": "Health alert settings",
+      "warningBelow": "Warning below",
+      "dangerBelow": "Danger below",
+      "saveThresholds": "Save thresholds",
+      "saved": "Saved.",
+      "close": "Close",
+      "notifyToggle": "Notify me when my health factor gets worse",
+      "notificationsUnsupported": "Browser notifications are not supported here.",
+      "notificationsDenied": "Notifications are blocked in your browser settings, so alerts are unavailable."
     },
     "actions": "Actions",
     "ltv": "LTV",
@@ -306,6 +318,10 @@
       "step3": "Open Markets and click Connect Freighter. Without a wallet the app runs in demo mode.",
       "step4": "Pick an asset, then Supply, Borrow, Withdraw or Repay."
     },
+    "sourceBadge": {
+      "chain": "source: chain",
+      "demo": "source: demo"
+    },
     "riskParameters": {
       "title": "Risk parameters",
       "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable.",
@@ -313,8 +329,14 @@
       "maxLtv": "Max LTV",
       "liquidationThreshold": "Liquidation threshold",
       "supplyCap": "Supply cap",
+      "borrowCap": "Borrow cap",
+      "supplyApy": "Supply APY",
+      "borrowApy": "Borrow APY",
       "minBorrow": "Min borrow",
-      "uncapped": "Uncapped"
+      "source": "Source",
+      "uncapped": "Uncapped",
+      "notSet": "—",
+      "rpcFallbackNote": "Could not load live values from chain; showing static fallback parameters."
     },
     "flashLoans": {
       "title": "Flash loans",
@@ -328,7 +350,19 @@
     "contracts": {
       "title": "Deployed contracts (testnet)",
       "label": "Lending contract",
-      "notDeployed": "not deployed"
+      "contract": "Contract",
+      "address": "Contract ID",
+      "source": "Source",
+      "notDeployed": "not deployed",
+      "names": {
+        "lending": "Lending contract",
+        "oracle": "Oracle contract",
+        "token": "Token contract",
+        "multisig": "Multisig contract",
+        "amm": "AMM contract",
+        "ammTokenA": "AMM Token A",
+        "ammTokenB": "AMM Token B"
+      }
     },
     "env": {
       "title": "Environment variables"
@@ -551,5 +585,71 @@
   },
   "amm": {
     "loadingTwapChart": "Loading TWAP price chart..."
+  },
+  "portfolioRisk": {
+    "title": "Portfolio risk",
+    "subtitle": "Per-asset positions, estimated liquidation prices, and instant collateral price-shock simulation.",
+    "aggregateHealth": "Aggregate health",
+    "projectedHealth": "Projected health",
+    "noDebt": "No debt",
+    "noPositions": "Supply or borrow an asset to view your portfolio risk breakdown.",
+    "priceShock": "Collateral price shock",
+    "reset": "Reset",
+    "columns": {
+      "asset": "Asset",
+      "supplied": "Supplied",
+      "borrowed": "Borrowed",
+      "currentPrice": "Current price",
+      "liqPrice": "Est. liquidation price"
+    },
+    "levels": {
+      "safe": "Safe",
+      "warning": "Warning",
+      "danger": "Danger",
+      "liquidatable": "Liquidatable"
+    },
+    "notApplicable": "-"
+  },
+  "meta": {
+    "home": {
+      "title": "StellarLend - Lending on Stellar",
+      "description": "Supply and borrow assets on Stellar with StellarLend, a Soroban-powered lending protocol (testnet)."
+    },
+    "markets": {
+      "title": "Markets - StellarLend",
+      "description": "Explore StellarLend markets: supply assets to earn yield or borrow against collateral on the Stellar testnet."
+    },
+    "amm": {
+      "title": "AMM Pool, Swap & Liquidity - StellarLend",
+      "description": "Inspect the StellarLend AMM pool, get swap quotes, and manage your liquidity on Stellar."
+    },
+    "docs": {
+      "title": "Docs - StellarLend",
+      "description": "Learn how StellarLend works: markets, borrowing, flash loans, and governance on the Stellar testnet."
+    },
+    "flashLoans": {
+      "title": "Flash loans - StellarLend",
+      "description": "Borrow and repay within a single transaction using StellarLend flash loans on Soroban."
+    },
+    "history": {
+      "title": "History - StellarLend",
+      "description": "Review your StellarLend supply, borrow, withdraw, and repay transactions recorded on-chain."
+    },
+    "multisig": {
+      "title": "Multisig Governance - StellarLend",
+      "description": "Signer management and proposal execution for the StellarLend multisig contract."
+    },
+    "multisigProposal": {
+      "title": "Multisig Proposal - StellarLend",
+      "description": "Review and sign multisig governance proposals with the Freighter wallet."
+    },
+    "governance": {
+      "title": "Governance - StellarLend",
+      "description": "Track StellarLend governance state, risk configuration, and the on-chain audit log."
+    },
+    "adminEmergency": {
+      "title": "Emergency Administration - StellarLend",
+      "description": "Emergency circuit-breaker and granular pause controls for the StellarLend protocol."
+    }
   }
 }
