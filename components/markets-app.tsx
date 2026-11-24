@@ -1,10 +1,31 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
-import { MARKETS, formatCurrency, formatNumber, formatPercent, type Locale, type Market } from "@/lib/markets";
+import {
+  MARKETS,
+  buildMarketQueryString,
+  filterAndSortMarkets,
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+  parseMarketQueryParams,
+  parseMarketSort,
+  type Locale,
+  type Market,
+  type MarketPositionMap,
+  type MarketSortKey,
+} from "@/lib/markets";
 import { Button, Card, Stat } from "@/components/ui";
 import { useWallet } from "./wallet";
 import { config, explorer, txExplorer } from "@/lib/config";
+import {
+  calculateMinReserve,
+  needsTrustline,
+  classifyTrustlineError,
+  type TrustlineErrorKind,
+} from "@/lib/horizon";
 import { normaliseAmountInput } from "@/lib/amount-input";
 import { fetchLiveMarketParams, bpsToPercent } from "@/lib/market-params";
 import { toBaseUnits, DECIMALS, type AmountError } from "@/lib/amount";
@@ -28,23 +49,34 @@ import {
   type Ledger,
 } from "@/lib/demo-ledger";
 import OraclePanel from "./oracle-panel";
-import { fetchOracleAssetPrices, type OracleAssetPrice } from "@/lib/oracle";
+import { PortfolioRisk } from "./portfolio-risk";
+import { useOracleGuard } from "@/hooks/use-oracle-guard";
+import { TradePreview } from "./trade-preview";
 import {
   buildDemoRateModelSnapshot,
   fetchRateModelSnapshot,
   type RateModelSnapshot,
 } from "@/lib/rate-model";
-import { RateChart, defaultRateChartLabels, type RateChartLabels } from "./rate-chart";
+import {
+  RateChart,
+  defaultRateChartLabels,
+  type RateChartLabels,
+  type RateChartOverlay,
+} from "./rate-chart";
+import { RateSimulator } from "./rate-simulator";
 
 import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
+import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-prompt";
 import { useProtocolStatus } from "./protocol-status";
+import { HealthIndicator } from "./health-indicator";
 
 export default function MarketsApp() {
   const {
     address,
     balance,
     balances,
+    rawAccount,
     isUnfunded,
     error,
     openPicker,
@@ -58,6 +90,14 @@ export default function MarketsApp() {
   const locale = useLocale() as Locale;
   const t = useTranslations("market");
   const tStatus = useTranslations("protocolStatus");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialQuery = parseMarketQueryParams(searchParams);
+  const [searchInput, setSearchInput] = useState(initialQuery.q);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialQuery.q);
+  const [sortBy, setSortBy] = useState<MarketSortKey>(initialQuery.sort);
+  const [mineOnly, setMineOnly] = useState(initialQuery.mine);
   const { status: protocolStatus, isActionAllowed } = useProtocolStatus();
   const [ledger, setLedger] = useState<Ledger>({});
   const [resetNotice, setResetNotice] = useState(false);
@@ -74,6 +114,23 @@ export default function MarketsApp() {
   const configured = isOnChainConfigured();
   const onChainMode = Boolean(address && configured);
   const busy = tx?.status === "pending";
+
+  // Classic assets need a trustline before they can be held, supplied or repaid.
+  // The shared pure helper matches the selected asset against the Horizon
+  // balances map via getAssetKey.
+  const missingTrustline = Boolean(address) && needsTrustline(sel, balances);
+  const nativeDetail = balances["native"];
+  const nativeBalanceXlm = nativeDetail ? Number(nativeDetail.balance) : 0;
+  const nativeSellingXlm = nativeDetail ? Number(nativeDetail.sellingLiabilities ?? "0") : 0;
+  // Prefer the exact Horizon reserve; fall back to the reserve already excluded from `available`.
+  const minReserveXlm = rawAccount
+    ? calculateMinReserve(rawAccount)
+    : Math.max(
+        0,
+        nativeBalanceXlm - nativeSellingXlm - (nativeDetail ? Number(nativeDetail.available) : 0)
+      );
+  const spendableXlm = nativeBalanceXlm - nativeSellingXlm - minReserveXlm;
+  const trustlineBlocksAction = missingTrustline && (mode === "supply" || mode === "repay");
 
   const refreshPosition = useCallback(async () => {
     if (!address || !configured) {
@@ -114,30 +171,15 @@ export default function MarketsApp() {
   const [rateSnapshot, setRateSnapshot] = useState<RateModelSnapshot>(() =>
     buildDemoRateModelSnapshot()
   );
+  const [rateOverlay, setRateOverlay] = useState<{
+    snapshotKey: string;
+    overlay: RateChartOverlay;
+  } | null>(null);
 
   const panelRef = useRef<HTMLElement | null>(null);
 
-  const [oraclePrices, setOraclePrices] = useState<Record<string, OracleAssetPrice>>({});
-  const [timeSource, setTimeSource] = useState<"ledger" | "browser">("ledger");
-  const [isLoadingOracle, setIsLoadingOracle] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    setIsLoadingOracle(true);
-    fetchOracleAssetPrices()
-      .then((res) => {
-        if (!active) return;
-        setOraclePrices(res.prices);
-        setTimeSource(res.timeSource);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setIsLoadingOracle(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { prices: oraclePrices, timeSource, isLoading: isLoadingOracle, evaluate: evaluateOracle } = useOracleGuard();
+  // Oracle prices and staleness are managed by useOracleGuard (30s React Query refetch).
 
   const activeMarkets = useMemo<Market[]>(() => {
     return markets.map((m) => {
@@ -163,6 +205,49 @@ export default function MarketsApp() {
     });
   }, [oraclePrices, markets]);
 
+  // Debounce search input by 150ms before filtering & syncing URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Persist search, sort, and position filter in URL query (?q=&sort=&mine=1)
+  useEffect(() => {
+    const nextQs = buildMarketQueryString(
+      { q: debouncedSearch, sort: sortBy, mine: mineOnly },
+      searchParams
+    );
+    if (nextQs === searchParams.toString()) return;
+    router.replace(nextQs ? `${pathname}?${nextQs}` : pathname, { scroll: false });
+  }, [debouncedSearch, sortBy, mineOnly, pathname, router, searchParams]);
+
+  const marketPositions = useMemo<MarketPositionMap>(() => {
+    const map: MarketPositionMap = { ...ledger };
+    if (onChainMode && position) {
+      for (const m of activeMarkets) {
+        if (m.live) {
+          map[m.symbol] = {
+            supplied: position.collateral,
+            borrowed: position.debt,
+          };
+        }
+      }
+    }
+    return map;
+  }, [ledger, onChainMode, position, activeMarkets]);
+
+  const visibleMarkets = useMemo(
+    () =>
+      filterAndSortMarkets(
+        activeMarkets,
+        { q: debouncedSearch, sort: sortBy, mine: mineOnly },
+        marketPositions
+      ),
+    [activeMarkets, debouncedSearch, sortBy, mineOnly, marketPositions]
+  );
+
   // Keep the selected market in sync when live params / prices update
   useEffect(() => {
     if (!sel) return;
@@ -175,17 +260,20 @@ export default function MarketsApp() {
   }, [ledger]);
   const [trustlineLoading, setTrustlineLoading] = useState<string | null>(null);
   const [trustlineMsg, setTrustlineMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [trustlineError, setTrustlineError] = useState<{ symbol: string; kind: TrustlineErrorKind } | null>(null);
 
   async function handleAddTrustline(market: Market) {
     if (market.asset === "native") return;
     setTrustlineLoading(market.symbol);
     setTrustlineMsg(null);
+    setTrustlineError(null);
     try {
       await addTrustline(market.asset);
       setTrustlineMsg({ type: "success", text: t("trustlineAdded") });
-    } catch (err: any) {
-      const errorText = err?.message || t("txCancelled");
-      setTrustlineMsg({ type: "error", text: errorText });
+    } catch (err) {
+      const kind = classifyTrustlineError(err);
+      setTrustlineError({ symbol: market.symbol, kind });
+      setTrustlineMsg({ type: "error", text: t(TRUSTLINE_ERROR_MESSAGE_KEYS[kind]) });
     } finally {
       setTrustlineLoading(null);
     }
@@ -279,6 +367,11 @@ export default function MarketsApp() {
     }
     return resolved;
   }, [t]);
+  const rateSnapshotKey = [
+    rateSnapshot.source,
+    ...Object.values(rateSnapshot.params).map((value) => value.toString()),
+    rateSnapshot.diagnostics.utilization_bps.toString(),
+  ].join(":");
 
   const risk = useMemo(() => computeRisk(ledger, activeMarkets), [ledger, activeMarkets]);
 
@@ -308,7 +401,9 @@ export default function MarketsApp() {
   }
 
   async function submit() {
-    if (!sel || busy) return;
+    if (!sel || busy || oracleGuard.blocked) return;
+    // A missing classic-asset trustline makes supply/repay fail on-chain; block it.
+    if (trustlineBlocksAction) return;
     // Accept locale-formatted input (e.g. "1.234,5" in Spanish), then parse
     // strictly into base units.
     const normalized = normaliseAmountInput(amt, locale);
@@ -433,6 +528,8 @@ export default function MarketsApp() {
   };
   const currentBlockedReason = !isDemoMode ? getBlockedReason(mode) : null;
   const currentBlocked = !isDemoMode && !isActionAllowed(mode);
+  const oracleGuard = useMemo(() => evaluateOracle(mode), [evaluateOracle, mode]);
+  const oracleReasonId = oracleGuard.reason ? "oracle-guard-reason" : undefined;
 
   const tradePanel = sel ? (
     <div className="space-y-4">
@@ -471,6 +568,16 @@ export default function MarketsApp() {
           {tStatus("actionBlockedTooltip", { reason: currentBlockedReason })}
         </div>
       )}
+      {missingTrustline && (
+        <TrustlinePrompt
+          symbol={sel.symbol}
+          spendableXlm={spendableXlm}
+          issuer={sel.asset !== "native" ? sel.asset.issuer : undefined}
+          isAdding={trustlineLoading === sel.symbol}
+          error={trustlineError?.symbol === sel.symbol ? trustlineError.kind : null}
+          onAdd={() => handleAddTrustline(sel)}
+        />
+      )}
       <input
         inputMode="decimal"
         placeholder={t("amountIn", { symbol: sel.symbol })}
@@ -482,11 +589,20 @@ export default function MarketsApp() {
       <button
         className="btn w-full"
         onClick={submit}
-        disabled={busy || currentBlocked}
+        disabled={busy || currentBlocked || trustlineBlocksAction}
         title={currentBlockedReason ? tStatus("actionBlockedTooltip", { reason: currentBlockedReason }) : undefined}
       >
         {busy ? t("status.pending") : t("confirm", { action: t(mode) })}
       </button>
+      <TradePreview
+        currentCollateralUsd={risk.collateralUsd}
+        currentBorrowUsd={risk.borrowUsd}
+        currentLimitUsd={risk.limitUsd}
+        currentHealth={risk.health}
+        projected={null}
+        oracleGuard={oracleGuard}
+        oracleGuardId={oracleReasonId}
+      />
       {msg && (
         <p
           className={msg.isError ? "text-amber-400 text-sm" : "mut text-sm"}
@@ -564,6 +680,7 @@ export default function MarketsApp() {
             {t("connectFreighter")}
           </Button>
         )}
+        <HealthIndicator />
         <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:gap-6">
           <Stat k={t("collateral")} v={collateralText} />
           <Stat k={t("borrowed")} v={borrowedText} />
@@ -575,23 +692,70 @@ export default function MarketsApp() {
         </div>
       </Card>
 
+      <PortfolioRisk ledger={marketPositions as Ledger} markets={activeMarkets} />
+
+      {/* Search, sort, and position filter controls */}
+      <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex-1 sm:max-w-xs">
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={t("controls.searchPlaceholder")}
+            aria-label={t("controls.searchLabel")}
+            className="w-full"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="mut whitespace-nowrap">{t("controls.sortLabel")}</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(parseMarketSort(e.target.value))}
+              aria-label={t("controls.sortLabel")}
+              className="rounded-lg border border-[var(--line)] bg-transparent px-3 py-1.5 text-sm"
+            >
+              <option value="default">{t("controls.sortDefault")}</option>
+              <option value="supplyApy">{t("controls.sortSupplyApy")}</option>
+              <option value="borrowApy">{t("controls.sortBorrowApy")}</option>
+              <option value="utilization">{t("controls.sortUtilization")}</option>
+            </select>
+          </label>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={mineOnly}
+              onChange={(e) => setMineOnly(e.target.checked)}
+              aria-label={t("controls.myPositionsOnly")}
+            />
+            <span>{t("controls.myPositionsOnly")}</span>
+          </label>
+        </div>
+      </Card>
+
       {/* Mobile: stacked cards */}
       <div className="space-y-3 sm:hidden">
-        {activeMarkets.map((m) => {
-          const p = ledger[m.symbol];
-          const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
-          const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
-          return (
-            <MarketCard
-              key={m.symbol}
-              market={m}
-              locale={locale}
-              supplied={p ? suppliedFloat : null}
-              borrowed={p ? borrowedFloat : null}
-              onTrade={() => openTrade(m)}
-            />
-          );
-        })}
+        {visibleMarkets.length === 0 ? (
+          <Card className="p-6 text-center text-sm mut" role="status">
+            {t("controls.noResults")}
+          </Card>
+        ) : (
+          visibleMarkets.map((m) => {
+            const p = ledger[m.symbol];
+            const suppliedFloat = p ? toFloat(p.supplied, m.decimals) : 0;
+            const borrowedFloat = p ? toFloat(p.borrowed, m.decimals) : 0;
+            return (
+              <MarketCard
+                key={m.symbol}
+                market={m}
+                locale={locale}
+                supplied={p ? suppliedFloat : null}
+                borrowed={p ? borrowedFloat : null}
+                onTrade={() => openTrade(m)}
+              />
+            );
+          })
+        )}
       </div>
 
       {trustlineMsg && (
@@ -628,7 +792,14 @@ export default function MarketsApp() {
             </tr>
           </thead>
           <tbody>
-            {activeMarkets.map((m) => {
+            {visibleMarkets.length === 0 ? (
+              <tr>
+                <td colSpan={11} className="p-6 text-center text-sm mut" role="status">
+                  {t("controls.noResults")}
+                </td>
+              </tr>
+            ) : (
+              visibleMarkets.map((m) => {
               const rawP = ledger && typeof ledger === "object" ? ledger[m.symbol] : undefined;
               const p =
                 rawP && typeof rawP === "object" && typeof rawP.supplied === "bigint" && typeof rawP.borrowed === "bigint"
@@ -767,7 +938,8 @@ export default function MarketsApp() {
                   </td>
                 </tr>
               );
-            })}
+            })
+            )}
           </tbody>
         </table>
       </Card>
@@ -812,6 +984,19 @@ export default function MarketsApp() {
         history={rateSnapshot.history}
         source={rateSnapshot.source}
         labels={rateChartLabels}
+        overlay={
+          rateOverlay?.snapshotKey === rateSnapshotKey
+            ? rateOverlay.overlay
+            : undefined
+        }
+      />
+      <RateSimulator
+        key={rateSnapshotKey}
+        params={rateSnapshot.params}
+        utilizationBps={rateSnapshot.diagnostics.utilization_bps}
+        onOverlayChange={(overlay) =>
+          setRateOverlay(overlay ? { snapshotKey: rateSnapshotKey, overlay } : null)
+        }
       />
 
       <div className="flex items-center justify-between text-xs mut">

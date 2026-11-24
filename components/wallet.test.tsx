@@ -1,8 +1,55 @@
-import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, act, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
-import { WalletProvider, useWallet, LAST_WALLET_STORAGE_KEY } from "./wallet";
+import { WalletProvider, ConnectButton, useWallet, LAST_WALLET_STORAGE_KEY } from "./wallet";
+import { NetworkBanner } from "./network-banner";
 import { WalletAdapter } from "@/lib/wallets/types";
+import { NETWORK_PASSPHRASES, accountExplorer } from "@/lib/config";
+
+type WatcherParams = {
+  address?: string | null;
+  network?: string | null;
+  networkPassphrase?: string | null;
+  error?: string | null;
+};
+
+type FakeWatcher = {
+  callback: ((params: WatcherParams) => void) | null;
+  watch: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+};
+
+const freighterMocks = vi.hoisted(() => ({
+  enabled: true,
+  instances: [] as FakeWatcher[],
+}));
+
+vi.mock("@stellar/freighter-api", () => {
+  class FakeWatchWalletChanges {
+    callback: ((params: WatcherParams) => void) | null = null;
+    watch = vi.fn((callback: (params: WatcherParams) => void) => {
+      this.callback = callback;
+    });
+    stop = vi.fn(() => {});
+
+    constructor() {
+      freighterMocks.instances.push(this as unknown as FakeWatcher);
+    }
+  }
+
+  return {
+    isConnected: vi.fn(async () => ({ isConnected: false })),
+    isAllowed: vi.fn(async () => ({ isAllowed: false })),
+    getAddress: vi.fn(async () => ({ error: true })),
+    getNetwork: vi.fn(async () => ({
+      network: "testnet",
+      networkPassphrase: "Test SDF Network ; September 2015",
+    })),
+    get WatchWalletChanges() {
+      return freighterMocks.enabled ? FakeWatchWalletChanges : undefined;
+    },
+  };
+});
 
 // Mock next-intl
 vi.mock("next-intl", () => ({
@@ -22,6 +69,11 @@ vi.mock("next-intl", () => ({
       install: "Install",
       connecting: "Connecting...",
       close: "Close",
+      copyAddress: "Copy address",
+      copied: "Address copied",
+      copyFailed: "Could not copy address",
+      viewOnExplorer: "View account on explorer",
+      networkMismatchTitle: "Network mismatch",
     };
     return messages[key] || key;
   },
@@ -66,6 +118,67 @@ function TestConsumer({ onSign }: { onSign?: (res: string) => void }) {
       </button>
     </div>
   );
+}
+
+function WatcherConsumer() {
+  const {
+    address,
+    balance,
+    balances,
+    network,
+    networkPassphrase,
+    networkMismatch,
+    expectedPassphrase,
+    connect,
+  } = useWallet();
+
+  return (
+    <div>
+      <span data-testid="watcher-address">{address ?? "no-address"}</span>
+      <span data-testid="watcher-balance">{balance ?? "no-balance"}</span>
+      <span data-testid="watcher-balances">
+        {Object.keys(balances).length ? Object.keys(balances).join(",") : "no-balances"}
+      </span>
+      <span data-testid="watcher-network">{network ?? "no-network"}</span>
+      <span data-testid="watcher-passphrase">{networkPassphrase ?? "no-passphrase"}</span>
+      <span data-testid="watcher-mismatch">{String(networkMismatch)}</span>
+      <span data-testid="watcher-expected-passphrase">{expectedPassphrase}</span>
+      <button
+        data-testid="watcher-connect-btn"
+        onClick={() => connect().catch(() => {})}
+      />
+    </div>
+  );
+}
+
+const WATCHER_OLD_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+const WATCHER_NEW_ADDRESS = "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBWHF";
+
+function makeFreighterAdapter(address: string): WalletAdapter {
+  return {
+    id: "freighter",
+    name: "Freighter",
+    icon: "icon.svg",
+    isAvailable: vi.fn().mockResolvedValue(true),
+    connect: vi.fn().mockResolvedValue(address),
+    signTransaction: vi.fn().mockResolvedValue(""),
+    disconnect: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+async function waitForWatcher(): Promise<FakeWatcher> {
+  await waitFor(() => expect(freighterMocks.instances.length).toBeGreaterThan(0));
+  const watcher = freighterMocks.instances[freighterMocks.instances.length - 1];
+  await waitFor(() => expect(watcher.watch).toHaveBeenCalled());
+  return watcher;
+}
+
+function mockFetchWithBalance(balance: string): typeof fetch {
+  return vi.fn(async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({ balances: [{ asset_type: "native", balance }] }),
+  })) as unknown as typeof fetch;
 }
 
 describe("WalletContext with Adapter", () => {
@@ -217,5 +330,264 @@ describe("WalletContext with Adapter", () => {
     });
 
     expect(screen.getByTestId("error").textContent).toBe("Internal adapter failure");
+  });
+});
+
+describe("WalletProvider Freighter watcher", () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    localStorage.clear();
+    freighterMocks.enabled = true;
+    freighterMocks.instances.length = 0;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("updates address on account change and clears balances for the old address", async () => {
+    global.fetch = vi.fn(async (input: unknown) => {
+      if (String(input).includes(WATCHER_NEW_ADDRESS)) {
+        return { status: 404, ok: false } as Response;
+      }
+      return {
+        status: 200,
+        ok: true,
+        json: async () => ({ balances: [{ asset_type: "native", balance: "100.50" }] }),
+      } as Response;
+    }) as unknown as typeof fetch;
+
+    render(
+      <WalletProvider initialAdapter={makeFreighterAdapter(WATCHER_OLD_ADDRESS)}>
+        <WatcherConsumer />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("watcher-connect-btn").click();
+    });
+
+    await waitFor(() => expect(screen.getByTestId("watcher-balance").textContent).toBe("100.50"));
+    expect(screen.getByTestId("watcher-balances").textContent).toContain("native");
+
+    const watcher = await waitForWatcher();
+
+    await act(async () => {
+      watcher.callback?.({ address: WATCHER_NEW_ADDRESS });
+    });
+
+    expect(screen.getByTestId("watcher-address").textContent).toBe(WATCHER_NEW_ADDRESS);
+    await waitFor(() => expect(screen.getByTestId("watcher-balance").textContent).toBe("Unfunded"));
+    expect(screen.getByTestId("watcher-balances").textContent).toBe("no-balances");
+    expect(screen.getByTestId("watcher-balance").textContent).not.toBe("100.50");
+  });
+
+  it("flags mismatch and shows NetworkBanner on a mainnet network change", async () => {
+    global.fetch = mockFetchWithBalance("100.50");
+
+    render(
+      <WalletProvider initialAdapter={makeFreighterAdapter(WATCHER_OLD_ADDRESS)}>
+        <WatcherConsumer />
+        <NetworkBanner />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("watcher-connect-btn").click();
+    });
+
+    const watcher = await waitForWatcher();
+
+    expect(screen.getByTestId("watcher-mismatch").textContent).toBe("false");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    await act(async () => {
+      watcher.callback?.({
+        network: "mainnet",
+        networkPassphrase: NETWORK_PASSPHRASES.mainnet,
+      });
+    });
+
+    expect(screen.getByTestId("watcher-network").textContent).toBe("mainnet");
+    expect(screen.getByTestId("watcher-passphrase").textContent).toBe(NETWORK_PASSPHRASES.mainnet);
+    expect(screen.getByTestId("watcher-expected-passphrase").textContent).toBe(
+      NETWORK_PASSPHRASES.testnet
+    );
+    expect(screen.getByTestId("watcher-mismatch").textContent).toBe("true");
+    expect(screen.getByRole("alert")).toHaveTextContent("Network mismatch");
+  });
+
+  it("stops watcher on unmount", async () => {
+    global.fetch = mockFetchWithBalance("100.50");
+
+    const view = render(
+      <WalletProvider initialAdapter={makeFreighterAdapter(WATCHER_OLD_ADDRESS)}>
+        <WatcherConsumer />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("watcher-connect-btn").click();
+    });
+
+    const watcher = await waitForWatcher();
+
+    expect(watcher.stop).not.toHaveBeenCalled();
+
+    view.unmount();
+
+    expect(watcher.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("tolerates a missing WatchWalletChanges API", async () => {
+    freighterMocks.enabled = false;
+    global.fetch = mockFetchWithBalance("100.50");
+
+    render(
+      <WalletProvider initialAdapter={makeFreighterAdapter(WATCHER_OLD_ADDRESS)}>
+        <WatcherConsumer />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("watcher-connect-btn").click();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("watcher-address").textContent).toBe(WATCHER_OLD_ADDRESS)
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(freighterMocks.instances).toHaveLength(0);
+    expect(screen.getByTestId("watcher-address").textContent).toBe(WATCHER_OLD_ADDRESS);
+  });
+});
+
+describe("ConnectButton copy address", () => {
+  const fullAddress = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+  const originalClipboard = navigator.clipboard;
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    Object.defineProperty(navigator, "clipboard", {
+      value: originalClipboard,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  function makeConnectedAdapter(): WalletAdapter {
+    return {
+      id: "fake-wallet",
+      name: "Fake Wallet",
+      icon: "icon.svg",
+      isAvailable: vi.fn().mockResolvedValue(true),
+      connect: vi.fn().mockResolvedValue(fullAddress),
+      signTransaction: vi.fn().mockResolvedValue(""),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  it("copies the full G-address rather than the shortened text and links to explorer", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <WalletProvider initialAdapter={makeConnectedAdapter()}>
+        <TestConsumer />
+        <ConnectButton />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: "Copy address" });
+    await act(async () => {
+      copyBtn.click();
+    });
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText).toHaveBeenCalledWith(fullAddress);
+
+    const explorerLink = screen.getByRole("link", { name: "View account on explorer" });
+    expect(explorerLink.getAttribute("href")).toBe(accountExplorer(fullAddress));
+  });
+
+  it("announces copied in the polite live region and clears it after ~2s", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <WalletProvider initialAdapter={makeConnectedAdapter()}>
+        <TestConsumer />
+        <ConnectButton />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: "Copy address" });
+    await act(async () => {
+      copyBtn.click();
+    });
+
+    const statusRegion = screen.getByRole("status");
+    expect(statusRegion.getAttribute("aria-live")).toBe("polite");
+    expect(statusRegion.textContent).toBe("Address copied");
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(statusRegion.textContent).toBe("");
+  });
+
+  it("does not throw when navigator.clipboard is undefined and shows failure message", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <WalletProvider initialAdapter={makeConnectedAdapter()}>
+        <TestConsumer />
+        <ConnectButton />
+      </WalletProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId("connect-btn").click();
+    });
+
+    const copyBtn = screen.getByRole("button", { name: "Copy address" });
+    await act(async () => {
+      copyBtn.click();
+    });
+
+    const statusRegion = screen.getByRole("status");
+    expect(statusRegion.textContent).toBe("Could not copy address");
   });
 });

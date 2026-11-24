@@ -1,6 +1,7 @@
 {
   "nav": {
     "brand": "Stellar",
+    "skipToContent": "Skip to content",
     "markets": "Markets",
     "history": "History",
     "docs": "Docs",
@@ -92,9 +93,19 @@
     "fundCooldown": "Please wait {seconds}s before requesting Friendbot funding again.",
     "fundFailed": "Friendbot funding failed.",
     "fundTimeout": "Funding request completed, but account was not detected yet. Please check again in a few moments.",
+    "networkTestnet": "Testnet",
+    "networkPublic": "Public",
+    "networkUnknown": "Unknown",
     "networkMismatchTitle": "Network mismatch detected",
     "networkMismatchDescription": "Freighter is connected to a different network ({currentNetwork}). Please switch Freighter to {expectedNetwork} to interact and sign transactions.",
-    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}."
+    "networkMismatchSigningBlocked": "Signing is blocked until you switch Freighter to {expectedNetwork}.",
+    "errors": {
+      "user_rejected": "Request was rejected in your wallet.",
+      "not_installed": "Wallet extension is not installed. Please install it to continue.",
+      "locked": "Your wallet is locked. Please unlock it and try again.",
+      "wrong_network": "Your wallet is connected to the wrong network. Please switch networks and try again.",
+      "unknown": "An unexpected wallet error occurred. Please try again."
+    }
   },
   "market": {
     "title": "Markets",
@@ -102,6 +113,7 @@
     "wallet": "Wallet",
     "demoMode": "Demo mode (no wallet connected)",
     "collateral": "Collateral",
+    "supplied": "Supplied",
     "borrowed": "Borrowed",
     "health": "Health",
     "nA": "n/a",
@@ -112,9 +124,16 @@
     "totalSupplied": "Total supplied",
     "yourPosition": "Your position",
     "trade": "Trade",
+    "tradeAriaLabel": "Trade {symbol}",
     "addTrustline": "Add trustline",
     "addingTrustline": "Adding trustline...",
     "trustlineAdded": "Trustline added successfully.",
+    "trustlineRequired": "This market uses the classic {symbol} asset. Add a trustline to hold {symbol} and to supply or repay — it locks {reserve} XLM as a reserve.",
+    "trustlineInsufficientReserve": "You need at least {reserve} XLM of spendable balance to add the {symbol} trustline. Free up XLM or fund your account first.",
+    "trustlineRejected": "Trustline request was rejected in your wallet.",
+    "trustlineLowReserve": "The network rejected the trustline: the account doesn't have enough XLM to cover the reserve. Add XLM and try again.",
+    "trustlineFailed": "Could not add the trustline. Please try again.",
+    "viewIssuer": "View issuer in explorer",
     "txCancelled": "Transaction cancelled or rejected.",
     "unfunded": "0.00 (unfunded on testnet)",
     "connectFreighter": "Connect Freighter",
@@ -154,6 +173,18 @@
     "notDeployed": "not deployed",
     "balance": "{balance} XLM",
     "resetDemo": "Reset demo data",
+    "controls": {
+      "searchLabel": "Search markets",
+      "searchPlaceholder": "Search by symbol or name...",
+      "sortLabel": "Sort by",
+      "sortDefault": "Default order",
+      "sortSupplyApy": "Supply APY (high to low)",
+      "sortBorrowApy": "Borrow APY (high to low)",
+      "sortUtilization": "Utilization (high to low)",
+      "myPositionsOnly": "My positions only",
+      "noResults": "No markets match your current filters.",
+      "clearFilters": "Clear filters"
+    },
     "oracle": {
       "title": "On-chain oracle prices",
       "subtitle": "Prices, freshness, and bounds recorded by the lending contract.",
@@ -174,7 +205,15 @@
       "noBounds": "No bounds set",
       "timeSourceLedger": "Ledger time",
       "timeSourceBrowser": "Browser clock",
-      "loading": "Loading oracle prices..."
+      "loading": "Loading oracle prices...",
+      "guard": {
+        "stale": "Oracle price is stale. Borrowing and withdrawing are disabled until a fresh price is posted.",
+        "future": "Oracle price timestamp is in the future. Borrowing and withdrawing are disabled until the oracle timestamp is valid.",
+        "missing": "Oracle price is missing. Borrowing and withdrawing are disabled until an on-chain price is available.",
+        "outOfBounds": "Oracle price is outside configured safety bounds. Borrowing and withdrawing are disabled.",
+        "warningPrefix": "Oracle warning:",
+        "viewOracle": "View oracle status"
+      }
     },
     "rateModel": {
       "eyebrow": "Interest-rate model",
@@ -198,6 +237,7 @@
       "summaryActive": "At {utilization} utilization, the target borrow rate is {targetRate} ({targetBps} bps) and the applied smoothed rate is {appliedRate} ({appliedBps} bps). The kink is at {kink} utilization.",
       "summaryInactive": "The dynamic rate model is currently inactive. The protocol applies the default borrow rate of {defaultRate} ({defaultBps} bps) regardless of utilization ({utilization}).",
       "legendCurve": "Borrow rate curve",
+      "legendProposedCurve": "Proposed curve",
       "legendCurrentUtil": "Current utilization",
       "legendAppliedRate": "Applied rate",
       "legendTargetRate": "Target rate",
@@ -220,7 +260,22 @@
       "markerCurrent": "Current",
       "markerSurcharge": "Surcharge kink",
       "historyTableCaption": "Utilization history samples",
-      "colLedger": "Ledger"
+      "colLedger": "Ledger",
+      "loadingChart": "Loading interest-rate model chart..."
+    },
+    "rateSimulator": {
+      "title": "Rate model simulator",
+      "subtitle": "Explore how utilization and rate parameters change estimated annual borrow and supply rates. Changes are local and do not call the contract.",
+      "utilization": "Utilization (%)",
+      "baseRate": "Base rate (% APR)",
+      "slope1": "Slope 1 (% APR)",
+      "slope2": "Slope 2 (% APR)",
+      "kink": "Kink (%)",
+      "sliderLabel": "{label} slider",
+      "reset": "Reset to on-chain parameters",
+      "borrowApy": "Estimated borrow APY",
+      "supplyApy": "Estimated supply APY",
+      "invalidInput": "Enter non-negative rates with at most two decimal places. Utilization and kink must be between 0 and 100%."
     },
     "comingSoon": "Coming soon",
     "onchainMode": "On-chain mode (Stellar testnet)",
@@ -229,7 +284,17 @@
     "healthStatus": {
       "healthy": "Healthy",
       "atRisk": "At risk",
-      "liquidatable": "Liquidatable"
+      "liquidatable": "Liquidatable",
+      "settingsLabel": "Health alert settings",
+      "settingsTitle": "Health alert settings",
+      "warningBelow": "Warning below",
+      "dangerBelow": "Danger below",
+      "saveThresholds": "Save thresholds",
+      "saved": "Saved.",
+      "close": "Close",
+      "notifyToggle": "Notify me when my health factor gets worse",
+      "notificationsUnsupported": "Browser notifications are not supported here.",
+      "notificationsDenied": "Notifications are blocked in your browser settings, so alerts are unavailable."
     },
     "actions": "Actions",
     "ltv": "LTV",
@@ -253,6 +318,10 @@
       "step3": "Open Markets and click Connect Freighter. Without a wallet the app runs in demo mode.",
       "step4": "Pick an asset, then Supply, Borrow, Withdraw or Repay."
     },
+    "sourceBadge": {
+      "chain": "source: chain",
+      "demo": "source: demo"
+    },
     "riskParameters": {
       "title": "Risk parameters",
       "body": "Each asset has a loan-to-value (LTV) ratio. Your borrowing limit is the sum of collateral value times LTV. The health factor is borrowing limit divided by borrowed value; below 1.0 a position becomes liquidatable.",
@@ -260,8 +329,14 @@
       "maxLtv": "Max LTV",
       "liquidationThreshold": "Liquidation threshold",
       "supplyCap": "Supply cap",
+      "borrowCap": "Borrow cap",
+      "supplyApy": "Supply APY",
+      "borrowApy": "Borrow APY",
       "minBorrow": "Min borrow",
-      "uncapped": "Uncapped"
+      "source": "Source",
+      "uncapped": "Uncapped",
+      "notSet": "—",
+      "rpcFallbackNote": "Could not load live values from chain; showing static fallback parameters."
     },
     "flashLoans": {
       "title": "Flash loans",
@@ -275,7 +350,19 @@
     "contracts": {
       "title": "Deployed contracts (testnet)",
       "label": "Lending contract",
-      "notDeployed": "not deployed"
+      "contract": "Contract",
+      "address": "Contract ID",
+      "source": "Source",
+      "notDeployed": "not deployed",
+      "names": {
+        "lending": "Lending contract",
+        "oracle": "Oracle contract",
+        "token": "Token contract",
+        "multisig": "Multisig contract",
+        "amm": "AMM contract",
+        "ammTokenA": "AMM Token A",
+        "ammTokenB": "AMM Token B"
+      }
     },
     "env": {
       "title": "Environment variables"
@@ -393,6 +480,8 @@
     "loadingMore": "Loading more...",
     "emptyTitle": "No transactions found",
     "emptySubtitle": "No transactions found for your address within the RPC retention window (~7 days). Older transactions cannot be queried via Soroban RPC.",
+    "emptyFilteredTitle": "No matching transactions",
+    "emptyFilteredSubtitle": "No loaded transactions match the selected filters. Try adjusting your filters or loading the entire retention window.",
     "errorTitle": "Failed to load transaction history",
     "retry": "Try again",
     "type": "Type",
@@ -402,6 +491,15 @@
     "tx": "Transaction",
     "viewTx": "View",
     "loadMore": "Load more",
+    "loadAll": "Load entire retention window",
+    "loadingAllProgress": "Loading pages ({pages} loaded, {rows} events)...",
+    "cancelLoadAll": "Cancel",
+    "exportCsv": "Export CSV",
+    "filterKindLabel": "Type",
+    "filterAllKinds": "All types",
+    "filterFromLabel": "From date",
+    "filterToLabel": "To date",
+    "clearFilters": "Clear filters",
     "deposit": "Deposit",
     "withdraw": "Withdraw",
     "borrow": "Borrow",
@@ -440,6 +538,118 @@
       "withdraw": "Withdraw",
       "repay": "Repay",
       "liquidate": "Liquidate"
+    }
+  },
+  "governance": {
+    "metaTitle": "Governance - StellarLend",
+    "heading": "Governance & risk configuration",
+    "notConfigured": "Lending contract is not configured.",
+    "contract": "Contract:",
+    "unavailable": "unavailable",
+    "notSet": "not set",
+    "tokens": "{amount} tokens",
+    "bpsRaw": "{value} bps",
+    "cards": {
+      "roles": "Roles",
+      "limits": "Supply & borrow limits",
+      "liquidation": "Liquidation",
+      "rateModel": "Interest-rate model",
+      "flashLoans": "Flash loans",
+      "oracle": "Oracle"
+    },
+    "fields": {
+      "admin": "Admin",
+      "guardian": "Guardian",
+      "minBorrow": "Minimum borrow",
+      "depositCap": "Deposit cap",
+      "borrowCap": "Borrow cap",
+      "closeFactor": "Close factor",
+      "liquidationThreshold": "Liquidation threshold",
+      "liquidationIncentive": "Liquidation incentive",
+      "rateParameters": "Rate parameters",
+      "maxFlashLoan": "Max flash loan",
+      "oracleKey": "Oracle key"
+    },
+    "audit": {
+      "title": "Governance audit log",
+      "entryCount": "{count, plural, =0 {No entries yet.} one {# entry} other {# entries}}",
+      "empty": "No entries yet.",
+      "showMore": "Show more",
+      "columns": {
+        "sequence": "Sequence",
+        "action": "Action",
+        "actor": "Actor",
+        "ledger": "Ledger"
+      }
+    }
+  },
+  "amm": {
+    "loadingTwapChart": "Loading TWAP price chart..."
+  },
+  "portfolioRisk": {
+    "title": "Portfolio risk",
+    "subtitle": "Per-asset positions, estimated liquidation prices, and instant collateral price-shock simulation.",
+    "aggregateHealth": "Aggregate health",
+    "projectedHealth": "Projected health",
+    "noDebt": "No debt",
+    "noPositions": "Supply or borrow an asset to view your portfolio risk breakdown.",
+    "priceShock": "Collateral price shock",
+    "reset": "Reset",
+    "columns": {
+      "asset": "Asset",
+      "supplied": "Supplied",
+      "borrowed": "Borrowed",
+      "currentPrice": "Current price",
+      "liqPrice": "Est. liquidation price"
+    },
+    "levels": {
+      "safe": "Safe",
+      "warning": "Warning",
+      "danger": "Danger",
+      "liquidatable": "Liquidatable"
+    },
+    "notApplicable": "-"
+  },
+  "meta": {
+    "home": {
+      "title": "StellarLend - Lending on Stellar",
+      "description": "Supply and borrow assets on Stellar with StellarLend, a Soroban-powered lending protocol (testnet)."
+    },
+    "markets": {
+      "title": "Markets - StellarLend",
+      "description": "Explore StellarLend markets: supply assets to earn yield or borrow against collateral on the Stellar testnet."
+    },
+    "amm": {
+      "title": "AMM Pool, Swap & Liquidity - StellarLend",
+      "description": "Inspect the StellarLend AMM pool, get swap quotes, and manage your liquidity on Stellar."
+    },
+    "docs": {
+      "title": "Docs - StellarLend",
+      "description": "Learn how StellarLend works: markets, borrowing, flash loans, and governance on the Stellar testnet."
+    },
+    "flashLoans": {
+      "title": "Flash loans - StellarLend",
+      "description": "Borrow and repay within a single transaction using StellarLend flash loans on Soroban."
+    },
+    "history": {
+      "title": "History - StellarLend",
+      "description": "Review your StellarLend supply, borrow, withdraw, and repay transactions recorded on-chain."
+    },
+    "multisig": {
+      "title": "Multisig Governance - StellarLend",
+      "description": "Signer management and proposal execution for the StellarLend multisig contract."
+    },
+    "multisigProposal": {
+      "title": "Multisig Proposal - StellarLend",
+      "description": "Review and sign multisig governance proposals with the Freighter wallet."
+    },
+    "governance": {
+      "title": "Governance - StellarLend",
+      "description": "Track StellarLend governance state, risk configuration, and the on-chain audit log."
+    },
+    "adminEmergency": {
+      "title": "Emergency Administration - StellarLend",
+      "description": "Emergency circuit-breaker and granular pause controls for the StellarLend protocol."
     }
   }
 }

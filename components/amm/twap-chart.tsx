@@ -6,10 +6,34 @@ import type { TwapPoint } from "@/lib/amm/twap";
 interface TwapChartProps {
   points: TwapPoint[];
   windowSecs?: number;
-  onWindowChange: (secs?: number) => void;
+  onWindowChange: (secs: number) => void;
+  labels?: Partial<TwapChartLabels>;
 }
 
-export function TwapChart({ points, windowSecs, onWindowChange }: TwapChartProps) {
+export type TwapChartLabels = {
+  title: string;
+  subtitle: string;
+  windowSelectorLabel: string;
+  emptyMessage: string;
+  latestTwap: string;
+};
+
+export const defaultTwapChartLabels: TwapChartLabels = {
+  title: "TWAP Price History",
+  subtitle: "Time-weighted average price reconstructed from on-chain buffer",
+  windowSelectorLabel: "TWAP window",
+  emptyMessage: "Insufficient TWAP observations to plot chart (needs at least 2 points).",
+  latestTwap: "Latest TWAP",
+};
+
+export function TwapChart({
+  points,
+  windowSecs = 3600,
+  onWindowChange,
+  labels,
+}: TwapChartProps) {
+  const copy = { ...defaultTwapChartLabels, ...labels };
+
   const chartData = useMemo(() => {
     if (points.length < 2) return null;
 
@@ -63,28 +87,39 @@ export function TwapChart({ points, windowSecs, onWindowChange }: TwapChartProps
     <div className="card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] pb-4">
         <div>
-          <h2 className="text-lg font-bold">TWAP Price History</h2>
-          <p className="mut text-xs">Time-weighted average price reconstructed from on-chain buffer</p>
+          <h2 className="text-lg font-bold">{copy.title}</h2>
+          <p className="mut text-xs">{copy.subtitle}</p>
         </div>
-        <div className="flex items-center gap-1.5 text-xs font-semibold">
-          {[
-            { label: "1h", value: 3600 },
-            { label: "24h", value: 86400 },
-            { label: "All", value: undefined },
-          ].map((option) => (
-            <button
-              key={option.label}
-              className={`rounded-md px-3 py-1.5 transition ${
-                windowSecs === option.value
-                  ? "bg-white/10 text-[var(--acc)] font-bold"
-                  : "mut hover:bg-white/5 hover:text-white"
-              }`}
-              onClick={() => onWindowChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <fieldset role="radiogroup">
+          <legend className="sr-only">{copy.windowSelectorLabel}</legend>
+          <div className="flex items-center gap-1.5 text-xs font-semibold">
+            {[
+              { label: "15m", value: 900 },
+              { label: "1h", value: 3600 },
+              { label: "6h", value: 21600 },
+              { label: "24h", value: 86400 },
+            ].map((option) => (
+              <label
+                key={option.value}
+                className={`cursor-pointer rounded-md px-3 py-1.5 transition ${
+                  windowSecs === option.value
+                    ? "bg-white/10 text-[var(--acc)] font-bold"
+                    : "mut hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <input
+                  className="sr-only"
+                  type="radio"
+                  name="twap-window"
+                  value={option.value}
+                  checked={windowSecs === option.value}
+                  onChange={() => onWindowChange(option.value)}
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </div>
 
       <div className="mt-4">
@@ -98,13 +133,13 @@ export function TwapChart({ points, windowSecs, onWindowChange }: TwapChartProps
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
-            <span>Insufficient TWAP observations to plot chart (needs at least 2 points).</span>
+            <span>{copy.emptyMessage}</span>
           </div>
         ) : (
           <div className="space-y-2">
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">{chartData.latestPrice}</span>
-              <span className="mut text-xs">Latest TWAP</span>
+              <span className="mut text-xs">{copy.latestTwap}</span>
             </div>
             <div className="w-full overflow-hidden">
               <svg

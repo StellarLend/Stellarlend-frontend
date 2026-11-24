@@ -1,13 +1,9 @@
 import {
-  BASE_FEE,
-  Contract,
-  Networks,
   rpc,
-  scValToNative,
-  TransactionBuilder,
   nativeToScVal,
 } from "@stellar/stellar-sdk";
 import { config } from "@/lib/config";
+import { simulateRead as simulateReadEntry } from "@/lib/soroban-read";
 import type { TwapObservation } from "./twap";
 
 export type ReadResult<T> =
@@ -42,15 +38,10 @@ export const MAX_IMPACT_SENTINEL = 4294967295; // u32::MAX (guard disabled)
 // Validates a Stellar StrKey contract address (starts with 'C', 56 uppercase alphanumeric chars)
 export function isValidContractAddress(address: string): boolean {
   if (!address || typeof address !== "string") return false;
-  return /^C[A-Z0-9]{55}$/.test(address);
+  if (!/^C[A-Z0-9]{55}$/.test(address)) return false;
+  if (/^CA+$/.test(address)) return false;
+  return true;
 }
-
-function getRpcServer(): rpc.Server {
-  return new rpc.Server(config.rpc);
-}
-
-// Dummy account used for Soroban read-only transaction simulation without wallet connection
-const DUMMY_SOURCE = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7";
 
 /**
  * Generic read-only call using simulateTransaction (invokeHostFunction).
@@ -62,31 +53,15 @@ export async function simulateRead<T>(
   args: ReturnType<typeof nativeToScVal>[] = [],
   customServer?: rpc.Server
 ): Promise<T> {
-  const server = customServer || getRpcServer();
-  let source;
-  try {
-    source = await server.getAccount(DUMMY_SOURCE);
-  } catch {
-    const { Account } = await import("@stellar/stellar-sdk");
-    source = new Account(DUMMY_SOURCE, "0");
-  }
-
-  const tx = new TransactionBuilder(source, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(new Contract(contractId).call(method, ...args))
-    .setTimeout(30)
-    .build();
-
-  const simulation = await server.simulateTransaction(tx);
-  if (rpc.Api.isSimulationError(simulation)) {
-    throw new Error(simulation.error || `Simulation error calling ${method}`);
-  }
-  if (!simulation.result) {
-    throw new Error(`Soroban RPC did not return a value for ${method}.`);
-  }
-  return scValToNative(simulation.result.retval) as T;
+  const { native } = await simulateReadEntry<T>({
+    contractId,
+    method,
+    args,
+    rpcServer: customServer,
+    rpcUrl: config.rpc,
+    passphrase: NETWORK_PASSPHRASE,
+  });
+  return native;
 }
 
 function calculateSpotPrice(reserveIn: bigint, reserveOut: bigint, decIn: number, decOut: number): string {
