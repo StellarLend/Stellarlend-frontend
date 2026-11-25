@@ -190,6 +190,12 @@
       "noResults": "Ningún mercado coincide con tus filtros actuales.",
       "clearFilters": "Limpiar filtros"
     },
+    "watchlist": {
+      "starLabel": "Destacar {symbol}",
+      "unstarLabel": "Quitar destacado de {symbol}",
+      "starAriaLabel": "Añadir {symbol} a la lista de seguimiento",
+      "unstarAriaLabel": "Quitar {symbol} de la lista de seguimiento"
+    },
     "oracle": {
       "title": "Precios de oráculo en cadena",
       "subtitle": "Precios, frescura y límites registrados por el contrato de préstamo.",
