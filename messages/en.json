@@ -327,6 +327,12 @@
       "warningLiquidation": "Caution: Projected health factor is close to liquidation (< 1.2).",
       "dangerLiquidation": "Action would put your position below minimum health factor (< 1.0) and risk liquidation."
     },
+    "watchlist": {
+      "starLabel": "Star {symbol}",
+      "unstarLabel": "Unstar {symbol}",
+      "starAriaLabel": "Add {symbol} to watchlist",
+      "unstarAriaLabel": "Remove {symbol} from watchlist"
+    },
     "actions": "Actions",
     "ltv": "LTV",
     "liquidationThreshold": "Liquidation threshold",

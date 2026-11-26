@@ -67,10 +67,10 @@ import { RateSimulator } from "./rate-simulator";
 
 import MarketCard from "./markets/market-card";
 import TradeSheet from "./markets/trade-sheet";
+import { useWatchlist } from "@/hooks/use-watchlist";
 import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-prompt";
 import { useProtocolStatus } from "./protocol-status";
 import { HealthIndicator } from "./health-indicator";
-import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
 import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
 import { usePendingTxs } from "@/hooks/use-pending-txs";
 
@@ -139,6 +139,9 @@ function MarketsAppInner() {
   const configured = isOnChainConfigured();
   const onChainMode = Boolean(address && configured);
   const busy = tx?.status === "pending";
+
+  // Watchlist: starred markets persisted in localStorage
+  const { watchlist, isStarred, toggle: toggleStar } = useWatchlist(address);
 
   // Classic assets need a trustline before they can be held, supplied or repaid.
   // The shared pure helper matches the selected asset against the Horizon
@@ -265,13 +268,19 @@ function MarketsAppInner() {
   }, [ledger, onChainMode, position, activeMarkets]);
 
   const visibleMarkets = useMemo(
-    () =>
-      filterAndSortMarkets(
+    () => {
+      const filtered = filterAndSortMarkets(
         activeMarkets,
         { q: debouncedSearch, sort: sortBy, mine: mineOnly },
         marketPositions
-      ),
-    [activeMarkets, debouncedSearch, sortBy, mineOnly, marketPositions]
+      );
+      // Starred markets float to the top
+      if (watchlist.length === 0) return filtered;
+      const starred = filtered.filter((m) => watchlist.includes(m.symbol));
+      const rest = filtered.filter((m) => !watchlist.includes(m.symbol));
+      return [...starred, ...rest];
+    },
+    [activeMarkets, debouncedSearch, sortBy, mineOnly, marketPositions, watchlist]
   );
 
   // Keep the selected market in sync when live params / prices update
@@ -846,6 +855,8 @@ function MarketsAppInner() {
                 locale={locale}
                 supplied={p ? suppliedFloat : null}
                 borrowed={p ? borrowedFloat : null}
+                starred={isStarred(m.symbol)}
+                onStar={(market) => toggleStar(market.symbol)}
                 onTrade={() => openTrade(m)}
               />
             );
@@ -868,6 +879,7 @@ function MarketsAppInner() {
           <thead className="mut">
             <tr className="border-b border-[var(--line)]">
               {[
+                "★",
                 t("asset"),
                 t("price"),
                 t("supplyApy"),
@@ -889,7 +901,7 @@ function MarketsAppInner() {
           <tbody>
             {visibleMarkets.length === 0 ? (
               <tr>
-                <td colSpan={11} className="p-6 text-center text-sm mut" role="status">
+                <td colSpan={12} className="p-6 text-center text-sm mut" role="status">
                   {t("controls.noResults")}
                 </td>
               </tr>
@@ -916,6 +928,25 @@ function MarketsAppInner() {
                 capFloat && capFloat > 0 ? Math.min(100, Math.round((m.totalSupply / capFloat) * 100)) : 0;
               return (
                 <tr key={m.symbol} className="border-b border-[var(--line)] last:border-0">
+                  <td className="p-4">
+                    <button
+                      type="button"
+                      aria-pressed={isStarred(m.symbol)}
+                      aria-label={
+                        isStarred(m.symbol)
+                          ? t("watchlist.unstarAriaLabel", { symbol: m.symbol })
+                          : t("watchlist.starAriaLabel", { symbol: m.symbol })
+                      }
+                      onClick={() => toggleStar(m.symbol)}
+                      className={`rounded p-1 text-lg leading-none transition-colors ${
+                        isStarred(m.symbol)
+                          ? "text-yellow-400 hover:text-yellow-300"
+                          : "text-zinc-500 hover:text-yellow-400"
+                      }`}
+                    >
+                      {isStarred(m.symbol) ? "★" : "☆"}
+                    </button>
+                  </td>
                   <td className="p-4">
                     <b>{m.symbol}</b> <span className="mut">{m.name}</span>
                   </td>

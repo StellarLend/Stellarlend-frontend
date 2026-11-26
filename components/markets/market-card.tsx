@@ -9,11 +9,21 @@ type MarketCardProps = {
   locale?: Locale;
   supplied?: number | null;
   borrowed?: number | null;
+  starred?: boolean;
+  onStar?: (market: Market) => void;
   onTrade: (market: Market) => void;
 };
 
 /** Compact mobile card for a single market (the sm+ layout uses the table in markets-app). */
-export default function MarketCard({ market, locale = "en" as Locale, supplied, borrowed, onTrade }: MarketCardProps) {
+export default function MarketCard({
+  market,
+  locale = "en" as Locale,
+  supplied,
+  borrowed,
+  starred = false,
+  onStar,
+  onTrade,
+}: MarketCardProps) {
   const t = useTranslations("market");
 
   return (
@@ -23,9 +33,30 @@ export default function MarketCard({ market, locale = "en" as Locale, supplied, 
           <b>{market.symbol}</b> <span className="mut">{market.name}</span>
           <div className="text-sm">{formatCurrency(market.price, locale)}</div>
         </div>
-        <Button variant="ghost" aria-label={t("tradeAriaLabel", { symbol: market.symbol })} onClick={() => onTrade(market)}>
-          {t("trade")}
-        </Button>
+        <div className="flex items-center gap-2">
+          {onStar && (
+            <button
+              type="button"
+              aria-pressed={starred}
+              aria-label={
+                starred
+                  ? t("watchlist.unstarAriaLabel", { symbol: market.symbol })
+                  : t("watchlist.starAriaLabel", { symbol: market.symbol })
+              }
+              onClick={() => onStar(market)}
+              className={`rounded p-1 text-lg leading-none transition-colors ${
+                starred
+                  ? "text-yellow-400 hover:text-yellow-300"
+                  : "text-zinc-500 hover:text-yellow-400"
+              }`}
+            >
+              {starred ? "★" : "☆"}
+            </button>
+          )}
+          <Button variant="ghost" aria-label={t("tradeAriaLabel", { symbol: market.symbol })} onClick={() => onTrade(market)}>
+            {t("trade")}
+          </Button>
+        </div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div>
