@@ -63,7 +63,7 @@ describe("useFriendbot", () => {
   });
 
   it("sets isFunding during the call and resets after success", async () => {
-    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: true, message: "" });
+    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: true, status: "success", message: "" });
     vi.mocked(pollUntilFunded).mockResolvedValue(true);
 
     const invalidate = vi.fn().mockResolvedValue(undefined);
@@ -79,7 +79,7 @@ describe("useFriendbot", () => {
   });
 
   it("sets fundError when Friendbot returns non-ok", async () => {
-    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: false, message: "Account already funded" });
+    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: false, status: "already_funded", message: "Account already funded" });
     const invalidate = vi.fn();
     const { result } = renderHook(() => useFriendbot(TEST_ADDRESS, invalidate));
 
@@ -92,7 +92,7 @@ describe("useFriendbot", () => {
   });
 
   it("sets fundError when poll times out", async () => {
-    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: true, message: "" });
+    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: true, status: "success", message: "" });
     vi.mocked(pollUntilFunded).mockResolvedValue(false);
 
     const invalidate = vi.fn();
@@ -107,7 +107,7 @@ describe("useFriendbot", () => {
   });
 
   it("resetFundState clears fundError", async () => {
-    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: false, message: "Failed" });
+    vi.mocked(fundWithFriendbot).mockResolvedValue({ ok: false, status: "error", message: "Failed" });
     const invalidate = vi.fn();
     const { result } = renderHook(() => useFriendbot(TEST_ADDRESS, invalidate));
 

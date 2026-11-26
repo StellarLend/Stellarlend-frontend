@@ -48,7 +48,6 @@ jobs:
 
       - name: Type checking
         run: npm run type-check
-        continue-on-error: true
 
       - name: Run tests
         run: npm run test:coverage

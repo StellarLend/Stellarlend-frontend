@@ -5,9 +5,6 @@ const withNextIntl = createNextIntlPlugin();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // TODO(drips-wave): re-enable type checking during build — ~40 pre-existing type errors from merged PRs
-  // (lib/multisig/decode.ts, missing lib/health, lib/liquidation.ts, ...). `npm run type-check` still reports them.
-  typescript: { ignoreBuildErrors: true },
   /**
    * Static security headers applied to every route.
    *

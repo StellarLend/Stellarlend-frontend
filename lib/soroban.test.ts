@@ -185,4 +185,23 @@ describe("lib/soroban", () => {
       "Simulation error for get_value: HostError: Error(Contract, #2)",
     );
   });
+
+  it("throws Simulation error when simulation requires restore and is not a success", async () => {
+    vi.stubEnv(
+      "NEXT_PUBLIC_SOROBAN_RPC_URL",
+      "https://rpc.example.org",
+    );
+    mockState.simulateTransaction.mockResolvedValue({
+      _parsed: true,
+      latestLedger: 456,
+      restorePreamble: {
+        minResourceFee: "100",
+        transactionData: {},
+      },
+    } as unknown as rpc.Api.SimulateTransactionResponse);
+
+    await expect(
+      simulateContractRead(CONTRACT_ID, "get_value", []),
+    ).rejects.toThrow("Simulation error for get_value: Simulation error");
+  });
 });

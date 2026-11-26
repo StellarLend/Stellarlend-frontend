@@ -58,7 +58,7 @@ function parseScValNative(val: unknown): unknown {
   if (!val) return null;
   if (typeof val === "object" && val !== null && "switch" in val) {
     try {
-      return scValToNative(val as xdr.ScVal);
+      return scValToNative(val as unknown as xdr.ScVal);
     } catch {
       return null;
     }
@@ -276,8 +276,7 @@ export async function getAdminEvents(
   const startLedger = options.startLedger ?? 1;
 
   const response = await server.getEvents({
-    startLedger,
-    cursor: options.cursor,
+    ...(options.cursor ? { cursor: options.cursor } : { startLedger }),
     limit,
     filters: [
       {
