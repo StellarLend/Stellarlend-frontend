@@ -110,7 +110,7 @@ function WalletProviderInner({ children, initialAdapter }: WalletProviderProps) 
   }, [resetFundState, baseDisconnect]);
 
   const signTransaction = useCallback(
-    async (xdr: string, options?: Parameters<typeof adapter.signTransaction>[1]) => {
+    async (xdr: string, options?: Parameters<NonNullable<typeof adapter>["signTransaction"]>[1]) => {
       if (!adapter) {
         throw new Error("No wallet connected to sign transaction.");
       }

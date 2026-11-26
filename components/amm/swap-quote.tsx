@@ -5,14 +5,17 @@ import { useTranslations } from "next-intl";
 import { useWallet } from "@/components/wallet";
 import {
   calculateEffectivePrice,
-  formatTokenAmount,
   minOutFromSlippage,
-  parseTokenAmount,
-  quoteSwapLocal,
+  priceImpactBps,
+  quoteExactIn,
+  type SwapQuoteResult,
+} from "@/lib/amm/quote";
+import {
+  GUARD_ERROR_MESSAGES,
   validateQuote,
   type GuardIssue,
-  type LocalQuoteResult,
-} from "@/lib/amm/quote";
+} from "@/lib/amm/validate";
+import { formatTokenAmount, parseTokenAmount } from "@/lib/amm/liquidity-math";
 import {
   contractErrorMessage,
   readPool,
@@ -28,14 +31,6 @@ const DEFAULT_SLIPPAGE_STR = "0.5";
 const SLIPPAGE_STORAGE_KEY = "stellarlend:swap:slippage_bps";
 const MIN_SLIPPAGE_BPS = 1n; // 0.01%
 const MAX_SLIPPAGE_BPS = 5000n; // 50.00%
-
-const GUARD_ERROR_MESSAGES: Record<GuardIssue, string> = {
-  insufficient_input: "Input amount is zero or negative.",
-  insufficient_liquidity: "Requested swap exceeds available pool liquidity.",
-  minimum_reserve_violation: "Swap would reduce pool reserve below its minimum floor.",
-  max_impact_exceeded: "Price impact exceeds the pool's safety threshold.",
-  below_min_swap: "Input amount is below the pool minimum swap threshold.",
-};
 
 function parseSlippageBps(raw: string): { bps: bigint | null; error: string | null } {
   const trimmed = raw.trim();
@@ -156,20 +151,18 @@ export default function SwapQuotePanel({
   }, [debouncedInputStr, decimalsIn]);
 
   // Compute local constant-product quote
-  const localQuote: LocalQuoteResult | null = useMemo(() => {
+  const localQuote: SwapQuoteResult | null = useMemo(() => {
     if (amountIn === null || reserveIn <= 0n || reserveOut <= 0n) return null;
-    return quoteSwapLocal(amountIn, reserveIn, reserveOut, feeBps);
+    const res = quoteExactIn({ amountIn, reserveIn, reserveOut, feeBps });
+    return res.ok ? res.value : null;
   }, [amountIn, reserveIn, reserveOut, feeBps]);
 
   // Price impact
   const impactBps: bigint | null = useMemo(() => {
     if (!localQuote || reserveIn <= 0n || reserveOut <= 0n) return null;
-    return validateQuote(localQuote, {
-      amountIn: localQuote.amountIn,
-      minSwapIn: 0n,
-      maxImpactBps: 0xffff_ffff,
-      minLiquidity: 0n,
-      impactBps: null,
+    return priceImpactBps({
+      reserveIn,
+      reserveOut,
       reserveInAfter: localQuote.reserveInAfter,
       reserveOutAfter: localQuote.reserveOutAfter,
     });

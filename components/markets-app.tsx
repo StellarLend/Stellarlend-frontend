@@ -71,7 +71,6 @@ import TrustlinePrompt, { TRUSTLINE_ERROR_MESSAGE_KEYS } from "./trustline-promp
 import { useProtocolStatus } from "./protocol-status";
 import { HealthIndicator } from "./health-indicator";
 import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
-import { TxToastsProvider, TxToastRegion, useTxToasts } from "./tx-toasts";
 import { usePendingTxs } from "@/hooks/use-pending-txs";
 
 export default function MarketsApp() {

@@ -151,13 +151,13 @@ export function log5xxError({
 export function withRequestId<TContext = unknown>(
   handler: (request: Request, context: TContext, requestId: string) => Promise<Response>,
 ) {
-  return async (request: Request, context: TContext): Promise<Response> => {
+  return async (request: Request, context?: TContext): Promise<Response> => {
     const rawId = request.headers.get("x-request-id");
     const requestId = normalizeRequestId(rawId);
     let response: Response;
     let caughtError: unknown = null;
     try {
-      response = await handler(request, context, requestId);
+      response = await handler(request, context as TContext, requestId);
     } catch (err) {
       caughtError = err;
       response = mapApiError(err, requestId);

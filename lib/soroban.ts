@@ -96,27 +96,14 @@ export async function simulateContractRead<T = unknown>(
     throw new Error(`Simulation error for ${method}: ${message}`);
   }
 
-  const responseRecord = simulation as unknown as Record<string, unknown>;
-  const errorMessage =
-    typeof responseRecord.error === "string"
-      ? responseRecord.error
-      : typeof rpc.Api?.isSimulationError === "function" &&
-          rpc.Api.isSimulationError(simulation)
-        ? "Simulation error"
-        : null;
-  if (errorMessage) {
+  if (!rpc.Api.isSimulationSuccess(simulation)) {
+    const errorMessage = rpc.Api.isSimulationError(simulation)
+      ? simulation.error
+      : "Simulation error";
     throw new Error(`Simulation error for ${method}: ${errorMessage}`);
   }
 
-  const success =
-    simulation as rpc.Api.SimulateTransactionSuccessResponse;
-  const scVal =
-    "result" in success &&
-    success.result &&
-    typeof success.result === "object" &&
-    "retval" in success.result
-      ? (success.result.retval as xdr.ScVal)
-      : null;
+  const scVal = simulation.result?.retval ?? null;
   if (!scVal) {
     throw new Error(
       `Simulation error for ${method}: No return value for ${method}`,

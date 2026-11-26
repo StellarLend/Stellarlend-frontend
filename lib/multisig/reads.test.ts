@@ -26,7 +26,6 @@ describe("Multisig Reads & Discovery", () => {
   // Helper to create a mock simulation response
   const createMockSimulationResponse = (retval: xdr.ScVal) => ({
     _parsed: true,
-    transactionData: {},
     transactionData: null,
     result: {
       retval,

@@ -14,7 +14,7 @@ describe("admin-events", () => {
     };
 
     expect(() => {
-      const decoded = decodeAdminEvent(raw);
+      const decoded = decodeAdminEvent(raw as unknown as Parameters<typeof decodeAdminEvent>[0]);
       expect(decoded).toBeNull();
     }).not.toThrow();
   });
@@ -35,7 +35,7 @@ describe("admin-events", () => {
       },
     };
 
-    const decoded = decodeAdminEvent(raw, currentLedger);
+    const decoded = decodeAdminEvent(raw as unknown as Parameters<typeof decodeAdminEvent>[0], currentLedger);
     expect(decoded).not.toBeNull();
     expect(decoded?.kind).toBe("pause_set");
     expect(decoded?.pauseType).toBe("Deposit");
@@ -45,7 +45,7 @@ describe("admin-events", () => {
     expect(decoded?.remainingSeconds).toBe(200 * SECONDS_PER_LEDGER);
 
     // Test when passed
-    const pastDecoded = decodeAdminEvent(raw, 1250);
+    const pastDecoded = decodeAdminEvent(raw as unknown as Parameters<typeof decodeAdminEvent>[0], 1250);
     expect(pastDecoded?.isExpired).toBe(true);
     expect(pastDecoded?.remainingSeconds).toBe(0);
   });

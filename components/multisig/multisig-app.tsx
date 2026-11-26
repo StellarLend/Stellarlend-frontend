@@ -246,7 +246,7 @@ export function MultisigApp() {
           aria-live="polite"
         >
           {t("failedProposals", {
-            plural: data!.failedProposalIds.length > 1,
+            plural: String(data!.failedProposalIds.length > 1),
             ids: data!.failedProposalIds.map((id) => `#${id}`).join(", "),
           })}
         </div>

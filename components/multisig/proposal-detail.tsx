@@ -160,7 +160,7 @@ export function ProposalDetail({ id }: { id: number }) {
                   )}`}
                   data-testid="proposal-status-badge"
                 >
-                  {t("storedVsEffective", { stored: proposal.status, effective: proposal.effectiveStatus })}
+                  {t("storedVsEffective", { stored: proposal.status, effective: proposal.effectiveStatus || "Expired" })}
                 </span>
               ) : (
                 <span

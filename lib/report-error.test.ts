@@ -187,6 +187,9 @@ describe("report-error", () => {
         process.env.NEXT_PUBLIC_ERROR_ENDPOINT = originalEnv;
         vi.unstubAllGlobals();
       }
+    });
+  });
+
   describe("createBeaconSink", () => {
     it("beacon sink falls back to fetch", () => {
       const sendBeaconMock = vi.fn().mockReturnValue(false);
