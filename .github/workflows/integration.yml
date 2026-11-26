@@ -60,7 +60,7 @@ jobs:
 
       - name: Set up Stellar CLI
         if: steps.cache-wasm.outputs.cache-hit != 'true'
-        uses: stellar/stellar-cli@v28.1.0
+        uses: stellar/stellar-cli@v30.0.1
 
       - name: Checkout pinned stellarlend-contracts
         if: steps.cache-wasm.outputs.cache-hit != 'true'
