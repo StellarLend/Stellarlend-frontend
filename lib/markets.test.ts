@@ -1,10 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./config", () => ({
+  TESTNET_ISSUERS: {
+    USDC: "GUSDCISSUER",
+    EURC: "GEURCISSUER",
+    BTC: "GBTCISSUER",
+  },
+}));
+
 import {
   MARKETS,
   buildMarketQueryString,
   filterAndSortMarkets,
+  fmt,
+  formatCompactCurrency,
+  formatCurrency,
+  formatNumber,
+  formatPercent,
   parseMarketQueryParams,
   parseMarketSort,
+  type Locale,
   type Market,
 } from "./markets";
 
@@ -27,7 +42,7 @@ describe("filterAndSortMarkets", () => {
 
   it("matches partial substrings across multiple markets", () => {
     const result = filterAndSortMarkets(MARKETS, { q: "coin" });
-    expect(result.map((m) => m.symbol)).toEqual(["USDC", "EURC"]);
+    expect(result.map((m) => m.symbol)).toEqual(["USDC", "EURC", "BTC"]);
   });
 
   it("sorts by supply apy desc", () => {
@@ -103,5 +118,100 @@ describe("market query params helpers", () => {
       new URLSearchParams("tab=all&q=xlm&sort=utilization&mine=1")
     );
     expect(cleared).toBe("tab=all");
+  });
+});
+
+describe("market formatters", () => {
+  const locales: Locale[] = ["en", "es"];
+
+  it.each(locales)("formatNumber formats per locale (%s)", (locale) => {
+    const value = 1234.5;
+    const digits = 2;
+    const expected = new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
+    expect(formatNumber(value, locale, digits)).toBe(expected);
+  });
+
+  it.each([
+    { value: 1234.5, locale: "en" as Locale, digits: 2 },
+    { value: 1234.5, locale: "es" as Locale, digits: 2 },
+  ])("formatNumber matches locale formatting ($locale, $value, $digits)", ({ value, locale, digits }) => {
+    const expected = new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
+    expect(formatNumber(value, locale, digits)).toBe(expected);
+  });
+
+  it.each(locales)("formatCurrency honours digits and sign (%s)", (locale) => {
+    const cases = [
+      { value: 1234.5, digits: 2 },
+      { value: -1234.5, digits: 2 },
+      { value: 0, digits: 0 },
+    ];
+    for (const { value, digits } of cases) {
+      const expected = new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: digits,
+      }).format(value);
+      expect(formatCurrency(value, locale, digits)).toBe(expected);
+    }
+  });
+
+  it.each(locales)("formatPercent honours digits and sign (%s)", (locale) => {
+    const cases = [
+      { value: 5, digits: 2 },
+      { value: -5, digits: 2 },
+      { value: 0, digits: 0 },
+      { value: 12.345, digits: 1 },
+    ];
+    for (const { value, digits } of cases) {
+      const expected = new Intl.NumberFormat(locale, {
+        style: "percent",
+        maximumFractionDigits: digits,
+      }).format(value / 100);
+      expect(formatPercent(value, locale, digits)).toBe(expected);
+    }
+  });
+
+  it.each(locales)("formatCompactCurrency shortens large values (%s)", (locale) => {
+    const cases = [1_234, 1_234_567, -2_500_000, 0];
+    for (const value of cases) {
+      const expected = new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: "USD",
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(value);
+      const actual = formatCompactCurrency(value, locale);
+      expect(actual).toBe(expected);
+    }
+  });
+
+  it("fmt uses default locale and digits", () => {
+    expect(fmt(1234.5)).toBe(formatNumber(1234.5, "en", 2));
+    expect(fmt(1234.567, 1)).toBe(formatNumber(1234.567, "en", 1));
+  });
+});
+
+describe("MARKETS invariants", () => {
+  it("has unique symbols", () => {
+    const symbols = MARKETS.map((m) => m.symbol);
+    expect(new Set(symbols).size).toBe(symbols.length);
+  });
+
+  it("has finite non-negative numeric fields", () => {
+    for (const market of MARKETS) {
+      const numericFields: Array<[string, number]> = [
+        ["price", market.price],
+        ["supplyApy", market.supplyApy],
+        ["borrowApy", market.borrowApy],
+        ["totalSupply", market.totalSupply],
+        ["totalBorrow", market.totalBorrow],
+        ["ltv", market.ltv],
+        ["decimals", market.decimals],
+      ];
+      for (const [field, value] of numericFields) {
+        expect(Number.isFinite(value), `${market.symbol}.${field} should be finite`).toBe(true);
+        expect(value, `${market.symbol}.${field} should be non-negative`).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 });
