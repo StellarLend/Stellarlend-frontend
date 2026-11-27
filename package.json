@@ -2,6 +2,9 @@
   "name": "stellarlend-frontend",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,8 +12,8 @@
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
     "check-lockfile": "node scripts/check-lockfile.mjs",
-    "test": "node scripts/check-lockfile.mjs && vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs lib/csp.test.mjs lib/next-headers.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
-    "test:coverage": "vitest run --config vitest.config.ts --coverage && node --test lib/demo-ledger.test.mjs lib/csp.test.mjs lib/next-headers.test.mjs scripts/check-lending-errors.node.mjs && node scripts/check-lending-errors.mjs",
+    "test": "vitest run --config vitest.config.ts && node --test scripts/check-lockfile.test.mjs lib/demo-ledger.test.mjs lib/csp.test.mjs lib/next-headers.test.mjs scripts/check-lending-errors.node.mjs",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage && node --test lib/demo-ledger.test.mjs lib/csp.test.mjs lib/next-headers.test.mjs scripts/check-lending-errors.node.mjs",
     "test:e2e": "playwright test",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "check-lending-errors": "node scripts/check-lending-errors.mjs"
