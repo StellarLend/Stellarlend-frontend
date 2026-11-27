@@ -80,6 +80,7 @@ Responses include weak `ETag` validators supporting conditional GETs (`If-None-M
 
 ## Setup
 ```bash
+# Requires Node.js 24 (see .nvmrc). Use `nvm use` to pick it up automatically.
 npm install
 cp .env.example .env.local
 npm run dev     # http://localhost:3000
